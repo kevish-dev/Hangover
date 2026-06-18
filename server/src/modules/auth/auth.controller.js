@@ -1,6 +1,6 @@
 import { sendSuccess } from "../../core/responses/responseFormat.js";
 import authService from "./auth.service.js";
-import { SignupSchema, LoginSchema, VerifyEmailSchema, ResendVerificationSchema } from "./auth.schemas.js";
+import { SignupSchema, LoginSchema, VerifyEmailSchema, ResendVerificationSchema, SendResetPasswordSchema, ResetPasswordSchema } from "./auth.schemas.js";
 import env from "../../core/env/env.js";
 
 const getMeta = (req) => ({
@@ -78,5 +78,17 @@ export const verifyEmail = async (req, res) => {
 export const resendVerificationEmail = async (req, res) => {
   const data = ResendVerificationSchema.parse(req.body);
   const result = await authService.resendVerificationEmail(data, getMeta(req));
+  return sendSuccess(res, null, result.message);
+};
+
+export const sendResetPassword = async (req, res) => {
+  const data = SendResetPasswordSchema.parse(req.body);
+  const result = await authService.sendResetPassword(data, getMeta(req));
+  return sendSuccess(res, null, result.message);
+};
+
+export const resetPassword = async (req, res) => {
+  const data = ResetPasswordSchema.parse(req.body);
+  const result = await authService.resetPassword(data, getMeta(req));
   return sendSuccess(res, null, result.message);
 };

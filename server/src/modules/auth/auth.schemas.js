@@ -23,9 +23,20 @@ export const ResendVerificationSchema = registry.register("ResendVerificationSch
   email: z.string().email(),
 }));
 
+export const SendResetPasswordSchema = registry.register("SendResetPasswordSchema", z.object({
+  email: z.string().email(),
+}));
+
+export const ResetPasswordSchema = registry.register("ResetPasswordSchema", z.object({
+  token: z.string().min(1, "Token is required"),
+  newPassword: z.string().min(8, "Password must be at least 8 characters"),
+}));
+
 // -- Types --
 
 /** @typedef {z.infer<typeof SignupSchema>} SignupReq */
 /** @typedef {z.infer<typeof LoginSchema>} LoginReq */
 /** @typedef {z.infer<typeof VerifyEmailSchema>} VerifyEmailReq */
 /** @typedef {z.infer<typeof ResendVerificationSchema>} ResendVerificationReq */
+/** @typedef {z.infer<typeof SendResetPasswordSchema>} SendResetPasswordReq */
+/** @typedef {z.infer<typeof ResetPasswordSchema>} ResetPasswordReq */

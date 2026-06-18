@@ -229,6 +229,78 @@ const authService = {
       }
     }
     return { message: "Logged out successfully" };
+  },
+
+  /**
+   * @param {import("./auth.schemas.js").SendResetPasswordReq} data 
+   * @param {object} meta 
+   */
+  sendResetPassword: async (data, meta) => {
+    const { email } = data;
+    const user = await authRepository.findUserByIdentifier("email", email);
+
+    if (!user) {
+      // Return success to avoid email enumeration
+      return { message: "If that email address is in our database, we will send you an email to reset your password." };
+    }
+
+    // Delete existing password reset tokens
+    await authRepository.deleteAllTokensForUser(user.id, "PASSWORD_RESET");
+
+    const resetToken = generateToken(32);
+    const resetTokenHash = hashToken(resetToken);
+
+    await authRepository.createToken(
+      user.id,
+      resetTokenHash,
+      "PASSWORD_RESET",
+      daysFromNow(1) // Token valid for 1 day
+    );
+
+    emailQueue.add("SEND_PASSWORD_RESET", {
+      email,
+      token: resetToken,
+    });
+
+    await auditService.logEvent({ userId: user.id, event: "PASSWORD_RESET_REQUESTED", ...meta });
+
+    return { message: "If that email address is in our database, we will send you an email to reset your password." };
+  },
+
+  /**
+   * @param {import("./auth.schemas.js").ResetPasswordReq} data 
+   * @param {object} meta 
+   */
+  resetPassword: async (data, meta) => {
+    const { token, newPassword } = data;
+    const tokenHash = hashToken(token);
+
+    const tokenRecord = await authRepository.fetchUserFromToken(tokenHash, "PASSWORD_RESET");
+
+    if (!tokenRecord || tokenRecord.expiresAt < new Date()) {
+      throw new UnauthorizedError("Token is invalid or has expired");
+    }
+
+    const hash = await hashPassword(newPassword);
+
+    await authRepository.findUserByIdentifierAndUpdate("id", tokenRecord.userId, {
+      password: hash,
+    });
+
+    await authRepository.deleteToken(tokenRecord.id);
+
+    // Also invalidate all active refresh tokens for security
+    await authRepository.deleteAllTokensForUser(tokenRecord.userId, "REFRESH");
+
+    await auditService.logEvent({ userId: tokenRecord.userId, event: "PASSWORD_RESET_SUCCESS", ...meta });
+    
+    // Optional: send security alert email that password was changed
+    emailQueue.add("SEND_SECURITY_ALERT", {
+      email: tokenRecord.user.email,
+      event: "Password changed successfully",
+    });
+
+    return { message: "Password reset successful" };
   }
 };
 

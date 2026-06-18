@@ -1,10 +1,10 @@
 import express from "express";
-import { login, me, signup, logout, refresh, verifyEmail, resendVerificationEmail } from "./auth.controller.js";
+import { login, me, signup, logout, refresh, verifyEmail, resendVerificationEmail, sendResetPassword, resetPassword } from "./auth.controller.js";
 import { authMiddleware } from "./auth.middleware.js";
 import asyncHandler from "../../utils/catchAsync.js";
 import rateLimit from "express-rate-limit";
 import { registry } from "../../core/docs/openApi.js";
-import { SignupSchema, LoginSchema, VerifyEmailSchema, ResendVerificationSchema } from "./auth.schemas.js";
+import { SignupSchema, LoginSchema, VerifyEmailSchema, ResendVerificationSchema, SendResetPasswordSchema, ResetPasswordSchema } from "./auth.schemas.js";
 
 const router = express.Router();
 
@@ -137,5 +137,46 @@ registry.registerPath({
 });
 
 router.post("/resend-verification", authLimiter, asyncHandler(resendVerificationEmail));
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/v1/auth/send-reset-password',
+  tags: ['Auth'],
+  summary: 'Send password reset email',
+  request: {
+    body: {
+      content: {
+        'application/json': { schema: SendResetPasswordSchema }
+      }
+    }
+  },
+  responses: {
+    200: { description: 'Password reset email sent (if exists)' },
+    400: { description: 'Validation error' }
+  }
+});
+
+router.post("/send-reset-password", authLimiter, asyncHandler(sendResetPassword));
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/v1/auth/reset-password',
+  tags: ['Auth'],
+  summary: 'Reset password using token',
+  request: {
+    body: {
+      content: {
+        'application/json': { schema: ResetPasswordSchema }
+      }
+    }
+  },
+  responses: {
+    200: { description: 'Password reset successful' },
+    400: { description: 'Validation error' },
+    401: { description: 'Token invalid or expired' }
+  }
+});
+
+router.post("/reset-password", authLimiter, asyncHandler(resetPassword));
 
 export { router };
