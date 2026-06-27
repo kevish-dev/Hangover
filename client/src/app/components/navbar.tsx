@@ -148,7 +148,9 @@ export function Navbar() {
       {/* Nav links */}
       <div className="hidden md:flex items-center gap-10">
         {["Home", "Trips", "Festivals", "Contact", "About"].map((item) => (
-          item === "Trips"
+          item === "Home"
+            ? <PageNavLink key={item} label="Home" to="/" scrolled={scrolled} />
+            : item === "Trips"
             ? <TripsNavLink key={item} scrolled={scrolled} />
             : item === "Festivals"
             ? <PageNavLink key={item} label="Festivals" to="/festivals" scrolled={scrolled} />
