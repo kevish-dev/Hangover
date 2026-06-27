@@ -61,3 +61,6 @@ vite.svg
 # Temporary files
 tmp/
 temp/
+
+
+.DS_Store
