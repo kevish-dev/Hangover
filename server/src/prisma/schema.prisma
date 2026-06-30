@@ -24,10 +24,7 @@ enum Gender {
 enum GovtIdType {
   AADHAAR
   PASSPORT
-  DRIVING_LICENSE
-  VOTER_ID
-  PAN
-  OTHER
+  
 }
 
 enum VerificationStatus {

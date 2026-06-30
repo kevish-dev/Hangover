@@ -41,3 +41,15 @@ export const requireAuth = async (req, res, next) => {
     res.status(500).json({ message: "Internal server error during authentication." });
   }
 };
+
+export const requireAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ message: "Authentication required." });
+  }
+
+  if (req.user.role !== "ADMIN") {
+    return res.status(403).json({ message: "Forbidden. Admin access required." });
+  }
+
+  next();
+};
