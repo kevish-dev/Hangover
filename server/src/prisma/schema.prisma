@@ -224,7 +224,7 @@ model Trip {
 
   bookings    Booking[]
   faqs        FAQ[]
-  itinerary   Itinerary[]
+  itineraries Itinerary[]
   tripTags    TripTag[]
   inquiries   Inquiry[]
   formFields  TripFormField[]
@@ -340,40 +340,54 @@ model Booking {
 }
 
 model Itinerary {
-  id     String @id @default(uuid())
-  tripId String
-  trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
-
-  day         Int
+  id          String  @id @default(uuid())
   title       String
-  description String
+  description String?
 
-  order Int
+  tripId String?
+  trip   Trip?   @relation(fields: [tripId], references: [id], onDelete: SetNull)
 
-  items ItineraryItem[]
+  days ItineraryDay[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([tripId, day])
   @@index([tripId])
-  @@index([order])
 }
 
-model ItineraryItem {
-  id          String @id @default(uuid())
+model ItineraryDay {
+  id          String    @id @default(uuid())
   itineraryId String
   itinerary   Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
 
+  dayNumber   Int
   title       String
   description String?
-  items       String[]
-  order       Int
+
+  activities ItineraryActivity[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([itineraryId, dayNumber])
   @@index([itineraryId])
+}
+
+model ItineraryActivity {
+  id             String       @id @default(uuid())
+  itineraryDayId String
+  itineraryDay   ItineraryDay @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  time        String?
+
+  order Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([itineraryDayId])
   @@index([order])
 }
 
