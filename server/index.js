@@ -18,6 +18,10 @@ app.use(
 
 app.use(cookieParser());
 
+import authRoutes from "./src/modules/auth/auth.routes.js";
+
+app.use("/api/v1/auth", authRoutes);
+
 app.use(errorHandler);
 
 app.listen(env.PORT, () => {
