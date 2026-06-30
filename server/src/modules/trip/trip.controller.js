@@ -48,3 +48,19 @@ export const deleteTrip = async (req, res, next) => {
     next(error);
   }
 };
+
+export const uploadBanners = async (req, res, next) => {
+  try {
+    const files = req.files;
+    if (!files || files.length === 0) {
+      return res.status(400).json({ message: "No images provided" });
+    }
+
+    const buffers = files.map(file => file.buffer);
+    const trip = await tripService.uploadBannerImages(req.params.id, buffers);
+    
+    res.status(200).json({ message: "Banner images uploaded successfully", trip });
+  } catch (error) {
+    next(error);
+  }
+};

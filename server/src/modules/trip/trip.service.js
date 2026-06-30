@@ -1,4 +1,6 @@
 import * as tripRepo from "./trip.repository.js";
+import { uploadToCloudinary } from "../../core/services/upload.service.js";
+import { randomUUID } from "crypto";
 
 const generateSlug = (title) => {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
@@ -43,4 +45,27 @@ export const updateTrip = async (id, data) => {
 
 export const deleteTrip = async (id) => {
   return tripRepo.remove(id);
+};
+
+export const uploadBannerImages = async (tripId, imageBuffers) => {
+  await getTripById(tripId); // Ensure trip exists
+
+  const folder = `uploads/trips/${tripId}/bannerimages`;
+  const uploadPromises = imageBuffers.map(buffer => 
+    uploadToCloudinary(buffer, {
+      folder,
+      publicId: randomUUID(), // Generate a unique ID for each banner
+      optimize: false, // Admin upload - no resize or optimization
+    })
+  );
+
+  const imageUrls = await Promise.all(uploadPromises);
+
+  // We need to fetch the existing trip to append the banners
+  const trip = await getTripById(tripId);
+  const existingBanners = trip.bannerImages || [];
+  
+  return tripRepo.update(tripId, {
+    bannerImages: [...existingBanners, ...imageUrls]
+  });
 };

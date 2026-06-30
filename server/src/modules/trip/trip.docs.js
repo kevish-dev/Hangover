@@ -144,3 +144,40 @@ registry.registerPath({
     },
   },
 });
+
+registry.registerPath({
+  method: "post",
+  path: "/trips/{id}/banner-images",
+  summary: "Upload Trip Banners",
+  description: "Uploads multiple banner images for a trip. Requires ADMIN role. Requires multipart/form-data.",
+  tags: ["Trip"],
+  security: [{ cookieAuth: [] }],
+  request: {
+    params: z.object({
+      id: z.string(),
+    }),
+    body: {
+      content: {
+        "multipart/form-data": {
+          schema: z.object({
+            banners: z.array(z.any()), // Array of Files
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Banners uploaded successfully",
+    },
+    400: {
+      description: "Bad Request",
+    },
+    401: {
+      description: "Unauthorized",
+    },
+    403: {
+      description: "Forbidden",
+    },
+  },
+});
