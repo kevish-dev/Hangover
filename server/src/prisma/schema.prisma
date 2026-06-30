@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
   output   = "./generated/prisma"
@@ -10,54 +5,574 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+
 }
 
-
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  password  String?
-  phone     String? @unique
-  emailVerified Boolean  @default(false)
-  tokens    Token[]
-  auditLogs AuditLog[]
-  role     Role  @default(USER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Token {
-  id        String   @id @default(cuid())
-  userId    String
-  tokenHash String   @unique
-  type      TokenType
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user      User     @relation(fields: [userId], references: [id])
-}
-
-enum Role {
+enum UserRole {
   USER
   ADMIN
+  CONTENT_MANAGER
 }
 
-enum TokenType {
-  EMAIL_VERIFICATION
-  PASSWORD_RESET
-  REFRESH
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
 }
 
-model AuditLog {
-  id        String   @id @default(cuid())
-  userId    String?
-  event     String
-  ipAddress String?
-  userAgent String?
-  details   Json?
+enum GovtIdType {
+  AADHAAR
+  PASSPORT
+  DRIVING_LICENSE
+  VOTER_ID
+  PAN
+  OTHER
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum TripType {
+  MOUNTAIN_TREK
+  BEACH_ESCAPE
+  DESERT_EXPEDITION
+  JUNGLE_WILDLIFE
+  HERITAGE_WALK
+  ROAD_TRIP
+  BACKPACKING_TOUR
+  PHOTOGRAPHY_TOUR
+  BONFIRE_RETREAT
+  INSTITUTE_COLLEGE_TRIP
+  CUSTOM_TRIP
+}
+
+enum BookingStatus {
+  PENDING
+  RESERVED
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  FAILED
+  OVERDUE
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentType {
+  TOKEN
+  BALANCE
+  FULL
+}
+
+enum PaymentTransactionStatus {
+  CREATED
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentIntentStatus {
+  CREATED
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+enum ReminderType {
+  MANUAL
+  AUTOMATIC
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum FormFieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  EMAIL
+  PHONE
+  DATE
+  SELECT
+  MULTI_SELECT
+  CHECKBOX
+  RADIO
+  FILE_UPLOAD
+}
+
+model User {
+  id       String   @id @default(uuid())
+  email    String   @unique
+  googleId String   @unique
+  role     UserRole @default(USER)
+
+  profile  UserProfile?
+
+  bookings        Booking[]
+  inquiries       Inquiry[]
+  resolvedInquiries Inquiry[] @relation("InquiryResolver")
+
+  isActive  Boolean  @default(true)
+  lastLoginAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([role])
+}
+
+model UserProfile {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fullName    String?
+  phone       String?
+  alternatePhone String?
+  dateOfBirth DateTime?
+  gender      Gender?
+
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  postalCode   String?
+  country      String?
+
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  emergencyContactRelation String?
+
+  bloodGroup   String?
+  medicalNotes String?
+
+  govtIdType   GovtIdType?
+  govtIdNumber String?
+  govtIdFrontImageUrl String?
+  govtIdBackImageUrl  String?
+  govtIdVerificationStatus VerificationStatus @default(UNVERIFIED)
+  govtIdVerifiedAt DateTime?
+  govtIdVerifiedBy String?
+  govtIdRejectionReason String?
+
+  profileImageUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([govtIdVerificationStatus])
+  @@index([govtIdNumber])
+}
+
+model Trip {
+  id String @id @default(uuid())
+
+  title    String
+  slug     String  @unique
+  location String
+
+  bannerImages String[]
+
+  duration     Int
+  groupSizeMin Int
+  groupSizeMax Int
+
+  difficultyLevel String
+  bestTimeToVisit String
+  maxAltitude     Int
+
+  overview String
+
+  highlights          String[]
+  galleryImages        String[]
+  inclusions           String[]
+  exclusions           String[]
+  stayTransportImages  String[]
+
+  price       Decimal @db.Decimal(10, 2)
+  tokenAmount Decimal @db.Decimal(10, 2)
+
+  capacity   Int
+  filledSpots Int @default(0)
+
+  startDate DateTime
+  endDate   DateTime
+
+  tripType   TripType
+  isActive   Boolean @default(true)
+  isFeatured Boolean @default(false)
+
+  bookings    Booking[]
+  faqs        FAQ[]
+  itinerary   Itinerary[]
+  tripTags    TripTag[]
+  inquiries   Inquiry[]
+  formFields  TripFormField[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tripType])
+  @@index([startDate])
+  @@index([isActive])
+  @@index([isFeatured])
+  @@index([location])
+}
+
+model TripFormField {
+  id     String @id @default(uuid())
+  tripId String
+  trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  label       String
+  fieldKey    String
+  fieldType   FormFieldType
+  placeholder String?
+  helpText    String?
+
+  options String[]
+
+  isRequired Boolean @default(false)
+  order      Int     @default(0)
+
+  validationRegex String?
+  minValue        Int?
+  maxValue        Int?
+
+  isActive Boolean @default(true)
+
+  responses BookingFormResponse[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tripId, fieldKey])
+  @@index([tripId])
+  @@index([order])
+}
+
+model BookingFormResponse {
+  id        String @id @default(uuid())
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  fieldId String
+  field   TripFormField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  value     String?
+  fileUrl   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([bookingId, fieldId])
+  @@index([bookingId])
+  @@index([fieldId])
+}
+
+model Booking {
+  id                String @id @default(uuid())
+  bookingReference  String @unique
+
+  userId String
+  tripId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  status        BookingStatus @default(PENDING)
+  paymentStatus PaymentStatus @default(PENDING)
+
+  numberOfTravelers Int @default(1)
+
+  totalAmount Decimal @db.Decimal(10, 2)
+  tokenAmount Decimal @db.Decimal(10, 2)
+  amountPaid  Decimal @default(0) @db.Decimal(10, 2)
+  amountDue   Decimal @db.Decimal(10, 2)
+
+  initialPaymentType PaymentType
+  balanceDueDate     DateTime?
+
+  reservedAt  DateTime?
+  confirmedAt DateTime?
+  cancelledAt DateTime?
+  completedAt DateTime?
+
+  cancellationReason String?
+  cancelledBy        String?
+
+  specialRequests String?
+
+  payments      Payment[]
+  reminders     PaymentReminder[]
+  formResponses BookingFormResponse[]
+  paymentIntents PaymentIntent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, tripId])
+  @@index([tripId])
+  @@index([userId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([balanceDueDate])
+}
+
+model Itinerary {
+  id     String @id @default(uuid())
+  tripId String
+  trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  day         Int
+  title       String
+  description String
+
+  order Int
+
+  items ItineraryItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tripId, day])
+  @@index([tripId])
+  @@index([order])
+}
+
+model ItineraryItem {
+  id          String @id @default(uuid())
+  itineraryId String
+  itinerary   Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  items       String[]
+  order       Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([itineraryId])
+  @@index([order])
+}
+
+model FAQ {
+  id     String @id @default(uuid())
+  tripId String
+  trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  question String
+  answer   String
+  order    Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tripId])
+  @@index([order])
+}
+
+model TripTag {
+  id  String @id @default(uuid())
+  tag String @unique
+
+  trips Trip[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Inquiry {
+  id String @id @default(uuid())
+
+  name  String
+  email String
+  phone String
+
+  tripType TripType?
+  tripId   String?
+  trip     Trip? @relation(fields: [tripId], references: [id], onDelete: SetNull)
+
+  userId String?
+  user   User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  subject String?
+  message String
+
+  isResolved Boolean   @default(false)
+  resolvedAt DateTime?
+
+  resolvedById String?
+  resolvedBy   User?   @relation("InquiryResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  adminNotes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([tripId])
+  @@index([userId])
+  @@index([isResolved])
+  @@index([createdAt])
+}
+
+model PaymentIntent {
+  id String @id @default(uuid())
+
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  razorpayOrderId String @unique
+  type            PaymentType
+  amount          Decimal @db.Decimal(10, 2)
+  currency        String  @default("INR")
+
+  status PaymentIntentStatus @default(CREATED)
+
+  expiresAt DateTime?
+
+  payment Payment?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId])
+  @@index([status])
+}
+
+model Payment {
+  id String @id @default(uuid())
+
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  paymentIntentId String?  @unique
+  paymentIntent   PaymentIntent? @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
+
+  type   PaymentType
+  status PaymentTransactionStatus @default(CREATED)
+
+  amount   Decimal @db.Decimal(10, 2)
+  currency String  @default("INR")
+
+  razorpayOrderId   String  @unique
+  razorpayPaymentId String? @unique
+  razorpaySignature String?
+
+  paymentMethod String?
+
+  idempotencyKey String @unique
+
+  failureCode   String?
+  failureReason String?
+
+  receiptNumber String? @unique
+  notes         Json?
+
+  paidAt DateTime?
+
+  refunds Refund[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+  @@index([paidAt])
+}
+
+model PaymentWebhook {
+  id String @id @default(uuid())
+
+  eventId   String @unique
+  eventType String
+  payload   Json
+  signature String
+
+  processed      Boolean   @default(false)
+  processedAt    DateTime?
+  processingError String?
+
+  retryCount Int @default(0)
+
   createdAt DateTime @default(now())
 
-  user      User?    @relation(fields: [userId], references: [id])
+  @@index([eventType])
+  @@index([processed])
+  @@index([createdAt])
+}
+
+model PaymentReminder {
+  id        String @id @default(uuid())
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  type   ReminderType
+  status ReminderStatus @default(PENDING)
+  sentBy String?
+
+  email   String
+  subject String
+
+  sentAt DateTime?
+
+  providerMessageId String?
+  failureReason      String?
+
+  createdAt DateTime @default(now())
+
+  @@index([bookingId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Refund {
+  id        String @id @default(uuid())
+  paymentId String
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  amount Decimal      @db.Decimal(10, 2)
+  status RefundStatus @default(PENDING)
+  reason String?
+
+  razorpayRefundId String? @unique
+
+  initiatedBy   String?
+  processedAt   DateTime?
+  failureReason String?
+  metadata      Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([paymentId])
+  @@index([status])
+  @@index([createdAt])
 }
