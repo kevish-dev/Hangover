@@ -63,8 +63,7 @@ export const uploadGovtIdImages = async (userId, govtIdType, frontImageBuffer, b
   const results = await Promise.all(uploadPromises);
   
   const updateData = {
-    govtIdType,
-    govtIdVerificationStatus: "UNVERIFIED"
+    govtIdType
   };
   
   results.forEach(res => {

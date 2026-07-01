@@ -169,9 +169,7 @@ model UserProfile {
   govtIdNumber String?
   govtIdFrontImageUrl String?
   govtIdBackImageUrl  String?
- 
 
-  
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

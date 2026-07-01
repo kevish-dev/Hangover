@@ -42,6 +42,35 @@ export const requireAuth = async (req, res, next) => {
   }
 };
 
+export const optionalAuth = async (req, res, next) => {
+  try {
+    const token = req.cookies.accessToken;
+    if (!token) {
+      return next();
+    }
+    const decoded = verifyAccessToken(token);
+    if (!decoded) {
+      return next();
+    }
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: {
+        id: true,
+        email: true,
+        googleId: true,
+        role: true,
+        isActive: true,
+      },
+    });
+    if (user && user.isActive) {
+      req.user = user;
+    }
+    next();
+  } catch (error) {
+    next();
+  }
+};
+
 export const requireAdmin = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({ message: "Authentication required." });
