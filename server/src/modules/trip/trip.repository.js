@@ -17,9 +17,13 @@ export const findById = async (id) => {
     where: { id },
     include: {
       faqs: true,
-      itinerary: {
+      itineraries: {
         include: {
-          items: true
+          days: {
+            include: {
+              activities: true
+            }
+          }
         }
       },
       tripTags: true,

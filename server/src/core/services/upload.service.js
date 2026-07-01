@@ -63,3 +63,39 @@ export const uploadToCloudinary = async (buffer, options = {}) => {
     uploadStream.end(imageBuffer);
   });
 };
+
+/**
+ * Extracts public ID from a Cloudinary URL
+ * @param {string} url - Cloudinary secure URL
+ * @returns {string|null}
+ */
+const extractPublicId = (url) => {
+  const matches = url.match(/\/upload\/(?:v\d+\/)?(.+?)\.[a-zA-Z0-9]+$/);
+  if (matches) return matches[1];
+  return null;
+};
+
+/**
+ * Deletes an image from Cloudinary
+ * @param {string} url - The Cloudinary secure URL
+ * @returns {Promise<any>}
+ */
+export const deleteFromCloudinary = async (url) => {
+  const publicId = extractPublicId(url);
+  if (!publicId) return null;
+  return cloudinary.uploader.destroy(publicId);
+};
+
+/**
+ * Deletes all assets in a specific trip folder
+ * @param {string} tripId - The Trip ID
+ * @returns {Promise<any>}
+ */
+export const deleteTripAssets = async (tripId) => {
+  try {
+    return await cloudinary.api.delete_resources_by_prefix(`uploads/trips/${tripId}`);
+  } catch (err) {
+    console.error(`Failed to delete trip assets for ${tripId}:`, err);
+    return null;
+  }
+};

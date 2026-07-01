@@ -6,6 +6,9 @@ import TripDetail from "./pages/trip-detail";
 import FestivalsPage from "./pages/festivals";
 import BookingPage from "./pages/booking";
 import AboutPage from "./pages/about";
+import AdminDashboardRedirect from "./pages/admin/dashboard";
+import AdminLayout from "./pages/admin/layout";
+import AdminTripsPage from "./pages/admin/trips";
 
 export const router = createBrowserRouter([
   {
@@ -18,6 +21,14 @@ export const router = createBrowserRouter([
       { path: "festivals", Component: FestivalsPage },
       { path: "book/:slug", Component: BookingPage },
       { path: "about", Component: AboutPage },
+    ],
+  },
+  {
+    path: "/dashboard",
+    Component: AdminLayout,
+    children: [
+      { index: true, Component: AdminDashboardRedirect },
+      { path: "trips", Component: AdminTripsPage },
     ],
   },
 ]);

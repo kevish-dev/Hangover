@@ -1,5 +1,5 @@
 import * as tripRepo from "./trip.repository.js";
-import { uploadToCloudinary } from "../../core/services/upload.service.js";
+import { uploadToCloudinary, deleteFromCloudinary, deleteTripAssets } from "../../core/services/upload.service.js";
 import { randomUUID } from "crypto";
 
 const generateSlug = (title) => {
@@ -44,7 +44,24 @@ export const updateTrip = async (id, data) => {
 };
 
 export const deleteTrip = async (id) => {
+  await deleteTripAssets(id);
   return tripRepo.remove(id);
+};
+
+export const deleteBannerImage = async (tripId, imageUrl) => {
+  const trip = await getTripById(tripId);
+  const existingBanners = trip.bannerImages || [];
+  
+  if (!existingBanners.includes(imageUrl)) {
+    throw new Error("Image not found in trip");
+  }
+
+  // Delete from Cloudinary
+  await deleteFromCloudinary(imageUrl);
+
+  // Update Database
+  const newBanners = existingBanners.filter(url => url !== imageUrl);
+  return tripRepo.update(tripId, { bannerImages: newBanners });
 };
 
 export const uploadBannerImages = async (tripId, imageBuffers) => {

@@ -2,7 +2,8 @@
 import logoSrc from "../../imports/final-logo_png_transparent.png";
 
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useLocation } from "react-router";
+import { LoginDialog } from "./auth/LoginDialog";
 
 function NavLink({ label, scrolled }: { label: string; scrolled: boolean }) {
   const [hovered, setHovered] = useState(false);
@@ -94,6 +95,7 @@ function TripsNavLink({ scrolled }: { scrolled: boolean }) {
 
 export function Navbar() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -160,30 +162,35 @@ export function Navbar() {
         ))}
       </div>
 
-      {/* CTA */}
-      <button
-        style={{
-          fontFamily: "'Poppins', sans-serif",
-          fontWeight: 600,
-          fontSize: "0.78rem",
-          letterSpacing: "0.14em",
-          padding: "10px 24px",
-          cursor: "pointer",
-          transition: "all 0.3s ease",
-          background: scrolled ? "#781216" : "#c8a96e",
-          color: "#ffffff",
-          border: "none",
-          activeTransform: "scale(0.95)",
-        } as React.CSSProperties}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = scrolled ? "#9a1a1f" : "#dfc08a";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = scrolled ? "#781216" : "#c8a96e";
-        }}
-      >
-        BOOK A TRIP
-      </button>
+      {/* Auth and CTA */}
+      <div className="flex items-center gap-4">
+        <LoginDialog />
+        {!location.pathname.startsWith("/dashboard") && (
+          <button
+            style={{
+              fontFamily: "'Poppins', sans-serif",
+              fontWeight: 600,
+              fontSize: "0.78rem",
+              letterSpacing: "0.14em",
+              padding: "10px 24px",
+              cursor: "pointer",
+              transition: "all 0.3s ease",
+              background: scrolled ? "#781216" : "#c8a96e",
+              color: "#ffffff",
+              border: "none",
+              activeTransform: "scale(0.95)",
+            } as React.CSSProperties}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = scrolled ? "#9a1a1f" : "#dfc08a";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = scrolled ? "#781216" : "#c8a96e";
+            }}
+          >
+            BOOK A TRIP
+          </button>
+        )}
+      </div>
     </nav>
   );
 }

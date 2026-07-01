@@ -28,5 +28,6 @@ router.post(
   uploadMiddleware.array("banners", 10), // Allow up to 10 banners at once
   tripController.uploadBanners
 );
+router.delete("/:id/banner-images", tripController.deleteBanner);
 
 export default router;
