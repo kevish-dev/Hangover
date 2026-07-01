@@ -118,6 +118,11 @@ enum FormFieldType {
   FILE_UPLOAD
 }
 
+enum FormFieldScope {
+  GROUP
+  TRAVELER
+}
+
 model User {
   id       String   @id @default(uuid())
   email    String   @unique
@@ -240,6 +245,7 @@ model TripFormField {
   label       String
   fieldKey    String
   fieldType   FormFieldType
+  scope       FormFieldScope @default(GROUP)
   placeholder String?
   helpText    String?
 
@@ -272,13 +278,15 @@ model BookingFormResponse {
   fieldId String
   field   TripFormField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
 
+  travelerIndex Int @default(0)
+
   value     String?
   fileUrl   String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([bookingId, fieldId])
+  @@unique([bookingId, fieldId, travelerIndex])
   @@index([bookingId])
   @@index([fieldId])
 }

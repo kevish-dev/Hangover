@@ -31,7 +31,18 @@ export const getAllBookings = async (req, res, next) => {
 
 export const getBookingById = async (req, res, next) => {
   try {
-    const booking = await bookingService.getBookingById(req.params.id, req.user.id);
+    const isAdmin = req.user.role === "ADMIN";
+    const booking = await bookingService.getBookingById(req.params.id, req.user.id, isAdmin);
+    res.status(200).json(booking);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const cancelBooking = async (req, res, next) => {
+  try {
+    const { reason } = req.body;
+    const booking = await bookingService.cancelBooking(req.params.id, req.user.id, reason);
     res.status(200).json(booking);
   } catch (error) {
     next(error);

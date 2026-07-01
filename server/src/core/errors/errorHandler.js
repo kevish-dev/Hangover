@@ -25,6 +25,15 @@ export const errorHandler = (err, req, res, next) => {
 
   console.error("Unhandled Error:", err);
 
+  // Respect manually-set statusCode on plain Error objects (legacy support)
+  if (err.statusCode && typeof err.statusCode === "number") {
+    return res.status(err.statusCode).json({
+      success: false,
+      code: err.code || "ERROR",
+      message: err.message,
+    });
+  }
+
   return res.status(500).json({
     success: false,
     code: "INTERNAL_SERVER_ERROR",

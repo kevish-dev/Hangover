@@ -35,6 +35,7 @@ registry.registerPath({
             label: z.string(),
             fieldKey: z.string(),
             fieldType: z.string(),
+            scope: z.enum(["GROUP", "TRAVELER"]).optional().default("GROUP"),
             placeholder: z.string().optional(),
             helpText: z.string().optional(),
             options: z.array(z.string()).optional(),
@@ -69,6 +70,7 @@ registry.registerPath({
         "application/json": {
           schema: z.object({
             label: z.string().optional(),
+            scope: z.enum(["GROUP", "TRAVELER"]).optional(),
             placeholder: z.string().optional(),
             helpText: z.string().optional(),
             isRequired: z.boolean().optional(),

@@ -7,11 +7,13 @@ const router = Router();
 
 router.use(requireAuth);
 
+// Admin must come before /:id to avoid route shadowing
+router.get("/", requireAdmin, bookingController.getAllBookings);
+
+// User routes
 router.post("/", bookingController.createBooking);
 router.get("/me", bookingController.getMyBookings);
 router.get("/:id", bookingController.getBookingById);
-
-// Admin routes
-router.get("/", requireAdmin, bookingController.getAllBookings);
+router.patch("/:id/cancel", bookingController.cancelBooking);
 
 export default router;

@@ -1,12 +1,15 @@
 import { prisma } from "../../prisma/client.js";
 
+const bookingInclude = {
+  trip: true,
+  formResponses: { include: { field: true } },
+  payments: { include: { refunds: true } },
+};
+
 export const createBooking = async (data) => {
   return prisma.booking.create({
     data,
-    include: {
-      formResponses: true,
-      trip: true
-    }
+    include: bookingInclude,
   });
 };
 
@@ -14,13 +17,17 @@ export const getBookingById = async (id) => {
   return prisma.booking.findUnique({
     where: { id },
     include: {
-      trip: true,
-      formResponses: {
-        include: {
-          field: true
-        }
-      }
-    }
+      ...bookingInclude,
+      user: { include: { profile: true } },
+    },
+  });
+};
+
+export const updateBooking = async (id, data) => {
+  return prisma.booking.update({
+    where: { id },
+    data,
+    include: bookingInclude,
   });
 };
 
@@ -28,12 +35,12 @@ export const getUserBookings = async (userId, skip, take) => {
   const [bookings, total] = await Promise.all([
     prisma.booking.findMany({
       where: { userId },
-      include: { trip: true },
+      include: { trip: true, payments: true },
       orderBy: { createdAt: "desc" },
       skip,
-      take
+      take,
     }),
-    prisma.booking.count({ where: { userId } })
+    prisma.booking.count({ where: { userId } }),
   ]);
   return { bookings, total };
 };
@@ -41,12 +48,12 @@ export const getUserBookings = async (userId, skip, take) => {
 export const getAllBookings = async (skip, take) => {
   const [bookings, total] = await Promise.all([
     prisma.booking.findMany({
-      include: { trip: true, user: true },
+      include: { trip: true, user: true, payments: true },
       orderBy: { createdAt: "desc" },
       skip,
-      take
+      take,
     }),
-    prisma.booking.count()
+    prisma.booking.count(),
   ]);
   return { bookings, total };
 };

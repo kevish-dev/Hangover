@@ -12,10 +12,18 @@ import userRoutes from "./src/modules/user/user.routes.js";
 import bookingRoutes from "./src/modules/booking/booking.routes.js";
 import tripTagRoutes from "./src/modules/trip-tag/trip-tag.routes.js";
 import inquiryRoutes from "./src/modules/inquiry/inquiry.routes.js";
+import paymentRoutes from "./src/modules/payment/payment.routes.js";
 import { errorHandler } from "./src/core/errors/errorHandler.js";
 const app = express();
 
-app.use(express.json());
+// Raw body parser for Razorpay webhook (must be before express.json)
+app.use((req, res, next) => {
+  if (req.path === "/api/v1/payments/webhook") {
+    express.raw({ type: "application/json" })(req, res, next);
+  } else {
+    express.json()(req, res, next);
+  }
+});
 app.use(morgan("dev"));
 app.use(
   cors({
@@ -35,6 +43,7 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/bookings", bookingRoutes);
 app.use("/api/v1/trip-tags", tripTagRoutes);
 app.use("/api/v1/inquiries", inquiryRoutes);
+app.use("/api/v1/payments", paymentRoutes);
 
 app.get("/openapi.json", (req, res) => {
   res.json(generateOpenApiDocument());

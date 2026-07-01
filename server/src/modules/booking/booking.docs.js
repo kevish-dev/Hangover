@@ -18,7 +18,8 @@ registry.registerPath({
             initialPaymentType: z.string().optional().default("TOKEN"),
             formResponses: z.array(z.object({
               fieldId: z.string(),
-              value: z.string()
+              value: z.string(),
+              travelerIndex: z.number().optional().default(0)
             })).optional()
           }),
         },
@@ -88,3 +89,29 @@ registry.registerPath({
     404: { description: "Booking not found" }
   },
 });
+
+registry.registerPath({
+  method: "patch",
+  path: "/bookings/{id}/cancel",
+  summary: "Cancel a booking",
+  description: "Cancels a PENDING or RESERVED booking. Users can only cancel their own bookings.",
+  tags: ["Booking"],
+  security: [{ cookieAuth: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({ reason: z.string().optional() }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: { description: "Booking cancelled" },
+    400: { description: "Booking is not cancellable in current status" },
+    403: { description: "Forbidden" },
+    404: { description: "Booking not found" },
+  },
+});
+
