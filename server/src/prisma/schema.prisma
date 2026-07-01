@@ -11,7 +11,6 @@ datasource db {
 enum UserRole {
   USER
   ADMIN
-  CONTENT_MANAGER
 }
 
 enum Gender {
@@ -170,17 +169,13 @@ model UserProfile {
   govtIdNumber String?
   govtIdFrontImageUrl String?
   govtIdBackImageUrl  String?
-  govtIdVerificationStatus VerificationStatus @default(UNVERIFIED)
-  govtIdVerifiedAt DateTime?
-  govtIdVerifiedBy String?
-  govtIdRejectionReason String?
+ 
 
-  profileImageUrl String?
+  
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([govtIdVerificationStatus])
   @@index([govtIdNumber])
 }
 
@@ -297,7 +292,7 @@ model Booking {
   userId String
   tripId String
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
   trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
   status        BookingStatus @default(PENDING)
