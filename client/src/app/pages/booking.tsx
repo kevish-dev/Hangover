@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -16,7 +16,7 @@ import {
   CheckCircle,
   AlertCircle,
 } from "lucide-react";
-import { getTripBySlug } from "../data/trips";
+import { fetchTripBySlug, formatPrice, formatDuration, formatGroupSize, type ApiTrip } from "../../lib/tripApi";
 import { SiteFooter } from "../components/site-footer";
 
 // ── Shared input styles ───────────────────────────────────────────
@@ -417,7 +417,8 @@ function TravelerForm({
 // ── Page ──────────────────────────────────────────────────────────
 export default function BookingPage() {
   const { slug } = useParams();
-  const trip = getTripBySlug(slug || "");
+  const [trip, setTrip] = useState<ApiTrip | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const [solo, setSolo] = useState<"yes" | "no" | null>(null);
   const [travelers, setTravelers] = useState<number[]>([]);
@@ -425,10 +426,36 @@ export default function BookingPage() {
   const [primaryPhone, setPrimaryPhone] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
+  useEffect(() => {
+    if (!slug) return;
+    setLoading(true);
+    fetchTripBySlug(slug)
+      .then((data) => setTrip(data))
+      .catch(() => setTrip(null))
+      .finally(() => setLoading(false));
+  }, [slug]);
+
   const addTraveler = () =>
     setTravelers((t) => [...t, Date.now()]);
   const removeTraveler = (id: number) =>
     setTravelers((t) => t.filter((x) => x !== id));
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f5f0e6",
+          fontFamily: "'Poppins', sans-serif",
+        }}
+      >
+        <p style={{ color: "rgba(30,26,20,0.4)" }}>Loading trip…</p>
+      </div>
+    );
+  }
 
   if (!trip) {
     return (
@@ -465,6 +492,16 @@ export default function BookingPage() {
       </div>
     );
   }
+
+  // Map backend fields to display values
+  const tripName = trip.title;
+  const tripImage = trip.bannerImages?.[0] || trip.galleryImages?.[0] || "";
+  const tripPrice = formatPrice(trip.price);
+  const tripDuration = formatDuration(trip.duration);
+  const tripDestination = trip.location;
+  const tripGroupSize = formatGroupSize(trip.groupSizeMin, trip.groupSizeMax);
+  const tripDifficulty = trip.difficultyLevel;
+  const tripSlug = trip.slug;
 
   if (submitted) {
     return (
@@ -516,7 +553,7 @@ export default function BookingPage() {
           >
             We've received your booking for{" "}
             <strong style={{ fontWeight: 500 }}>
-              {trip.name}
+              {tripName}
             </strong>
             . A confirmation will be sent to{" "}
             <strong style={{ color: "#781216" }}>
@@ -575,7 +612,7 @@ export default function BookingPage() {
           style={{
             position: "absolute",
             inset: 0,
-            backgroundImage: `url(${trip.image})`,
+            backgroundImage: `url(${tripImage})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
             opacity: 0.08,
@@ -613,7 +650,7 @@ export default function BookingPage() {
               ).style.color = "rgba(242,237,228,0.55)")
             }
           >
-            <ArrowLeft size={13} /> Back to {trip.name}
+            <ArrowLeft size={13} /> Back to {tripName}
           </Link>
           <p
             style={{
@@ -637,7 +674,7 @@ export default function BookingPage() {
               margin: 0,
             }}
           >
-            {trip.name}
+            {tripName}
           </h1>
         </div>
       </div>
@@ -1082,7 +1119,7 @@ export default function BookingPage() {
                 {[
                   {
                     label: "Trip Price (per person)",
-                    val: trip.price,
+                    val: tripPrice,
                   },
                   {
                     label: `Travelers`,
@@ -1305,8 +1342,8 @@ export default function BookingPage() {
                   }}
                 >
                   <img
-                    src={trip.image}
-                    alt={trip.name}
+                    src={tripImage}
+                    alt={tripName}
                     style={{
                       width: "100%",
                       height: "100%",
@@ -1334,7 +1371,7 @@ export default function BookingPage() {
                         textTransform: "uppercase",
                       }}
                     >
-                      {trip.destination}
+                      {tripDestination}
                     </span>
                   </div>
                   <h3
@@ -1347,20 +1384,20 @@ export default function BookingPage() {
                       margin: "0 0 14px",
                     }}
                   >
-                    {trip.name}
+                    {tripName}
                   </h3>
 
                   {[
-                    { label: "Duration", val: trip.duration },
+                    { label: "Duration", val: tripDuration },
                     {
                       label: "Group Size",
-                      val: trip.groupSize,
+                      val: tripGroupSize,
                     },
                     {
                       label: "Difficulty",
-                      val: trip.difficulty,
+                      val: tripDifficulty,
                     },
-                    { label: "Best Time", val: trip.bestTime },
+                    { label: "Best Time", val: trip.bestTimeToVisit || "Not Available" },
                   ].map(({ label, val }) => (
                     <div
                       key={label}
@@ -1421,7 +1458,7 @@ export default function BookingPage() {
                         margin: 0,
                       }}
                     >
-                      {trip.price}
+                      {tripPrice}
                     </p>
                   </div>
                 </div>
@@ -1459,7 +1496,7 @@ export default function BookingPage() {
                   through the process.
                 </p>
                 <a
-                  href={`https://wa.me/919876543210?text=Hi, I need help booking the ${trip.name} trip.`}
+                  href={`https://wa.me/919876543210?text=Hi, I need help booking the ${tripName} trip.`}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{

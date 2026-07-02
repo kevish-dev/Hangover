@@ -24,8 +24,11 @@ export const getTrips = async (page = 1, limit = 10, isAdmin = false) => {
   };
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const getTripById = async (id, isAdmin = false) => {
-  const where = isAdmin ? { id } : { id, isPublished: true };
+  const idField = UUID_RE.test(id) ? 'id' : 'slug';
+  const where = isAdmin ? { [idField]: id } : { [idField]: id, isPublished: true };
   const trip = await tripRepo.findById(where);
   if (!trip) throw new Error("Trip not found");
   return trip;

@@ -452,7 +452,7 @@ export function SiteFooter() {
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#b8943a" }} />
               <span style={{ color: "rgba(242,237,228,0.22)", fontSize: "0.65rem", letterSpacing: "0.1em" }}>
-                Made with wanderlust
+                Made with Love
               </span>
             </div>
           </div>

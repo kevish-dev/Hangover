@@ -1,34 +1,26 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Link } from "react-router";
-import { MapPin, Clock, Search, X, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
+import { MapPin, Clock, Search, X, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, AlertCircle } from "lucide-react";
 import { SiteFooter } from "../components/site-footer";
-import { TRIPS_DATA } from "../data/trips";
+import {
+  fetchAllTrips,
+  formatTripType,
+  formatPrice,
+  priceToNumber,
+  formatDuration,
+  spotsLeft,
+  safeValue,
+  isNotAvailable,
+  type ApiTrip,
+} from "../../lib/tripApi";
 
-// ── Filter metadata (extends trip data without touching the shared data file) ─
-const TRIP_META: Record<number, {
-  destinations: string[];
-  categories: string[];
-  months: string[];
-  destGroup?: string;
-}> = {
-  1:  { destinations: ["Ziro"],     categories: ["Student", "Backpacking"],     months: ["Sep", "Oct"],                                          destGroup: "Ziro" },
-  2:  { destinations: ["Other"],    categories: ["Trek"],                        months: ["Dec", "Jan", "Feb"],                                   destGroup: "Other" },
-  3:  { destinations: ["Other"],    categories: ["Backpacking", "Family"],       months: ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar"] },
-  4:  { destinations: ["Other"],    categories: ["Family", "Backpacking"],       months: ["Nov", "Dec", "Jan", "Feb"] },
-  5:  { destinations: ["Other"],    categories: ["Family"],                      months: ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May"] },
-  6:  { destinations: ["Other"],    categories: ["Student", "Family"],           months: ["Oct", "Nov", "Dec", "Jan", "Feb"] },
-  7:  { destinations: ["Other"],    categories: ["Trek", "Backpacking"],         months: ["Jun", "Jul", "Aug", "Sep"] },
-  8:  { destinations: ["Other"],    categories: ["Trek", "Backpacking"],         months: ["Jun", "Jul", "Aug", "Sep", "Oct"] },
-  9:  { destinations: ["Other"],    categories: ["Student", "Family"],           months: ["Dec"] },
-  10: { destinations: ["Other"],    categories: ["Family", "Student"],           months: ["Oct", "Nov", "Dec", "Jan", "Feb"] },
-  11: { destinations: ["Other"],    categories: ["Family", "Backpacking"],       months: ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr"] },
-  12: { destinations: ["Other"],    categories: ["Backpacking", "Family"],       months: ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct"] },
-};
+// ── "Not Available" inline label ──────────────────────────────────
+function NA({ text = "Not Available" }: { text?: string }) {
+  return <span style={{ color: "#c0392b", fontSize: "inherit", fontWeight: 500, fontStyle: "italic" }}>{text}</span>;
+}
 
 // ── Filter option definitions ─────────────────────────────────────
-const DESTINATIONS = ["Tawang", "Mechuka", "Ziro", "Dirang"];
-const CATEGORIES   = ["Trek", "Backpacking", "Family", "Student"];
 const DURATIONS    = ["Weekend", "5 Days", "6 Days", "7 Days", "8 Days"];
 const MONTHS       = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const DIFFICULTIES = ["Easy", "Moderate", "Challenging"];
@@ -60,8 +52,22 @@ const EMPTY_FILTERS: Filters = {
   months: [], difficulties: [], priceRange: null,
 };
 
+// ── Helper: extract month abbreviations from bestTimeToVisit ──────
+function parseMonths(bestTime: string | null | undefined): string[] {
+  if (!bestTime) return [];
+  const result: string[] = [];
+  for (const m of MONTHS) {
+    if (bestTime.toLowerCase().includes(m.toLowerCase())) {
+      result.push(m);
+    }
+  }
+  // If "year round" or "all year", return all months
+  if (/year\s*round|all\s*year/i.test(bestTime)) return [...MONTHS];
+  return result;
+}
+
 // ── Filter group accordion ─────────────────────────────────────────
-function FilterGroup({ title, children, defaultOpen = true }: {
+function FilterGroup({ title, children, defaultOpen = false }: {
   title: string; children: React.ReactNode; defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -72,13 +78,14 @@ function FilterGroup({ title, children, defaultOpen = true }: {
         style={{
           width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
           padding: "14px 0", background: "none", border: "none", cursor: "pointer",
-          fontFamily: "'Poppins', sans-serif", fontSize: "0.78rem", fontWeight: 600,
-          color: "#1e1a14", letterSpacing: "0.04em", textTransform: "uppercase",
+          fontFamily: "'Poppins', sans-serif",
         }}
       >
-        {title}
+        <span style={{ color: "#1e1a14", fontSize: "0.78rem", fontWeight: 600, letterSpacing: "0.06em" }}>
+          {title}
+        </span>
         <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
-          <ChevronDown size={14} color="rgba(30,26,20,0.4)" />
+          <ChevronDown size={13} color="rgba(30,26,20,0.4)" />
         </motion.div>
       </button>
       <AnimatePresence>
@@ -303,9 +310,11 @@ function MonthCalendar({
 }
 
 // ── Filter sidebar ─────────────────────────────────────────────────
-function FilterSidebar({ filters, setFilters }: {
+function FilterSidebar({ filters, setFilters, availableDestinations, availableCategories }: {
   filters: Filters;
   setFilters: React.Dispatch<React.SetStateAction<Filters>>;
+  availableDestinations: string[];
+  availableCategories: string[];
 }) {
   const toggle = (key: keyof Omit<Filters, "priceRange">, val: string) => {
     setFilters((f) => ({
@@ -332,22 +341,26 @@ function FilterSidebar({ filters, setFilters }: {
       </div>
 
       {/* Destination */}
-      <FilterGroup title="Destination">
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "7px" }}>
-          {DESTINATIONS.map((d) => (
-            <CheckPill key={d} label={d} active={filters.destinations.includes(d)} onToggle={() => toggle("destinations", d)} />
-          ))}
-        </div>
-      </FilterGroup>
+      {availableDestinations.length > 0 && (
+        <FilterGroup title="Destination">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "7px" }}>
+            {availableDestinations.map((d) => (
+              <CheckPill key={d} label={d} active={filters.destinations.includes(d)} onToggle={() => toggle("destinations", d)} />
+            ))}
+          </div>
+        </FilterGroup>
+      )}
 
       {/* Category */}
-      <FilterGroup title="Category">
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "7px" }}>
-          {CATEGORIES.map((c) => (
-            <CheckPill key={c} label={c} active={filters.categories.includes(c)} onToggle={() => toggle("categories", c)} />
-          ))}
-        </div>
-      </FilterGroup>
+      {availableCategories.length > 0 && (
+        <FilterGroup title="Category">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "7px" }}>
+            {availableCategories.map((c) => (
+              <CheckPill key={c} label={c} active={filters.categories.includes(c)} onToggle={() => toggle("categories", c)} />
+            ))}
+          </div>
+        </FilterGroup>
+      )}
 
       {/* Duration */}
       <FilterGroup title="Duration">
@@ -391,8 +404,16 @@ function FilterSidebar({ filters, setFilters }: {
 }
 
 // ── Trip Card ──────────────────────────────────────────────────────
-function TripCard({ trip, index }: { trip: typeof TRIPS_DATA[0]; index: number }) {
+function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
   const [hovered, setHovered] = useState(false);
+  const heroImage = trip.bannerImages?.[0] || trip.galleryImages?.[0] || "";
+  const priceNum = priceToNumber(trip.price);
+  const spots = spotsLeft(trip.capacity, trip.filledSpots);
+  const tags = trip.tripTags?.map((t) => t.tag) || [];
+  const typeLabel = formatTripType(trip.tripType);
+  const durationStr = formatDuration(trip.duration);
+  const priceStr = formatPrice(trip.price);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
@@ -411,37 +432,53 @@ function TripCard({ trip, index }: { trip: typeof TRIPS_DATA[0]; index: number }
       }}
     >
       <div style={{ position: "relative", aspectRatio: "16/10", overflow: "hidden" }}>
-        <img src={trip.image} alt={trip.name} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.55s ease", transform: hovered ? "scale(1.05)" : "scale(1)" }} />
+        {heroImage ? (
+          <img src={heroImage} alt={trip.title} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.55s ease", transform: hovered ? "scale(1.05)" : "scale(1)" }} />
+        ) : (
+          <div style={{ width: "100%", height: "100%", background: "#ede8dc", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <NA text="No Image" />
+          </div>
+        )}
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(11,11,11,0.55) 0%, transparent 50%)" }} />
         <div style={{ position: "absolute", top: "12px", left: "12px", background: "#781216", color: "#fff", borderRadius: "4px", padding: "3px 10px", fontSize: "0.58rem", fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase" }}>
-          {trip.type}
+          {typeLabel}
         </div>
-        {trip.spots <= 8 && (
+        {spots <= 8 && spots > 0 && (
           <div style={{ position: "absolute", top: "12px", right: "12px", background: "rgba(11,11,11,0.7)", backdropFilter: "blur(6px)", color: "#C8A96E", borderRadius: "4px", padding: "3px 10px", fontSize: "0.58rem", fontWeight: 500 }}>
-            {trip.spots} spots left
+            {spots} spots left
           </div>
         )}
       </div>
       <div style={{ padding: "20px 22px 22px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "7px" }}>
           <MapPin size={11} color="#781216" />
-          <span style={{ color: "#781216", fontSize: "0.65rem", fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase" }}>{trip.destination}</span>
+          <span style={{ color: "#781216", fontSize: "0.65rem", fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+            {safeValue(trip.location) === "Not Available" ? <NA /> : trip.location}
+          </span>
         </div>
-        <h3 style={{ color: "#1e1a14", fontSize: "1rem", fontWeight: 500, letterSpacing: "-0.01em", lineHeight: 1.3, margin: "0 0 6px" }}>{trip.name}</h3>
-        <p style={{ color: "rgba(30,26,20,0.52)", fontSize: "0.78rem", fontWeight: 300, lineHeight: 1.6, margin: "0 0 16px" }}>{trip.tagline}</p>
+        <h3 style={{ color: "#1e1a14", fontSize: "1rem", fontWeight: 500, letterSpacing: "-0.01em", lineHeight: 1.3, margin: "0 0 6px" }}>
+          {trip.title || <NA />}
+        </h3>
+        <p style={{ color: "rgba(30,26,20,0.52)", fontSize: "0.78rem", fontWeight: 300, lineHeight: 1.6, margin: "0 0 16px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          {trip.overview ? trip.overview.substring(0, 120) + (trip.overview.length > 120 ? "…" : "") : <NA text="No description available" />}
+        </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginBottom: "18px" }}>
-          {trip.tags.map((tag) => (
+          {tags.length > 0 ? tags.map((tag) => (
             <span key={tag} style={{ background: "rgba(120,18,22,0.06)", border: "1px solid rgba(120,18,22,0.1)", color: "rgba(30,26,20,0.6)", borderRadius: "999px", padding: "2px 9px", fontSize: "0.6rem", letterSpacing: "0.06em" }}>
               {tag}
             </span>
-          ))}
+          )) : (
+            <span style={{ color: "rgba(30,26,20,0.3)", fontSize: "0.6rem", fontStyle: "italic" }}>No tags</span>
+          )}
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "14px", borderTop: "1px solid rgba(30,26,20,0.07)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
             <span style={{ display: "flex", alignItems: "center", gap: "4px", color: "rgba(30,26,20,0.5)", fontSize: "0.72rem" }}>
-              <Clock size={11} />{trip.duration}
+              <Clock size={11} />{isNotAvailable(durationStr) ? <NA /> : durationStr}
             </span>
-            <span style={{ color: "#1e1a14", fontSize: "0.88rem", fontWeight: 600 }}>{trip.price}</span>
+            <span style={{ color: "#1e1a14", fontSize: "0.88rem", fontWeight: 600 }}>
+              {isNotAvailable(priceStr) ? <NA /> : priceStr}
+            </span>
           </div>
           <Link to={`/trips/${trip.slug}`} style={{ background: hovered ? "#C8A96E" : "transparent", border: `1.5px solid ${hovered ? "#C8A96E" : "rgba(30,26,20,0.15)"}`, color: hovered ? "#1e1a14" : "rgba(30,26,20,0.6)", borderRadius: "4px", padding: "7px 16px", fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Poppins', sans-serif", transition: "all 0.25s ease", display: "flex", alignItems: "center", gap: "5px", textDecoration: "none" }}>
             View Trip <ArrowRight size={11} />
@@ -461,9 +498,21 @@ const DEST_CONFIG = [
   { key: "Other",   label: "Beyond the Northeast",  region: "India & International", tagline: "Beaches, deserts, jungles and mountains across India and abroad." },
 ];
 
+function getDestGroup(trip: ApiTrip): string {
+  // Use the destination relation name if available, otherwise fall back to location
+  const destName = trip.destination?.name || trip.location || "";
+  // Check if it matches any known DEST_CONFIG key
+  for (const cfg of DEST_CONFIG) {
+    if (cfg.key !== "Other" && destName.toLowerCase().includes(cfg.key.toLowerCase())) {
+      return cfg.key;
+    }
+  }
+  return "Other";
+}
+
 function DestinationAccordion({ destKey, label, region, tagline, trips, defaultOpen }: {
   destKey: string; label: string; region: string; tagline: string;
-  trips: typeof TRIPS_DATA; defaultOpen: boolean;
+  trips: ApiTrip[]; defaultOpen: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [hovered, setHovered] = useState(false);
@@ -606,15 +655,41 @@ function DestinationAccordion({ destKey, label, region, tagline, trips, defaultO
   );
 }
 
-function DestinationSections({ trips }: { trips: typeof TRIPS_DATA }) {
-  const groups: Record<string, typeof TRIPS_DATA> = {};
+function DestinationSections({ trips }: { trips: ApiTrip[] }) {
+  const groups: Record<string, ApiTrip[]> = {};
   trips.forEach((t) => {
-    const key = (t as any).destGroup || "Other";
+    const key = getDestGroup(t);
     if (!groups[key]) groups[key] = [];
     groups[key].push(t);
   });
 
   const visible = DEST_CONFIG.filter(({ key }) => groups[key]?.length > 0);
+
+  // If no trips match any DEST_CONFIG key, show them under dynamic groups
+  if (visible.length === 0 && trips.length > 0) {
+    // Group by destination name or location
+    const dynamicGroups: Record<string, ApiTrip[]> = {};
+    trips.forEach((t) => {
+      const key = t.destination?.name || t.location || "Other";
+      if (!dynamicGroups[key]) dynamicGroups[key] = [];
+      dynamicGroups[key].push(t);
+    });
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        {Object.entries(dynamicGroups).map(([key, groupTrips], idx) => (
+          <DestinationAccordion
+            key={key}
+            destKey={key}
+            label={key}
+            region=""
+            tagline={`${groupTrips.length} trip${groupTrips.length !== 1 ? "s" : ""} available`}
+            trips={groupTrips}
+            defaultOpen={idx === 0}
+          />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -633,38 +708,121 @@ function DestinationSections({ trips }: { trips: typeof TRIPS_DATA }) {
   );
 }
 
+// ── Loading skeleton ──────────────────────────────────────────────
+function LoadingSkeleton() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "2rem 0" }}>
+      {[1, 2, 3].map((i) => (
+        <div key={i} style={{
+          background: "#ffffff",
+          borderRadius: "14px",
+          border: "1px solid rgba(30,26,20,0.07)",
+          overflow: "hidden",
+          animation: "pulse 1.5s ease-in-out infinite",
+        }}>
+          <div style={{ padding: "clamp(18px,3vw,26px) clamp(20px,3vw,32px)", display: "flex", alignItems: "center", gap: "16px" }}>
+            <div style={{ width: "3px", height: "52px", borderRadius: "2px", background: "rgba(30,26,20,0.08)" }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ width: "200px", height: "20px", borderRadius: "4px", background: "rgba(30,26,20,0.06)", marginBottom: "8px" }} />
+              <div style={{ width: "300px", height: "14px", borderRadius: "4px", background: "rgba(30,26,20,0.04)" }} />
+            </div>
+          </div>
+        </div>
+      ))}
+      <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }`}</style>
+    </div>
+  );
+}
+
+// ── Error state ───────────────────────────────────────────────────
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div style={{ textAlign: "center", padding: "5rem 0", fontFamily: "'Poppins', sans-serif" }}>
+      <AlertCircle size={40} color="#c0392b" strokeWidth={1.5} style={{ marginBottom: "16px" }} />
+      <p style={{ color: "#c0392b", fontSize: "1rem", fontWeight: 500, marginBottom: "8px" }}>Failed to load trips</p>
+      <p style={{ color: "rgba(30,26,20,0.5)", fontSize: "0.82rem", fontWeight: 300, marginBottom: "20px" }}>{message}</p>
+      <button onClick={onRetry}
+        style={{ background: "#781216", color: "#fff", border: "none", borderRadius: "8px", padding: "10px 24px", fontSize: "0.78rem", fontWeight: 600, fontFamily: "'Poppins', sans-serif", cursor: "pointer", letterSpacing: "0.06em" }}>
+        Try Again
+      </button>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────
 export default function TripsPage() {
+  const [trips, setTrips] = useState<ApiTrip[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [search, setSearch]   = useState("");
   const [sort, setSort]       = useState("popular");
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
+  const loadTrips = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchAllTrips();
+      setTrips(data);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTrips();
+  }, []);
+
+  // Derive available filter options from actual data
+  const availableDestinations = useMemo(() => {
+    const destSet = new Set<string>();
+    trips.forEach((t) => {
+      const group = getDestGroup(t);
+      destSet.add(group);
+    });
+    // Return only DEST_CONFIG keys that appear, in order
+    return DEST_CONFIG.map((c) => c.key).filter((k) => destSet.has(k));
+  }, [trips]);
+
+  const availableCategories = useMemo(() => {
+    const catSet = new Set<string>();
+    trips.forEach((t) => {
+      catSet.add(formatTripType(t.tripType));
+    });
+    return Array.from(catSet).sort();
+  }, [trips]);
+
   const activeCount = Object.values(filters).flat().filter(Boolean).length;
 
   const filtered = useMemo(() => {
-    let list = TRIPS_DATA.filter((t) => {
-      const meta = TRIP_META[t.id] ?? { destinations: [], categories: [], months: [] };
-
+    let list = trips.filter((t) => {
       // Search
       const q = search.toLowerCase();
-      if (q && !t.name.toLowerCase().includes(q) && !t.destination.toLowerCase().includes(q) && !t.tags.some((tag) => tag.toLowerCase().includes(q))) return false;
+      const tags = t.tripTags?.map((tg) => tg.tag) || [];
+      if (q && !t.title.toLowerCase().includes(q) && !t.location.toLowerCase().includes(q) && !tags.some((tag) => tag.toLowerCase().includes(q)) && !formatTripType(t.tripType).toLowerCase().includes(q)) return false;
 
-      // Destination — check both TRIP_META and destGroup on the trip itself
-      const tripDestGroup = (t as any).destGroup || meta.destGroup;
+      // Destination
       if (filters.destinations.length > 0) {
-        const matchesDest = filters.destinations.some((d) => meta.destinations.includes(d) || d === tripDestGroup);
-        if (!matchesDest) return false;
+        const tripDest = getDestGroup(t);
+        if (!filters.destinations.includes(tripDest)) return false;
       }
 
-      // Category
-      if (filters.categories.length > 0 && !filters.categories.some((c) => meta.categories.includes(c))) return false;
+      // Category (trip type)
+      if (filters.categories.length > 0) {
+        const typeLabel = formatTripType(t.tripType);
+        if (!filters.categories.includes(typeLabel)) return false;
+      }
 
       // Duration
       if (filters.durations.length > 0) {
-        const days = t.durationDays;
+        const days = t.duration;
         const match = filters.durations.some((d) => {
           if (d === "Weekend") return days <= 3;
-          return d === t.duration;
+          return d === formatDuration(days);
         });
         if (!match) return false;
       }
@@ -672,24 +830,29 @@ export default function TripsPage() {
       // Price
       if (filters.priceRange) {
         const range = PRICE_RANGES.find((r) => r.label === filters.priceRange);
-        if (range && (t.priceNum < range.min || t.priceNum > range.max)) return false;
+        const price = priceToNumber(t.price);
+        if (range && (price < range.min || price > range.max)) return false;
       }
 
       // Month
-      if (filters.months.length > 0 && !filters.months.some((m) => meta.months.includes(m))) return false;
+      if (filters.months.length > 0) {
+        const tripMonths = parseMonths(t.bestTimeToVisit);
+        if (!filters.months.some((m) => tripMonths.includes(m))) return false;
+      }
 
       // Difficulty
-      if (filters.difficulties.length > 0 && !filters.difficulties.includes(t.difficulty)) return false;
+      if (filters.difficulties.length > 0 && !filters.difficulties.includes(t.difficultyLevel)) return false;
 
       return true;
     });
 
-    if (sort === "price_asc")    list = [...list].sort((a, b) => a.priceNum - b.priceNum);
-    if (sort === "price_desc")   list = [...list].sort((a, b) => b.priceNum - a.priceNum);
-    if (sort === "duration_asc") list = [...list].sort((a, b) => a.durationDays - b.durationDays);
+    const pn = priceToNumber;
+    if (sort === "price_asc")    list = [...list].sort((a, b) => pn(a.price) - pn(b.price));
+    if (sort === "price_desc")   list = [...list].sort((a, b) => pn(b.price) - pn(a.price));
+    if (sort === "duration_asc") list = [...list].sort((a, b) => a.duration - b.duration);
 
     return list;
-  }, [search, filters, sort]);
+  }, [trips, search, filters, sort]);
 
   return (
     <div style={{ background: "#f5f0e6", minHeight: "100vh", fontFamily: "'Poppins', sans-serif" }}>
@@ -705,7 +868,7 @@ export default function TripsPage() {
             Find your kind of <em style={{ color: "#C8A96E", fontStyle: "italic" }}>adventure.</em>
           </h1>
           <p style={{ color: "rgba(242,237,228,0.5)", fontSize: "0.88rem", fontWeight: 300, lineHeight: 1.8, maxWidth: "480px", margin: 0 }}>
-            {TRIPS_DATA.length} handcrafted trips across India and beyond — each one built around real experiences.
+            {loading ? "Loading trips…" : `${trips.length} handcrafted trips across India and beyond — each one built around real experiences.`}
           </p>
         </div>
       </div>
@@ -738,7 +901,7 @@ export default function TripsPage() {
 
           {/* Results count */}
           <span style={{ color: "rgba(30,26,20,0.38)", fontSize: "0.72rem", letterSpacing: "0.06em", marginLeft: "auto" }}>
-            {filtered.length} trip{filtered.length !== 1 ? "s" : ""} found
+            {loading ? "…" : `${filtered.length} trip${filtered.length !== 1 ? "s" : ""} found`}
           </span>
         </div>
 
@@ -773,7 +936,7 @@ export default function TripsPage() {
 
           {/* Sidebar — desktop */}
           <div className="hidden lg:block" style={{ width: "240px", flexShrink: 0, position: "sticky", top: "155px", background: "#ffffff", border: "1px solid rgba(30,26,20,0.07)", borderRadius: "12px", padding: "20px 20px 8px" }}>
-            <FilterSidebar filters={filters} setFilters={setFilters} />
+            <FilterSidebar filters={filters} setFilters={setFilters} availableDestinations={availableDestinations} availableCategories={availableCategories} />
           </div>
 
           {/* Mobile filter drawer */}
@@ -793,7 +956,7 @@ export default function TripsPage() {
                     <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, color: "#1e1a14", fontSize: "0.9rem" }}>Filters</span>
                     <button onClick={() => setMobileFiltersOpen(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#1e1a14" /></button>
                   </div>
-                  <FilterSidebar filters={filters} setFilters={setFilters} />
+                  <FilterSidebar filters={filters} setFilters={setFilters} availableDestinations={availableDestinations} availableCategories={availableCategories} />
                 </motion.div>
               </>
             )}
@@ -801,7 +964,11 @@ export default function TripsPage() {
 
           {/* Destination sections */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            {filtered.length === 0 ? (
+            {loading ? (
+              <LoadingSkeleton />
+            ) : error ? (
+              <ErrorState message={error} onRetry={loadTrips} />
+            ) : filtered.length === 0 ? (
               <div style={{ textAlign: "center", padding: "5rem 0" }}>
                 <p style={{ color: "rgba(30,26,20,0.35)", fontSize: "1rem", fontWeight: 300, marginBottom: "16px" }}>No trips match your filters.</p>
                 <button onClick={() => { setSearch(""); setFilters(EMPTY_FILTERS); }}

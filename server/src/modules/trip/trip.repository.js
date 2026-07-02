@@ -10,6 +10,7 @@ export const findAll = async (skip, take, where = {}) => {
       include: {
         tripTags: true,
         faqs: true,
+        destination: true,
       }
     }),
     prisma.trip.count({ where }),
@@ -26,13 +27,17 @@ export const findById = async (whereObj) => {
       itineraries: {
         include: {
           days: {
+            orderBy: { dayNumber: 'asc' },
             include: {
-              activities: true
+              activities: {
+                orderBy: { order: 'asc' },
+              }
             }
           }
         }
       },
       tripTags: true,
+      destination: true,
     }
   });
 };
