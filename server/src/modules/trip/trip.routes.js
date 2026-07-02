@@ -30,4 +30,17 @@ router.post(
 );
 router.delete("/:id/banner-images", tripController.deleteBanner);
 
+router.post(
+  "/:id/gallery-images",
+  uploadMiddleware.array("gallery", 20),
+  tripController.uploadGalleryImages
+);
+router.delete("/:id/gallery-images", tripController.deleteGalleryImage);
+
+router.post(
+  "/:id/stay-transport",
+  uploadMiddleware.array("images", 15),
+  tripController.syncStayTransport
+);
+
 export default router;

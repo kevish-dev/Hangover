@@ -15,3 +15,11 @@ export const updateFormField = async (id, data) => {
 export const deleteFormField = async (id) => {
   return repo.deleteFormField(id);
 };
+
+export const updateFieldOrder = async (fieldIds) => {
+  return repo.updateFieldOrder(fieldIds);
+};
+
+export const getSubmissions = async (tripId) => {
+  return repo.getSubmissionsByTripId(tripId);
+};

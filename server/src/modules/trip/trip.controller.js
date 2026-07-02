@@ -82,3 +82,50 @@ export const deleteBanner = async (req, res, next) => {
     next(error);
   }
 };
+
+export const uploadGalleryImages = async (req, res, next) => {
+  try {
+    const files = req.files;
+    if (!files || files.length === 0) {
+      return res.status(400).json({ message: "No images provided" });
+    }
+
+    const buffers = files.map(file => file.buffer);
+    const trip = await tripService.uploadGalleryImages(req.params.id, buffers);
+    
+    res.status(200).json({ message: "Gallery images uploaded successfully", trip });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteGalleryImage = async (req, res, next) => {
+  try {
+    const { imageUrl } = req.body;
+    if (!imageUrl) {
+      return res.status(400).json({ message: "imageUrl is required" });
+    }
+    const trip = await tripService.deleteGalleryImage(req.params.id, imageUrl);
+    res.status(200).json({ message: "Gallery image deleted successfully", trip });
+  } catch (error) {
+    if (error.message === "Image not found in trip") {
+      return res.status(404).json({ message: error.message });
+    }
+    next(error);
+  }
+};
+
+export const syncStayTransport = async (req, res, next) => {
+  try {
+    const { payload } = req.body;
+    if (!payload) {
+      return res.status(400).json({ message: "Payload missing" });
+    }
+    
+    const files = req.files || [];
+    const trip = await tripService.syncStayTransport(req.params.id, payload, files);
+    res.status(200).json({ message: "Stay & Transport updated", trip });
+  } catch (error) {
+    next(error);
+  }
+};

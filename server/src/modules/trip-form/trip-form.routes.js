@@ -11,7 +11,9 @@ router.get("/", tripFormController.getFormFields);
 // Admin routes
 router.use(requireAuth, requireAdmin);
 router.post("/", tripFormController.createFormField);
+router.put("/reorder", tripFormController.updateFieldOrder);
 router.put("/:fieldId", tripFormController.updateFormField);
 router.delete("/:fieldId", tripFormController.deleteFormField);
+router.get("/submissions", tripFormController.getTripSubmissions);
 
 export default router;

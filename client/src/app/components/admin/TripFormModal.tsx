@@ -54,7 +54,7 @@ const TRIP_TYPES = [
   "BONFIRE_RETREAT", "INSTITUTE_COLLEGE_TRIP", "CUSTOM_TRIP"
 ];
 
-const STEPS = ["Basics", "Logistics", "Content", "FAQs & Tags", "Media"];
+const STEPS = ["Basics", "Logistics", "Content", "FAQs & Tags", "Stay & Transport", "Media"];
 
 interface TripFormModalProps {
   trip?: any;
@@ -66,6 +66,12 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
   const [step, setStep] = useState(0);
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [galleryImages, setGalleryImages] = useState<File[]>([]);
+  const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
+  
+  // Stay & Transport State
+  const [stayItems, setStayItems] = useState<{ id: string, text: string, type: "NEW" | "EXISTING", url?: string, file?: File, preview?: string }[]>([]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
 
@@ -123,6 +129,15 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
           faqs: trip.faqs?.length ? trip.faqs.map((f: any) => ({ question: f.question, answer: f.answer })) : [{ question: "", answer: "" }],
           isPublished: trip.isPublished || false,
         });
+
+        // Initialize Stay items
+        setStayItems(trip.stayTransportImages?.map((item: any) => ({
+          id: Math.random().toString(),
+          text: item.text || "",
+          type: "EXISTING",
+          url: item.imageUrl,
+          preview: item.imageUrl
+        })) || []);
       } else {
         form.reset({
           title: "", location: "", tripType: "MOUNTAIN_TREK", difficultyLevel: "Moderate",
@@ -134,10 +149,13 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
           faqs: [],
           isPublished: false,
         });
+        setStayItems([]);
       }
       setStep(0);
       setImages([]);
       setImagePreviews([]);
+      setGalleryImages([]);
+      setGalleryPreviews([]);
     }
   }, [trip, open, form]);
 
@@ -164,7 +182,6 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
       const newPreviews = newFiles.map(file => URL.createObjectURL(file));
       setImagePreviews(prev => [...prev, ...newPreviews]);
     }
-    // Reset file input value to allow selecting the same file again if needed
     e.target.value = "";
   };
 
@@ -176,6 +193,61 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
     });
   };
 
+  const handleGalleryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      setGalleryImages(prev => [...prev, ...newFiles]);
+      const newPreviews = newFiles.map(file => URL.createObjectURL(file));
+      setGalleryPreviews(prev => [...prev, ...newPreviews]);
+    }
+    e.target.value = "";
+  };
+
+  const removeGalleryImage = (index: number) => {
+    setGalleryImages(prev => prev.filter((_, i) => i !== index));
+    setGalleryPreviews(prev => {
+      URL.revokeObjectURL(prev[index]);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  // --- Stay & Transport Handlers ---
+  const addStayItem = () => {
+    setStayItems(prev => [...prev, { id: Math.random().toString(), text: "", type: "NEW" }]);
+  };
+  const removeStayItem = (index: number) => {
+    setStayItems(prev => {
+       const newItems = [...prev];
+       if (newItems[index].type === "NEW" && newItems[index].preview) {
+         URL.revokeObjectURL(newItems[index].preview!);
+       }
+       newItems.splice(index, 1);
+       return newItems;
+    });
+  };
+  const updateStayItemText = (index: number, text: string) => {
+    setStayItems(prev => {
+       const newItems = [...prev];
+       newItems[index].text = text;
+       return newItems;
+    });
+  };
+  const handleStayImageChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+       const file = e.target.files[0];
+       setStayItems(prev => {
+         const newItems = [...prev];
+         if (newItems[index].preview && newItems[index].type === "NEW") {
+           URL.revokeObjectURL(newItems[index].preview!);
+         }
+         newItems[index].type = "NEW";
+         newItems[index].file = file;
+         newItems[index].preview = URL.createObjectURL(file);
+         return newItems;
+       });
+    }
+  };
+
   const deleteExistingImage = async (url: string) => {
     if (!trip?.id) return;
     if (!window.confirm("Are you sure you want to permanently delete this banner image?")) return;
@@ -183,9 +255,21 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
     try {
       await apiClient.delete(`/trips/${trip.id}/banner-images`, { data: { imageUrl: url } });
       toast.success("Image deleted successfully");
-      // Optimistically update the local trip prop so UI reflects immediately
       trip.bannerImages = trip.bannerImages.filter((img: string) => img !== url);
-      // Invalidate to refresh the underlying list data
+      queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Failed to delete image");
+    }
+  };
+
+  const deleteExistingGalleryImage = async (url: string) => {
+    if (!trip?.id) return;
+    if (!window.confirm("Are you sure you want to permanently delete this gallery image?")) return;
+
+    try {
+      await apiClient.delete(`/trips/${trip.id}/gallery-images`, { data: { imageUrl: url } });
+      toast.success("Gallery image deleted successfully");
+      trip.galleryImages = trip.galleryImages.filter((img: string) => img !== url);
       queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
     } catch (error: any) {
       toast.error(error?.response?.data?.message || "Failed to delete image");
@@ -198,8 +282,18 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
     if (step === 1) fieldsToValidate = ["startDate", "endDate", "duration", "groupSizeMin", "groupSizeMax", "maxAltitude"];
     if (step === 2) fieldsToValidate = ["overview", "highlights", "inclusions", "exclusions"];
     if (step === 3) fieldsToValidate = ["faqs", "tripTags"];
+    if (step === 4) return true; // Stay & Transport has local state, basic validation can be skipped or added if needed
     
     const isValid = await form.trigger(fieldsToValidate);
+    
+    if (step === 4) {
+      const invalid = stayItems.some(i => i.text.trim() === "" || (!i.preview && !i.url));
+      if (invalid) {
+        toast.error("Please fill text and select an image for all Stay & Transport items.");
+        return false;
+      }
+    }
+    
     return isValid;
   };
 
@@ -239,13 +333,52 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
         toast.success("Trip created successfully!");
       }
 
+      // Sync Stay & Transport Images
+      if (stayItems.length > 0) {
+        const stayFormData = new FormData();
+        const stayPayload: any[] = [];
+        let fileIndex = 0;
+        
+        stayItems.forEach(item => {
+          if (item.type === "NEW" && item.file) {
+             stayFormData.append("images", item.file);
+             stayPayload.push({ text: item.text, type: "NEW", fileIndex });
+             fileIndex++;
+          } else if (item.type === "EXISTING") {
+             stayPayload.push({ text: item.text, type: "EXISTING", url: item.url });
+          }
+        });
+        stayFormData.append("payload", JSON.stringify(stayPayload));
+        
+        await apiClient.post(`/trips/${tripId}/stay-transport`, stayFormData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
+        toast.success("Stay & Transport updated!");
+      } else if (isEdit) {
+        const stayFormData = new FormData();
+        stayFormData.append("payload", JSON.stringify([]));
+        await apiClient.post(`/trips/${tripId}/stay-transport`, stayFormData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
+      }
+
+      // Sync Banners & Gallery
       if (images.length > 0) {
         const formData = new FormData();
         images.forEach(img => formData.append("banners", img));
         await apiClient.post(`/trips/${tripId}/banner-images`, formData, {
           headers: { "Content-Type": "multipart/form-data" }
         });
-        toast.success("Images uploaded!");
+        toast.success("Banner images uploaded!");
+      }
+
+      if (galleryImages.length > 0) {
+        const formData = new FormData();
+        galleryImages.forEach(img => formData.append("gallery", img));
+        await apiClient.post(`/trips/${tripId}/gallery-images`, formData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
+        toast.success("Gallery images uploaded!");
       }
 
       queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
@@ -257,7 +390,6 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
     }
   };
 
-  // Intercept Enter key to prevent auto-submission on steps 1-3
   const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
     if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "TEXTAREA") {
       e.preventDefault();
@@ -284,7 +416,7 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-colors duration-300 ${i <= step ? 'border-[#781216] bg-[#781216] text-white' : 'border-gray-300 bg-white text-gray-500'}`}>
                     {i + 1}
                   </div>
-                  <span className="text-xs font-medium">{s}</span>
+                  <span className="text-[10px] sm:text-xs font-medium text-center leading-tight">{s}</span>
                 </div>
                 {i < STEPS.length - 1 && (
                   <div className={`flex-1 h-[2px] -mt-5 ${i < step ? 'bg-[#781216]' : 'bg-gray-200'}`} />
@@ -315,14 +447,17 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
                   <select {...form.register("tripType")} className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
                     {TRIP_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
                   </select>
+                  {form.formState.errors.tripType && <p className="text-sm text-red-500">{form.formState.errors.tripType.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Difficulty Level</Label>
                   <Input {...form.register("difficultyLevel")} placeholder="e.g. Moderate to Difficult" />
+                  {form.formState.errors.difficultyLevel && <p className="text-sm text-red-500">{form.formState.errors.difficultyLevel.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Best Time to Visit</Label>
                   <Input {...form.register("bestTimeToVisit")} placeholder="e.g. Dec to March" />
+                  {form.formState.errors.bestTimeToVisit && <p className="text-sm text-red-500">{form.formState.errors.bestTimeToVisit.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Price (₹)</Label>
@@ -332,10 +467,12 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
                 <div className="space-y-2">
                   <Label>Token Amount (₹)</Label>
                   <Input type="number" {...form.register("tokenAmount")} />
+                  {form.formState.errors.tokenAmount && <p className="text-sm text-red-500">{form.formState.errors.tokenAmount.message}</p>}
                 </div>
                 <div className="space-y-2 col-span-2">
                   <Label>Total Capacity (Pax)</Label>
                   <Input type="number" {...form.register("capacity")} />
+                  {form.formState.errors.capacity && <p className="text-sm text-red-500">{form.formState.errors.capacity.message}</p>}
                 </div>
                 <div className="space-y-2 col-span-2 flex items-center gap-2 mt-2">
                   <input type="checkbox" id="isPublished" {...form.register("isPublished")} className="w-4 h-4 text-[#c8a96e] rounded border-gray-300 focus:ring-[#c8a96e]" />
@@ -360,18 +497,22 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
                 <div className="space-y-2">
                   <Label>Duration (Days)</Label>
                   <Input type="number" {...form.register("duration")} />
+                  {form.formState.errors.duration && <p className="text-sm text-red-500">{form.formState.errors.duration.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Max Altitude (ft)</Label>
                   <Input type="number" {...form.register("maxAltitude")} />
+                  {form.formState.errors.maxAltitude && <p className="text-sm text-red-500">{form.formState.errors.maxAltitude.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Min Group Size</Label>
                   <Input type="number" {...form.register("groupSizeMin")} />
+                  {form.formState.errors.groupSizeMin && <p className="text-sm text-red-500">{form.formState.errors.groupSizeMin.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Max Group Size</Label>
                   <Input type="number" {...form.register("groupSizeMax")} />
+                  {form.formState.errors.groupSizeMax && <p className="text-sm text-red-500">{form.formState.errors.groupSizeMax.message}</p>}
                 </div>
               </div>
             </div>
@@ -401,7 +542,7 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
                       </Button>
                     </div>
                   ))}
-                  {form.formState.errors.highlights && <p className="text-sm text-red-500">{form.formState.errors.highlights.root?.message}</p>}
+                  {form.formState.errors.highlights && <p className="text-sm text-red-500">{form.formState.errors.highlights.root?.message || form.formState.errors.highlights.message}</p>}
                 </div>
 
                 {/* INCLUSIONS */}
@@ -420,6 +561,7 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
                       </Button>
                     </div>
                   ))}
+                  {form.formState.errors.inclusions && <p className="text-sm text-red-500">{form.formState.errors.inclusions.root?.message || form.formState.errors.inclusions.message}</p>}
                 </div>
 
                 {/* EXCLUSIONS */}
@@ -438,9 +580,8 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
                       </Button>
                     </div>
                   ))}
+                  {form.formState.errors.exclusions && <p className="text-sm text-red-500">{form.formState.errors.exclusions.root?.message || form.formState.errors.exclusions.message}</p>}
                 </div>
-
-
 
               </div>
             </div>
@@ -538,8 +679,66 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
               </div>
             </div>
 
-            {/* STEP 4: MEDIA (BANNER IMAGES) */}
+            {/* STEP 4: STAY & TRANSPORT */}
             <div className={step === 4 ? "block" : "hidden"}>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b pb-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Stay & Transport Options</h3>
+                    <p className="text-sm text-gray-500">Add images and descriptions for accommodation and transport.</p>
+                  </div>
+                  <Button type="button" onClick={addStayItem} className="bg-[#781216] hover:bg-[#5a0d10] text-white flex items-center gap-2">
+                    <Plus className="w-4 h-4" /> Add Item
+                  </Button>
+                </div>
+
+                <div className="space-y-4 pt-2">
+                  {stayItems.length === 0 ? (
+                    <div className="py-8 text-center border-2 border-dashed border-gray-200 rounded-lg bg-gray-50 text-gray-500">
+                      No Stay & Transport items added. Click 'Add Item' to start.
+                    </div>
+                  ) : (
+                    stayItems.map((item, index) => (
+                      <div key={item.id} className="p-4 border rounded-lg bg-white shadow-sm flex items-start gap-4 group">
+                        <div className="w-24 h-24 shrink-0 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center relative overflow-hidden">
+                           {item.preview ? (
+                             <img src={item.preview} alt="preview" className="w-full h-full object-cover" />
+                           ) : (
+                             <ImageIcon className="w-8 h-8 text-gray-300" />
+                           )}
+                           <input 
+                             type="file" 
+                             accept="image/*"
+                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                             onChange={(e) => handleStayImageChange(index, e)}
+                           />
+                        </div>
+                        <div className="flex-1 space-y-2">
+                           <Label className="text-xs text-gray-500 uppercase font-semibold">Description</Label>
+                           <Input 
+                             value={item.text} 
+                             onChange={(e) => updateStayItemText(index, e.target.value)} 
+                             placeholder="e.g. Volvo Semi-Sleeper Bus / Luxury Tents" 
+                           />
+                        </div>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => removeStayItem(index)} 
+                          className="text-red-500 hover:bg-red-50 mt-6 shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* STEP 5: MEDIA (BANNER IMAGES) */}
+            <div className={step === 5 ? "block" : "hidden"}>
               <div className="space-y-4">
                 {isEdit && trip?.bannerImages?.length > 0 && (
                   <div className="mb-6">
@@ -590,7 +789,7 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
                 {/* Previews */}
                 {imagePreviews.length > 0 && (
                   <div className="mt-6">
-                    <h4 className="font-medium mb-3 text-sm text-gray-500">New Selected Images ({imagePreviews.length})</h4>
+                    <h4 className="font-medium mb-3 text-sm text-gray-500">New Selected Banners ({imagePreviews.length})</h4>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {imagePreviews.map((url, i) => (
                         <div key={url} className="relative group rounded-lg overflow-hidden border border-gray-200 aspect-video bg-gray-100">
@@ -609,6 +808,79 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
                     </div>
                   </div>
                 )}
+                
+                {/* GALLERY IMAGES */}
+                <div className="mt-12 mb-6 pt-8 border-t border-gray-200">
+                  <h3 className="text-xl font-bold text-gray-900 mb-4">Gallery Images</h3>
+                  {isEdit && trip?.galleryImages?.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="font-medium mb-3 text-sm text-gray-500">Current Gallery Images</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {trip.galleryImages.map((url: string, i: number) => (
+                          <div key={url} className="relative group rounded-lg overflow-hidden border border-gray-200 aspect-square bg-gray-100">
+                            <img src={url} alt={`Gallery ${i}`} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <button 
+                                type="button" 
+                                onClick={() => deleteExistingGalleryImage(url)}
+                                className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
+                                title="Delete Image"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="p-8 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 flex flex-col items-center justify-center text-center">
+                     <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 mb-4">
+                       <UploadCloud className="w-8 h-8 text-blue-500" />
+                     </div>
+                     <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                       Upload Gallery Images
+                     </h3>
+                     <p className="text-sm text-gray-500 mb-6 max-w-sm">
+                       Upload multiple photos of the destination to show in the trip gallery grid.
+                     </p>
+                     <Label htmlFor="gallery-upload" className="cursor-pointer bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2.5 rounded-lg font-medium transition-colors shadow-sm inline-flex items-center gap-2">
+                       <ImageIcon className="w-4 h-4" />
+                       Select Gallery Images
+                       <input 
+                         id="gallery-upload" 
+                         type="file" 
+                         multiple 
+                         accept="image/*" 
+                         className="hidden" 
+                         onChange={handleGalleryChange}
+                       />
+                     </Label>
+                  </div>
+                  
+                  {galleryPreviews.length > 0 && (
+                    <div className="mt-6">
+                      <h4 className="font-medium mb-3 text-sm text-gray-500">New Selected Gallery ({galleryPreviews.length})</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {galleryPreviews.map((url, i) => (
+                          <div key={url} className="relative group rounded-lg overflow-hidden border border-gray-200 aspect-square bg-gray-100">
+                            <img src={url} alt={`Gallery Preview ${i}`} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <button 
+                                type="button" 
+                                onClick={() => removeGalleryImage(i)}
+                                className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 

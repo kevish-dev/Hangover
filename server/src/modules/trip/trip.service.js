@@ -35,6 +35,9 @@ export const createTrip = async (data) => {
   if (!data.slug) {
     data.slug = generateSlug(data.title) + "-" + Date.now();
   }
+  if (!data.stayTransportImages) {
+    data.stayTransportImages = [];
+  }
   return tripRepo.create(data);
 };
 
@@ -84,4 +87,71 @@ export const uploadBannerImages = async (tripId, imageBuffers) => {
   return tripRepo.update(tripId, {
     bannerImages: [...existingBanners, ...imageUrls]
   });
+};
+
+export const uploadGalleryImages = async (tripId, buffers) => {
+  const trip = await tripRepo.findById(tripId);
+  if (!trip) {
+    throw new Error("Trip not found");
+  }
+
+  const folder = `uploads/trips/${tripId}/galleryimages`;
+  const uploadPromises = buffers.map(buffer => 
+    uploadToCloudinary(buffer, {
+      folder,
+      publicId: randomUUID(),
+    })
+  );
+
+  const imageUrls = await Promise.all(uploadPromises);
+  const existingGallery = trip.galleryImages || [];
+
+  return tripRepo.update(tripId, {
+    galleryImages: [...existingGallery, ...imageUrls]
+  });
+};
+
+export const deleteGalleryImage = async (tripId, imageUrl) => {
+  const trip = await tripRepo.findById(tripId);
+  if (!trip) {
+    throw new Error("Trip not found");
+  }
+
+  const existingGallery = trip.galleryImages || [];
+  if (!existingGallery.includes(imageUrl)) {
+    throw new Error("Image not found in trip");
+  }
+
+  await deleteFromCloudinary(imageUrl);
+
+  return tripRepo.update(tripId, {
+    galleryImages: existingGallery.filter(url => url !== imageUrl)
+  });
+};
+
+export const syncStayTransport = async (tripId, payloadStr, files) => {
+  const trip = await tripRepo.findById(tripId);
+  if (!trip) throw new Error("Trip not found");
+
+  const payload = JSON.parse(payloadStr); 
+  const folder = `uploads/trips/${tripId}/staytransport`;
+  
+  const finalArray = [];
+  
+  for (const item of payload) {
+    if (item.type === "EXISTING") {
+      finalArray.push({ text: item.text, imageUrl: item.url });
+    } else if (item.type === "NEW") {
+      const file = files[item.fileIndex];
+      if (file) {
+         const url = await uploadToCloudinary(file.buffer, {
+           folder,
+           publicId: randomUUID(),
+         });
+         finalArray.push({ text: item.text, imageUrl: url });
+      }
+    }
+  }
+
+  return tripRepo.update(tripId, { stayTransportImages: finalArray });
 };

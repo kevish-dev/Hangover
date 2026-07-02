@@ -205,7 +205,7 @@ model Trip {
   galleryImages        String[]
   inclusions           String[]
   exclusions           String[]
-  stayTransportImages  String[]
+  stayTransportImages  Json
 
   price       Decimal @db.Decimal(10, 2)
   tokenAmount Decimal @db.Decimal(10, 2)
