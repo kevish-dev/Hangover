@@ -42,14 +42,10 @@ const tripSchema = z.object({
 
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
-  duration: z.coerce.number().min(1, "Duration must be at least 1 day"),
 
-  maxAltitude: z.coerce.number().min(0, "Altitude must be valid"),
+  maxAltitude: z.coerce.number().optional(),
 
   overview: z.string().min(10, "Overview must be detailed"),
-  highlights: z
-    .array(z.object({ value: z.string().min(1) }))
-    .min(1, "At least one highlight"),
   inclusions: z
     .array(z.object({ value: z.string().min(1) }))
     .min(1, "At least one inclusion"),
@@ -107,8 +103,18 @@ export function TripFormModal({
   const [step, setStep] = useState(0);
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-  const [galleryImages, setGalleryImages] = useState<File[]>([]);
-  const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
+
+  // Highlight State
+  const [highlightItems, setHighlightItems] = useState<
+    {
+      id: string;
+      text: string;
+      type: "NEW" | "EXISTING";
+      url?: string;
+      file?: File;
+      preview?: string;
+    }[]
+  >([]);
 
   // Stay & Transport State
   const [stayItems, setStayItems] = useState<
@@ -150,10 +156,8 @@ export function TripFormModal({
       capacity: 10,
       startDate: "",
       endDate: "",
-      duration: 1,
       maxAltitude: 0,
       overview: "",
-      highlights: [],
       inclusions: [],
       exclusions: [],
       tripTags: [],
@@ -178,13 +182,9 @@ export function TripFormModal({
           capacity: trip.capacity || 10,
           startDate: formatDateForInput(trip.startDate),
           endDate: formatDateForInput(trip.endDate),
-          duration: trip.duration || 1,
 
           maxAltitude: trip.maxAltitude || 0,
           overview: trip.overview || "",
-          highlights: trip.highlights?.length
-            ? trip.highlights.map((h: string) => ({ value: h }))
-            : [{ value: "" }],
           inclusions: trip.inclusions?.length
             ? trip.inclusions.map((i: string) => ({ value: i }))
             : [{ value: "" }],
@@ -202,6 +202,17 @@ export function TripFormModal({
             : [{ question: "", answer: "" }],
           isPublished: trip.isPublished || false,
         });
+
+        // Initialize Highlight items
+        setHighlightItems(
+          trip.highlights?.map((item: any) => ({
+            id: Math.random().toString(),
+            text: item.text || "",
+            type: "EXISTING",
+            url: item.imageUrl,
+            preview: item.imageUrl,
+          })) || [],
+        );
 
         // Initialize Stay items
         setStayItems(
@@ -225,10 +236,8 @@ export function TripFormModal({
           capacity: 10,
           startDate: "",
           endDate: "",
-          duration: 1,
           maxAltitude: 0,
           overview: "",
-          highlights: [],
           inclusions: [],
           exclusions: [],
           tripTags: [],
@@ -240,19 +249,10 @@ export function TripFormModal({
       setStep(0);
       setImages([]);
       setImagePreviews([]);
-      setGalleryImages([]);
-      setGalleryPreviews([]);
+      setHighlightItems([]);
     }
   }, [trip, open, form]);
 
-  const {
-    fields: highlightFields,
-    append: addHighlight,
-    remove: removeHighlight,
-  } = useFieldArray({
-    control: form.control,
-    name: "highlights",
-  });
   const {
     fields: inclusionFields,
     append: addInclusion,
@@ -321,6 +321,49 @@ export function TripFormModal({
       URL.revokeObjectURL(prev[index]);
       return prev.filter((_, i) => i !== index);
     });
+  };
+
+  // --- Highlights Handlers ---
+  const addHighlightItem = () => {
+    setHighlightItems((prev) => [
+      ...prev,
+      { id: Math.random().toString(), text: "", type: "NEW" },
+    ]);
+  };
+  const removeHighlightItem = (index: number) => {
+    setHighlightItems((prev) => {
+      const newItems = [...prev];
+      if (newItems[index].type === "NEW" && newItems[index].preview) {
+        URL.revokeObjectURL(newItems[index].preview!);
+      }
+      newItems.splice(index, 1);
+      return newItems;
+    });
+  };
+  const updateHighlightItemText = (index: number, text: string) => {
+    setHighlightItems((prev) => {
+      const newItems = [...prev];
+      newItems[index].text = text;
+      return newItems;
+    });
+  };
+  const handleHighlightImageChange = (
+    index: number,
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setHighlightItems((prev) => {
+        const newItems = [...prev];
+        if (newItems[index].preview && newItems[index].type === "NEW") {
+          URL.revokeObjectURL(newItems[index].preview!);
+        }
+        newItems[index].type = "NEW";
+        newItems[index].file = file;
+        newItems[index].preview = URL.createObjectURL(file);
+        return newItems;
+      });
+    }
   };
 
   // --- Stay & Transport Handlers ---
@@ -426,13 +469,25 @@ export function TripFormModal({
         "capacity",
       ];
     if (step === 1)
-      fieldsToValidate = ["startDate", "endDate", "duration", "maxAltitude"];
+      fieldsToValidate = ["startDate", "endDate", "maxAltitude"];
     if (step === 2)
-      fieldsToValidate = ["overview", "highlights", "inclusions", "exclusions"];
+      fieldsToValidate = ["overview", "inclusions", "exclusions"];
     if (step === 3) fieldsToValidate = ["faqs", "tripTags"];
     if (step === 4) return true; // Stay & Transport has local state, basic validation can be skipped or added if needed
 
     const isValid = await form.trigger(fieldsToValidate);
+
+    if (step === 2) {
+      const invalid = highlightItems.some(
+        (i) => i.text.trim() === "" || (!i.preview && !i.url),
+      );
+      if (invalid) {
+        toast.error(
+          "Please fill text and select an image for all Highlight items.",
+        );
+        return false;
+      }
+    }
 
     if (step === 4) {
       const invalid = stayItems.some(
@@ -469,9 +524,6 @@ export function TripFormModal({
         ...data,
         startDate: new Date(data.startDate).toISOString(),
         endDate: new Date(data.endDate).toISOString(),
-        highlights: data.highlights
-          .map((h) => h.value)
-          .filter((h) => h.trim() !== ""),
         inclusions: data.inclusions
           .map((i) => i.value)
           .filter((i) => i.trim() !== ""),
@@ -530,7 +582,40 @@ export function TripFormModal({
         });
       }
 
-      // Sync Banners & Gallery
+      // Sync Highlights
+      if (highlightItems.length > 0) {
+        const highlightFormData = new FormData();
+        const highlightPayload: any[] = [];
+        let highlightFileIndex = 0;
+
+        highlightItems.forEach((item) => {
+          if (item.type === "NEW" && item.file) {
+            highlightFormData.append("images", item.file);
+            highlightPayload.push({ text: item.text, type: "NEW", fileIndex: highlightFileIndex });
+            highlightFileIndex++;
+          } else if (item.type === "EXISTING") {
+            highlightPayload.push({
+              text: item.text,
+              type: "EXISTING",
+              url: item.url,
+            });
+          }
+        });
+        highlightFormData.append("payload", JSON.stringify(highlightPayload));
+
+        await apiClient.post(`/trips/${tripId}/highlights`, highlightFormData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        toast.success("Highlights updated!");
+      } else if (isEdit) {
+        const highlightFormData = new FormData();
+        highlightFormData.append("payload", JSON.stringify([]));
+        await apiClient.post(`/trips/${tripId}/highlights`, highlightFormData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
+      // Sync Banners
       if (images.length > 0) {
         const formData = new FormData();
         images.forEach((img) => formData.append("banners", img));
@@ -538,15 +623,6 @@ export function TripFormModal({
           headers: { "Content-Type": "multipart/form-data" },
         });
         toast.success("Banner images uploaded!");
-      }
-
-      if (galleryImages.length > 0) {
-        const formData = new FormData();
-        galleryImages.forEach((img) => formData.append("gallery", img));
-        await apiClient.post(`/trips/${tripId}/gallery-images`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-        toast.success("Gallery images uploaded!");
       }
 
       queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
@@ -746,15 +822,7 @@ export function TripFormModal({
                     </p>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Label>Duration (Days)</Label>
-                  <Input type="number" {...form.register("duration")} />
-                  {form.formState.errors.duration && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.duration.message}
-                    </p>
-                  )}
-                </div>
+
                 <div className="space-y-2">
                   <Label>Max Altitude (ft)</Label>
                   <Input type="number" {...form.register("maxAltitude")} />
@@ -786,42 +854,70 @@ export function TripFormModal({
                 </div>
 
                 {/* HIGHLIGHTS */}
-                <div className="space-y-3 p-4 border rounded-lg bg-gray-50/50">
+                <div className="space-y-4 pt-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-base font-semibold">
                       Highlights
                     </Label>
                     <Button
                       type="button"
-                      variant="outline"
+                      onClick={addHighlightItem}
+                      className="bg-gray-900 hover:bg-gray-800 text-white flex items-center gap-2"
                       size="sm"
-                      onClick={() => addHighlight({ value: "" })}
                     >
-                      <Plus className="w-4 h-4 mr-1" /> Add
+                      <Plus className="w-4 h-4 mr-1" /> Add Highlight
                     </Button>
                   </div>
-                  {highlightFields.map((field, index) => (
-                    <div key={field.id} className="flex items-center gap-2">
-                      <Input
-                        {...form.register(`highlights.${index}.value`)}
-                        placeholder={`Highlight ${index + 1}`}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeHighlight(index)}
-                        className="text-red-500 hover:text-red-600 hover:bg-red-50 shrink-0"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                  {highlightItems.length === 0 ? (
+                    <div className="py-6 text-center border-2 border-dashed border-gray-200 rounded-lg bg-gray-50 text-gray-500">
+                      No highlights added. Click 'Add Highlight' to start.
                     </div>
-                  ))}
-                  {form.formState.errors.highlights && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.highlights.root?.message ||
-                        form.formState.errors.highlights.message}
-                    </p>
+                  ) : (
+                    highlightItems.map((item, index) => (
+                      <div
+                        key={item.id}
+                        className="p-4 border rounded-lg bg-white shadow-sm flex items-start gap-4 group"
+                      >
+                        <div className="w-24 h-24 shrink-0 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center relative overflow-hidden">
+                          {item.preview ? (
+                            <img
+                              src={item.preview}
+                              alt="preview"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <ImageIcon className="w-8 h-8 text-gray-300" />
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            onChange={(e) => handleHighlightImageChange(index, e)}
+                          />
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <Label className="text-xs text-gray-500 uppercase font-semibold">
+                            Highlight Description
+                          </Label>
+                          <Input
+                            value={item.text}
+                            onChange={(e) =>
+                              updateHighlightItemText(index, e.target.value)
+                            }
+                            placeholder="e.g. Visit to highest peak"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeHighlightItem(index)}
+                          className="text-red-500 hover:bg-red-50 mt-6 shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))
                   )}
                 </div>
 
@@ -1232,102 +1328,7 @@ export function TripFormModal({
                   </div>
                 )}
 
-                {/* GALLERY IMAGES */}
-                <div className="mt-12 mb-6 pt-8 border-t border-gray-200">
-                  <h3 className="text-xl font-bold text-gray-900 mb-4">
-                    Gallery Images
-                  </h3>
-                  {isEdit && trip?.galleryImages?.length > 0 && (
-                    <div className="mb-6">
-                      <h4 className="font-medium mb-3 text-sm text-gray-500">
-                        Current Gallery Images
-                      </h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {trip.galleryImages.map((url: string, i: number) => (
-                          <div
-                            key={url}
-                            className="relative group rounded-lg overflow-hidden border border-gray-200 aspect-square bg-gray-100"
-                          >
-                            <img
-                              src={url}
-                              alt={`Gallery ${i}`}
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <button
-                                type="button"
-                                onClick={() => deleteExistingGalleryImage(url)}
-                                className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
-                                title="Delete Image"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
-                  <div className="p-8 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 flex flex-col items-center justify-center text-center">
-                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 mb-4">
-                      <UploadCloud className="w-8 h-8 text-blue-500" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                      Upload Gallery Images
-                    </h3>
-                    <p className="text-sm text-gray-500 mb-6 max-w-sm">
-                      Upload multiple photos of the destination to show in the
-                      trip gallery grid.
-                    </p>
-                    <Label
-                      htmlFor="gallery-upload"
-                      className="cursor-pointer bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2.5 rounded-lg font-medium transition-colors shadow-sm inline-flex items-center gap-2"
-                    >
-                      <ImageIcon className="w-4 h-4" />
-                      Select Gallery Images
-                      <input
-                        id="gallery-upload"
-                        type="file"
-                        multiple
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleGalleryChange}
-                      />
-                    </Label>
-                  </div>
-
-                  {galleryPreviews.length > 0 && (
-                    <div className="mt-6">
-                      <h4 className="font-medium mb-3 text-sm text-gray-500">
-                        New Selected Gallery ({galleryPreviews.length})
-                      </h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {galleryPreviews.map((url, i) => (
-                          <div
-                            key={url}
-                            className="relative group rounded-lg overflow-hidden border border-gray-200 aspect-square bg-gray-100"
-                          >
-                            <img
-                              src={url}
-                              alt={`Gallery Preview ${i}`}
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <button
-                                type="button"
-                                onClick={() => removeGalleryImage(i)}
-                                className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
           </form>

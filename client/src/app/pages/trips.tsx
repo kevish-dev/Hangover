@@ -406,7 +406,7 @@ function FilterSidebar({ filters, setFilters, availableDestinations, availableCa
 // ── Trip Card ──────────────────────────────────────────────────────
 function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
   const [hovered, setHovered] = useState(false);
-  const heroImage = trip.bannerImages?.[0] || trip.galleryImages?.[0] || "";
+  const heroImage = trip.bannerImages?.[0] || trip.highlights?.[0]?.imageUrl || "";
   const priceNum = priceToNumber(trip.price);
   const spots = spotsLeft(trip.capacity, trip.filledSpots);
   const tags = trip.tripTags?.map((t) => t.tag) || [];

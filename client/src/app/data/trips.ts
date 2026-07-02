@@ -56,13 +56,13 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "Tribal culture meets indie music in India's most remote valley.",
     description: "Ziro Valley sits quietly in the lower Himalayan foothills of Arunachal Pradesh, home to the Apatani tribe — one of the most unique indigenous communities in all of Asia. Every September, this rice-farming valley transforms into the backdrop of India's coolest music festival, where independent artists perform under open skies while the tribal community goes about its ancient, unhurried way of life. This trip takes you deep into both worlds: the festival's community spirit and the Apatani's centuries-old traditions. You'll walk through bamboo villages, eat home-cooked tribal food, sit around bonfires with strangers who become friends, and hear music that sounds nothing like anything you've heard before.",
     highlights: [
-      "Live music performances across 3 festival days with 40+ indie artists",
-      "Guided walk through Apatani tribal villages with a local host",
-      "Overnight camping in the valley with bonfire evenings",
-      "Home-cooked Apatani meals — bamboo shoot curry, smoked pork, rice beer",
-      "Dawn walk to the paddy fields — the most serene hour you'll ever spend",
-      "Small group (max 12 people) — you actually get to know your travel mates",
-    ],
+        { text: "Live music performances across 3 festival days with 40+ indie artists" },
+        { text: "Guided walk through Apatani tribal villages with a local host" },
+        { text: "Overnight camping in the valley with bonfire evenings" },
+        { text: "Home-cooked Apatani meals — bamboo shoot curry, smoked pork, rice beer" },
+        { text: "Dawn walk to the paddy fields — the most serene hour you'll ever spend" },
+        { text: "Small group (max 12 people) — you actually get to know your travel mates" }
+      ],
     itinerary: [
       { day: 1, title: "Guwahati → Naharlagun", description: "Fly into Guwahati and transfer to Naharlagun. Evening orientation dinner with the group.", activities: ["Airport pickup", "3-hour drive to Naharlagun", "Group dinner and briefing"] },
       { day: 2, title: "Naharlagun → Ziro Valley", description: "Morning drive into the hills. Arrive by afternoon and set up your camp. First look at the festival grounds at sunset.", activities: ["Scenic mountain drive", "Camp check-in", "Festival ground walk", "Welcome bonfire"] },
@@ -90,11 +90,7 @@ export const TRIPS_DATA: Trip[] = [
     ],
     tags: ["Northeast India", "Music", "Tribal"],
     image: "https://images.unsplash.com/photo-1756370256926-e48ca54c5efe?w=1400&h=800&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1508519829430-40f7d3d161b4?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1532458605850-e9f7a26d9f80?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1536607961765-592e80bcc19e?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 12,
     difficulty: "Easy",
     bestTime: "September – October",
@@ -118,13 +114,13 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "Snow-covered summit, oak forests and a sky full of stars.",
     description: "Kedarkantha is widely considered the finest beginner's winter trek in India — and for good reason. The trail winds through dense oak and rhododendron forests dusted with snow, passes frozen lakes, and opens up to one of the most jaw-dropping 360° summit views in the entire Himalayan range. At 3,800 metres, it's challenging enough to feel earned and accessible enough not to require prior trekking experience. Our team of certified mountain guides takes care of everything so you can stay entirely present to the landscape.",
     highlights: [
-      "Summit at 3,800m with views of Swargarohini, Bandarpoonch and Kala Nag peaks",
-      "Trek through snow-covered oak and pine forests",
-      "Campfire evenings at base camp under a sky thick with stars",
-      "Certified mountain guides with 10+ years' Himalayan experience",
-      "All safety equipment including crampons and trekking poles provided",
-      "Maximum 12 trekkers per batch — never a crowd",
-    ],
+        { text: "Summit at 3,800m with views of Swargarohini, Bandarpoonch and Kala Nag peaks" },
+        { text: "Trek through snow-covered oak and pine forests" },
+        { text: "Campfire evenings at base camp under a sky thick with stars" },
+        { text: "Certified mountain guides with 10+ years' Himalayan experience" },
+        { text: "All safety equipment including crampons and trekking poles provided" },
+        { text: "Maximum 12 trekkers per batch — never a crowd" }
+      ],
     itinerary: [
       { day: 1, title: "Delhi → Sankri", description: "Overnight drive from Delhi to Sankri village — the trek's base.", activities: ["Delhi pickup (10 PM)", "Night drive through Mussoorie and Purola", "Arrive Sankri by dawn"] },
       { day: 2, title: "Sankri → Juda Ka Talab (2,700m)", description: "First day on the trail. Gentle ascent through pine forests to a frozen lake campsite.", activities: ["Trek briefing and gear check", "5-hour trek to Juda Ka Talab", "Campfire dinner under stars"] },
@@ -152,11 +148,7 @@ export const TRIPS_DATA: Trip[] = [
     ],
     tags: ["Trekking", "Snow", "Beginners"],
     image: "https://images.unsplash.com/photo-1617380613434-7495e9b45dfb?w=1400&h=800&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1637580980556-085dee659c7e?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1626948688703-0136bc0a90da?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1488415032361-b7e238421f1b?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 8,
     difficulty: "Moderate",
     bestTime: "December – February",
@@ -180,13 +172,13 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "Hidden coves, cliff walks, and sunsets that feel personal.",
     description: "Gokarna is what Goa was forty years ago — raw, beautiful, unhurried. Its coastline is a series of coves and headlands, each beach completely different from the last. Om Beach curves like the Om symbol. Half Moon is only reachable by trail or boat. Paradise Beach has no road access at all. This trip strings them all together with cliff walks, boat rides, and evenings that stretch well past sunset into bonfires on the sand.",
     highlights: [
-      "Cliff walk connecting Om, Half Moon, and Paradise beaches",
-      "Sunset boat ride around the headlands",
-      "Campfire on Paradise Beach — accessible only by boat or trail",
-      "Temple town walk through the old Gokarna village",
-      "Beachside yoga session at dawn",
-      "Local seafood dinner at a family-run shack",
-    ],
+        { text: "Cliff walk connecting Om, Half Moon, and Paradise beaches" },
+        { text: "Sunset boat ride around the headlands" },
+        { text: "Campfire on Paradise Beach — accessible only by boat or trail" },
+        { text: "Temple town walk through the old Gokarna village" },
+        { text: "Beachside yoga session at dawn" },
+        { text: "Local seafood dinner at a family-run shack" }
+      ],
     itinerary: [
       { day: 1, title: "Arrive Gokarna", description: "Train or bus from Goa/Bangalore. Check in, orientation walk.", activities: ["Check-in at beach property", "Om Beach orientation walk", "Group dinner on the beach"] },
       { day: 2, title: "Cliff Walk + Half Moon Beach", description: "Morning cliff walk from Om Beach to Half Moon. Afternoon at leisure.", activities: ["2-hour cliff walk", "Swim at Half Moon", "Hammock afternoon", "Sunset at Om Beach"] },
@@ -205,11 +197,7 @@ export const TRIPS_DATA: Trip[] = [
     exclusions: ["Travel to/from Gokarna", "Lunches", "Personal shopping", "Water sports"],
     tags: ["Beach", "Coastal", "Chill"],
     image: "https://images.unsplash.com/photo-1558960214-f4283a743867?w=1400&h=800&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1507501336603-6e31db2be093?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1649792880509-3897bbe2ba83?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1590523277543-a94d2e4eb00b?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 15,
     difficulty: "Easy",
     bestTime: "October – March",
@@ -232,13 +220,13 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "Full moon, white salt desert, and a bonfire under the stars.",
     description: "The Rann of Kutch is one of the largest salt flats on Earth — an endless white expanse that becomes surreal under a full moon. During the Rann Utsav season, the desert comes alive with folk music, camel rides, craft markets, and the kind of sky that makes you feel very small in the best possible way. This trip times your visit to the full moon night — the one evening every year when the salt flats glow white under moonlight and you can walk kilometres into pure silence.",
     highlights: [
-      "Full moon night walk on the Rann salt flats",
-      "Kutchi folk music performance under open skies",
-      "Camel ride across the white desert at sunrise",
-      "Bhujodi village craft walk — weaving, block printing, mirror work",
-      "Mandvi beach visit — shipbuilding yards and colonial beach house",
-      "Local Kutchi dal-dhokli dinner with a host family",
-    ],
+        { text: "Full moon night walk on the Rann salt flats" },
+        { text: "Kutchi folk music performance under open skies" },
+        { text: "Camel ride across the white desert at sunrise" },
+        { text: "Bhujodi village craft walk — weaving, block printing, mirror work" },
+        { text: "Mandvi beach visit — shipbuilding yards and colonial beach house" },
+        { text: "Local Kutchi dal-dhokli dinner with a host family" }
+      ],
     itinerary: [
       { day: 1, title: "Arrive Bhuj", description: "Fly or train to Bhuj. Check in and evening orientation.", activities: ["Arrive Bhuj", "Bhuj old town walk", "Group dinner"] },
       { day: 2, title: "Bhujodi Village + Rann Camp", description: "Morning craft village walk. Afternoon drive to Dhordo camp at the Rann edge.", activities: ["Bhujodi weaving village", "Craft shopping at source prices", "Drive to Rann camp", "Sunset on the salt flats"] },
@@ -257,11 +245,7 @@ export const TRIPS_DATA: Trip[] = [
     exclusions: ["Flights to/from Bhuj", "Personal shopping", "Alcohol"],
     tags: ["Desert", "Rann Utsav", "Craft"],
     image: "https://images.unsplash.com/photo-1486314030120-d5ab85fe58cd?w=1400&h=800&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1508513268030-f8a9af25721c?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1629659340345-6f38a77dedc8?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1772976455832-9d6b078ac401?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 20,
     difficulty: "Easy",
     bestTime: "November – February",
@@ -283,13 +267,13 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "Track leopards and elephants at dawn in one of India's finest reserves.",
     description: "Kabini sits at the confluence of two rivers on the edge of Nagarhole National Park — one of the few reserves in India where you can reliably spot leopards, elephants, and wild dogs in a single morning. The backwaters attract animals like a magnet at dusk. Our naturalist-led safaris go where the crowds don't, timing entries to the golden hours when animals are most active and light is most beautiful.",
     highlights: [
-      "Jeep and boat safaris led by certified naturalists",
-      "Kabini backwaters boat ride at sunset — elephant herds come to drink",
-      "High probability of leopard sightings in Nagarhole",
-      "Stay at a jungle property on the reservoir edge",
-      "Night drives (where permitted) with spotlights",
-      "Bird walk at dawn with dedicated birding guide",
-    ],
+        { text: "Jeep and boat safaris led by certified naturalists" },
+        { text: "Kabini backwaters boat ride at sunset — elephant herds come to drink" },
+        { text: "High probability of leopard sightings in Nagarhole" },
+        { text: "Stay at a jungle property on the reservoir edge" },
+        { text: "Night drives (where permitted) with spotlights" },
+        { text: "Bird walk at dawn with dedicated birding guide" }
+      ],
     itinerary: [
       { day: 1, title: "Arrive Kabini", description: "Drive from Bangalore (4 hours) or Mysore (2 hours). Afternoon safari.", activities: ["Arrival and check-in", "Afternoon jeep safari", "Sunset boat ride on backwaters", "Naturalist dinner talk"] },
       { day: 2, title: "Full Safari Day", description: "Dawn jeep safari, birding walk, evening boat safari.", activities: ["5:30 AM dawn jeep safari (3 hours)", "Birding walk with guide", "Afternoon rest", "Sunset boat safari"] },
@@ -306,11 +290,7 @@ export const TRIPS_DATA: Trip[] = [
     exclusions: ["Personal gear", "Alcohol", "Tips for staff", "Travel insurance"],
     tags: ["Safari", "Wildlife", "Forest"],
     image: "https://images.unsplash.com/photo-1549366021-9f761d450615?w=1400&h=800&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1621531518034-94ecf4778186?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1723248339001-89b0a2ac5f3b?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1555400038-63f5ba517a47?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 6,
     difficulty: "Easy",
     bestTime: "October – May",
@@ -333,13 +313,13 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "Ruins, boulders, and stories carved into stone for centuries.",
     description: "Hampi was the capital of the Vijayanagara Empire — once the second largest city on Earth after Beijing. What remains is an archaeological wonder scattered across a surreal landscape of giant boulders. A temple at every turn. Carvings that took decades. And a river that has been flowing past all of it for thousands of years. This trip pairs expert historical storytelling with early morning walks before the crowds arrive, coracle rides across the Tungabhadra, and evenings watching the boulders turn gold.",
     highlights: [
-      "Guided walk through the royal enclosure and Lotus Mahal with a historian",
-      "Dawn walk to Virupaksha Temple before tourist hours",
-      "Coracle ride across the Tungabhadra river",
-      "Sunset from Matanga Hill — 360° view over the entire ruin field",
-      "Bicycle ride to the riverside ruins at Vitthala temple",
-      "Evening storytelling session on the history of Vijayanagara",
-    ],
+        { text: "Guided walk through the royal enclosure and Lotus Mahal with a historian" },
+        { text: "Dawn walk to Virupaksha Temple before tourist hours" },
+        { text: "Coracle ride across the Tungabhadra river" },
+        { text: "Sunset from Matanga Hill — 360° view over the entire ruin field" },
+        { text: "Bicycle ride to the riverside ruins at Vitthala temple" },
+        { text: "Evening storytelling session on the history of Vijayanagara" }
+      ],
     itinerary: [
       { day: 1, title: "Arrive Hampi", description: "Arrive by overnight bus or train from Bangalore. Check in and orientation.", activities: ["Check-in", "Bazaar street walk", "First glimpse of Virupaksha Temple at sunset"] },
       { day: 2, title: "Royal Enclosure + Lotus Mahal", description: "Full morning with historian guide through the royal zone.", activities: ["Dawn Virupaksha Temple visit", "Historian-led royal enclosure walk", "Lunch at a riverside café", "Afternoon coracle ride"] },
@@ -358,11 +338,7 @@ export const TRIPS_DATA: Trip[] = [
     exclusions: ["Flights/trains to Bangalore", "Lunches", "Personal shopping"],
     tags: ["History", "Architecture", "Culture"],
     image: "https://images.unsplash.com/photo-1773680690692-8e94e1794f9f?w=1400&h=800&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1777222219334-acf1885f245c?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1771766995256-1618791109d5?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1665706896821-319040b81753?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 18,
     difficulty: "Easy",
     bestTime: "October – February",
@@ -384,13 +360,13 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "High passes, blue lakes, and roads that exist at the edge of the world.",
     description: "The Manali–Leh highway is not a road trip. It's a rite of passage. Five of the world's highest motorable passes. The Rohtang, the Baralacha La, the Tanglang La. Pangong Lake turning impossibly blue. The monasteries at Thiksey and Diskit. The silence of Nubra Valley. This trip does it all in 10 days — slowly enough to actually experience it, with support vehicles so you can ride without worrying about anything but the road ahead.",
     highlights: [
-      "Crossing 5 high mountain passes including Khardung La (5,359m)",
-      "Pangong Tso Lake — 134km of electric blue at 4,350m altitude",
-      "Nubra Valley and the Bactrian double-hump camels of Hunder",
-      "Thiksey monastery at dawn — monks, butter lamps, and silence",
-      "Magnetic Hill and Indus-Zanskar river confluence",
-      "Fully supported ride with mechanic vehicle alongside",
-    ],
+        { text: "Crossing 5 high mountain passes including Khardung La (5,359m)" },
+        { text: "Pangong Tso Lake — 134km of electric blue at 4,350m altitude" },
+        { text: "Nubra Valley and the Bactrian double-hump camels of Hunder" },
+        { text: "Thiksey monastery at dawn — monks, butter lamps, and silence" },
+        { text: "Magnetic Hill and Indus-Zanskar river confluence" },
+        { text: "Fully supported ride with mechanic vehicle alongside" }
+      ],
     itinerary: [
       { day: 1, title: "Manali — Acclimatisation", description: "Arrive Manali. Bike checks, gear fitting, group briefing.", activities: ["Arrive Manali", "Bike allocation and checks", "Briefing and acclimatisation walk", "Group dinner"] },
       { day: 2, title: "Manali → Jispa (3,200m)", description: "First day on the road. Cross Rohtang Pass. Camp at Jispa.", activities: ["Cross Rohtang Pass (3,978m)", "Drive through Keylong", "Camp at Jispa"] },
@@ -415,11 +391,7 @@ export const TRIPS_DATA: Trip[] = [
     exclusions: ["Flights to Manali / from Leh", "Fuel", "Personal gear", "Travel insurance"],
     tags: ["Bike", "Ladakh", "High Altitude"],
     image: "https://images.unsplash.com/photo-1767947774950-d33a9c59ccad?w=1400&h=800&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1637580980556-085dee659c7e?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1604715686140-d5bef96c8b9d?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1612171181961-d8ac6c52dff1?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 10,
     difficulty: "Challenging",
     bestTime: "June – September",
@@ -443,13 +415,13 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "Monastic life, stark landscapes, and friendships that last forever.",
     description: "Spiti Valley is the cold desert of Himachal — a place that looks like a different planet. Barren mountains in impossible shades of brown, red and orange. Monasteries perched on cliffs that look like they shouldn't exist. Villages so remote that the road closes for 6 months every winter. This backpacking trip moves through the valley slowly — staying with local families, walking to monasteries before other travellers wake up, and eating meals that taste of the altitude and the effort it took to grow them.",
     highlights: [
-      "Key Monastery at sunrise — ancient murals and resident monks",
-      "Chandratal Lake (4,300m) — emerald in a bowl of bare mountains",
-      "Chicham Bridge — the highest bridge in Asia",
-      "Homestays with Spitian families — salt tea, tsampa and real conversation",
-      "Dhankar Monastery hike — built on a column of rock above the confluence",
-      "Night sky photography in Komic (world's highest inhabited village)",
-    ],
+        { text: "Key Monastery at sunrise — ancient murals and resident monks" },
+        { text: "Chandratal Lake (4,300m) — emerald in a bowl of bare mountains" },
+        { text: "Chicham Bridge — the highest bridge in Asia" },
+        { text: "Homestays with Spitian families — salt tea, tsampa and real conversation" },
+        { text: "Dhankar Monastery hike — built on a column of rock above the confluence" },
+        { text: "Night sky photography in Komic (world's highest inhabited village)" }
+      ],
     itinerary: [
       { day: 1, title: "Shimla → Narkanda", description: "Drive from Shimla into the apple country.", activities: ["Shimla pickup", "Drive to Narkanda", "Acclimatisation evening"] },
       { day: 2, title: "Narkanda → Rekong Peo", description: "Into the Kinnaur Valley.", activities: ["Drive through Rampur", "Sangla Valley view", "Reach Rekong Peo"] },
@@ -465,11 +437,7 @@ export const TRIPS_DATA: Trip[] = [
     exclusions: ["Travel to Shimla/from Manali", "Personal gear", "Travel insurance"],
     tags: ["Budget", "Mountain", "Offbeat"],
     image: "https://images.unsplash.com/photo-1539635278303-d4002c07eae3?w=1400&h=800&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1626948688703-0136bc0a90da?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1534067783941-51c9c23ecefd?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1627289496743-8a9a08bb228a?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 14,
     difficulty: "Moderate",
     bestTime: "June – October",
@@ -492,13 +460,13 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "The greatest tribal show on earth — music, dance, and warrior traditions.",
     description: "Every December, 17 Naga tribes gather at Kisama Heritage Village outside Kohima to perform, compete, and celebrate their cultural heritage. Hornbill Festival is raw in the way only authentic things can be — warrior dances that have been performed for centuries, bamboo music, fire-keeping ceremonies, and food that tastes of smoked wood and fermented tradition. This trip takes you inside the festival, beyond the tourist entrance, into the community side of it.",
     highlights: [
-      "Private access to tribal cultural performances across all 17 Naga tribes",
-      "Traditional Naga warrior dance and fire ceremony",
-      "Kohima War Cemetery — one of the most moving WWII sites in Asia",
-      "Local Naga food experience — smoked pork, fermented bamboo, anishi",
-      "Dzükou Valley walk — the 'Valley of Flowers' of Northeast India",
-      "Evening bonfire with local Naga musicians",
-    ],
+        { text: "Private access to tribal cultural performances across all 17 Naga tribes" },
+        { text: "Traditional Naga warrior dance and fire ceremony" },
+        { text: "Kohima War Cemetery — one of the most moving WWII sites in Asia" },
+        { text: "Local Naga food experience — smoked pork, fermented bamboo, anishi" },
+        { text: "Dzükou Valley walk — the 'Valley of Flowers' of Northeast India" },
+        { text: "Evening bonfire with local Naga musicians" }
+      ],
     itinerary: [
       { day: 1, title: "Arrive Dimapur → Kohima", description: "Fly to Dimapur, drive to Kohima. Check in and evening orientation.", activities: ["Airport pickup", "2-hour drive to Kohima", "Kohima market walk", "Welcome dinner"] },
       { day: 2, title: "Hornbill Day 1 + Kohima War Cemetery", description: "Full day at Kisama Heritage Village. Tribal performances begin.", activities: ["Kisama Heritage Village opening", "Tribal dance performances", "Kohima War Cemetery visit", "Local dinner"] },
@@ -510,11 +478,7 @@ export const TRIPS_DATA: Trip[] = [
     exclusions: ["Flights to/from Dimapur", "Personal shopping", "Alcohol", "Tips"],
     tags: ["Northeast", "Tribal", "Heritage"],
     image: "https://images.unsplash.com/photo-1508519829430-40f7d3d161b4?w=1400&h=800&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1756370256926-e48ca54c5efe?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1777222219334-acf1885f245c?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1532458605850-e9f7a26d9f80?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 16,
     difficulty: "Easy",
     bestTime: "December 1–10",
@@ -536,13 +500,13 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "Palaces, deserts, folk music and the scent of marigold at golden hour.",
     description: "Rajasthan is a state that performs for you. The palaces were built to impress. The forts were built to intimidate. But the real Rajasthan lives in the narrow lanes behind the monuments — in the dhow workshops, the dyers' markets, the families who have lived in the same haveli for twelve generations. This circuit moves through Jaipur, Jodhpur and Jaisalmer with local guides who were born in each city and know exactly which door to knock on.",
     highlights: [
-      "Private sunrise access to Mehrangarh Fort in Jodhpur — before tourists arrive",
-      "Jaisalmer sand dune camp with folk musicians and stargazing",
-      "Jantar Mantar — the 18th century open-air astronomical observatory",
-      "Block printing workshop in Bagru village outside Jaipur",
-      "Blue City walking tour with a Jodhpur-born guide",
-      "Camel ride across Thar Desert at sunset",
-    ],
+        { text: "Private sunrise access to Mehrangarh Fort in Jodhpur — before tourists arrive" },
+        { text: "Jaisalmer sand dune camp with folk musicians and stargazing" },
+        { text: "Jantar Mantar — the 18th century open-air astronomical observatory" },
+        { text: "Block printing workshop in Bagru village outside Jaipur" },
+        { text: "Blue City walking tour with a Jodhpur-born guide" },
+        { text: "Camel ride across Thar Desert at sunset" }
+      ],
     itinerary: [
       { day: 1, title: "Arrive Jaipur", description: "Arrive and check into a heritage haveli. Evening orientation walk.", activities: ["Arrive Jaipur", "Old city orientation", "Choki Dhani folk dinner"] },
       { day: 2, title: "Jaipur — Pink City", description: "Full day covering Amber Fort, Jantar Mantar, Hawa Mahal.", activities: ["Amber Fort at dawn", "Jantar Mantar", "Hawa Mahal street", "Block printing workshop"] },
@@ -557,11 +521,7 @@ export const TRIPS_DATA: Trip[] = [
     exclusions: ["Trains/flights to Jaipur / from Jaipur", "Lunches", "Personal shopping", "Alcohol"],
     tags: ["Heritage", "Desert", "Culture"],
     image: "https://images.unsplash.com/photo-1772976455832-9d6b078ac401?w=1400&h=800&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1692710066201-bcf1c0aad35a?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1486314030120-d5ab85fe58cd?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1508513268030-f8a9af25721c?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 12,
     difficulty: "Easy",
     bestTime: "October – February",
@@ -583,13 +543,13 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "Coffee estates, misty mornings, and evenings built around a fire.",
     description: "Coorg is the Scotland of India — rolling hills, perpetual mist, and an air that smells of coffee and cardamom. This retreat is designed for one thing: to slow down. We stay at a working coffee estate, walk the plantation at dawn, and spend evenings doing exactly what the retreat is named after. The bonfire is where it all happens — stories, music, new friendships, and the kind of conversation you only have when screens are put away.",
     highlights: [
-      "Stay at a working organic coffee estate",
-      "Dawn walk through the coffee and cardamom plantation with the estate manager",
-      "Coorg breakfast — akki rotti, pandi curry, rice pancakes with honey",
-      "Abbey Falls trek through the rainforest",
-      "Nightly bonfires with campfire cooking and acoustic music",
-      "Forest yoga and guided meditation session",
-    ],
+        { text: "Stay at a working organic coffee estate" },
+        { text: "Dawn walk through the coffee and cardamom plantation with the estate manager" },
+        { text: "Coorg breakfast — akki rotti, pandi curry, rice pancakes with honey" },
+        { text: "Abbey Falls trek through the rainforest" },
+        { text: "Nightly bonfires with campfire cooking and acoustic music" },
+        { text: "Forest yoga and guided meditation session" }
+      ],
     itinerary: [
       { day: 1, title: "Arrive Coorg", description: "Drive from Bangalore or Mysore. Settle in and first bonfire.", activities: ["Arrive by afternoon", "Estate walk and introduction", "Welcome bonfire and dinner"] },
       { day: 2, title: "Coffee Walk + Abbey Falls", description: "Morning plantation walk. Afternoon trek to Abbey Falls.", activities: ["Dawn plantation walk", "Coffee processing tour", "Abbey Falls trek", "Evening bonfire with campfire cooking"] },
@@ -599,11 +559,7 @@ export const TRIPS_DATA: Trip[] = [
     exclusions: ["Personal alcohol", "Spa services", "Tips"],
     tags: ["Wellness", "Nature", "Community"],
     image: "https://images.unsplash.com/photo-1532458605850-e9f7a26d9f80?w=1400&h=800&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1598557252466-7d722941687d?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1555400038-63f5ba517a47?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1604715686140-d5bef96c8b9d?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 20,
     difficulty: "Easy",
     bestTime: "October – April",
@@ -625,13 +581,13 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "Chase the perfect light through rice terraces, temples, and volcanic peaks.",
     description: "Bali's magic is built for photography — but most people photograph the same ten spots. This expedition, led by a professional travel photographer, takes you to the angles everyone else misses. Pre-dawn at Pura Lempuyang temple for the Gates of Heaven shot without a queue. Tegallalang at golden hour with no one else in frame. The black sand beach at Amed at sunrise. This is photography with intention — and the skills to match the opportunity.",
     highlights: [
-      "Gates of Heaven (Lempuyang Temple) at dawn — no queue, perfect light",
-      "Tegallalang rice terraces at golden hour with professional lighting guidance",
-      "Mt. Batur pre-dawn trek for sunrise above the clouds",
-      "Jatiluwih UNESCO rice terrace landscape shoot",
-      "Portrait photography in Ubud traditional costume",
-      "Daily photography critique and editing workshop",
-    ],
+        { text: "Gates of Heaven (Lempuyang Temple) at dawn — no queue, perfect light" },
+        { text: "Tegallalang rice terraces at golden hour with professional lighting guidance" },
+        { text: "Mt. Batur pre-dawn trek for sunrise above the clouds" },
+        { text: "Jatiluwih UNESCO rice terrace landscape shoot" },
+        { text: "Portrait photography in Ubud traditional costume" },
+        { text: "Daily photography critique and editing workshop" }
+      ],
     itinerary: [
       { day: 1, title: "Arrive Bali — Ubud", description: "Arrive Ngurah Rai, transfer to Ubud. Evening orientation.", activities: ["Airport pickup", "Ubud check-in", "Monkey Forest evening walk", "Camera settings briefing"] },
       { day: 2, title: "Lempuyang Gates + East Bali", description: "3 AM departure for the Gates of Heaven at sunrise.", activities: ["3 AM departure", "Lempuyang Temple sunrise", "Tirta Gangga water palace", "Afternoon edit session"] },
@@ -645,11 +601,7 @@ export const TRIPS_DATA: Trip[] = [
     exclusions: ["International flights", "Lunches and dinners", "Personal camera equipment", "Travel insurance"],
     tags: ["International", "Photography", "Creative"],
     image: "https://images.unsplash.com/photo-1555400038-63f5ba517a47?w=1400&h=800&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1665706896821-319040b81753?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1507501336603-6e31db2be093?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1559628233-100c798642d4?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 8,
     difficulty: "Moderate",
     bestTime: "April – October",
@@ -673,13 +625,13 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "Butter lamps, ancient chants, and a monastery older than most nations.",
     description: "Tawang Monastery is the largest Buddhist monastery in India and the second largest in the world — a 400-year-old complex perched at 10,000 feet that still houses over 700 monks. This circuit takes you through the monastery's inner sanctums, the surrounding villages, the war memorial, and the high-altitude lakes that sit between Bhutan, Tibet, and India. Tawang is one of the last truly undisturbed places on Earth.",
     highlights: [
-      "Private early morning prayer access at Tawang Monastery with resident monks",
-      "Sela Pass (13,700 ft) — the gateway between two worlds",
-      "Madhuri Lake (Shungetser) — the mirror lake of the Himalayas",
-      "Bum La Pass border with Tibet (permit required — we handle it)",
-      "Nuranang Waterfalls — one of the most dramatic in Northeast India",
-      "Local Monpa village homestay — food, culture, and real conversation",
-    ],
+        { text: "Private early morning prayer access at Tawang Monastery with resident monks" },
+        { text: "Sela Pass (13,700 ft) — the gateway between two worlds" },
+        { text: "Madhuri Lake (Shungetser) — the mirror lake of the Himalayas" },
+        { text: "Bum La Pass border with Tibet (permit required — we handle it)" },
+        { text: "Nuranang Waterfalls — one of the most dramatic in Northeast India" },
+        { text: "Local Monpa village homestay — food, culture, and real conversation" }
+      ],
     itinerary: [
       { day: 1, title: "Guwahati → Bhalukpong", description: "Fly into Guwahati. Drive to Bhalukpong — the gateway to Arunachal.", activities: ["Guwahati airport pickup", "4-hour drive to Bhalukpong", "ILP check and documentation", "Evening briefing"] },
       { day: 2, title: "Bhalukpong → Dirang", description: "Through Assam forests into the mountains. Dirang valley views.", activities: ["Morning drive", "Bomdila market visit", "Arrive Dirang by evening", "Hot spring dip (seasonal)"] },
@@ -692,11 +644,7 @@ export const TRIPS_DATA: Trip[] = [
     exclusions: ["Flights to/from Guwahati", "Personal shopping", "Travel insurance"],
     tags: ["Monastery", "Northeast", "High Altitude"],
     image: "https://images.unsplash.com/photo-1665706896821-319040b81753?w=900&h=520&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1777222219334-acf1885f245c?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1637580980556-085dee659c7e?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1488415032361-b7e238421f1b?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 12,
     difficulty: "Moderate",
     bestTime: "March – June, September – November",
@@ -720,12 +668,12 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "Frozen passes, snow-draped monasteries, and silence so deep it echoes.",
     description: "Tawang in winter is a completely different world. Sela Pass freezes over, the monastery rooftops turn white, and the entire region empties of tourists. For those brave enough to go when everyone else turns back, winter Tawang offers an intimacy with the place that no other season can match.",
     highlights: [
-      "Frozen Sela Lake walk on solid ice",
-      "Tawang Monastery entirely to yourself — no tourist crowds",
-      "Snow leopard track sighting in Zemithang Valley",
-      "Monpa winter festivals and ceremonies",
-      "Gorichen view on clear winter days — Arunachal's highest peak",
-    ],
+        { text: "Frozen Sela Lake walk on solid ice" },
+        { text: "Tawang Monastery entirely to yourself — no tourist crowds" },
+        { text: "Snow leopard track sighting in Zemithang Valley" },
+        { text: "Monpa winter festivals and ceremonies" },
+        { text: "Gorichen view on clear winter days — Arunachal's highest peak" }
+      ],
     itinerary: [
       { day: 1, title: "Guwahati → Bhalukpong", description: "Arrive and begin the drive north.", activities: ["Airport pickup", "Drive to Bhalukpong", "Gear check for cold weather"] },
       { day: 2, title: "Bhalukpong → Bomdila", description: "Drive into the mountains. Bomdila monastery visit.", activities: ["Scenic drive", "Bomdila Monastery", "Stay at Bomdila"] },
@@ -739,10 +687,7 @@ export const TRIPS_DATA: Trip[] = [
     exclusions: ["Flights", "Personal winter gear", "Travel insurance"],
     tags: ["Winter", "Snow", "Monastery"],
     image: "https://images.unsplash.com/photo-1626948688703-0136bc0a90da?w=900&h=520&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1604715686140-d5bef96c8b9d?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1612171181961-d8ac6c52dff1?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 8,
     difficulty: "Challenging",
     bestTime: "December – February",
@@ -766,12 +711,12 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "A living classroom — history, geography, culture and courage in one journey.",
     description: "Designed specifically for student groups, this expedition covers Tawang from an educational lens. The 1962 war history, the biodiversity of the Eastern Himalayas, the living Buddhist culture, and the border dynamics with China and Bhutan. Students return with a perspective that no classroom can provide.",
     highlights: [
-      "Tawang War Memorial — the story of the 1962 India-China war",
-      "Monastery learning session — Buddhist philosophy for students",
-      "Nuranang Waterfall nature study with a botanist",
-      "Interaction with Indian Army jawans at forward posts",
-      "Monpa tribe cultural workshop — craft, food, language",
-    ],
+        { text: "Tawang War Memorial — the story of the 1962 India-China war" },
+        { text: "Monastery learning session — Buddhist philosophy for students" },
+        { text: "Nuranang Waterfall nature study with a botanist" },
+        { text: "Interaction with Indian Army jawans at forward posts" },
+        { text: "Monpa tribe cultural workshop — craft, food, language" }
+      ],
     itinerary: [
       { day: 1, title: "Guwahati → Bhalukpong", description: "Departure day.", activities: ["Group assembly", "Drive to Bhalukpong", "Briefing session"] },
       { day: 2, title: "Bhalukpong → Dirang", description: "Into Arunachal Pradesh.", activities: ["Nameri National Park brief stop", "Dirang valley arrival", "Evening group discussion"] },
@@ -786,9 +731,7 @@ export const TRIPS_DATA: Trip[] = [
     exclusions: ["Flights", "Personal gear", "Travel insurance"],
     tags: ["Student", "Educational", "Northeast"],
     image: "https://images.unsplash.com/photo-1536607961765-592e80bcc19e?w=900&h=520&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1764072970350-2ce4f354a483?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 40,
     difficulty: "Easy",
     bestTime: "March – June, September – November",
@@ -813,13 +756,13 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "India's best kept secret — a valley so remote it still doesn't have a road in winter.",
     description: "Mechuka Valley sits at 6,000 feet in West Siang district — one of the last truly pristine valleys in India. The Adi and Memba tribes have lived here for centuries, undisturbed by the outside world until barely a decade ago. The valley is ringed by snow-capped peaks, split by the Siyom River, and dotted with ancient Buddhist monasteries. Getting here is half the adventure.",
     highlights: [
-      "Mechuka Monastery — 400-year-old Memba tribe Buddhist shrine",
-      "Adi tribal village homestay — the most authentic experience in Northeast India",
-      "Siyom River suspension bridge walk",
-      "Dorje Drag Monastery trail — 3-hour hike to a cliffside shrine",
-      "Night sky photography — zero light pollution in the valley",
-      "Traditional Memba cuisine — buckwheat bread, yak butter tea, bamboo rice",
-    ],
+        { text: "Mechuka Monastery — 400-year-old Memba tribe Buddhist shrine" },
+        { text: "Adi tribal village homestay — the most authentic experience in Northeast India" },
+        { text: "Siyom River suspension bridge walk" },
+        { text: "Dorje Drag Monastery trail — 3-hour hike to a cliffside shrine" },
+        { text: "Night sky photography — zero light pollution in the valley" },
+        { text: "Traditional Memba cuisine — buckwheat bread, yak butter tea, bamboo rice" }
+      ],
     itinerary: [
       { day: 1, title: "Dibrugarh → Along", description: "Fly to Dibrugarh, drive to Along.", activities: ["Airport pickup", "Drive to Along (6 hrs)", "Along overnight"] },
       { day: 2, title: "Along → Mechuka", description: "The final stretch into the valley.", activities: ["Along departure", "Mountain road to Mechuka", "Valley arrival", "Orientation walk"] },
@@ -833,10 +776,7 @@ export const TRIPS_DATA: Trip[] = [
     exclusions: ["Flights to Dibrugarh", "Personal gear", "Travel insurance"],
     tags: ["Remote", "Tribal", "Northeast"],
     image: "https://images.unsplash.com/photo-1771766995256-1618791109d5?w=900&h=520&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1627289496743-8a9a08bb228a?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1534067783941-51c9c23ecefd?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 10,
     difficulty: "Moderate",
     bestTime: "October – May",
@@ -860,12 +800,12 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "No WiFi. No itinerary. Just you and a valley that time forgot.",
     description: "A stripped-back, self-paced experience in Mechuka for travelers who want to be genuinely off-grid. No fixed hour-by-hour schedule — just guiding principles, a local fixer, and the freedom to explore one of India's most remote valleys at your own rhythm.",
     highlights: [
-      "Truly off-grid experience — no fixed daily schedule",
-      "Local fixer who has lived in Mechuka their entire life",
-      "Camping option by the Siyom River banks",
-      "Spontaneous village encounters and impromptu community meals",
-      "Zero-crowd guarantee — limited to 6 travelers",
-    ],
+        { text: "Truly off-grid experience — no fixed daily schedule" },
+        { text: "Local fixer who has lived in Mechuka their entire life" },
+        { text: "Camping option by the Siyom River banks" },
+        { text: "Spontaneous village encounters and impromptu community meals" },
+        { text: "Zero-crowd guarantee — limited to 6 travelers" }
+      ],
     itinerary: [
       { day: 1, title: "Arrive Mechuka", description: "Arrive and settle in. Evening orientation.", activities: ["Arrive from Along", "Guesthouse check-in", "Meet your local fixer", "Evening walk"] },
       { day: 2, title: "Explore at will — North Valley", description: "North valley with monastery and villages.", activities: ["Mechuka Monastery", "Village walk", "Riverside lunch"] },
@@ -877,9 +817,7 @@ export const TRIPS_DATA: Trip[] = [
     exclusions: ["Flights", "Personal gear", "Alcohol"],
     tags: ["Off-grid", "Remote", "Backpacking"],
     image: "https://images.unsplash.com/photo-1539635278303-d4002c07eae3?w=900&h=520&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1532458605850-e9f7a26d9f80?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 6,
     difficulty: "Moderate",
     bestTime: "October – May",
@@ -904,13 +842,13 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "Through UNESCO rice terraces and pine forests with the Apatani as your guides.",
     description: "Beyond the music festival, Ziro Valley is a living UNESCO World Heritage nomination — a landscape of rice paddy terraces, pine forests, and Apatani tribal villages that have been farmed the same way for centuries. This trek takes you through the valley on foot, led by Apatani guides who have walked these trails their whole lives.",
     highlights: [
-      "UNESCO-listed Apatani agricultural landscape — walking through history",
-      "Talley Valley Wildlife Sanctuary bird walks at dawn",
-      "Traditional Apatani nose plug ceremony explanation with an elder",
-      "Pine forest camping at 5,500 feet",
-      "Ziro Puto village — the oldest Apatani settlement",
-      "Fresh bamboo shoot curry cooked over a wood fire",
-    ],
+        { text: "UNESCO-listed Apatani agricultural landscape — walking through history" },
+        { text: "Talley Valley Wildlife Sanctuary bird walks at dawn" },
+        { text: "Traditional Apatani nose plug ceremony explanation with an elder" },
+        { text: "Pine forest camping at 5,500 feet" },
+        { text: "Ziro Puto village — the oldest Apatani settlement" },
+        { text: "Fresh bamboo shoot curry cooked over a wood fire" }
+      ],
     itinerary: [
       { day: 1, title: "Itanagar → Ziro", description: "Drive from Itanagar to Ziro Valley.", activities: ["Itanagar pickup", "Drive to Ziro (5 hrs)", "Valley orientation walk"] },
       { day: 2, title: "Apatani Villages Trek", description: "Full day on the paddy terrace trails.", activities: ["Paddy field walk", "Village-to-village trail", "Elder interaction", "Community dinner"] },
@@ -922,9 +860,7 @@ export const TRIPS_DATA: Trip[] = [
     exclusions: ["Flights to Itanagar", "Personal gear", "Travel insurance"],
     tags: ["Trek", "UNESCO", "Tribal"],
     image: "https://images.unsplash.com/photo-1604715686140-d5bef96c8b9d?w=900&h=520&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1555400038-63f5ba517a47?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 12,
     difficulty: "Easy",
     bestTime: "October – March",
@@ -949,13 +885,13 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "Hot springs, orchid gardens, and the gentlest valley in Arunachal.",
     description: "Dirang is the valley you pass through on the way to Tawang — but most travelers never stop. That's a mistake. Dirang has natural hot springs, an orchid research centre, an ancient dzong (fortress), and one of the most pleasant climates in Arunachal. This retreat slows down and sits with it.",
     highlights: [
-      "Natural hot spring bath surrounded by mountains — the best soak of your life",
-      "National Research Centre on Yak — the only one in India",
-      "Dirang Dzong (ancient fortress) walk with local historian",
-      "Sangti Valley birds — one of the finest birding spots in Asia",
-      "Apple and kiwi orchards — pick and eat in season",
-      "Evening bonfire by the Dirang river",
-    ],
+        { text: "Natural hot spring bath surrounded by mountains — the best soak of your life" },
+        { text: "National Research Centre on Yak — the only one in India" },
+        { text: "Dirang Dzong (ancient fortress) walk with local historian" },
+        { text: "Sangti Valley birds — one of the finest birding spots in Asia" },
+        { text: "Apple and kiwi orchards — pick and eat in season" },
+        { text: "Evening bonfire by the Dirang river" }
+      ],
     itinerary: [
       { day: 1, title: "Arrive Dirang", description: "Travel from Guwahati. Arrive by evening.", activities: ["Transfer from Guwahati or Bhalukpong", "Check-in at riverside guesthouse", "Welcome bonfire"] },
       { day: 2, title: "Hot Springs + Dzong", description: "Morning soak, afternoon history.", activities: ["Natural hot spring bath", "Dirang Dzong guided walk", "Orchard visit in season"] },
@@ -966,10 +902,7 @@ export const TRIPS_DATA: Trip[] = [
     exclusions: ["Travel to/from Guwahati", "Personal shopping", "Travel insurance"],
     tags: ["Retreat", "Nature", "Hot Springs"],
     image: "https://images.unsplash.com/photo-1612171181961-d8ac6c52dff1?w=900&h=520&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1603833665858-e61d17a86224?w=800&h=600&fit=crop&auto=format&q=85",
-      "https://images.unsplash.com/photo-1598557252466-7d722941687d?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 16,
     difficulty: "Easy",
     bestTime: "October – April",
@@ -992,13 +925,13 @@ export const TRIPS_DATA: Trip[] = [
     tagline: "The most biodiverse birding site in Asia, barely 30km from the main highway.",
     description: "Sangti Valley is to birders what the Maldives is to divers. Over 300 bird species pass through or breed here. In winter, the black-necked cranes arrive from Tibet — a sight so rare it stops ornithologists mid-sentence. This camp is run by a professional birding guide who has spent 15 years in this valley.",
     highlights: [
-      "Black-necked crane winter congregation (November – February)",
-      "300+ bird species across 4 days of guided walks",
-      "Pre-dawn walks to prime hide locations",
-      "Photography coaching for bird-in-flight shots",
-      "Night drives for owls and nightjars",
-      "Checklist review and species identification workshop each evening",
-    ],
+        { text: "Black-necked crane winter congregation (November – February)" },
+        { text: "300+ bird species across 4 days of guided walks" },
+        { text: "Pre-dawn walks to prime hide locations" },
+        { text: "Photography coaching for bird-in-flight shots" },
+        { text: "Night drives for owls and nightjars" },
+        { text: "Checklist review and species identification workshop each evening" }
+      ],
     itinerary: [
       { day: 1, title: "Arrive Dirang → Sangti", description: "Arrive and settle. Briefing with lead birding guide.", activities: ["Transfer from Guwahati", "Sangti camp check-in", "Equipment check", "Sunset birds walk"] },
       { day: 2, title: "Full Birding Day — Riverbanks", description: "The crane corridor and river forest.", activities: ["4:30 AM start", "Crane congregation watch", "Riverside forest birds", "Photography session"] },
@@ -1009,9 +942,7 @@ export const TRIPS_DATA: Trip[] = [
     exclusions: ["Flights", "Personal camera equipment", "Travel insurance"],
     tags: ["Birding", "Photography", "Nature"],
     image: "https://images.unsplash.com/photo-1534067783941-51c9c23ecefd?w=900&h=520&fit=crop&auto=format&q=90",
-    galleryImages: [
-      "https://images.unsplash.com/photo-1604715686140-d5bef96c8b9d?w=800&h=600&fit=crop&auto=format&q=85",
-    ],
+    
     spots: 8,
     difficulty: "Easy",
     bestTime: "November – February",

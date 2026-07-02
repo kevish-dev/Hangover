@@ -41,10 +41,31 @@ export const createTrip = async (data) => {
   if (!data.stayTransportImages) {
     data.stayTransportImages = [];
   }
+  if (data.startDate && data.endDate) {
+    const start = new Date(data.startDate);
+    const end = new Date(data.endDate);
+    const diffTime = Math.abs(end - start);
+    data.duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  }
   return tripRepo.create(data);
 };
 
 export const updateTrip = async (id, data) => {
+  if (data.startDate || data.endDate) {
+    let start = data.startDate;
+    let end = data.endDate;
+    if (!start || !end) {
+      const trip = await tripRepo.findById(id);
+      start = start || trip.startDate;
+      end = end || trip.endDate;
+    }
+    if (start && end) {
+      const s = new Date(start);
+      const e = new Date(end);
+      const diffTime = Math.abs(e - s);
+      data.duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    }
+  }
   return tripRepo.update(id, data);
 };
 
@@ -92,44 +113,31 @@ export const uploadBannerImages = async (tripId, imageBuffers) => {
   });
 };
 
-export const uploadGalleryImages = async (tripId, buffers) => {
+export const syncHighlights = async (tripId, payloadStr, files) => {
   const trip = await tripRepo.findById(tripId);
-  if (!trip) {
-    throw new Error("Trip not found");
+  if (!trip) throw new Error("Trip not found");
+
+  const payload = JSON.parse(payloadStr); 
+  const folder = `uploads/trips/${tripId}/highlights`;
+  
+  const finalArray = [];
+  
+  for (const item of payload) {
+    if (item.type === "EXISTING") {
+      finalArray.push({ text: item.text, imageUrl: item.url });
+    } else if (item.type === "NEW") {
+      const file = files[item.fileIndex];
+      if (file) {
+         const url = await uploadToCloudinary(file.buffer, {
+           folder,
+           publicId: randomUUID(),
+         });
+         finalArray.push({ text: item.text, imageUrl: url });
+      }
+    }
   }
 
-  const folder = `uploads/trips/${tripId}/galleryimages`;
-  const uploadPromises = buffers.map(buffer => 
-    uploadToCloudinary(buffer, {
-      folder,
-      publicId: randomUUID(),
-    })
-  );
-
-  const imageUrls = await Promise.all(uploadPromises);
-  const existingGallery = trip.galleryImages || [];
-
-  return tripRepo.update(tripId, {
-    galleryImages: [...existingGallery, ...imageUrls]
-  });
-};
-
-export const deleteGalleryImage = async (tripId, imageUrl) => {
-  const trip = await tripRepo.findById(tripId);
-  if (!trip) {
-    throw new Error("Trip not found");
-  }
-
-  const existingGallery = trip.galleryImages || [];
-  if (!existingGallery.includes(imageUrl)) {
-    throw new Error("Image not found in trip");
-  }
-
-  await deleteFromCloudinary(imageUrl);
-
-  return tripRepo.update(tripId, {
-    galleryImages: existingGallery.filter(url => url !== imageUrl)
-  });
+  return tripRepo.update(tripId, { highlights: finalArray });
 };
 
 export const syncStayTransport = async (tripId, payloadStr, files) => {

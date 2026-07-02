@@ -183,7 +183,7 @@ function RelatedTrips({
 
 function RelatedCard({ trip }: { trip: ApiTrip }) {
   const [hovered, setHovered] = useState(false);
-  const heroImage = trip.bannerImages?.[0] || trip.galleryImages?.[0] || "";
+  const heroImage = trip.bannerImages?.[0] || trip.highlights?.[0]?.imageUrl || "";
   const typeLabel = formatTripType(trip.tripType);
 
   return (
@@ -1134,10 +1134,10 @@ export default function TripDetail() {
   }
 
   // Derived values
-  const heroImage = trip.bannerImages?.[0] || trip.galleryImages?.[0] || "";
+  const heroImage = trip.bannerImages?.[0] || trip.highlights?.[0]?.imageUrl || "";
   const allImages = [
     ...(trip.bannerImages || []),
-    ...(trip.galleryImages || []),
+    ...(trip.highlights?.map((h) => h.imageUrl) || []),
   ];
   const typeLabel = formatTripType(trip.tripType);
   const priceStr = formatPrice(trip.price);
@@ -1792,52 +1792,54 @@ function TripDetailContent({
               {trip.highlights && trip.highlights.length > 0 ? (
                 <div
                   style={{
-                    display: "flex",
-                    flexDirection: "column",
+                    display: "grid",
+                    gridTemplateColumns: "repeat(2, 1fr)",
                     gap: "10px",
                   }}
+                  className="grid-cols-2 sm:grid-cols-3"
                 >
-                  {trip.highlights.map((h) => (
+                  {trip.highlights.map((h: any, i: number) => (
                     <div
-                      key={h}
+                      key={i}
                       style={{
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: "12px",
+                        borderRadius: "8px",
+                        overflow: "hidden",
+                        position: "relative",
+                        aspectRatio: "4/3",
                       }}
                     >
+                      <img
+                        src={h.imageUrl}
+                        alt={`Highlight ${i + 1}`}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
                       <div
                         style={{
-                          width: "22px",
-                          height: "22px",
-                          borderRadius: "50%",
-                          background: "rgba(120,18,22,0.08)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                          marginTop: "1px",
+                          position: "absolute",
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          padding: "24px 12px 10px",
+                          background:
+                            "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%)",
+                          color: "#fff",
                         }}
                       >
-                        <div
+                        <p
                           style={{
-                            width: "6px",
-                            height: "6px",
-                            borderRadius: "50%",
-                            background: "#781216",
+                            margin: 0,
+                            fontSize: "0.75rem",
+                            fontWeight: 400,
+                            lineHeight: 1.3,
                           }}
-                        />
+                        >
+                          {h.text}
+                        </p>
                       </div>
-                      <span
-                        style={{
-                          color: "rgba(30,26,20,0.75)",
-                          fontSize: "0.88rem",
-                          fontWeight: 300,
-                          lineHeight: 1.6,
-                        }}
-                      >
-                        {h}
-                      </span>
                     </div>
                   ))}
                 </div>
@@ -1874,47 +1876,7 @@ function TripDetailContent({
               )}
             </div>
 
-            {/* Gallery */}
-            {trip.galleryImages && trip.galleryImages.length > 0 && (
-              <div>
-                <SectionTitle>Gallery</SectionTitle>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(3, 1fr)",
-                    gap: "10px",
-                  }}
-                >
-                  {trip.galleryImages.map((img, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        borderRadius: "8px",
-                        overflow: "hidden",
-                        aspectRatio: "4/3",
-                      }}
-                    >
-                      <img
-                        src={img}
-                        alt={`${trip.title} ${i + 1}`}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                          transition: "transform 0.4s ease",
-                        }}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.transform = "scale(1.05)")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.transform = "scale(1)")
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+
 
             {/* Accommodation & Transport */}
             <AccommodationSection items={stayItems} />

@@ -478,7 +478,7 @@ export default function BookingPage() {
 
   // Map backend fields to display values
   const tripName = trip.title;
-  const tripImage = trip.bannerImages?.[0] || trip.galleryImages?.[0] || "";
+  const tripImage = trip.bannerImages?.[0] || trip.highlights?.[0]?.imageUrl || "";
   const tripPrice = formatPrice(trip.price);
   const tripDuration = formatDuration(trip.duration);
   const tripDestination = trip.location;

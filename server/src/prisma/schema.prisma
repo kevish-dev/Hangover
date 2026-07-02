@@ -180,12 +180,11 @@ model Trip {
 
   difficultyLevel String
   bestTimeToVisit String
-  maxAltitude     Int
+  maxAltitude     Int?
 
   overview String
 
-  highlights          String[]
-  galleryImages        String[]
+  highlights          Json @default("[]")
   inclusions           String[]
   exclusions           String[]
   stayTransportImages  Json

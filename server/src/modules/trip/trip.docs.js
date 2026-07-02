@@ -57,10 +57,10 @@ registry.registerPath({
             .object({
               title: z.string(),
               location: z.string(),
-              duration: z.number(),
+              duration: z.number().optional(),
               difficultyLevel: z.string(),
               bestTimeToVisit: z.string(),
-              maxAltitude: z.number(),
+              maxAltitude: z.number().optional(),
               overview: z.string(),
               price: z.number(),
               tokenAmount: z.number(),

@@ -30,11 +30,10 @@ router.post(
 router.delete("/:id/banner-images", tripController.deleteBanner);
 
 router.post(
-  "/:id/gallery-images",
-  uploadMiddleware.array("gallery", 20),
-  tripController.uploadGalleryImages
+  "/:id/highlights",
+  uploadMiddleware.array("images", 15),
+  tripController.syncHighlights
 );
-router.delete("/:id/gallery-images", tripController.deleteGalleryImage);
 
 router.post(
   "/:id/stay-transport",
