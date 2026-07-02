@@ -3,7 +3,8 @@ import * as tripService from "./trip.service.js";
 export const getTrips = async (req, res, next) => {
   try {
     const { page, limit } = req.query;
-    const result = await tripService.getTrips(page, limit);
+    const isAdmin = req.user?.role === "ADMIN";
+    const result = await tripService.getTrips(page, limit, isAdmin);
     res.status(200).json(result);
   } catch (error) {
     next(error);
@@ -12,7 +13,8 @@ export const getTrips = async (req, res, next) => {
 
 export const getTripById = async (req, res, next) => {
   try {
-    const trip = await tripService.getTripById(req.params.id);
+    const isAdmin = req.user?.role === "ADMIN";
+    const trip = await tripService.getTripById(req.params.id, isAdmin);
     res.status(200).json(trip);
   } catch (error) {
     if (error.message === "Trip not found") {

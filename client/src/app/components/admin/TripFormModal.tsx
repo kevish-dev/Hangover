@@ -41,6 +41,7 @@ const tripSchema = z.object({
   highlights: z.array(z.object({ value: z.string().min(1) })).min(1, "At least one highlight"),
   inclusions: z.array(z.object({ value: z.string().min(1) })).min(1, "At least one inclusion"),
   exclusions: z.array(z.object({ value: z.string().min(1) })).min(1, "At least one exclusion"),
+  isPublished: z.boolean().default(false),
 });
 
 type TripFormValues = z.infer<typeof tripSchema>;
@@ -86,6 +87,7 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
       startDate: "", endDate: "", duration: 1, groupSizeMin: 4, groupSizeMax: 15, maxAltitude: 0,
       overview: "",
       highlights: [{ value: "" }], inclusions: [{ value: "" }], exclusions: [{ value: "" }],
+      isPublished: false,
     },
     mode: "onTouched",
   });
@@ -113,6 +115,7 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
           highlights: trip.highlights?.length ? trip.highlights.map((h: string) => ({ value: h })) : [{ value: "" }],
           inclusions: trip.inclusions?.length ? trip.inclusions.map((i: string) => ({ value: i })) : [{ value: "" }],
           exclusions: trip.exclusions?.length ? trip.exclusions.map((e: string) => ({ value: e })) : [{ value: "" }],
+          isPublished: trip.isPublished || false,
         });
       } else {
         form.reset({
@@ -121,6 +124,7 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
           startDate: "", endDate: "", duration: 1, groupSizeMin: 4, groupSizeMax: 15, maxAltitude: 0,
           overview: "",
           highlights: [{ value: "" }], inclusions: [{ value: "" }], exclusions: [{ value: "" }],
+          isPublished: false,
         });
       }
       setStep(0);
@@ -313,6 +317,10 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
                 <div className="space-y-2 col-span-2">
                   <Label>Total Capacity (Pax)</Label>
                   <Input type="number" {...form.register("capacity")} />
+                </div>
+                <div className="space-y-2 col-span-2 flex items-center gap-2 mt-2">
+                  <input type="checkbox" id="isPublished" {...form.register("isPublished")} className="w-4 h-4 text-[#c8a96e] rounded border-gray-300 focus:ring-[#c8a96e]" />
+                  <Label htmlFor="isPublished" className="mb-0 cursor-pointer">Publish this trip (visible to public)</Label>
                 </div>
               </div>
             </div>

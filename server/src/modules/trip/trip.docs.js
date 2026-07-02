@@ -68,6 +68,7 @@ registry.registerPath({
             startDate: z.string().datetime(),
             endDate: z.string().datetime(),
             tripType: z.string(),
+            isPublished: z.boolean().optional(),
           }).passthrough(),
         },
       },
@@ -102,6 +103,7 @@ registry.registerPath({
         "application/json": {
           schema: z.object({
             title: z.string().optional(),
+            isPublished: z.boolean().optional(),
           }).passthrough(),
         },
       },

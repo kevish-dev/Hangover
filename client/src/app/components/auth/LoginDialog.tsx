@@ -45,8 +45,8 @@ export function LoginDialog({ children }: LoginDialogProps) {
       <DialogTrigger asChild>
         {children || <Button variant="default">Login</Button>}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[425px] p-8 sm:p-10">
+        <DialogHeader className="gap-2">
           <DialogTitle>Sign In</DialogTitle>
           <DialogDescription>
             Welcome back! Please sign in to your account.

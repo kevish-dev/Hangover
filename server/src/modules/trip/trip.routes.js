@@ -1,6 +1,6 @@
 import { Router } from "express";
 import * as tripController from "./trip.controller.js";
-import { requireAuth, requireAdmin } from "../../core/middlewares/auth.middleware.js";
+import { requireAuth, requireAdmin, optionalAuth } from "../../core/middlewares/auth.middleware.js";
 import { uploadMiddleware } from "../../core/services/upload.service.js";
 import faqRoutes from "../faq/faq.routes.js";
 import tripFormRoutes from "../trip-form/trip-form.routes.js";
@@ -14,9 +14,9 @@ router.use("/:tripId/faqs", faqRoutes);
 // Mount nested Trip Forms routes
 router.use("/:tripId/forms", tripFormRoutes);
 
-// Public routes
-router.get("/", tripController.getTrips);
-router.get("/:id", tripController.getTripById);
+// Public routes (with optional auth for admin view)
+router.get("/", optionalAuth, tripController.getTrips);
+router.get("/:id", optionalAuth, tripController.getTripById);
 
 // Admin routes
 router.use(requireAuth, requireAdmin);

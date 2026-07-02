@@ -6,11 +6,12 @@ const generateSlug = (title) => {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
 };
 
-export const getTrips = async (page = 1, limit = 10) => {
+export const getTrips = async (page = 1, limit = 10, isAdmin = false) => {
   const skip = (page - 1) * limit;
   const take = parseInt(limit, 10);
   
-  const { trips, total } = await tripRepo.findAll(skip, take);
+  const where = isAdmin ? {} : { isPublished: true };
+  const { trips, total } = await tripRepo.findAll(skip, take, where);
   
   return {
     data: trips,
@@ -23,8 +24,9 @@ export const getTrips = async (page = 1, limit = 10) => {
   };
 };
 
-export const getTripById = async (id) => {
-  const trip = await tripRepo.findById(id);
+export const getTripById = async (id, isAdmin = false) => {
+  const where = isAdmin ? { id } : { id, isPublished: true };
+  const trip = await tripRepo.findById(where);
   if (!trip) throw new Error("Trip not found");
   return trip;
 };

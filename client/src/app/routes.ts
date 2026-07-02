@@ -9,6 +9,7 @@ import AboutPage from "./pages/about";
 import AdminDashboardRedirect from "./pages/admin/dashboard";
 import AdminLayout from "./pages/admin/layout";
 import AdminTripsPage from "./pages/admin/trips";
+import AdminDestinationsPage from "./pages/admin/destinations";
 
 export const router = createBrowserRouter([
   {
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: AdminDashboardRedirect },
       { path: "trips", Component: AdminTripsPage },
+      { path: "destinations", Component: AdminDestinationsPage },
     ],
   },
 ]);

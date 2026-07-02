@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../lib/axios";
 import { TripFormModal } from "../../components/admin/TripFormModal";
-import { Map, MapPin, Calendar, Users, IndianRupee, Plus, Edit2, Trash2 } from "lucide-react";
+import { Map, MapPin, Calendar, Users, IndianRupee, Plus, Edit2, Trash2, Eye, EyeOff } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "../../components/ui/button";
 import { toast } from "sonner";
@@ -29,6 +29,17 @@ export default function AdminTripsPage() {
       } catch (error) {
         toast.error("Failed to delete trip");
       }
+    }
+  };
+
+  const handleTogglePublish = async (trip: any) => {
+    try {
+      // Create a payload with the existing data to satisfy schema requirements if necessary, but prisma partial update allows just the flag.
+      await apiClient.put(`/trips/${trip.id}`, { isPublished: !trip.isPublished });
+      toast.success(trip.isPublished ? "Trip unpublished" : "Trip published");
+      queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
+    } catch (error) {
+      toast.error("Failed to update status");
     }
   };
 
@@ -90,7 +101,7 @@ export default function AdminTripsPage() {
                 <div className="absolute top-3 left-3 px-2.5 py-1 bg-white/90 backdrop-blur-md rounded text-xs font-semibold text-gray-800 uppercase tracking-wider">
                   {trip.tripType.replace(/_/g, " ")}
                 </div>
-                {!trip.isActive && (
+                {!trip.isPublished && (
                   <div className="absolute top-3 right-3 px-2.5 py-1 bg-red-100 text-red-700 rounded text-xs font-bold uppercase tracking-wider">
                     Draft
                   </div>
@@ -120,6 +131,13 @@ export default function AdminTripsPage() {
                     <span>{parseInt(trip.price).toLocaleString('en-IN')}</span>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => handleTogglePublish(trip)}
+                      className={`text-sm font-medium transition-colors flex items-center gap-1 ${trip.isPublished ? 'text-gray-500 hover:text-orange-600' : 'text-gray-500 hover:text-green-600'}`}
+                    >
+                      {trip.isPublished ? <><EyeOff className="w-3.5 h-3.5" /> Unpublish</> : <><Eye className="w-3.5 h-3.5" /> Publish</>}
+                    </button>
+                    <div className="w-px h-3 bg-gray-300 mx-1" />
                     <button 
                       onClick={() => openEditModal(trip)}
                       className="text-sm font-medium text-gray-500 hover:text-[#c8a96e] transition-colors flex items-center gap-1"

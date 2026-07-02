@@ -1,20 +1,22 @@
 import { prisma } from "../../prisma/client.js";
 
-export const findAll = async (skip, take) => {
+export const findAll = async (skip, take, where = {}) => {
   const [trips, total] = await Promise.all([
     prisma.trip.findMany({
+      where,
       skip,
       take,
       orderBy: { createdAt: "desc" },
     }),
-    prisma.trip.count(),
+    prisma.trip.count({ where }),
   ]);
   return { trips, total };
 };
 
-export const findById = async (id) => {
-  return prisma.trip.findUnique({
-    where: { id },
+export const findById = async (whereObj) => {
+  const filter = typeof whereObj === 'string' ? { id: whereObj } : whereObj;
+  return prisma.trip.findFirst({
+    where: filter,
     include: {
       faqs: true,
       itineraries: {

@@ -218,6 +218,7 @@ model Trip {
 
   tripType   TripType
   isActive   Boolean @default(true)
+  isPublished Boolean @default(false)
   isFeatured Boolean @default(false)
 
   bookings    Booking[]
@@ -226,6 +227,9 @@ model Trip {
   tripTags    TripTag[]
   inquiries   Inquiry[]
   formFields  TripFormField[]
+
+  destinationId String?
+  destination   Destination? @relation(fields: [destinationId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -587,4 +591,20 @@ model Refund {
   @@index([paymentId])
   @@index([status])
   @@index([createdAt])
+}
+
+model Destination {
+  id String @id @default(uuid())
+
+  name       String
+  state      String
+  subheading String?
+  isPublished Boolean @default(false)
+
+  trips Trip[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
 }
