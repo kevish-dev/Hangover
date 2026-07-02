@@ -779,7 +779,7 @@ function FAQSection({ faqs }: { faqs: ApiFaq[] }) {
   );
 }
 
-const WHATSAPP_NUMBER = "919876543210";
+const WHATSAPP_NUMBER = "918415929069";
 
 function StarRating({ rating }: { rating: number }) {
   return (
