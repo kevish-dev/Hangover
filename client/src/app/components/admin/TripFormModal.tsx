@@ -13,7 +13,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
-import { Plus, UploadCloud, Loader2, Image as ImageIcon, Trash2, ArrowRight, ArrowLeft } from "lucide-react";
+import { Plus, UploadCloud, Loader2, Image as ImageIcon, Trash2, ArrowRight, ArrowLeft, ArrowUp, ArrowDown } from "lucide-react";
 import { apiClient } from "../../../lib/axios";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -41,6 +41,8 @@ const tripSchema = z.object({
   highlights: z.array(z.object({ value: z.string().min(1) })).min(1, "At least one highlight"),
   inclusions: z.array(z.object({ value: z.string().min(1) })).min(1, "At least one inclusion"),
   exclusions: z.array(z.object({ value: z.string().min(1) })).min(1, "At least one exclusion"),
+  tripTags: z.array(z.object({ value: z.string().min(1) })).optional(),
+  faqs: z.array(z.object({ question: z.string().min(1, "Required"), answer: z.string().min(1, "Required") })).optional(),
   isPublished: z.boolean().default(false),
 });
 
@@ -52,7 +54,7 @@ const TRIP_TYPES = [
   "BONFIRE_RETREAT", "INSTITUTE_COLLEGE_TRIP", "CUSTOM_TRIP"
 ];
 
-const STEPS = ["Basics", "Logistics", "Content", "Media"];
+const STEPS = ["Basics", "Logistics", "Content", "FAQs & Tags", "Media"];
 
 interface TripFormModalProps {
   trip?: any;
@@ -87,6 +89,8 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
       startDate: "", endDate: "", duration: 1, groupSizeMin: 4, groupSizeMax: 15, maxAltitude: 0,
       overview: "",
       highlights: [{ value: "" }], inclusions: [{ value: "" }], exclusions: [{ value: "" }],
+      tripTags: [{ value: "" }],
+      faqs: [{ question: "", answer: "" }],
       isPublished: false,
     },
     mode: "onTouched",
@@ -115,6 +119,8 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
           highlights: trip.highlights?.length ? trip.highlights.map((h: string) => ({ value: h })) : [{ value: "" }],
           inclusions: trip.inclusions?.length ? trip.inclusions.map((i: string) => ({ value: i })) : [{ value: "" }],
           exclusions: trip.exclusions?.length ? trip.exclusions.map((e: string) => ({ value: e })) : [{ value: "" }],
+          tripTags: trip.tripTags?.length ? trip.tripTags.map((t: any) => ({ value: t.tag })) : [{ value: "" }],
+          faqs: trip.faqs?.length ? trip.faqs.map((f: any) => ({ question: f.question, answer: f.answer })) : [{ question: "", answer: "" }],
           isPublished: trip.isPublished || false,
         });
       } else {
@@ -124,6 +130,8 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
           startDate: "", endDate: "", duration: 1, groupSizeMin: 4, groupSizeMax: 15, maxAltitude: 0,
           overview: "",
           highlights: [{ value: "" }], inclusions: [{ value: "" }], exclusions: [{ value: "" }],
+          tripTags: [{ value: "" }],
+          faqs: [{ question: "", answer: "" }],
           isPublished: false,
         });
       }
@@ -141,6 +149,12 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
   });
   const { fields: exclusionFields, append: addExclusion, remove: removeExclusion } = useFieldArray({
     control: form.control, name: "exclusions"
+  });
+  const { fields: tripTagFields, append: addTripTag, remove: removeTripTag } = useFieldArray({
+    control: form.control, name: "tripTags"
+  });
+  const { fields: faqFields, append: addFaq, remove: removeFaq, move: moveFaq } = useFieldArray({
+    control: form.control, name: "faqs"
   });
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -183,6 +197,7 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
     if (step === 0) fieldsToValidate = ["title", "location", "tripType", "difficultyLevel", "bestTimeToVisit", "price", "tokenAmount", "capacity"];
     if (step === 1) fieldsToValidate = ["startDate", "endDate", "duration", "groupSizeMin", "groupSizeMax", "maxAltitude"];
     if (step === 2) fieldsToValidate = ["overview", "highlights", "inclusions", "exclusions"];
+    if (step === 3) fieldsToValidate = ["faqs", "tripTags"];
     
     const isValid = await form.trigger(fieldsToValidate);
     return isValid;
@@ -204,9 +219,11 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
         ...data,
         startDate: new Date(data.startDate).toISOString(),
         endDate: new Date(data.endDate).toISOString(),
-        highlights: data.highlights.map(h => h.value),
-        inclusions: data.inclusions.map(i => i.value),
-        exclusions: data.exclusions.map(e => e.value),
+        highlights: data.highlights.map(h => h.value).filter(h => h.trim() !== ""),
+        inclusions: data.inclusions.map(i => i.value).filter(i => i.trim() !== ""),
+        exclusions: data.exclusions.map(e => e.value).filter(e => e.trim() !== ""),
+        tripTags: data.tripTags?.map(t => t.value).filter(t => t.trim() !== ""),
+        faqs: data.faqs?.filter(f => f.question.trim() !== "" && f.answer.trim() !== ""),
       };
 
       let tripId = trip?.id;
@@ -421,11 +438,106 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
                   ))}
                 </div>
 
+
+
               </div>
             </div>
 
-            {/* STEP 3: MEDIA (BANNER IMAGES) */}
+            {/* STEP 3: FAQs */}
             <div className={step === 3 ? "block" : "hidden"}>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b pb-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Frequently Asked Questions</h3>
+                    <p className="text-sm text-gray-500">Add common questions and answers for this trip.</p>
+                  </div>
+                  <Button type="button" onClick={() => addFaq({ question: "", answer: "" })} className="bg-gray-900 hover:bg-gray-800 text-white flex items-center gap-2">
+                    <Plus className="w-4 h-4" /> Add FAQ
+                  </Button>
+                </div>
+                
+                <div className="space-y-4">
+                  {faqFields.length === 0 ? (
+                    <div className="py-8 text-center border-2 border-dashed border-gray-200 rounded-lg bg-gray-50 text-gray-500">
+                      No FAQs added yet. Click 'Add FAQ' to start.
+                    </div>
+                  ) : (
+                    faqFields.map((field, index) => (
+                      <div key={field.id} className="p-4 border rounded-lg bg-white shadow-sm flex flex-col gap-3 group relative">
+                        <div className="flex justify-between items-center">
+                          <Label className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Question {index + 1}</Label>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => index > 0 && moveFaq(index, index - 1)} 
+                              className="h-7 w-7 text-gray-400 hover:text-gray-800"
+                              disabled={index === 0}
+                            >
+                              <ArrowUp className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => index < faqFields.length - 1 && moveFaq(index, index + 1)} 
+                              className="h-7 w-7 text-gray-400 hover:text-gray-800"
+                              disabled={index === faqFields.length - 1}
+                            >
+                              <ArrowDown className="w-3.5 h-3.5" />
+                            </Button>
+                            <div className="w-px h-4 bg-gray-200 mx-1" />
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => removeFaq(index)} 
+                              className="h-7 w-7 text-red-500 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div>
+                          <Input {...form.register(`faqs.${index}.question`)} placeholder="e.g. What is the fitness level required?" className="font-medium" />
+                          {form.formState.errors.faqs?.[index]?.question && <p className="text-xs text-red-500 mt-1">{form.formState.errors.faqs[index].question.message}</p>}
+                        </div>
+                        <div>
+                          <Textarea {...form.register(`faqs.${index}.answer`)} placeholder="Provide a detailed answer..." rows={2} className="resize-none" />
+                          {form.formState.errors.faqs?.[index]?.answer && <p className="text-xs text-red-500 mt-1">{form.formState.errors.faqs[index].answer.message}</p>}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                
+                {/* TRIP TAGS */}
+                <div className="space-y-3 p-4 mt-6 border rounded-lg bg-blue-50/30 border-blue-100">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-semibold text-blue-800">Trip Tags</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={() => addTripTag({ value: "" })}>
+                      <Plus className="w-4 h-4 mr-1" /> Add Tag
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500">Add tags to categorize this trip (e.g. Adventure, Couples, Snow)</p>
+                  <div className="space-y-3">
+                    {tripTagFields.map((field, index) => (
+                      <div key={field.id} className="flex items-center gap-2">
+                        <Input {...form.register(`tripTags.${index}.value`)} placeholder={`Tag ${index + 1}`} className="bg-white" />
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeTripTag(index)} className="text-red-500 hover:bg-red-50 shrink-0 border border-red-100 bg-white">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* STEP 4: MEDIA (BANNER IMAGES) */}
+            <div className={step === 4 ? "block" : "hidden"}>
               <div className="space-y-4">
                 {isEdit && trip?.bannerImages?.length > 0 && (
                   <div className="mb-6">

@@ -124,6 +124,21 @@ export default function AdminTripsPage() {
                     <span>{trip.capacity} pax</span>
                   </div>
                 </div>
+
+                {trip.tripTags && trip.tripTags.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {trip.tripTags.slice(0, 3).map((t: any) => (
+                      <span key={t.id} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                        {t.tag}
+                      </span>
+                    ))}
+                    {trip.tripTags.length > 3 && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                        +{trip.tripTags.length - 3}
+                      </span>
+                    )}
+                  </div>
+                )}
                 
                 <div className="mt-auto pt-4 flex items-center justify-between border-t border-gray-100">
                   <div className="flex items-center font-semibold text-[#781216]">

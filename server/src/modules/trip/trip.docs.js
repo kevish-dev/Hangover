@@ -69,6 +69,12 @@ registry.registerPath({
             endDate: z.string().datetime(),
             tripType: z.string(),
             isPublished: z.boolean().optional(),
+            tripTags: z.array(z.string()).optional(),
+            faqs: z.array(z.object({
+              question: z.string(),
+              answer: z.string(),
+              order: z.number().optional()
+            })).optional(),
           }).passthrough(),
         },
       },
@@ -104,6 +110,12 @@ registry.registerPath({
           schema: z.object({
             title: z.string().optional(),
             isPublished: z.boolean().optional(),
+            tripTags: z.array(z.string()).optional(),
+            faqs: z.array(z.object({
+              question: z.string(),
+              answer: z.string(),
+              order: z.number().optional()
+            })).optional(),
           }).passthrough(),
         },
       },

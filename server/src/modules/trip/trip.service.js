@@ -39,9 +39,6 @@ export const createTrip = async (data) => {
 };
 
 export const updateTrip = async (id, data) => {
-  if (data.title && !data.slug) {
-    data.slug = generateSlug(data.title) + "-" + Date.now();
-  }
   return tripRepo.update(id, data);
 };
 

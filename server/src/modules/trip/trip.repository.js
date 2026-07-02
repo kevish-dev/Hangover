@@ -7,6 +7,10 @@ export const findAll = async (skip, take, where = {}) => {
       skip,
       take,
       orderBy: { createdAt: "desc" },
+      include: {
+        tripTags: true,
+        faqs: true,
+      }
     }),
     prisma.trip.count({ where }),
   ]);
@@ -34,13 +38,65 @@ export const findById = async (whereObj) => {
 };
 
 export const create = async (data) => {
-  return prisma.trip.create({ data });
+  const { tripTags, faqs, ...rest } = data;
+  const payload = { ...rest };
+  
+  if (tripTags && Array.isArray(tripTags)) {
+    payload.tripTags = {
+      connectOrCreate: tripTags.map(tag => ({
+        where: { tag },
+        create: { tag }
+      }))
+    };
+  }
+
+  if (faqs && Array.isArray(faqs)) {
+    payload.faqs = {
+      create: faqs.map((faq, index) => ({
+        question: faq.question,
+        answer: faq.answer,
+        order: faq.order !== undefined ? faq.order : index
+      }))
+    };
+  }
+  
+  return prisma.trip.create({ data: payload });
 };
 
 export const update = async (id, data) => {
+  const { tripTags, faqs, ...rest } = data;
+  const payload = { ...rest };
+  
+  if (tripTags && Array.isArray(tripTags)) {
+    // 1. Clear existing tags
+    await prisma.trip.update({
+      where: { id },
+      data: { tripTags: { set: [] } }
+    });
+    
+    // 2. Add new tags
+    payload.tripTags = {
+      connectOrCreate: tripTags.map(tag => ({
+        where: { tag },
+        create: { tag }
+      }))
+    };
+  }
+
+  if (faqs && Array.isArray(faqs)) {
+    payload.faqs = {
+      deleteMany: {},
+      create: faqs.map((faq, index) => ({
+        question: faq.question,
+        answer: faq.answer,
+        order: faq.order !== undefined ? faq.order : index
+      }))
+    };
+  }
+  
   return prisma.trip.update({
     where: { id },
-    data,
+    data: payload,
   });
 };
 
