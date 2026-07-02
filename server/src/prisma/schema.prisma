@@ -104,24 +104,9 @@ enum RefundStatus {
   FAILED
 }
 
-enum FormFieldType {
-  TEXT
-  TEXTAREA
-  NUMBER
-  EMAIL
-  PHONE
-  DATE
-  SELECT
-  MULTI_SELECT
-  CHECKBOX
-  RADIO
-  FILE_UPLOAD
-}
 
-enum FormFieldScope {
-  GROUP
-  TRAVELER
-}
+
+
 
 model User {
   id       String   @id @default(uuid())
@@ -192,8 +177,6 @@ model Trip {
   bannerImages String[]
 
   duration     Int
-  groupSizeMin Int
-  groupSizeMax Int
 
   difficultyLevel String
   bestTimeToVisit String
@@ -226,7 +209,7 @@ model Trip {
   itineraries Itinerary[]
   tripTags    TripTag[]
   inquiries   Inquiry[]
-  formFields  TripFormField[]
+
 
   destinationId String?
   destination   Destination? @relation(fields: [destinationId], references: [id], onDelete: SetNull)
@@ -241,59 +224,9 @@ model Trip {
   @@index([location])
 }
 
-model TripFormField {
-  id     String @id @default(uuid())
-  tripId String
-  trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
-  label       String
-  fieldKey    String
-  fieldType   FormFieldType
-  scope       FormFieldScope @default(GROUP)
-  placeholder String?
-  helpText    String?
 
-  options String[]
 
-  isRequired Boolean @default(false)
-  order      Int     @default(0)
-
-  validationRegex String?
-  minValue        Int?
-  maxValue        Int?
-
-  isActive Boolean @default(true)
-
-  responses BookingFormResponse[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([tripId, fieldKey])
-  @@index([tripId])
-  @@index([order])
-}
-
-model BookingFormResponse {
-  id        String @id @default(uuid())
-  bookingId String
-  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  fieldId String
-  field   TripFormField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
-
-  travelerIndex Int @default(0)
-
-  value     String?
-  fileUrl   String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([bookingId, fieldId, travelerIndex])
-  @@index([bookingId])
-  @@index([fieldId])
-}
 
 model Booking {
   id                String @id @default(uuid())
@@ -330,7 +263,7 @@ model Booking {
 
   payments      Payment[]
   reminders     PaymentReminder[]
-  formResponses BookingFormResponse[]
+
   paymentIntents PaymentIntent[]
 
   createdAt DateTime @default(now())

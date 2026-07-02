@@ -35,7 +35,6 @@ export interface Trip {
   galleryImages: string[];
   spots: number;
   difficulty: "Easy" | "Moderate" | "Challenging";
-  groupSize: string;
   bestTime: string;
   destGroup?: string;   // primary destination group for categorised listing
   altitude?: string;
@@ -98,7 +97,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 12,
     difficulty: "Easy",
-    groupSize: "8–12 people",
     bestTime: "September – October",
     reviews: [
       { name: "Priya Mehta", avatar: "https://randomuser.me/api/portraits/women/44.jpg", rating: 5, text: "The Ziro trip was the best decision I made last year. The music was incredible, the valley is otherworldly, and the Hangover team made sure we were never just tourists — we were guests of the community.", tripMonth: "Sep 2024" },
@@ -161,7 +159,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 8,
     difficulty: "Moderate",
-    groupSize: "8–12 people",
     bestTime: "December – February",
     altitude: "3,800m",
     reviews: [
@@ -215,7 +212,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 15,
     difficulty: "Easy",
-    groupSize: "8–15 people",
     bestTime: "October – March",
     reviews: [
       { name: "Meera Patel", avatar: "https://randomuser.me/api/portraits/women/55.jpg", rating: 5, text: "Paradise Beach is exactly that. No roads, no WiFi, no noise. Just the sound of waves and people you didn't know 48 hours ago who now feel like old friends.", tripMonth: "Nov 2024" },
@@ -268,7 +264,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 20,
     difficulty: "Easy",
-    groupSize: "10–20 people",
     bestTime: "November – February",
     reviews: [
       { name: "Rohan Desai", avatar: "https://randomuser.me/api/portraits/men/56.jpg", rating: 5, text: "Walking on the Rann at midnight under a full moon is the single most other-worldly experience of my life. No photograph does it justice. You have to go.", tripMonth: "Nov 2024" },
@@ -318,7 +313,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 6,
     difficulty: "Easy",
-    groupSize: "4–8 people",
     bestTime: "October – May",
     reviews: [
       { name: "Nikhil Joshi", avatar: "https://randomuser.me/api/portraits/men/76.jpg", rating: 5, text: "Saw a leopard dragging prey up a tree on the first morning. I nearly fell off the jeep. The naturalist knew exactly where to be at exactly the right time.", tripMonth: "Mar 2025" },
@@ -371,7 +365,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 18,
     difficulty: "Easy",
-    groupSize: "8–15 people",
     bestTime: "October – February",
     reviews: [
       { name: "Priya Mehta", avatar: "https://randomuser.me/api/portraits/women/44.jpg", rating: 5, text: "The historian guide changed everything. Without her, it's just beautiful ruins. With her, it's a civilisation you can touch. Worth every rupee.", tripMonth: "Dec 2024" },
@@ -429,7 +422,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 10,
     difficulty: "Challenging",
-    groupSize: "6–10 riders",
     bestTime: "June – September",
     altitude: "5,359m (Khardung La)",
     reviews: [
@@ -480,7 +472,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 14,
     difficulty: "Moderate",
-    groupSize: "8–14 people",
     bestTime: "June – October",
     altitude: "4,300m (Chandratal)",
     reviews: [
@@ -526,7 +517,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 16,
     difficulty: "Easy",
-    groupSize: "8–16 people",
     bestTime: "December 1–10",
     reviews: [
       { name: "Ananya Iyer", avatar: "https://randomuser.me/api/portraits/women/29.jpg", rating: 5, text: "I've attended 20 music festivals. Nothing compares to watching a Naga warrior dance that's been passed down for 500 years. This is not a festival. This is a civilisation.", tripMonth: "Dec 2024" },
@@ -574,7 +564,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 12,
     difficulty: "Easy",
-    groupSize: "8–12 people",
     bestTime: "October – February",
     reviews: [
       { name: "Priya Mehta", avatar: "https://randomuser.me/api/portraits/women/44.jpg", rating: 5, text: "Getting into Mehrangarh at 5 AM before anyone else arrives — walking those empty ramparts in silence with the Blue City below waking up. That's a memory I'll give to my grandchildren.", tripMonth: "Jan 2025" },
@@ -617,7 +606,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 20,
     difficulty: "Easy",
-    groupSize: "8–20 people",
     bestTime: "October – April",
     reviews: [
       { name: "Meera Patel", avatar: "https://randomuser.me/api/portraits/women/55.jpg", rating: 5, text: "We got there stressed out of our minds and left ready to face everything. Coorg does something to you. The bonfire, the mist, the coffee smell in the morning — it resets you.", tripMonth: "Feb 2025" },
@@ -664,7 +652,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 8,
     difficulty: "Moderate",
-    groupSize: "4–8 people",
     bestTime: "April – October",
     reviews: [
       { name: "Nikhil Joshi", avatar: "https://randomuser.me/api/portraits/men/76.jpg", rating: 5, text: "I've had a DSLR for 3 years and thought I knew how to use it. After 7 days with Rishi our guide, I realised I'd been wasting it. The shots I got at Lempuyang at 5 AM are genuinely the best photographs I've ever taken.", tripMonth: "May 2025" },
@@ -712,7 +699,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 12,
     difficulty: "Moderate",
-    groupSize: "8–12 people",
     bestTime: "March – June, September – November",
     altitude: "15,200m (Bum La)",
     destGroup: "Tawang",
@@ -759,7 +745,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 8,
     difficulty: "Challenging",
-    groupSize: "6–8 people",
     bestTime: "December – February",
     altitude: "13,700m (Sela Pass)",
     destGroup: "Tawang",
@@ -806,7 +791,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 40,
     difficulty: "Easy",
-    groupSize: "20–40 students",
     bestTime: "March – June, September – November",
     destGroup: "Tawang",
     reviews: [
@@ -855,7 +839,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 10,
     difficulty: "Moderate",
-    groupSize: "6–10 people",
     bestTime: "October – May",
     altitude: "6,000 ft",
     destGroup: "Mechuka",
@@ -899,7 +882,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 6,
     difficulty: "Moderate",
-    groupSize: "4–6 people",
     bestTime: "October – May",
     destGroup: "Mechuka",
     reviews: [
@@ -945,7 +927,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 12,
     difficulty: "Easy",
-    groupSize: "8–12 people",
     bestTime: "October – March",
     destGroup: "Ziro",
     reviews: [
@@ -991,7 +972,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 16,
     difficulty: "Easy",
-    groupSize: "8–16 people",
     bestTime: "October – April",
     destGroup: "Dirang",
     reviews: [
@@ -1034,7 +1014,6 @@ export const TRIPS_DATA: Trip[] = [
     ],
     spots: 8,
     difficulty: "Easy",
-    groupSize: "4–8 people",
     bestTime: "November – February",
     destGroup: "Dirang",
     reviews: [

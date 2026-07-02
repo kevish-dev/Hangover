@@ -16,11 +16,7 @@ registry.registerPath({
             tripId: z.string(),
             numberOfTravelers: z.number().optional().default(1),
             initialPaymentType: z.string().optional().default("TOKEN"),
-            formResponses: z.array(z.object({
-              fieldId: z.string(),
-              value: z.string(),
-              travelerIndex: z.number().optional().default(0)
-            })).optional()
+
           }),
         },
       },

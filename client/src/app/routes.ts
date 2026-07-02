@@ -10,8 +10,7 @@ import AdminDashboardRedirect from "./pages/admin/dashboard";
 import AdminLayout from "./pages/admin/layout";
 import AdminTripsPage from "./pages/admin/trips";
 import AdminDestinationsPage from "./pages/admin/destinations";
-import AdminFormsPage from "./pages/admin/forms";
-import AdminFormsManagePage from "./pages/admin/forms-manage";
+
 
 export const router = createBrowserRouter([
   {
@@ -33,8 +32,7 @@ export const router = createBrowserRouter([
       { index: true, Component: AdminDashboardRedirect },
       { path: "trips", Component: AdminTripsPage },
       { path: "destinations", Component: AdminDestinationsPage },
-      { path: "forms", Component: AdminFormsPage },
-      { path: "forms/:tripId", Component: AdminFormsManagePage },
+
     ],
   },
 ]);

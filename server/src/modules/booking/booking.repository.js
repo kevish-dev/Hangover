@@ -2,7 +2,7 @@ import { prisma } from "../../prisma/client.js";
 
 const bookingInclude = {
   trip: true,
-  formResponses: { include: { field: true } },
+
   payments: { include: { refunds: true } },
 };
 

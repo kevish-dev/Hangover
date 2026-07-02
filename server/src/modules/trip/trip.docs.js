@@ -24,7 +24,8 @@ registry.registerPath({
   method: "get",
   path: "/trips/{id}",
   summary: "Get trip by ID",
-  description: "Retrieves a single trip by ID, including its FAQs and Itinerary. Publicly accessible.",
+  description:
+    "Retrieves a single trip by ID, including its FAQs and Itinerary. Publicly accessible.",
   tags: ["Trip"],
   request: {
     params: z.object({
@@ -52,30 +53,34 @@ registry.registerPath({
     body: {
       content: {
         "application/json": {
-          schema: z.object({
-            title: z.string(),
-            location: z.string(),
-            duration: z.number(),
-            groupSizeMin: z.number(),
-            groupSizeMax: z.number(),
-            difficultyLevel: z.string(),
-            bestTimeToVisit: z.string(),
-            maxAltitude: z.number(),
-            overview: z.string(),
-            price: z.number(),
-            tokenAmount: z.number(),
-            capacity: z.number(),
-            startDate: z.string().datetime(),
-            endDate: z.string().datetime(),
-            tripType: z.string(),
-            isPublished: z.boolean().optional(),
-            tripTags: z.array(z.string()).optional(),
-            faqs: z.array(z.object({
-              question: z.string(),
-              answer: z.string(),
-              order: z.number().optional()
-            })).optional(),
-          }).passthrough(),
+          schema: z
+            .object({
+              title: z.string(),
+              location: z.string(),
+              duration: z.number(),
+              difficultyLevel: z.string(),
+              bestTimeToVisit: z.string(),
+              maxAltitude: z.number(),
+              overview: z.string(),
+              price: z.number(),
+              tokenAmount: z.number(),
+              capacity: z.number(),
+              startDate: z.string().datetime(),
+              endDate: z.string().datetime(),
+              tripType: z.string(),
+              isPublished: z.boolean().optional(),
+              tripTags: z.array(z.string()).optional(),
+              faqs: z
+                .array(
+                  z.object({
+                    question: z.string(),
+                    answer: z.string(),
+                    order: z.number().optional(),
+                  }),
+                )
+                .optional(),
+            })
+            .passthrough(),
         },
       },
     },
@@ -107,16 +112,22 @@ registry.registerPath({
     body: {
       content: {
         "application/json": {
-          schema: z.object({
-            title: z.string().optional(),
-            isPublished: z.boolean().optional(),
-            tripTags: z.array(z.string()).optional(),
-            faqs: z.array(z.object({
-              question: z.string(),
-              answer: z.string(),
-              order: z.number().optional()
-            })).optional(),
-          }).passthrough(),
+          schema: z
+            .object({
+              title: z.string().optional(),
+              isPublished: z.boolean().optional(),
+              tripTags: z.array(z.string()).optional(),
+              faqs: z
+                .array(
+                  z.object({
+                    question: z.string(),
+                    answer: z.string(),
+                    order: z.number().optional(),
+                  }),
+                )
+                .optional(),
+            })
+            .passthrough(),
         },
       },
     },
@@ -163,7 +174,8 @@ registry.registerPath({
   method: "post",
   path: "/trips/{id}/banner-images",
   summary: "Upload Trip Banners",
-  description: "Uploads multiple banner images for a trip. Requires ADMIN role. Requires multipart/form-data.",
+  description:
+    "Uploads multiple banner images for a trip. Requires ADMIN role. Requires multipart/form-data.",
   tags: ["Trip"],
   security: [{ cookieAuth: [] }],
   request: {

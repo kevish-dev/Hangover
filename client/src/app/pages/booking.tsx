@@ -16,7 +16,12 @@ import {
   CheckCircle,
   AlertCircle,
 } from "lucide-react";
-import { fetchTripBySlug, formatPrice, formatDuration, formatGroupSize, type ApiTrip } from "../../lib/tripApi";
+import {
+  fetchTripBySlug,
+  formatPrice,
+  formatDuration,
+  type ApiTrip,
+} from "../../lib/tripApi";
 import { SiteFooter } from "../components/site-footer";
 
 // ── Shared input styles ───────────────────────────────────────────
@@ -63,10 +68,7 @@ function Field({
           fontFamily: "'Poppins', sans-serif",
         }}
       >
-        {label}{" "}
-        {required && (
-          <span style={{ color: "#781216" }}>*</span>
-        )}
+        {label} {required && <span style={{ color: "#781216" }}>*</span>}
       </label>
       {children}
       {hint && (
@@ -85,9 +87,7 @@ function Field({
   );
 }
 
-function Input({
-  ...props
-}: React.InputHTMLAttributes<HTMLInputElement>) {
+function Input({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   const [focused, setFocused] = useState(false);
   return (
     <input
@@ -102,9 +102,7 @@ function Input({
       }}
       style={{
         ...inputBase,
-        borderColor: focused
-          ? "#781216"
-          : "rgba(30,26,20,0.14)",
+        borderColor: focused ? "#781216" : "rgba(30,26,20,0.14)",
         ...props.style,
       }}
     />
@@ -130,9 +128,7 @@ function Select({
       style={{
         ...inputBase,
         cursor: "pointer",
-        borderColor: focused
-          ? "#781216"
-          : "rgba(30,26,20,0.14)",
+        borderColor: focused ? "#781216" : "rgba(30,26,20,0.14)",
         WebkitAppearance: "none",
       }}
     >
@@ -141,13 +137,7 @@ function Select({
   );
 }
 
-function AadhaarUpload({
-  label,
-  name,
-}: {
-  label: string;
-  name: string;
-}) {
+function AadhaarUpload({ label, name }: { label: string; name: string }) {
   const [fileName, setFileName] = useState<string | null>(null);
   return (
     <Field
@@ -163,9 +153,7 @@ function AadhaarUpload({
           padding: "11px 14px",
           borderRadius: "8px",
           border: `1.5px dashed ${fileName ? "#781216" : "rgba(30,26,20,0.2)"}`,
-          background: fileName
-            ? "rgba(120,18,22,0.03)"
-            : "#faf8f4",
+          background: fileName ? "rgba(120,18,22,0.03)" : "#faf8f4",
           cursor: "pointer",
           transition: "border-color 0.2s, background 0.2s",
           fontFamily: "'Poppins', sans-serif",
@@ -190,9 +178,7 @@ function AadhaarUpload({
           name={name}
           accept="image/*,.pdf"
           style={{ display: "none" }}
-          onChange={(e) =>
-            setFileName(e.target.files?.[0]?.name ?? null)
-          }
+          onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
         />
       </label>
     </Field>
@@ -360,9 +346,7 @@ function TravelerForm({
             fontSize: "0.7rem",
             transition: "color 0.2s",
           }}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.color = "#781216")
-          }
+          onMouseEnter={(e) => (e.currentTarget.style.color = "#781216")}
           onMouseLeave={(e) =>
             (e.currentTarget.style.color = "rgba(30,26,20,0.4)")
           }
@@ -435,8 +419,7 @@ export default function BookingPage() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  const addTraveler = () =>
-    setTravelers((t) => [...t, Date.now()]);
+  const addTraveler = () => setTravelers((t) => [...t, Date.now()]);
   const removeTraveler = (id: number) =>
     setTravelers((t) => t.filter((x) => x !== id));
 
@@ -499,9 +482,13 @@ export default function BookingPage() {
   const tripPrice = formatPrice(trip.price);
   const tripDuration = formatDuration(trip.duration);
   const tripDestination = trip.location;
-  const tripGroupSize = formatGroupSize(trip.groupSizeMin, trip.groupSizeMax);
   const tripDifficulty = trip.difficultyLevel;
   const tripSlug = trip.slug;
+
+  const numTravelers = 1 + travelers.length;
+  const totalAmountDue = Number(trip.price) * numTravelers;
+  const tokenAmountDue = Number(trip.tokenAmount) * numTravelers;
+  const isTokenZero = tokenAmountDue === 0;
 
   if (submitted) {
     return (
@@ -552,10 +539,8 @@ export default function BookingPage() {
             }}
           >
             We've received your booking for{" "}
-            <strong style={{ fontWeight: 500 }}>
-              {tripName}
-            </strong>
-            . A confirmation will be sent to{" "}
+            <strong style={{ fontWeight: 500 }}>{tripName}</strong>. A
+            confirmation will be sent to{" "}
             <strong style={{ color: "#781216" }}>
               {primaryEmail || "your email"}
             </strong>{" "}
@@ -640,14 +625,11 @@ export default function BookingPage() {
               transition: "color 0.2s",
             }}
             onMouseEnter={(e) =>
-              ((
-                e.currentTarget as HTMLAnchorElement
-              ).style.color = "#f2ede4")
+              ((e.currentTarget as HTMLAnchorElement).style.color = "#f2ede4")
             }
             onMouseLeave={(e) =>
-              ((
-                e.currentTarget as HTMLAnchorElement
-              ).style.color = "rgba(242,237,228,0.55)")
+              ((e.currentTarget as HTMLAnchorElement).style.color =
+                "rgba(242,237,228,0.55)")
             }
           >
             <ArrowLeft size={13} /> Back to {tripName}
@@ -684,8 +666,7 @@ export default function BookingPage() {
         style={{
           maxWidth: "1280px",
           margin: "0 auto",
-          padding:
-            "clamp(2rem,4vw,3.5rem) clamp(1.5rem,5vw,6rem)",
+          padding: "clamp(2rem,4vw,3.5rem) clamp(1.5rem,5vw,6rem)",
         }}
       >
         <div
@@ -738,25 +719,16 @@ export default function BookingPage() {
                     type="email"
                     placeholder="arjun@email.com"
                     value={primaryEmail}
-                    onChange={(e) =>
-                      setPrimaryEmail(e.target.value)
-                    }
+                    onChange={(e) => setPrimaryEmail(e.target.value)}
                   />
                 </Field>
                 <div className="sm:col-span-2">
                   <Field label="Address" required>
-                    <Input
-                      type="text"
-                      placeholder="House / Street / Colony"
-                    />
+                    <Input type="text" placeholder="House / Street / Colony" />
                   </Field>
                 </div>
                 <Field label="PIN Code" required>
-                  <Input
-                    type="text"
-                    placeholder="400001"
-                    maxLength={6}
-                  />
+                  <Input type="text" placeholder="400001" maxLength={6} />
                 </Field>
                 <Field
                   label="Contact Number"
@@ -767,9 +739,7 @@ export default function BookingPage() {
                     type="tel"
                     placeholder="+91 98765 43210"
                     value={primaryPhone}
-                    onChange={(e) =>
-                      setPrimaryPhone(e.target.value)
-                    }
+                    onChange={(e) => setPrimaryPhone(e.target.value)}
                   />
                 </Field>
                 <Field label="Date of Birth" required>
@@ -824,8 +794,8 @@ export default function BookingPage() {
                       margin: 0,
                     }}
                   >
-                    Your booking confirmation, trip documents
-                    and payment receipt will be sent to{" "}
+                    Your booking confirmation, trip documents and payment
+                    receipt will be sent to{" "}
                     {primaryEmail && (
                       <strong
                         style={{
@@ -847,8 +817,8 @@ export default function BookingPage() {
                         {primaryPhone}
                       </strong>
                     )}
-                    . Please ensure you have active access to
-                    both before submitting.
+                    . Please ensure you have active access to both before
+                    submitting.
                   </p>
                 </motion.div>
               )}
@@ -895,22 +865,14 @@ export default function BookingPage() {
                         fontFamily: "'Poppins', sans-serif",
                         fontSize: "0.78rem",
                         fontWeight: solo === v ? 600 : 400,
-                        background:
-                          solo === v
-                            ? "#781216"
-                            : "transparent",
+                        background: solo === v ? "#781216" : "transparent",
                         border: `1.5px solid ${solo === v ? "#781216" : "rgba(30,26,20,0.14)"}`,
-                        color:
-                          solo === v
-                            ? "#fff"
-                            : "rgba(30,26,20,0.6)",
+                        color: solo === v ? "#fff" : "rgba(30,26,20,0.6)",
                         transition: "all 0.22s ease",
                         textTransform: "capitalize",
                       }}
                     >
-                      {v === "yes"
-                        ? "Yes, just me"
-                        : "No, with others"}
+                      {v === "yes" ? "Yes, just me" : "No, with others"}
                     </button>
                   ))}
                 </div>
@@ -960,8 +922,7 @@ export default function BookingPage() {
                           margin: 0,
                         }}
                       >
-                        Add details for each person travelling
-                        with you.
+                        Add details for each person travelling with you.
                       </p>
                     </div>
                     <button
@@ -972,8 +933,7 @@ export default function BookingPage() {
                         alignItems: "center",
                         gap: "6px",
                         background: "rgba(120,18,22,0.06)",
-                        border:
-                          "1.5px solid rgba(120,18,22,0.2)",
+                        border: "1.5px solid rgba(120,18,22,0.2)",
                         borderRadius: "6px",
                         padding: "9px 18px",
                         color: "#781216",
@@ -982,14 +942,12 @@ export default function BookingPage() {
                         fontWeight: 600,
                         cursor: "pointer",
                         letterSpacing: "0.04em",
-                        transition:
-                          "background 0.2s, border-color 0.2s",
+                        transition: "background 0.2s, border-color 0.2s",
                       }}
                       onMouseEnter={(e) => {
                         (
                           e.currentTarget as HTMLButtonElement
-                        ).style.background =
-                          "rgba(120,18,22,0.1)";
+                        ).style.background = "rgba(120,18,22,0.1)";
                         (
                           e.currentTarget as HTMLButtonElement
                         ).style.borderColor = "#781216";
@@ -997,12 +955,10 @@ export default function BookingPage() {
                       onMouseLeave={(e) => {
                         (
                           e.currentTarget as HTMLButtonElement
-                        ).style.background =
-                          "rgba(120,18,22,0.06)";
+                        ).style.background = "rgba(120,18,22,0.06)";
                         (
                           e.currentTarget as HTMLButtonElement
-                        ).style.borderColor =
-                          "rgba(120,18,22,0.2)";
+                        ).style.borderColor = "rgba(120,18,22,0.2)";
                       }}
                     >
                       <Plus size={14} /> Add Traveler
@@ -1012,8 +968,7 @@ export default function BookingPage() {
                   {travelers.length === 0 && (
                     <div
                       style={{
-                        border:
-                          "1.5px dashed rgba(30,26,20,0.14)",
+                        border: "1.5px dashed rgba(30,26,20,0.14)",
                         borderRadius: "10px",
                         padding: "28px",
                         textAlign: "center",
@@ -1028,8 +983,7 @@ export default function BookingPage() {
                           fontFamily: "'Poppins', sans-serif",
                         }}
                       >
-                        Click "Add Traveler" to add group
-                        members.
+                        Click "Add Traveler" to add group members.
                       </p>
                     </div>
                   )}
@@ -1077,11 +1031,7 @@ export default function BookingPage() {
                     justifyContent: "center",
                   }}
                 >
-                  <CreditCard
-                    size={14}
-                    color="#781216"
-                    strokeWidth={1.5}
-                  />
+                  <CreditCard size={14} color="#781216" strokeWidth={1.5} />
                 </div>
                 <div>
                   <h3
@@ -1175,7 +1125,9 @@ export default function BookingPage() {
                       fontWeight: 600,
                     }}
                   >
-                    Token / Partial Payment Due Now
+                    {isTokenZero
+                      ? "Total Payment Due Now"
+                      : "Token / Partial Payment Due Now"}
                   </span>
                   <span
                     style={{
@@ -1185,7 +1137,9 @@ export default function BookingPage() {
                       letterSpacing: "-0.02em",
                     }}
                   >
-                    ₹5,000
+                    {isTokenZero
+                      ? formatPrice(totalAmountDue)
+                      : formatPrice(tokenAmountDue)}
                   </span>
                 </div>
               </div>
@@ -1196,8 +1150,12 @@ export default function BookingPage() {
                   display: "flex",
                   alignItems: "flex-start",
                   gap: "9px",
-                  background: "rgba(184,148,58,0.06)",
-                  border: "1px solid rgba(184,148,58,0.18)",
+                  background: isTokenZero
+                    ? "rgba(120,18,22,0.06)"
+                    : "rgba(184,148,58,0.06)",
+                  border: isTokenZero
+                    ? "1px solid rgba(120,18,22,0.18)"
+                    : "1px solid rgba(184,148,58,0.18)",
                   borderRadius: "8px",
                   padding: "12px 14px",
                   marginBottom: "20px",
@@ -1205,7 +1163,7 @@ export default function BookingPage() {
               >
                 <Info
                   size={14}
-                  color="#b8943a"
+                  color={isTokenZero ? "#781216" : "#b8943a"}
                   strokeWidth={1.5}
                   style={{ flexShrink: 0, marginTop: "1px" }}
                 />
@@ -1220,16 +1178,17 @@ export default function BookingPage() {
                 >
                   <span
                     style={{
-                      color: "#b8943a",
+                      color: isTokenZero ? "#781216" : "#b8943a",
                       fontWeight: 600,
                     }}
                   >
-                    Partial payment accepted.
+                    {isTokenZero
+                      ? "Full payment required."
+                      : "Partial payment accepted."}
                   </span>{" "}
-                  Pay ₹5,000 now to confirm your spot. The
-                  remaining balance is due 14 days before
-                  departure. Full payment options are available
-                  on the next step.
+                  {isTokenZero
+                    ? `Pay ${formatPrice(totalAmountDue)} now to confirm your booking.`
+                    : `Pay ${formatPrice(tokenAmountDue)} now to confirm your spot. The remaining balance is due 14 days before departure. Full payment options are available on the next step.`}
                 </p>
               </div>
 
@@ -1256,8 +1215,8 @@ export default function BookingPage() {
                     margin: 0,
                   }}
                 >
-                  Payment gateway — UPI / Card / Net Banking
-                  will appear here at checkout.
+                  Payment gateway — UPI / Card / Net Banking will appear here at
+                  checkout.
                 </p>
               </div>
             </div>
@@ -1304,17 +1263,14 @@ export default function BookingPage() {
                   lineHeight: 1.6,
                 }}
               >
-                By submitting, you agree to Hangover Trails'
-                booking terms and cancellation policy.
+                By submitting, you agree to Hangover Trails' booking terms and
+                cancellation policy.
               </p>
             </div>
           </form>
 
           {/* ══ RIGHT: Trip summary (sticky) ══ */}
-          <div
-            className="hidden lg:block"
-            style={{ alignSelf: "stretch" }}
-          >
+          <div className="hidden lg:block" style={{ alignSelf: "stretch" }}>
             <div
               style={{
                 position: "sticky",
@@ -1389,15 +1345,15 @@ export default function BookingPage() {
 
                   {[
                     { label: "Duration", val: tripDuration },
-                    {
-                      label: "Group Size",
-                      val: tripGroupSize,
-                    },
+
                     {
                       label: "Difficulty",
                       val: tripDifficulty,
                     },
-                    { label: "Best Time", val: trip.bestTimeToVisit || "Not Available" },
+                    {
+                      label: "Best Time",
+                      val: trip.bestTimeToVisit || "Not Available",
+                    },
                   ].map(({ label, val }) => (
                     <div
                       key={label}
@@ -1406,8 +1362,7 @@ export default function BookingPage() {
                         justifyContent: "space-between",
                         alignItems: "center",
                         padding: "8px 0",
-                        borderBottom:
-                          "1px solid rgba(30,26,20,0.05)",
+                        borderBottom: "1px solid rgba(30,26,20,0.05)",
                       }}
                     >
                       <span
@@ -1434,8 +1389,7 @@ export default function BookingPage() {
                     style={{
                       marginTop: "16px",
                       paddingTop: "14px",
-                      borderTop:
-                        "1px solid rgba(30,26,20,0.06)",
+                      borderTop: "1px solid rgba(30,26,20,0.06)",
                     }}
                   >
                     <p
@@ -1492,8 +1446,8 @@ export default function BookingPage() {
                     margin: "0 0 12px",
                   }}
                 >
-                  Our team is available on WhatsApp to walk you
-                  through the process.
+                  Our team is available on WhatsApp to walk you through the
+                  process.
                 </p>
                 <a
                   href={`https://wa.me/919876543210?text=Hi, I need help booking the ${tripName} trip.`}
@@ -1515,14 +1469,12 @@ export default function BookingPage() {
                     transition: "background 0.2s",
                   }}
                   onMouseEnter={(e) =>
-                    ((
-                      e.currentTarget as HTMLAnchorElement
-                    ).style.background = "#1db954")
+                    ((e.currentTarget as HTMLAnchorElement).style.background =
+                      "#1db954")
                   }
                   onMouseLeave={(e) =>
-                    ((
-                      e.currentTarget as HTMLAnchorElement
-                    ).style.background = "#25D366")
+                    ((e.currentTarget as HTMLAnchorElement).style.background =
+                      "#25D366")
                   }
                 >
                   Chat on WhatsApp

@@ -56,8 +56,6 @@ export interface ApiTrip {
   location: string;
   bannerImages: string[];
   duration: number;
-  groupSizeMin: number;
-  groupSizeMax: number;
   difficultyLevel: string;
   bestTimeToVisit: string;
   maxAltitude: number;
@@ -128,7 +126,10 @@ export const TRIP_TYPE_LABELS: Record<string, string> = {
 };
 
 export function formatTripType(tripType: string): string {
-  return TRIP_TYPE_LABELS[tripType] || tripType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return (
+    TRIP_TYPE_LABELS[tripType] ||
+    tripType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  );
 }
 
 // ── Formatting helpers ────────────────────────────────────────────
@@ -150,12 +151,6 @@ export function formatDuration(days: number): string {
   return `${days} Days`;
 }
 
-export function formatGroupSize(min: number, max: number): string {
-  if (!min && !max) return "Not Available";
-  if (min === max) return `${min} people`;
-  return `${min}–${max} people`;
-}
-
 export function formatAltitude(meters: number): string {
   if (!meters || meters <= 0) return "Not Available";
   return `${meters.toLocaleString("en-IN")} m`;
@@ -167,7 +162,10 @@ export function spotsLeft(capacity: number, filled: number): number {
 
 // ── "Not Available" display value ─────────────────────────────────
 
-export function safeValue(val: string | null | undefined, fallback = "Not Available"): string {
+export function safeValue(
+  val: string | null | undefined,
+  fallback = "Not Available",
+): string {
   return val && val.trim().length > 0 ? val : fallback;
 }
 
