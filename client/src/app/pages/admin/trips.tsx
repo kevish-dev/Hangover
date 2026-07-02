@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../lib/axios";
 import { TripFormModal } from "../../components/admin/TripFormModal";
-import { Map, MapPin, Calendar, Users, IndianRupee, Plus, Edit2, Trash2, Eye, EyeOff } from "lucide-react";
+import { Map, MapPin, Calendar, Users, IndianRupee, Plus, Edit2, Trash2, Eye, EyeOff, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "../../components/ui/button";
 import { toast } from "sonner";
@@ -11,6 +11,8 @@ export default function AdminTripsPage() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTrip, setEditingTrip] = useState<any>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [processingAction, setProcessingAction] = useState<"delete" | "publish" | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "trips"],
@@ -20,27 +22,61 @@ export default function AdminTripsPage() {
     },
   });
 
-  const handleDelete = async (tripId: string) => {
-    if (window.confirm("Are you sure you want to delete this trip? This action cannot be undone.")) {
-      try {
-        await apiClient.delete(`/trips/${tripId}`);
-        toast.success("Trip deleted successfully");
-        queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
-      } catch (error) {
-        toast.error("Failed to delete trip");
-      }
-    }
+  const confirmAction = (title: string, description: string, actionLabel: string, actionFn: () => Promise<void>) => {
+    toast(title, {
+      description,
+      position: "bottom-right",
+      action: {
+        label: actionLabel,
+        onClick: actionFn
+      },
+      cancel: { label: "Cancel", onClick: () => {} }
+    });
   };
 
-  const handleTogglePublish = async (trip: any) => {
-    try {
-      // Create a payload with the existing data to satisfy schema requirements if necessary, but prisma partial update allows just the flag.
-      await apiClient.put(`/trips/${trip.id}`, { isPublished: !trip.isPublished });
-      toast.success(trip.isPublished ? "Trip unpublished" : "Trip published");
-      queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
-    } catch (error) {
-      toast.error("Failed to update status");
-    }
+  const handleDelete = (tripId: string) => {
+    confirmAction(
+      "Are you sure you want to delete this trip?",
+      "This action cannot be undone.",
+      "Delete",
+      async () => {
+        setProcessingId(tripId);
+        setProcessingAction("delete");
+        try {
+          await apiClient.delete(`/trips/${tripId}`);
+          toast.success("Trip deleted successfully");
+          queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
+        } catch (error) {
+          toast.error("Failed to delete trip");
+        } finally {
+          setProcessingId(null);
+          setProcessingAction(null);
+        }
+      }
+    );
+  };
+
+  const handleTogglePublish = (trip: any) => {
+    const isPub = trip.isPublished;
+    confirmAction(
+      `Are you sure you want to ${isPub ? "unpublish" : "publish"} this trip?`,
+      `This will make the trip ${isPub ? "hidden from" : "visible to"} the public.`,
+      "Confirm",
+      async () => {
+        setProcessingId(trip.id);
+        setProcessingAction("publish");
+        try {
+          await apiClient.put(`/trips/${trip.id}`, { isPublished: !isPub });
+          toast.success(isPub ? "Trip unpublished" : "Trip published");
+          queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
+        } catch (error) {
+          toast.error("Failed to update status");
+        } finally {
+          setProcessingId(null);
+          setProcessingAction(null);
+        }
+      }
+    );
   };
 
   const openCreateModal = () => {
@@ -148,23 +184,38 @@ export default function AdminTripsPage() {
                   <div className="flex items-center gap-2">
                     <button 
                       onClick={() => handleTogglePublish(trip)}
-                      className={`text-sm font-medium transition-colors flex items-center gap-1 ${trip.isPublished ? 'text-gray-500 hover:text-orange-600' : 'text-gray-500 hover:text-green-600'}`}
+                      disabled={processingId === trip.id}
+                      className={`text-sm font-medium transition-colors flex items-center gap-1 ${trip.isPublished ? 'text-gray-500 hover:text-orange-600' : 'text-gray-500 hover:text-green-600'} disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
-                      {trip.isPublished ? <><EyeOff className="w-3.5 h-3.5" /> Unpublish</> : <><Eye className="w-3.5 h-3.5" /> Publish</>}
+                      {processingId === trip.id && processingAction === "publish" ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : trip.isPublished ? (
+                        <EyeOff className="w-3.5 h-3.5" />
+                      ) : (
+                        <Eye className="w-3.5 h-3.5" />
+                      )}
+                      {trip.isPublished ? "Unpublish" : "Publish"}
                     </button>
                     <div className="w-px h-3 bg-gray-300 mx-1" />
                     <button 
                       onClick={() => openEditModal(trip)}
-                      className="text-sm font-medium text-gray-500 hover:text-[#c8a96e] transition-colors flex items-center gap-1"
+                      disabled={processingId === trip.id}
+                      className="text-sm font-medium text-gray-500 hover:text-[#c8a96e] transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Edit2 className="w-3.5 h-3.5" /> Edit
                     </button>
                     <div className="w-px h-3 bg-gray-300 mx-1" />
                     <button 
                       onClick={() => handleDelete(trip.id)}
-                      className="text-sm font-medium text-gray-500 hover:text-red-600 transition-colors flex items-center gap-1"
+                      disabled={processingId === trip.id}
+                      className="text-sm font-medium text-gray-500 hover:text-red-600 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <Trash2 className="w-3.5 h-3.5" /> Delete
+                      {processingId === trip.id && processingAction === "delete" ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3.5 h-3.5" />
+                      )}
+                      Delete
                     </button>
                   </div>
                 </div>

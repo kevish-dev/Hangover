@@ -88,9 +88,9 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
       bestTimeToVisit: "", price: 0, tokenAmount: 0, capacity: 10,
       startDate: "", endDate: "", duration: 1, groupSizeMin: 4, groupSizeMax: 15, maxAltitude: 0,
       overview: "",
-      highlights: [{ value: "" }], inclusions: [{ value: "" }], exclusions: [{ value: "" }],
-      tripTags: [{ value: "" }],
-      faqs: [{ question: "", answer: "" }],
+      highlights: [], inclusions: [], exclusions: [],
+      tripTags: [],
+      faqs: [],
       isPublished: false,
     },
     mode: "onTouched",
@@ -129,9 +129,9 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
           bestTimeToVisit: "", price: 0, tokenAmount: 0, capacity: 10,
           startDate: "", endDate: "", duration: 1, groupSizeMin: 4, groupSizeMax: 15, maxAltitude: 0,
           overview: "",
-          highlights: [{ value: "" }], inclusions: [{ value: "" }], exclusions: [{ value: "" }],
-          tripTags: [{ value: "" }],
-          faqs: [{ question: "", answer: "" }],
+          highlights: [], inclusions: [], exclusions: [],
+          tripTags: [],
+          faqs: [],
           isPublished: false,
         });
       }
@@ -206,6 +206,8 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
   const nextStep = async () => {
     if (await validateStep()) {
       setStep(s => Math.min(STEPS.length - 1, s + 1));
+    } else {
+      toast.error("Please fill in all required fields correctly to continue.", { position: "bottom-right" });
     }
   };
   const prevStep = () => setStep(s => Math.max(0, s - 1));
@@ -643,7 +645,7 @@ export function TripFormModal({ trip, open, onOpenChange }: TripFormModalProps) 
               className="bg-[#781216] hover:bg-[#9a1a1f] text-white flex items-center gap-2 px-8 shadow-md"
             >
               {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
-              {isSubmitting ? "Saving..." : (isEdit ? "Save Changes" : "Publish Trip")}
+              {isSubmitting ? "Saving..." : (isEdit ? "Save Changes" : "Save Trip")}
             </Button>
           )}
         </div>

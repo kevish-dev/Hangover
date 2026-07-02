@@ -48,7 +48,7 @@ export const deleteTrip = async (id) => {
 };
 
 export const deleteBannerImage = async (tripId, imageUrl) => {
-  const trip = await getTripById(tripId);
+  const trip = await getTripById(tripId, true);
   const existingBanners = trip.bannerImages || [];
   
   if (!existingBanners.includes(imageUrl)) {
@@ -64,7 +64,7 @@ export const deleteBannerImage = async (tripId, imageUrl) => {
 };
 
 export const uploadBannerImages = async (tripId, imageBuffers) => {
-  await getTripById(tripId); // Ensure trip exists
+  await getTripById(tripId, true); // Ensure trip exists
 
   const folder = `uploads/trips/${tripId}/bannerimages`;
   const uploadPromises = imageBuffers.map(buffer => 
@@ -78,7 +78,7 @@ export const uploadBannerImages = async (tripId, imageBuffers) => {
   const imageUrls = await Promise.all(uploadPromises);
 
   // We need to fetch the existing trip to append the banners
-  const trip = await getTripById(tripId);
+  const trip = await getTripById(tripId, true);
   const existingBanners = trip.bannerImages || [];
   
   return tripRepo.update(tripId, {
