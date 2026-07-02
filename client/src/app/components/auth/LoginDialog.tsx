@@ -8,37 +8,16 @@ import {
 } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { API_URL } from "../../../lib/axios";
-import { useAuth } from "../../../contexts/AuthContext";
 
 interface LoginDialogProps {
   children?: React.ReactNode;
 }
 
 export function LoginDialog({ children }: LoginDialogProps) {
-  const { user, isLoading, logout } = useAuth();
-
   const handleGoogleLogin = () => {
     // Redirect to backend OAuth initiation endpoint
     window.location.href = `${API_URL}/auth/google`;
   };
-
-  if (isLoading) {
-    return (
-      <Button variant="outline" disabled>
-        Loading...
-      </Button>
-    );
-  }
-
-  if (user) {
-    return (
-      <div className="flex items-center gap-4">
-        <Button variant="outline" onClick={logout}>
-          Logout
-        </Button>
-      </div>
-    );
-  }
 
   return (
     <Dialog>

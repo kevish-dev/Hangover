@@ -1,9 +1,10 @@
 // @ts-ignore
 import logoSrc from "../../imports/final-logo_png_transparent.png";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router";
 import { LoginDialog } from "./auth/LoginDialog";
+import { useAuth } from "../../contexts/AuthContext";
 
 function NavLink({ label, scrolled }: { label: string; scrolled: boolean }) {
   const [hovered, setHovered] = useState(false);
@@ -93,10 +94,44 @@ function TripsNavLink({ scrolled }: { scrolled: boolean }) {
   );
 }
 
+const AuthButton = forwardRef<HTMLButtonElement, { label: string; onClick?: () => void; scrolled: boolean; className?: string }>(
+  ({ label, onClick, scrolled, className, ...props }, ref) => {
+    const [hovered, setHovered] = useState(false);
+    const themeColor = scrolled ? "#b8943a" : "#c8a96e";
+    
+    return (
+      <button
+        ref={ref}
+        onClick={onClick}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        className={className}
+        style={{
+          fontFamily: "'Poppins', sans-serif",
+          fontWeight: 400,
+          fontSize: "0.9rem",
+          letterSpacing: "0.05em",
+          padding: "6px 20px",
+          cursor: "pointer",
+          transition: "all 0.3s ease",
+          background: hovered ? themeColor : "transparent",
+          color: hovered ? (scrolled ? "#ffffff" : "#111") : themeColor,
+          border: `1px solid ${themeColor}`,
+          outline: "none",
+        }}
+        {...props}
+      >
+        {label}
+      </button>
+    );
+  }
+);
+
 export function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
+  const { user, isLoading, logout } = useAuth();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > window.innerHeight * 0.7);
@@ -164,7 +199,20 @@ export function Navbar() {
 
       {/* Auth and CTA */}
       <div className="flex items-center gap-4">
-        <LoginDialog />
+        {isLoading ? (
+          <AuthButton label="Loading..." scrolled={scrolled} />
+        ) : user ? (
+          <>
+            {user.role === "ADMIN" && (
+              <AuthButton label="Dashboard" onClick={() => navigate("/dashboard")} scrolled={scrolled} />
+            )}
+            <AuthButton label="Logout" onClick={logout} scrolled={scrolled} />
+          </>
+        ) : (
+          <LoginDialog>
+            <AuthButton label="Sign In" scrolled={scrolled} />
+          </LoginDialog>
+        )}
         {!location.pathname.startsWith("/dashboard") && (
           <button
             style={{
