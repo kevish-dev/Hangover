@@ -18,7 +18,9 @@ export const createUser = async (userData) => {
       email: userData.email,
       googleId: userData.googleId,
       profile: {
-        create: {},
+        create: {
+          fullName: userData.fullName || null,
+        },
       },
     },
   });

@@ -10,6 +10,8 @@ import AdminDashboardRedirect from "./pages/admin/dashboard";
 import AdminLayout from "./pages/admin/layout";
 import AdminTripsPage from "./pages/admin/trips";
 import AdminDestinationsPage from "./pages/admin/destinations";
+import AdminPaymentsPage from "./pages/admin/payments";
+import AdminBookingsPage from "./pages/admin/bookings";
 
 
 export const router = createBrowserRouter([
@@ -32,6 +34,8 @@ export const router = createBrowserRouter([
       { index: true, Component: AdminDashboardRedirect },
       { path: "trips", Component: AdminTripsPage },
       { path: "destinations", Component: AdminDestinationsPage },
+      { path: "bookings", Component: AdminBookingsPage },
+      { path: "payments", Component: AdminPaymentsPage },
 
     ],
   },

@@ -144,3 +144,7 @@ export const getAllBookings = async (page = 1, limit = 10) => {
     },
   };
 };
+
+export const getBookingsByTripId = async (tripId) => {
+  return repo.getBookingsByTripId(tripId);
+};

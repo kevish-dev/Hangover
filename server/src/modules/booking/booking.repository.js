@@ -57,3 +57,15 @@ export const getAllBookings = async (skip, take) => {
   ]);
   return { bookings, total };
 };
+
+export const getBookingsByTripId = async (tripId) => {
+  return prisma.booking.findMany({
+    where: { tripId },
+    include: {
+      user: { include: { profile: true } },
+      payments: { include: { refunds: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+};
+

@@ -69,7 +69,7 @@ export const getAllPayments = async (req, res, next) => {
 
 export const issueRefund = async (req, res, next) => {
   try {
-    const { amount, reason } = req.body;
+    const { amount, reason } = req.body || {};
     const refund = await paymentService.issueRefund(req.params.paymentId, amount, reason, req.user.id);
     res.status(200).json(refund);
   } catch (error) {

@@ -48,3 +48,12 @@ export const cancelBooking = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getBookingsByTrip = async (req, res, next) => {
+  try {
+    const bookings = await bookingService.getBookingsByTripId(req.params.tripId);
+    res.status(200).json(bookings);
+  } catch (error) {
+    next(error);
+  }
+};

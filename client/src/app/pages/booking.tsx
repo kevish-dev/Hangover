@@ -15,6 +15,7 @@ import {
   CreditCard,
   CheckCircle,
   AlertCircle,
+  Loader2,
 } from "lucide-react";
 import {
   fetchTripBySlug,
@@ -22,7 +23,12 @@ import {
   formatDuration,
   type ApiTrip,
 } from "../../lib/tripApi";
+import { apiClient, API_URL } from "../../lib/axios";
+import { useAuth } from "../../contexts/AuthContext";
 import { SiteFooter } from "../components/site-footer";
+
+// Razorpay is loaded as a static <script> in index.html
+declare const Razorpay: any;
 
 // ── Shared input styles ───────────────────────────────────────────
 const inputBase: React.CSSProperties = {
@@ -137,14 +143,21 @@ function Select({
   );
 }
 
-function AadhaarUpload({ label, name }: { label: string; name: string }) {
-  const [fileName, setFileName] = useState<string | null>(null);
+function FilePickerField({
+  label,
+  required,
+  hint,
+  file,
+  onChange,
+}: {
+  label: string;
+  required?: boolean;
+  hint?: string;
+  file: File | null;
+  onChange: (f: File | null) => void;
+}) {
   return (
-    <Field
-      label={label}
-      required
-      hint="PDF or image — max 5MB. Used only for identity verification."
-    >
+    <Field label={label} required={required} hint={hint}>
       <label
         style={{
           display: "flex",
@@ -152,8 +165,8 @@ function AadhaarUpload({ label, name }: { label: string; name: string }) {
           gap: "10px",
           padding: "11px 14px",
           borderRadius: "8px",
-          border: `1.5px dashed ${fileName ? "#781216" : "rgba(30,26,20,0.2)"}`,
-          background: fileName ? "rgba(120,18,22,0.03)" : "#faf8f4",
+          border: `1.5px dashed ${file ? "#781216" : "rgba(30,26,20,0.2)"}`,
+          background: file ? "rgba(120,18,22,0.03)" : "#faf8f4",
           cursor: "pointer",
           transition: "border-color 0.2s, background 0.2s",
           fontFamily: "'Poppins', sans-serif",
@@ -161,24 +174,23 @@ function AadhaarUpload({ label, name }: { label: string; name: string }) {
       >
         <Upload
           size={15}
-          color={fileName ? "#781216" : "rgba(30,26,20,0.38)"}
+          color={file ? "#781216" : "rgba(30,26,20,0.38)"}
           strokeWidth={1.5}
         />
         <span
           style={{
-            color: fileName ? "#781216" : "rgba(30,26,20,0.5)",
+            color: file ? "#781216" : "rgba(30,26,20,0.5)",
             fontSize: "0.78rem",
             fontWeight: 300,
           }}
         >
-          {fileName ?? "Choose file…"}
+          {file ? file.name : "Choose file…"}
         </span>
         <input
           type="file"
-          name={name}
           accept="image/*,.pdf"
           style={{ display: "none" }}
-          onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
+          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
         />
       </label>
     </Field>
@@ -401,14 +413,39 @@ function TravelerForm({
 // ── Page ──────────────────────────────────────────────────────────
 export default function BookingPage() {
   const { slug } = useParams();
+  const { user, isLoading: authLoading } = useAuth();
+
   const [trip, setTrip] = useState<ApiTrip | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Form state
   const [solo, setSolo] = useState<"yes" | "no" | null>(null);
   const [travelers, setTravelers] = useState<number[]>([]);
   const [primaryEmail, setPrimaryEmail] = useState("");
   const [primaryPhone, setPrimaryPhone] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [specialRequests, setSpecialRequests] = useState("");
+
+  // Govt ID upload state
+  const [govtIdFront, setGovtIdFront] = useState<File | null>(null);
+  const [govtIdBack, setGovtIdBack] = useState<File | null>(null);
+
+  // Booking flow state
+  const [bookingStep, setBookingStep] = useState<"form" | "paying" | "verifying" | "success" | "failed">("form");
+  const [submitting, setSubmitting] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [pendingVerify, setPendingVerify] = useState<{
+    razorpayOrderId: string;
+    razorpayPaymentId: string;
+    razorpaySignature: string;
+    bookingReference: string;
+    amountPaid: number;
+    paymentType: string;
+  } | null>(null);
+  const [successData, setSuccessData] = useState<{
+    bookingReference: string;
+    amountPaid: number;
+    paymentType: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -419,11 +456,152 @@ export default function BookingPage() {
       .finally(() => setLoading(false));
   }, [slug]);
 
+  // On return from Google OAuth, check if we saved a redirect intent
+  useEffect(() => {
+    if (user && slug) {
+      const intent = localStorage.getItem("booking_redirect_intent");
+      if (intent === `/book/${slug}`) {
+        localStorage.removeItem("booking_redirect_intent");
+      }
+    }
+  }, [user, slug]);
+
   const addTraveler = () => setTravelers((t) => [...t, Date.now()]);
   const removeTraveler = (id: number) =>
     setTravelers((t) => t.filter((x) => x !== id));
 
-  if (loading) {
+  // ── Submit handler ────────────────────────────────────────────────
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBookingError(null);
+
+    // 1. Auth guard — redirect to Google login if not logged in
+    if (!user) {
+      localStorage.setItem("booking_redirect_intent", `/book/${slug}`);
+      window.location.href = `${API_URL}/auth/google`;
+      return;
+    }
+
+    // Validate Govt ID uploaded
+    if (!govtIdFront && !govtIdBack) {
+      setBookingError("Please upload at least one side of your Aadhaar / Govt ID before proceeding.");
+      return;
+    }
+
+    setSubmitting(true);
+    setBookingStep("paying");
+
+    try {
+      // 2. Upload Govt ID to profile first
+      const idForm = new FormData();
+      idForm.append("govtIdType", "AADHAAR");
+      if (govtIdFront) idForm.append("frontImage", govtIdFront);
+      if (govtIdBack) idForm.append("backImage", govtIdBack);
+      await apiClient.post("/users/me/govt-id", idForm, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      // 3. Create the booking
+      const numberOfTravelers = 1 + travelers.length;
+      const bookingRes = await apiClient.post("/bookings", {
+        tripId: trip!.id,
+        numberOfTravelers,
+        specialRequests: specialRequests || undefined,
+      });
+      const { id: bookingId, bookingReference, initialPaymentType, tokenAmount, totalAmount } =
+        bookingRes.data;
+
+      // 4. Initiate Razorpay payment — TOKEN or FULL based on backend decision
+      const paymentType = initialPaymentType; // "TOKEN" or "FULL"
+      const initiateRes = await apiClient.post("/payments/initiate", {
+        bookingId,
+        type: paymentType,
+      });
+      const { razorpayOrderId, razorpayKeyId, amount, currency } = initiateRes.data;
+
+      // 4. Open Razorpay checkout (SDK already loaded in index.html)
+      await new Promise<void>((resolve, reject) => {
+        const options = {
+          key: razorpayKeyId,
+          amount,
+          currency,
+          name: "Hangover Trails",
+          description: `${trip!.title} — ${paymentType === "TOKEN" ? "Token Payment" : "Full Payment"}`,
+          order_id: razorpayOrderId,
+          prefill: {
+            email: primaryEmail,
+            contact: primaryPhone,
+          },
+          theme: {
+            color: "#781216",
+          },
+          modal: {
+            ondismiss: () => {
+              reject(new Error("Payment cancelled. You can try again."));
+            },
+          },
+          handler: (response: {
+            razorpay_order_id: string;
+            razorpay_payment_id: string;
+            razorpay_signature: string;
+          }) => {
+            // Immediately show verifying screen — don't make the user wait on this modal
+            setBookingStep("verifying");
+            setPendingVerify({
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+              bookingReference,
+              amountPaid: amount / 100,
+              paymentType,
+            });
+            resolve();
+          },
+        };
+
+        const rzp = new Razorpay(options);
+        rzp.open();
+      });
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Something went wrong. Please try again.";
+      setBookingError(msg);
+      setBookingStep("form");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ── Run verify in background once pendingVerify is set ──────────
+  useEffect(() => {
+    if (!pendingVerify || bookingStep !== "verifying") return;
+
+    apiClient
+      .post("/payments/verify", {
+        razorpayOrderId: pendingVerify.razorpayOrderId,
+        razorpayPaymentId: pendingVerify.razorpayPaymentId,
+        razorpaySignature: pendingVerify.razorpaySignature,
+      })
+      .then(() => {
+        setSuccessData({
+          bookingReference: pendingVerify.bookingReference,
+          amountPaid: pendingVerify.amountPaid,
+          paymentType: pendingVerify.paymentType,
+        });
+        setBookingStep("success");
+      })
+      .catch((err: any) => {
+        setBookingError(
+          err?.response?.data?.message || "Payment verification failed. Please contact support."
+        );
+        setBookingStep("failed");
+      });
+  }, [pendingVerify, bookingStep]);
+
+  // ── Loading states ─────────────────────────────────────────────
+  if (loading || authLoading) {
     return (
       <div
         style={{
@@ -483,14 +661,94 @@ export default function BookingPage() {
   const tripDuration = formatDuration(trip.duration);
   const tripDestination = trip.location;
   const tripDifficulty = trip.difficultyLevel;
-  const tripSlug = trip.slug;
 
   const numTravelers = 1 + travelers.length;
   const totalAmountDue = Number(trip.price) * numTravelers;
   const tokenAmountDue = Number(trip.tokenAmount) * numTravelers;
   const isTokenZero = tokenAmountDue === 0;
 
-  if (submitted) {
+  // ── Verifying screen (shown immediately after Razorpay handler fires) ─
+  if (bookingStep === "verifying") {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f5f0e6",
+          fontFamily: "'Poppins', sans-serif",
+        }}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+          style={{ textAlign: "center", maxWidth: "400px", padding: "3rem 2rem" }}
+        >
+          <div style={{ position: "relative", width: "60px", height: "60px", margin: "0 auto 24px" }}>
+            <Loader2 size={60} color="#781216" strokeWidth={1} style={{ animation: "spin 1s linear infinite" }} />
+          </div>
+          <h2 style={{ color: "#1e1a14", fontSize: "1.4rem", fontWeight: 300, letterSpacing: "-0.02em", margin: "0 0 10px" }}>
+            Confirming your booking…
+          </h2>
+          <p style={{ color: "rgba(30,26,20,0.5)", fontSize: "0.82rem", fontWeight: 300, lineHeight: 1.7, margin: 0 }}>
+            Your payment was received. We're confirming your booking — this takes just a moment.
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ── Failed screen (verify failed after payment) ─────────────────
+  if (bookingStep === "failed") {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f5f0e6",
+          fontFamily: "'Poppins', sans-serif",
+        }}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          style={{ textAlign: "center", maxWidth: "480px", padding: "3rem 2rem" }}
+        >
+          <AlertCircle size={52} color="#c0392b" strokeWidth={1.2} style={{ margin: "0 auto 20px" }} />
+          <h2 style={{ color: "#1e1a14", fontSize: "1.5rem", fontWeight: 300, letterSpacing: "-0.02em", margin: "0 0 12px" }}>
+            Verification Issue
+          </h2>
+          <p style={{ color: "rgba(30,26,20,0.6)", fontSize: "0.85rem", fontWeight: 300, lineHeight: 1.8, margin: "0 0 8px" }}>
+            {bookingError}
+          </p>
+          <p style={{ color: "rgba(30,26,20,0.45)", fontSize: "0.75rem", fontWeight: 300, lineHeight: 1.7, margin: "0 0 28px" }}>
+            Your payment may have been captured. Please contact us on WhatsApp with your payment details and we'll resolve it immediately.
+          </p>
+          <a
+            href="https://wa.me/917374898467?text=Hi, I need help with a payment verification issue."
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: "7px",
+              background: "#25D366", color: "#fff", borderRadius: "8px",
+              padding: "12px 24px", textDecoration: "none", fontSize: "0.8rem",
+              fontWeight: 600, fontFamily: "'Poppins', sans-serif",
+            }}
+          >
+            Contact Support on WhatsApp
+          </a>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ── Success screen ─────────────────────────────────────────────
+  if (bookingStep === "success" && successData) {
     return (
       <div
         style={{
@@ -524,31 +782,52 @@ export default function BookingPage() {
               fontSize: "1.6rem",
               fontWeight: 300,
               letterSpacing: "-0.02em",
-              margin: "0 0 12px",
+              margin: "0 0 8px",
             }}
           >
-            Booking Request Received!
+            Booking Confirmed!
           </h2>
+          <p
+            style={{
+              color: "#781216",
+              fontSize: "1rem",
+              fontWeight: 600,
+              letterSpacing: "0.06em",
+              margin: "0 0 16px",
+            }}
+          >
+            {successData.bookingReference}
+          </p>
           <p
             style={{
               color: "rgba(30,26,20,0.55)",
               fontSize: "0.88rem",
               fontWeight: 300,
               lineHeight: 1.8,
+              margin: "0 0 8px",
+            }}
+          >
+            {successData.paymentType === "FULL"
+              ? "Full payment received."
+              : "Token payment received. Your spot is reserved."}{" "}
+            A confirmation has been sent to{" "}
+            <strong style={{ color: "#781216" }}>
+              {primaryEmail || "your email"}
+            </strong>
+            .
+          </p>
+          <p
+            style={{
+              color: "rgba(30,26,20,0.42)",
+              fontSize: "0.78rem",
+              fontWeight: 300,
               margin: "0 0 28px",
             }}
           >
-            We've received your booking for{" "}
-            <strong style={{ fontWeight: 500 }}>{tripName}</strong>. A
-            confirmation will be sent to{" "}
-            <strong style={{ color: "#781216" }}>
-              {primaryEmail || "your email"}
-            </strong>{" "}
-            and{" "}
-            <strong style={{ color: "#781216" }}>
-              {primaryPhone || "your phone"}
-            </strong>{" "}
-            within 2 hours.
+            Amount paid:{" "}
+            <strong style={{ fontWeight: 600 }}>
+              ₹{successData.amountPaid.toLocaleString("en-IN")}
+            </strong>
           </p>
           <Link
             to={`/trips/${slug}`}
@@ -680,16 +959,59 @@ export default function BookingPage() {
         >
           {/* ══ LEFT: Form ══ */}
           <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setSubmitted(true);
-            }}
+            onSubmit={handleSubmit}
             style={{
               display: "flex",
               flexDirection: "column",
               gap: "36px",
             }}
           >
+            {/* ── Error banner ── */}
+            <AnimatePresence>
+              {bookingError && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "10px",
+                    background: "rgba(192,57,43,0.07)",
+                    border: "1px solid rgba(192,57,43,0.22)",
+                    borderRadius: "10px",
+                    padding: "14px 16px",
+                  }}
+                >
+                  <AlertCircle size={16} color="#c0392b" strokeWidth={1.5} style={{ flexShrink: 0, marginTop: "1px" }} />
+                  <p style={{ color: "#c0392b", fontSize: "0.82rem", fontWeight: 400, margin: 0, lineHeight: 1.6 }}>
+                    {bookingError}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* ── Not logged in notice ── */}
+            {!user && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "10px",
+                  background: "rgba(184,148,58,0.06)",
+                  border: "1px solid rgba(184,148,58,0.22)",
+                  borderRadius: "10px",
+                  padding: "14px 16px",
+                }}
+              >
+                <Info size={15} color="#b8943a" strokeWidth={1.5} style={{ flexShrink: 0, marginTop: "1px" }} />
+                <p style={{ color: "rgba(30,26,20,0.7)", fontSize: "0.78rem", fontWeight: 300, margin: 0, lineHeight: 1.65 }}>
+                  <span style={{ color: "#b8943a", fontWeight: 600 }}>You're not signed in.</span>{" "}
+                  Clicking "Confirm Booking" will redirect you to Google login, then bring you back here automatically.
+                </p>
+              </div>
+            )}
+
             {/* ── 1. Primary Traveler ── */}
             <div
               style={{
@@ -720,6 +1042,7 @@ export default function BookingPage() {
                     placeholder="arjun@email.com"
                     value={primaryEmail}
                     onChange={(e) => setPrimaryEmail(e.target.value)}
+                    required
                   />
                 </Field>
                 <div className="sm:col-span-2">
@@ -740,6 +1063,7 @@ export default function BookingPage() {
                     placeholder="+91 98765 43210"
                     value={primaryPhone}
                     onChange={(e) => setPrimaryPhone(e.target.value)}
+                    required
                   />
                 </Field>
                 <Field label="Date of Birth" required>
@@ -755,9 +1079,20 @@ export default function BookingPage() {
                   </Select>
                 </Field>
                 <div className="sm:col-span-2">
-                  <AadhaarUpload
-                    label="Upload Aadhaar Card"
-                    name="primary-aadhaar"
+                  <FilePickerField
+                    label="Aadhaar / Govt ID — Front Side"
+                    required
+                    hint="Clear photo or scan of the front — max 5 MB"
+                    file={govtIdFront}
+                    onChange={setGovtIdFront}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <FilePickerField
+                    label="Aadhaar / Govt ID — Back Side"
+                    hint="Clear photo or scan of the back — max 5 MB"
+                    file={govtIdBack}
+                    onChange={setGovtIdBack}
                   />
                 </div>
               </FormSection>
@@ -1001,7 +1336,32 @@ export default function BookingPage() {
               )}
             </AnimatePresence>
 
-            {/* ── 3. Booking Amount ── */}
+            {/* ── 3. Special Requests ── */}
+            <div
+              style={{
+                background: "#ffffff",
+                borderRadius: "14px",
+                border: "1px solid rgba(30,26,20,0.07)",
+                padding: "clamp(22px,3vw,32px)",
+                boxShadow: "0 2px 10px rgba(30,26,20,0.04)",
+              }}
+            >
+              <Field label="Special Requests" hint="Dietary preferences, accessibility needs, room preferences, etc.">
+                <textarea
+                  value={specialRequests}
+                  onChange={(e) => setSpecialRequests(e.target.value)}
+                  placeholder="Any specific requirements or requests..."
+                  rows={3}
+                  style={{
+                    ...inputBase,
+                    resize: "vertical",
+                    minHeight: "80px",
+                  }}
+                />
+              </Field>
+            </div>
+
+            {/* ── 4. Booking Amount ── */}
             <div
               style={{
                 background: "#ffffff",
@@ -1073,7 +1433,7 @@ export default function BookingPage() {
                   },
                   {
                     label: `Travelers`,
-                    val: `× ${1 + travelers.length}`,
+                    val: `× ${numTravelers}`,
                   },
                 ].map(({ label, val }) => (
                   <div
@@ -1144,7 +1504,7 @@ export default function BookingPage() {
                 </div>
               </div>
 
-              {/* Partial payment info */}
+              {/* Payment info banner */}
               <div
                 style={{
                   display: "flex",
@@ -1188,35 +1548,32 @@ export default function BookingPage() {
                   </span>{" "}
                   {isTokenZero
                     ? `Pay ${formatPrice(totalAmountDue)} now to confirm your booking.`
-                    : `Pay ${formatPrice(tokenAmountDue)} now to confirm your spot. The remaining balance is due 14 days before departure. Full payment options are available on the next step.`}
+                    : `Pay ${formatPrice(tokenAmountDue)} now to confirm your spot. The remaining ${formatPrice(totalAmountDue - tokenAmountDue)} is due before departure.`}
                 </p>
               </div>
 
-              {/* Payment method placeholder */}
+              {/* Razorpay badge */}
               <div
                 style={{
-                  border: "1.5px dashed rgba(30,26,20,0.14)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "10px 14px",
+                  background: "#faf8f4",
                   borderRadius: "8px",
-                  padding: "20px",
-                  textAlign: "center",
+                  border: "1px solid rgba(30,26,20,0.07)",
                 }}
               >
-                <CreditCard
-                  size={22}
-                  color="rgba(30,26,20,0.22)"
-                  strokeWidth={1.2}
-                  style={{ margin: "0 auto 8px" }}
-                />
+                <CreditCard size={14} color="rgba(30,26,20,0.35)" strokeWidth={1.5} />
                 <p
                   style={{
-                    color: "rgba(30,26,20,0.35)",
-                    fontSize: "0.76rem",
+                    color: "rgba(30,26,20,0.45)",
+                    fontSize: "0.7rem",
                     fontWeight: 300,
                     margin: 0,
                   }}
                 >
-                  Payment gateway — UPI / Card / Net Banking will appear here at
-                  checkout.
+                  Secured by <strong style={{ fontWeight: 500 }}>Razorpay</strong> — UPI · Cards · Net Banking
                 </p>
               </div>
             </div>
@@ -1225,9 +1582,10 @@ export default function BookingPage() {
             <div>
               <button
                 type="submit"
+                disabled={submitting}
                 style={{
                   width: "100%",
-                  background: "#781216",
+                  background: submitting ? "rgba(120,18,22,0.5)" : "#781216",
                   color: "#fff",
                   border: "none",
                   borderRadius: "10px",
@@ -1237,21 +1595,30 @@ export default function BookingPage() {
                   fontWeight: 700,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  cursor: "pointer",
+                  cursor: submitting ? "not-allowed" : "pointer",
                   transition: "background 0.25s ease",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: "8px",
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "#9a1a1f")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "#781216")
-                }
+                onMouseEnter={(e) => {
+                  if (!submitting) e.currentTarget.style.background = "#9a1a1f";
+                }}
+                onMouseLeave={(e) => {
+                  if (!submitting) e.currentTarget.style.background = "#781216";
+                }}
               >
-                Confirm Booking
+                {submitting ? (
+                  <>
+                    <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+                    Processing…
+                  </>
+                ) : user ? (
+                  "Confirm & Pay Now"
+                ) : (
+                  "Sign in & Continue →"
+                )}
               </button>
               <p
                 style={{
@@ -1345,7 +1712,6 @@ export default function BookingPage() {
 
                   {[
                     { label: "Duration", val: tripDuration },
-
                     {
                       label: "Difficulty",
                       val: tripDifficulty,
@@ -1385,6 +1751,7 @@ export default function BookingPage() {
                     </div>
                   ))}
 
+                  {/* Live price breakdown in sidebar */}
                   <div
                     style={{
                       marginTop: "16px",
@@ -1392,28 +1759,40 @@ export default function BookingPage() {
                       borderTop: "1px solid rgba(30,26,20,0.06)",
                     }}
                   >
-                    <p
-                      style={{
-                        color: "rgba(30,26,20,0.38)",
-                        fontSize: "0.58rem",
-                        letterSpacing: "0.14em",
-                        textTransform: "uppercase",
-                        margin: "0 0 3px",
-                      }}
-                    >
-                      Price per person
-                    </p>
-                    <p
-                      style={{
-                        color: "#781216",
-                        fontSize: "1.4rem",
-                        fontWeight: 600,
-                        letterSpacing: "-0.03em",
-                        margin: 0,
-                      }}
-                    >
-                      {tripPrice}
-                    </p>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "6px" }}>
+                      <p
+                        style={{
+                          color: "rgba(30,26,20,0.38)",
+                          fontSize: "0.58rem",
+                          letterSpacing: "0.14em",
+                          textTransform: "uppercase",
+                          margin: 0,
+                        }}
+                      >
+                        Price per person
+                      </p>
+                      <p
+                        style={{
+                          color: "#781216",
+                          fontSize: "1.4rem",
+                          fontWeight: 600,
+                          letterSpacing: "-0.03em",
+                          margin: 0,
+                        }}
+                      >
+                        {tripPrice}
+                      </p>
+                    </div>
+                    {numTravelers > 1 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <p style={{ color: "rgba(30,26,20,0.38)", fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", margin: 0 }}>
+                          Total ({numTravelers} travelers)
+                        </p>
+                        <p style={{ color: "#1e1a14", fontSize: "0.9rem", fontWeight: 600, margin: 0 }}>
+                          {formatPrice(totalAmountDue)}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

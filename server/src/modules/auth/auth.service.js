@@ -22,7 +22,7 @@ export const googleLogin = async (code) => {
     headers: { Authorization: `Bearer ${googleAccessToken}` },
   });
 
-  const { id: googleId, email } = userInfoResponse.data;
+  const { id: googleId, email, name: fullName } = userInfoResponse.data;
 
   if (!email || !googleId) {
     throw new Error("Failed to retrieve user email or Google ID from Google.");
@@ -40,7 +40,7 @@ export const googleLogin = async (code) => {
       throw new Error("Email already registered with a different provider.");
     } else {
       // Create new user
-      user = await authRepo.createUser({ email, googleId });
+      user = await authRepo.createUser({ email, googleId, fullName });
     }
   }
 
