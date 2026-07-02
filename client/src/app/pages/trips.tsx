@@ -489,25 +489,8 @@ function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
   );
 }
 
-// ── Destination config ────────────────────────────────────────────
-const DEST_CONFIG = [
-  { key: "Tawang",  label: "Tawang",               region: "Arunachal Pradesh", tagline: "Monasteries, frozen passes, and the roof of the Northeast." },
-  { key: "Mechuka", label: "Mechuka",               region: "Arunachal Pradesh", tagline: "India's best-kept secret — a valley untouched by mass tourism." },
-  { key: "Ziro",    label: "Ziro",                  region: "Arunachal Pradesh", tagline: "UNESCO rice terraces, Apatani culture and India's finest music festival." },
-  { key: "Dirang",  label: "Dirang",                region: "Arunachal Pradesh", tagline: "Hot springs, black-necked cranes, orchids and the gentlest valley." },
-  { key: "Other",   label: "Beyond the Northeast",  region: "India & International", tagline: "Beaches, deserts, jungles and mountains across India and abroad." },
-];
-
 function getDestGroup(trip: ApiTrip): string {
-  // Use the destination relation name if available, otherwise fall back to location
-  const destName = trip.destination?.name || trip.location || "";
-  // Check if it matches any known DEST_CONFIG key
-  for (const cfg of DEST_CONFIG) {
-    if (cfg.key !== "Other" && destName.toLowerCase().includes(cfg.key.toLowerCase())) {
-      return cfg.key;
-    }
-  }
-  return "Other";
+  return trip.destination?.name || "Others";
 }
 
 function DestinationAccordion({ destKey, label, region, tagline, trips, defaultOpen }: {
@@ -656,6 +639,7 @@ function DestinationAccordion({ destKey, label, region, tagline, trips, defaultO
 }
 
 function DestinationSections({ trips }: { trips: ApiTrip[] }) {
+  // Group trips by destination name (from backend relation)
   const groups: Record<string, ApiTrip[]> = {};
   trips.forEach((t) => {
     const key = getDestGroup(t);
@@ -663,47 +647,30 @@ function DestinationSections({ trips }: { trips: ApiTrip[] }) {
     groups[key].push(t);
   });
 
-  const visible = DEST_CONFIG.filter(({ key }) => groups[key]?.length > 0);
+  // Build ordered entries: named destinations first (sorted), then "Others" at the bottom
+  const entries = Object.entries(groups);
+  const named = entries.filter(([key]) => key !== "Others").sort(([a], [b]) => a.localeCompare(b));
+  const others = entries.filter(([key]) => key === "Others");
+  const ordered = [...named, ...others];
 
-  // If no trips match any DEST_CONFIG key, show them under dynamic groups
-  if (visible.length === 0 && trips.length > 0) {
-    // Group by destination name or location
-    const dynamicGroups: Record<string, ApiTrip[]> = {};
-    trips.forEach((t) => {
-      const key = t.destination?.name || t.location || "Other";
-      if (!dynamicGroups[key]) dynamicGroups[key] = [];
-      dynamicGroups[key].push(t);
-    });
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-        {Object.entries(dynamicGroups).map(([key, groupTrips], idx) => (
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+      {ordered.map(([key, groupTrips], idx) => {
+        // Get region from the first trip's destination state, if available
+        const region = groupTrips[0]?.destination?.state || "";
+        const tagline = groupTrips[0]?.destination?.subheading || `${groupTrips.length} trip${groupTrips.length !== 1 ? "s" : ""} available`;
+        return (
           <DestinationAccordion
             key={key}
             destKey={key}
             label={key}
-            region=""
-            tagline={`${groupTrips.length} trip${groupTrips.length !== 1 ? "s" : ""} available`}
+            region={region}
+            tagline={tagline}
             trips={groupTrips}
             defaultOpen={idx === 0}
           />
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-      {visible.map(({ key, label, region, tagline }, idx) => (
-        <DestinationAccordion
-          key={key}
-          destKey={key}
-          label={label}
-          region={region}
-          tagline={tagline}
-          trips={groups[key]}
-          defaultOpen={idx === 0}
-        />
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -781,11 +748,10 @@ export default function TripsPage() {
   const availableDestinations = useMemo(() => {
     const destSet = new Set<string>();
     trips.forEach((t) => {
-      const group = getDestGroup(t);
-      destSet.add(group);
+      destSet.add(getDestGroup(t));
     });
-    // Return only DEST_CONFIG keys that appear, in order
-    return DEST_CONFIG.map((c) => c.key).filter((k) => destSet.has(k));
+    // Named destinations sorted alphabetically, "Others" excluded from filter (it's a catch-all)
+    return Array.from(destSet).filter((d) => d !== "Others").sort();
   }, [trips]);
 
   const availableCategories = useMemo(() => {
