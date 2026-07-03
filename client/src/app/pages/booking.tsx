@@ -197,6 +197,60 @@ function FilePickerField({
   );
 }
 
+function UncontrolledFilePicker({
+  label,
+  name,
+  required,
+  hint,
+}: {
+  label: string;
+  name: string;
+  required?: boolean;
+  hint?: string;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  return (
+    <Field label={label} required={required} hint={hint}>
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          padding: "11px 14px",
+          borderRadius: "8px",
+          border: `1.5px dashed ${file ? "#781216" : "rgba(30,26,20,0.2)"}`,
+          background: file ? "rgba(120,18,22,0.03)" : "#faf8f4",
+          cursor: "pointer",
+          transition: "border-color 0.2s, background 0.2s",
+          fontFamily: "'Poppins', sans-serif",
+        }}
+      >
+        <Upload
+          size={15}
+          color={file ? "#781216" : "rgba(30,26,20,0.38)"}
+          strokeWidth={1.5}
+        />
+        <span
+          style={{
+            color: file ? "#781216" : "rgba(30,26,20,0.5)",
+            fontSize: "0.78rem",
+            fontWeight: 300,
+          }}
+        >
+          {file ? file.name : "Choose file…"}
+        </span>
+        <input
+          type="file"
+          name={name}
+          accept="image/*,.pdf"
+          style={{ display: "none" }}
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        />
+      </label>
+    </Field>
+  );
+}
+
 // ── Section divider ───────────────────────────────────────────────
 function FormSection({
   title,
@@ -400,9 +454,10 @@ function TravelerForm({
           </Select>
         </Field>
         <div className="sm:col-span-2">
-          <AadhaarUpload
+          <UncontrolledFilePicker
             label="Upload Aadhaar Card"
             name={`traveler-${index}-aadhaar`}
+            hint="Clear photo or scan — max 5 MB"
           />
         </div>
       </div>

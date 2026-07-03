@@ -3,73 +3,31 @@ import { motion } from "motion/react";
 
 const TESTIMONIALS = [
   {
-    text: "The Ziro Music Festival trip was beyond anything I imagined. Camping in the valley, music echoing off the hills — Hangover Trails made it feel effortless and deeply personal.",
-    image: "https://randomuser.me/api/portraits/women/44.jpg",
-    name: "Priya Mehta",
-    role: "Ziro Festival · Oct 2024",
+    text: "Had an amazing experience on my recent trip to Tawang with the Hangover team. Everything was exceptionally well planned, from the itinerary to the smallest details. The service was excellent and the stay was super comfortable, which made the journey even more enjoyable. Truly a hassle-free and memorable trip.\n\nLooking forward to many more trips with you all! Hope to see Hangover expanding to all-India destinations soon 🤞✨",
+    image: "https://lh3.googleusercontent.com/a-/ALV-UjU3LHAljId4ObLAkqcUHcDelDFeOA4CjJfaM8HIY37PL8sTFDjt_w=w130-h130-p-rp-mo-ba12-br100",
+    name: "Shilpa Nanda",
+    role: "Tawang Trip",
     rating: 5,
   },
   {
-    text: "I was a solo traveler a little nervous about joining a group trip. Within a day, these strangers were family. The community Hangover builds is genuinely something special.",
-    image: "https://randomuser.me/api/portraits/men/32.jpg",
-    name: "Arjun Nair",
-    role: "Backpacking Tour · Spiti",
+    text: "An Unforgettable Journey Through Arunachal Pradesh😃\n\nAmazing trip planned by Hangover Trails through Tawang, Arunachal Pradesh! The scenic drives, wonderful homestays, local food, Bumla Pass breathtaking views, and the incredible Tawang Monastery were all highlights. A special shoutout to our guide Dorjee — his warmth and guidance made the trip truly memorable.\n\nOnly downside was the last day's accommodation and overpriced BBQ arrangements. A little improvement there and this would be a perfect experience.\n\nOverall, a wonderful trip — Hangover Trails is your go-to for exploring Arunachal Pradesh!",
+    image: "",
+    name: "Sai Anusha",
+    role: "Arunachal Pradesh",
     rating: 5,
   },
   {
-    text: "Our college batch of 40 people had an absolutely seamless Rajasthan trip. Every detail — logistics, stays, local guides — was handled with such warmth and professionalism.",
-    image: "https://randomuser.me/api/portraits/women/68.jpg",
-    name: "Sneha Kulkarni",
-    role: "Institute Trip · Rajasthan",
-    rating: 5,
-  },
-  {
-    text: "The Rann Utsav experience hit different. Full moon night, bonfire on the salt flats, strangers singing together — I've traveled a lot, but this one I'll never forget.",
-    image: "https://randomuser.me/api/portraits/men/56.jpg",
-    name: "Rohan Desai",
-    role: "Rann Utsav · Nov 2024",
-    rating: 5,
-  },
-  {
-    text: "What I love most is how Hangover Trails doesn't rush you. Every destination had breathing space, local experiences, real food. They travel the right way.",
-    image: "https://randomuser.me/api/portraits/women/12.jpg",
-    name: "Kavya Reddy",
-    role: "Heritage Walk · Hampi",
-    rating: 5,
-  },
-  {
-    text: "Booked the Himalayan trek as a 28-year-old with zero trekking experience. The team guided us so patiently. I reached the summit crying — that's how good it was.",
-    image: "https://randomuser.me/api/portraits/men/14.jpg",
-    name: "Vikram Sharma",
-    role: "Mountain Trek · Kedarkantha",
-    rating: 5,
-  },
-  {
-    text: "The bonfire evenings are what make Hangover Trails different. No screens, no rush — just conversations, laughter, and the kind of connection you don't find on typical tours.",
-    image: "https://randomuser.me/api/portraits/women/29.jpg",
-    name: "Ananya Iyer",
-    role: "Bonfire Retreat · Coorg",
-    rating: 5,
-  },
-  {
-    text: "As a photography enthusiast, I was blown away by how thoughtfully they planned shooting spots. Golden hour at Hampi's ruins — I got the best frames of my life.",
-    image: "https://randomuser.me/api/portraits/men/76.jpg",
-    name: "Nikhil Joshi",
-    role: "Photography Tour · Karnataka",
-    rating: 5,
-  },
-  {
-    text: "From itinerary to local food recommendations to emergency support — Hangover Trails is thorough like no other. I felt safe, cared for, and completely present throughout.",
-    image: "https://randomuser.me/api/portraits/women/55.jpg",
-    name: "Meera Patel",
-    role: "Beach Escape · Gokarna",
+    text: "We had an awesome time, throughout the trip, we were getting prompt support and itinerary updates. Driver hired was professional and kind.\n\nHotels, Cottages stays were good with home made food provided by the host.",
+    image: "",
+    name: "Bharat Mhatre",
+    role: "Hangover Trails",
     rating: 5,
   },
 ];
 
-const firstCol  = TESTIMONIALS.slice(0, 3);
-const secondCol = TESTIMONIALS.slice(3, 6);
-const thirdCol  = TESTIMONIALS.slice(6, 9);
+const firstCol  = [TESTIMONIALS[0], TESTIMONIALS[1], TESTIMONIALS[2]];
+const secondCol = [TESTIMONIALS[1], TESTIMONIALS[2], TESTIMONIALS[0]];
+const thirdCol  = [TESTIMONIALS[2], TESTIMONIALS[0], TESTIMONIALS[1]];
 
 /* ── single card ────────────────────────────────────────────────── */
 function TestimonialCard({
@@ -112,13 +70,33 @@ function TestimonialCard({
 
       {/* Author */}
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-        <img
-          src={image}
-          alt={name}
-          width={38}
-          height={38}
-          style={{ width: "38px", height: "38px", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
-        />
+        {image ? (
+          <img
+            src={image}
+            alt={name}
+            width={38}
+            height={38}
+            style={{ width: "38px", height: "38px", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+          />
+        ) : (
+          <div
+            style={{
+              width: "38px",
+              height: "38px",
+              borderRadius: "50%",
+              background: "#b8943a",
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "1.1rem",
+              fontWeight: 500,
+              flexShrink: 0,
+            }}
+          >
+            {name.charAt(0).toUpperCase()}
+          </div>
+        )}
         <div>
           <p style={{ color: "#1e1a14", fontSize: "0.82rem", fontWeight: 500, letterSpacing: "0.02em", margin: 0, lineHeight: 1.3 }}>
             {name}
