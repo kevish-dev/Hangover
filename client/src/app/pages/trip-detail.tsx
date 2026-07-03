@@ -183,7 +183,7 @@ function RelatedTrips({
 
 function RelatedCard({ trip }: { trip: ApiTrip }) {
   const [hovered, setHovered] = useState(false);
-  const heroImage = trip.bannerImages?.[0] || trip.highlights?.[0]?.imageUrl || "";
+  const heroImage = trip.bannerImages?.[0] || "";
   const typeLabel = formatTripType(trip.tripType);
 
   return (
@@ -1134,15 +1134,12 @@ export default function TripDetail() {
   }
 
   // Derived values
-  const heroImage = trip.bannerImages?.[0] || trip.highlights?.[0]?.imageUrl || "";
-  const allImages = [
-    ...(trip.bannerImages || []),
-    ...(trip.highlights?.map((h) => h.imageUrl) || []),
-  ];
+  const heroImage = trip.bannerImages?.[0] || "";
+  const allImages = trip.bannerImages || [];
   const typeLabel = formatTripType(trip.tripType);
   const priceStr = formatPrice(trip.price);
   const durationStr = formatDuration(trip.duration);
-  const altitudeStr = formatAltitude(trip.maxAltitude);
+  const altitudeStr = formatAltitude(trip?.maxAltitude || null);
   const spots = spotsLeft(trip.capacity, trip.filledSpots);
   const tags = trip.tripTags?.map((t) => t.tag) || [];
   const stayItems = (
@@ -1460,7 +1457,7 @@ function TripDetailContent({
                 width: "100%",
                 height: "100%",
                 objectFit: "cover",
-                objectPosition: "center",
+                objectPosition: "top",
               }}
             />
           </AnimatePresence>
@@ -1713,7 +1710,7 @@ function TripDetailContent({
                   label: "Best Time",
                   value: trip.bestTimeToVisit || null,
                 },
-                ...(trip.maxAltitude > 0
+                ...((trip.maxAltitude || 0) > 0
                   ? [{ icon: Zap, label: "Max Altitude", value: altitudeStr }]
                   : []),
               ].map(({ icon: Icon, label, value }) => (
@@ -2197,7 +2194,7 @@ function TripDetailContent({
                   }
                 >
                   <MessageCircle size={15} />
-                  Ask on WhatsApp
+                  Solve your queries on WhatsApp
                 </a>
 
                 {/* Partial payment note */}

@@ -150,7 +150,7 @@ export function formatDuration(days: number): string {
   return `${days} Days`;
 }
 
-export function formatAltitude(meters: number): string {
+export function formatAltitude(meters: number | null): string {
   if (!meters || meters <= 0) return "Not Available";
   return `${meters.toLocaleString("en-IN")} m`;
 }
