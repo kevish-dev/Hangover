@@ -51,7 +51,7 @@ export const googleLogin = async (code) => {
   await authRepo.updateLastLogin(user.id);
 
   // Generate JWTs
-  const tokens = generateTokens(user.id);
+  const tokens = generateTokens(user);
 
   return { user, tokens };
 };
@@ -73,7 +73,7 @@ export const refreshToken = async (token) => {
   }
 
   // Generate new tokens
-  const tokens = generateTokens(user.id);
+  const tokens = generateTokens(user);
 
   return { user, tokens };
 };

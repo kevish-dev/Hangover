@@ -95,6 +95,8 @@ model Trip {
   @@index([isActive])
   @@index([isFeatured])
   @@index([location])
+  @@index([createdAt])
+  @@index([isPublished])
 }
 
 model Booking {

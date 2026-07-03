@@ -11,8 +11,13 @@ export const getTrips = async (page = 1, limit = 10, isAdmin = false) => {
   const take = parseInt(limit, 10);
   
   const where = isAdmin ? {} : { isPublished: true };
+  const startTime = new Date().getTime();
+  
   const { trips, total } = await tripRepo.findAll(skip, take, where);
   
+  const endTime = new Date().getTime() - startTime;
+  console.log("Time taken to fetch trips:", endTime / 1000, "seconds");
+
   return {
     data: trips,
     meta: {

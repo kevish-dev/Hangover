@@ -15,16 +15,21 @@ export const requireAuth = async (req, res, next) => {
       return res.status(401).json({ message: "Invalid or expired access token." });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: {
-        id: true,
-        email: true,
-        googleId: true,
-        role: true,
-        isActive: true,
-      },
-    });
+    let user;
+    if (decoded.role !== undefined) {
+      user = decoded;
+    } else {
+      user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: {
+          id: true,
+          email: true,
+          googleId: true,
+          role: true,
+          isActive: true,
+        },
+      });
+    }
 
     if (!user) {
       return res.status(401).json({ message: "User no longer exists." });
@@ -52,16 +57,21 @@ export const optionalAuth = async (req, res, next) => {
     if (!decoded) {
       return next();
     }
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: {
-        id: true,
-        email: true,
-        googleId: true,
-        role: true,
-        isActive: true,
-      },
-    });
+    let user;
+    if (decoded.role !== undefined) {
+      user = decoded;
+    } else {
+      user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: {
+          id: true,
+          email: true,
+          googleId: true,
+          role: true,
+          isActive: true,
+        },
+      });
+    }
     if (user && user.isActive) {
       req.user = user;
     }

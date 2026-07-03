@@ -148,9 +148,9 @@ export function SiteFooter() {
               style={{ display: "flex", flexDirection: "column", gap: "14px" }}
             >
               {[
-                { icon: Mail, text: "hello@hangovertrails.com", href: "mailto:hello@hangovertrails.com" },
+                { icon: Mail, text: "experience@hangovertrails.com", href: "mailto:experience@hangovertrails.com" },
                 { icon: Phone, text: "+91 84159 29069", href: "tel:+918415929069" },
-                { icon: MapPin, text: "Northeast India & Beyond", href: "https://maps.app.goo.gl/D1eC1BV9xyoP8iP56?g_st=aw" },
+                { icon: MapPin, text: "Dawn Tours and Travels\nPapu-1, Naharlagun\nArunachal Pradesh- 791110", href: "https://maps.app.goo.gl/D1eC1BV9xyoP8iP56?g_st=aw" },
               ].map(({ icon: Icon, text, href }) => (
                 <a
                   key={text}
