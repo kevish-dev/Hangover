@@ -177,3 +177,17 @@ export const syncStayTransport = async (tripId, payloadStr, files) => {
 
   return tripRepo.update(tripId, { stayTransportImages: finalArray });
 };
+
+// ============ V2 apis for User ====================
+
+export const getFeaturedTrips = async () => {
+  let data = await tripRepo.getFeaturedTrips();
+  data = data.map(trip => {
+    return {
+      ...trip,
+      bannerImages: trip.bannerImages[0]
+    }
+  })
+
+  return {data}
+}

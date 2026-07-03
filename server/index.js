@@ -7,6 +7,7 @@ import { apiReference } from "@scalar/express-api-reference";
 import { generateOpenApiDocument } from "./src/core/openapi/openapi.js";
 import authRoutes from "./src/modules/auth/auth.routes.js";
 import tripRoutes from "./src/modules/trip/trip.routes.js";
+import tripRoutesV2 from "./src/modules/trip/trip.routes.v2.js";
 import itineraryRoutes from "./src/modules/itinerary/itinerary.routes.js";
 import userRoutes from "./src/modules/user/user.routes.js";
 import bookingRoutes from "./src/modules/booking/booking.routes.js";
@@ -39,6 +40,7 @@ app.use(cookieParser());
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/trips", tripRoutes);
+app.use("/api/v2/trips", tripRoutesV2);
 app.use("/api/v1/itineraries", itineraryRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/bookings", bookingRoutes);

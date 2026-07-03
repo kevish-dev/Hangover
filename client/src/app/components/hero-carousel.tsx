@@ -2,86 +2,247 @@ import { useEffect, useRef, useState } from "react";
 import { ShaderAnimation } from "./shader-animation";
 import { ArrowRight, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { useNavigate } from "react-router";
+import axios from "axios";
 
-const destinations = [
+interface FeaturedTrip {
+  id: string;
+  title: string;
+  slug: string;
+  overview?: string;
+  location: string;
+  duration: number;
+  price: number;
+  bannerImages: string; // first banner image URL
+}
+
+const API_V2_URL =
+  (import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1").replace(
+    /\/api\/v1$/,
+    "/api/v2"
+  );
+
+// Hardcoded fallback in case no featured trips exist
+const FALLBACK_TRIPS: FeaturedTrip[] = [
   {
-    id: 1,
-    name: "Santorini",
-    country: "Greece",
-    tagline: "Where the Aegean whispers eternity",
-    description: "Drift through whitewashed villages perched on volcanic cliffs, and watch the sun dissolve into the deepest blue on Earth.",
-    duration: "8 Days",
-    price: "From ₹2,06,000",
-    image: "https://images.unsplash.com/photo-1507501336603-6e31db2be093?w=1920&h=1080&fit=crop&auto=format",
-  },
-  {
-    id: 2,
-    name: "Kyoto",
-    country: "Japan",
-    tagline: "Ancient temples, eternal stillness",
-    description: "Walk beneath vermilion torii gates and centuries-old cedar forests. Find tranquility in a city where tradition breathes.",
-    duration: "10 Days",
-    price: "From ₹2,65,000",
-    image: "https://images.unsplash.com/photo-1665706896821-319040b81753?w=1920&h=1080&fit=crop&auto=format",
-  },
-  {
-    id: 3,
-    name: "Patagonia",
-    country: "Chile",
-    tagline: "Where the world ends and wonder begins",
-    description: "Hike beneath granite spires that pierce low clouds. Feel the raw, untouched silence of the world's last wilderness.",
-    duration: "12 Days",
-    price: "From ₹3,57,000",
-    image: "https://images.unsplash.com/photo-1637580980556-085dee659c7e?w=1920&h=1080&fit=crop&auto=format",
-  },
-  {
-    id: 4,
-    name: "Amalfi Coast",
-    country: "Italy",
-    tagline: "Cliffs, cerulean sea, and la dolce vita",
-    description: "Wind along clifftop roads where lemon groves meet the sea. Every cove holds a story of sun, salt, and timeless beauty.",
-    duration: "7 Days",
-    price: "From ₹2,40,000",
-    image: "https://images.unsplash.com/photo-1649792880509-3897bbe2ba83?w=1920&h=1080&fit=crop&auto=format",
-  },
-  {
-    id: 5,
-    name: "Swiss Alps",
-    country: "Switzerland",
-    tagline: "Above the clouds, below the stars",
-    description: "Ascend into a world of crystalline peaks and silence so profound it changes you. Winter or summer — always extraordinary.",
-    duration: "9 Days",
-    price: "From ₹3,07,000",
-    image: "https://images.unsplash.com/photo-1626948688703-0136bc0a90da?w=1920&h=1080&fit=crop&auto=format",
+    id: "fallback-1",
+    title: "Santorini",
+    slug: "santorini",
+    location: "Greece",
+    duration: 8,
+    price: 206000,
+    bannerImages:
+      "https://images.unsplash.com/photo-1507501336603-6e31db2be093?w=1920&h=1080&fit=crop&auto=format",
   },
 ];
 
-
 export function HeroCarousel() {
+  const [trips, setTrips] = useState<FeaturedTrip[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [current, setCurrent] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const navigate = useNavigate();
+
+  // Fetch featured trips from v2 API
+  useEffect(() => {
+    let cancelled = false;
+    const fetchFeatured = async () => {
+      try {
+        const res = await axios.get(`${API_V2_URL}/trips`, {
+          withCredentials: true,
+        });
+        const data = res.data?.result?.data;
+        if (!cancelled && Array.isArray(data) && data.length > 0) {
+          setTrips(data);
+        } else if (!cancelled) {
+          setTrips(FALLBACK_TRIPS);
+        }
+      } catch {
+        if (!cancelled) setTrips(FALLBACK_TRIPS);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+    fetchFeatured();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const go = (next: number) => {
-    setCurrent((next + destinations.length) % destinations.length);
+    if (trips.length === 0) return;
+    setCurrent((next + trips.length) % trips.length);
   };
 
   const resetInterval = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
+    if (trips.length <= 1) return;
     intervalRef.current = setInterval(() => {
-      setCurrent((c) => (c + 1) % destinations.length);
+      setCurrent((c) => (c + 1) % trips.length);
     }, 6000);
   };
 
   useEffect(() => {
+    if (trips.length > 0) {
+      resetInterval();
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [trips]);
+
+  const handlePrev = () => {
+    go(current - 1);
     resetInterval();
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, []);
+  };
+  const handleNext = () => {
+    go(current + 1);
+    resetInterval();
+  };
+  const handleDot = (i: number) => {
+    go(i);
+    resetInterval();
+  };
 
-  const handlePrev = () => { go(current - 1); resetInterval(); };
-  const handleNext = () => { go(current + 1); resetInterval(); };
-  const handleDot = (i: number) => { go(i); resetInterval(); };
+  // ──── LOADING STATE ────
+  if (isLoading) {
+    return (
+      <section className="relative w-full h-screen overflow-hidden bg-[#0b0b0b]">
+        {/* Animated solid color pulse */}
+        <motion.div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(135deg, #0b0b0b 0%, #1a1510 30%, #201a12 50%, #1a1510 70%, #0b0b0b 100%)",
+          }}
+          animate={{ opacity: [0.6, 1, 0.6] }}
+          transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+        />
 
-  const slide = destinations[current];
+        {/* Overlay gradient */}
+        <div
+          className="absolute inset-0 z-10"
+          style={{
+            background:
+              "linear-gradient(to right, rgba(11,11,11,0.92) 0%, rgba(11,11,11,0.60) 50%, rgba(11,11,11,0.20) 100%), linear-gradient(to top, rgba(11,11,11,0.70) 0%, transparent 45%)",
+          }}
+        />
+
+        {/* Shader texture overlay */}
+        <div className="absolute inset-0 z-20">
+          <ShaderAnimation opacity={0.12} />
+        </div>
+
+        {/* Skeleton content */}
+        <div className="absolute inset-0 z-30 flex items-center">
+          <div className="px-10 md:px-16 lg:px-24 max-w-2xl w-full">
+            {/* Location chip skeleton */}
+            <motion.div
+              className="h-3 w-24 rounded-full mb-6"
+              style={{ background: "rgba(200,169,110,0.15)" }}
+              animate={{ opacity: [0.3, 0.7, 0.3] }}
+              transition={{
+                duration: 1.8,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            />
+
+            {/* Title skeleton */}
+            <motion.div
+              className="rounded mb-4"
+              style={{
+                background: "rgba(242,237,228,0.08)",
+                height: "clamp(3.5rem, 8vw, 7rem)",
+                width: "80%",
+              }}
+              animate={{ opacity: [0.3, 0.6, 0.3] }}
+              transition={{
+                duration: 1.8,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 0.15,
+              }}
+            />
+
+            {/* Separator skeleton */}
+            <div
+              className="w-12 h-px mb-6"
+              style={{ background: "rgba(200,169,110,0.2)" }}
+            />
+
+            {/* Description skeleton lines */}
+            <div className="space-y-2 mb-8">
+              {[0.9, 0.75, 0.6].map((w, i) => (
+                <motion.div
+                  key={i}
+                  className="h-3 rounded-full"
+                  style={{
+                    background: "rgba(242,237,228,0.06)",
+                    width: `${w * 100}%`,
+                  }}
+                  animate={{ opacity: [0.2, 0.5, 0.2] }}
+                  transition={{
+                    duration: 1.8,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    delay: 0.1 * i,
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Meta skeleton */}
+            <div className="flex items-center gap-8 mb-8">
+              <motion.div
+                className="h-10 w-20 rounded"
+                style={{ background: "rgba(242,237,228,0.06)" }}
+                animate={{ opacity: [0.2, 0.5, 0.2] }}
+                transition={{
+                  duration: 1.8,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 0.3,
+                }}
+              />
+              <div
+                className="w-px h-8"
+                style={{ background: "rgba(242,237,228,0.1)" }}
+              />
+              <motion.div
+                className="h-10 w-24 rounded"
+                style={{ background: "rgba(242,237,228,0.06)" }}
+                animate={{ opacity: [0.2, 0.5, 0.2] }}
+                transition={{
+                  duration: 1.8,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 0.4,
+                }}
+              />
+            </div>
+
+            {/* Button skeleton */}
+            <motion.div
+              className="h-11 w-36 rounded"
+              style={{ background: "rgba(200,169,110,0.12)" }}
+              animate={{ opacity: [0.3, 0.6, 0.3] }}
+              transition={{
+                duration: 1.8,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 0.5,
+              }}
+            />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // ──── LOADED STATE ────
+  const slide = trips[current];
+  if (!slide) return null;
 
   return (
     <section className="relative w-full h-screen overflow-hidden bg-[#0b0b0b]">
@@ -96,8 +257,8 @@ export function HeroCarousel() {
           className="absolute inset-0"
         >
           <img
-            src={slide.image}
-            alt={`${slide.name}, ${slide.country}`}
+            src={slide.bannerImages}
+            alt={slide.title}
             className="w-full h-full object-cover"
           />
         </motion.div>
@@ -117,8 +278,6 @@ export function HeroCarousel() {
         <ShaderAnimation opacity={0.12} />
       </div>
 
-      {/* NAV is now rendered globally as a fixed sticky bar — see Navbar component */}
-
       {/* HERO CONTENT */}
       <div className="absolute inset-0 z-30 flex items-center">
         <div className="px-10 md:px-16 lg:px-24 max-w-2xl">
@@ -133,14 +292,17 @@ export function HeroCarousel() {
               {/* Location chip */}
               <div
                 className="flex items-center gap-2 mb-6"
-                style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 400 }}
+                style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 400,
+                }}
               >
                 <MapPin size={12} className="text-[#c8a96e]" />
                 <span
                   className="text-[#c8a96e] uppercase tracking-[0.2em]"
                   style={{ fontSize: "0.72rem" }}
                 >
-                  {slide.country}
+                  {slide.location}
                 </span>
               </div>
 
@@ -154,63 +316,77 @@ export function HeroCarousel() {
                   letterSpacing: "-0.02em",
                 }}
               >
-                {slide.name}
+                {slide.title}
               </h1>
 
               {/* Thin separator */}
               <div className="w-12 h-px bg-[#c8a96e] mb-6" />
 
-              {/* Tagline */}
-              <p
-                className="text-[#f2ede4]/80 mb-4 italic"
-                style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 300, fontSize: "1.05rem", letterSpacing: "0.01em" }}
-              >
-                {slide.tagline}
-              </p>
-
-              {/* Description */}
-              <p
-                className="text-[#f2ede4]/80 mb-8 leading-relaxed max-w-md"
-                style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 300, fontSize: "0.88rem" }}
-              >
-                {slide.description}
-              </p>
+              {/* Overview / Description */}
+              {slide.overview && (
+                <p
+                  className="text-[#f2ede4]/80 mb-8 leading-relaxed max-w-md"
+                  style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 300, fontSize: "0.88rem" }}
+                >
+                  {slide.overview.length > 160
+                    ? slide.overview.slice(0, 160).trimEnd() + "…"
+                    : slide.overview}
+                </p>
+              )}
 
               {/* Meta — Duration + Starting price */}
               <div className="flex items-center gap-8">
                 <div>
                   <div
                     className="text-[#f2ede4]/65 uppercase tracking-widest mb-1"
-                    style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 400, fontSize: "0.65rem" }}
+                    style={{
+                      fontFamily: "'Poppins', sans-serif",
+                      fontWeight: 400,
+                      fontSize: "0.65rem",
+                    }}
                   >
                     Duration
                   </div>
                   <div
                     className="text-[#f2ede4]"
-                    style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: "0.88rem" }}
+                    style={{
+                      fontFamily: "'Poppins', sans-serif",
+                      fontWeight: 500,
+                      fontSize: "0.88rem",
+                    }}
                   >
-                    {slide.duration}
+                    {slide.duration}{" "}
+                    {slide.duration === 1 ? "Day" : "Days"}
                   </div>
                 </div>
                 <div className="w-px h-8 bg-[#f2ede4]/30" />
                 <div>
                   <div
                     className="text-[#f2ede4]/65 uppercase tracking-widest mb-1"
-                    style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 400, fontSize: "0.65rem" }}
+                    style={{
+                      fontFamily: "'Poppins', sans-serif",
+                      fontWeight: 400,
+                      fontSize: "0.65rem",
+                    }}
                   >
                     Starting
                   </div>
                   <div
                     className="text-[#c8a96e]"
-                    style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: "0.88rem" }}
+                    style={{
+                      fontFamily: "'Poppins', sans-serif",
+                      fontWeight: 500,
+                      fontSize: "0.88rem",
+                    }}
                   >
-                    {slide.price}
+                    From ₹{slide.price.toLocaleString("en-IN")}
                   </div>
                 </div>
               </div>
 
-              {/* Explore CTA — below pricing & duration */}
+              {/* Explore CTA */}
               <button
+                onClick={() => navigate(`/trips/${slide.slug}`)}
                 className="group active:scale-95 transition-all duration-300 mt-8"
                 style={{
                   background: "#C8A96E",
@@ -227,60 +403,77 @@ export function HeroCarousel() {
                   alignItems: "center",
                   gap: "8px",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#dfc08a")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "#C8A96E")}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "#dfc08a")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "#C8A96E")
+                }
               >
                 EXPLORE
-                <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform duration-300" />
+                <ArrowRight
+                  size={14}
+                  className="group-hover:translate-x-1 transition-transform duration-300"
+                />
               </button>
             </motion.div>
           </AnimatePresence>
         </div>
       </div>
 
-      {/* NAV ARROWS */}
-      <div className="absolute right-10 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-3">
-        <button
-          onClick={handlePrev}
-          className="w-11 h-11 bg-[#f2ede4]/15 border border-[#f2ede4]/55 text-[#f2ede4] hover:bg-[#c8a96e] hover:border-[#c8a96e] hover:text-[#0b0b0b] active:scale-95 flex items-center justify-center transition-all duration-300"
-          aria-label="Previous"
-        >
-          <ChevronLeft size={16} />
-        </button>
-        <button
-          onClick={handleNext}
-          className="w-11 h-11 bg-[#f2ede4]/15 border border-[#f2ede4]/55 text-[#f2ede4] hover:bg-[#c8a96e] hover:border-[#c8a96e] hover:text-[#0b0b0b] active:scale-95 flex items-center justify-center transition-all duration-300"
-          aria-label="Next"
-        >
-          <ChevronRight size={16} />
-        </button>
-      </div>
+      {/* NAV ARROWS (only show if more than 1 trip) */}
+      {trips.length > 1 && (
+        <div className="absolute right-10 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-3">
+          <button
+            onClick={handlePrev}
+            className="w-11 h-11 bg-[#f2ede4]/15 border border-[#f2ede4]/55 text-[#f2ede4] hover:bg-[#c8a96e] hover:border-[#c8a96e] hover:text-[#0b0b0b] active:scale-95 flex items-center justify-center transition-all duration-300"
+            aria-label="Previous"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <button
+            onClick={handleNext}
+            className="w-11 h-11 bg-[#f2ede4]/15 border border-[#f2ede4]/55 text-[#f2ede4] hover:bg-[#c8a96e] hover:border-[#c8a96e] hover:text-[#0b0b0b] active:scale-95 flex items-center justify-center transition-all duration-300"
+            aria-label="Next"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
 
       {/* SLIDE COUNTER + DOTS */}
-      <div className="absolute bottom-10 left-10 md:left-16 lg:left-24 z-30 flex items-center gap-6">
-        <span
-          className="text-[#f2ede4]/65 tabular-nums"
-          style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 300, fontSize: "0.75rem" }}
-        >
-          {String(current + 1).padStart(2, "0")} / {String(destinations.length).padStart(2, "0")}
-        </span>
-        <div className="flex items-center gap-2">
-          {destinations.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => handleDot(i)}
-              className="transition-all duration-500 rounded-full"
-              style={{
-                width: i === current ? "24px" : "6px",
-                height: "2px",
-                borderRadius: "1px",
-                background: i === current ? "#c8a96e" : "rgba(242,237,228,0.50)",
-              }}
-              aria-label={`Go to slide ${i + 1}`}
-            />
-          ))}
+      {trips.length > 1 && (
+        <div className="absolute bottom-10 left-10 md:left-16 lg:left-24 z-30 flex items-center gap-6">
+          <span
+            className="text-[#f2ede4]/65 tabular-nums"
+            style={{
+              fontFamily: "'Poppins', sans-serif",
+              fontWeight: 300,
+              fontSize: "0.75rem",
+            }}
+          >
+            {String(current + 1).padStart(2, "0")} /{" "}
+            {String(trips.length).padStart(2, "0")}
+          </span>
+          <div className="flex items-center gap-2">
+            {trips.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => handleDot(i)}
+                className="transition-all duration-500 rounded-full"
+                style={{
+                  width: i === current ? "24px" : "6px",
+                  height: "2px",
+                  borderRadius: "1px",
+                  background:
+                    i === current ? "#c8a96e" : "rgba(242,237,228,0.50)",
+                }}
+                aria-label={`Go to slide ${i + 1}`}
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Scroll hint */}
       <div className="absolute bottom-10 right-10 z-30 flex flex-col items-center gap-2">
@@ -294,7 +487,12 @@ export function HeroCarousel() {
         </div>
         <span
           className="text-[#f2ede4]/65 uppercase tracking-widest"
-          style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 400, fontSize: "0.58rem", writingMode: "vertical-rl" }}
+          style={{
+            fontFamily: "'Poppins', sans-serif",
+            fontWeight: 400,
+            fontSize: "0.58rem",
+            writingMode: "vertical-rl",
+          }}
         >
           Scroll
         </span>

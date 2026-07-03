@@ -112,3 +112,14 @@ export const syncStayTransport = async (req, res, next) => {
     next(error);
   }
 };
+
+// ============ V2 apis for User ====================
+
+export const getFeaturedTrips = async (req, res, next) => {
+  try {
+    const result = await tripService.getFeaturedTrips();
+    res.status(200).json({ message: "Featured trips", result });
+  } catch (error) {
+    next(error);
+  }
+}

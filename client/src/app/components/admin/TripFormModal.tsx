@@ -62,6 +62,7 @@ const tripSchema = z.object({
     )
     .optional(),
   isPublished: z.boolean().default(false),
+  isFeatured: z.boolean().default(false),
 }).refine(
   (data) => {
     if (data.startDate && data.endDate) {
@@ -174,6 +175,7 @@ export function TripFormModal({
       tripTags: [],
       faqs: [],
       isPublished: false,
+      isFeatured: false,
     },
     mode: "onTouched",
   });
@@ -212,6 +214,7 @@ export function TripFormModal({
               }))
             : [],
           isPublished: trip.isPublished || false,
+          isFeatured: trip.isFeatured || false,
         });
 
         // Initialize Highlight items
@@ -262,6 +265,7 @@ export function TripFormModal({
           tripTags: [],
           faqs: [],
           isPublished: false,
+          isFeatured: false,
         });
         setStayItems([]);
         setHighlightItems([]);
@@ -786,16 +790,29 @@ export function TripFormModal({
                     </p>
                   )}
                 </div>
-                <div className="space-y-2 col-span-2 flex items-center gap-2 mt-2">
-                  <input
-                    type="checkbox"
-                    id="isPublished"
-                    {...form.register("isPublished")}
-                    className="w-4 h-4 text-[#c8a96e] rounded border-gray-300 focus:ring-[#c8a96e]"
-                  />
-                  <Label htmlFor="isPublished" className="mb-0 cursor-pointer">
-                    Publish this trip (visible to public)
-                  </Label>
+                <div className="space-y-2 col-span-2 flex flex-col sm:flex-row sm:items-center gap-4 mt-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="isPublished"
+                      {...form.register("isPublished")}
+                      className="w-4 h-4 text-[#c8a96e] rounded border-gray-300 focus:ring-[#c8a96e]"
+                    />
+                    <Label htmlFor="isPublished" className="mb-0 cursor-pointer">
+                      Publish this trip (visible to public)
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="isFeatured"
+                      {...form.register("isFeatured")}
+                      className="w-4 h-4 text-[#c8a96e] rounded border-gray-300 focus:ring-[#c8a96e]"
+                    />
+                    <Label htmlFor="isFeatured" className="mb-0 cursor-pointer">
+                      Feature this trip (highlight on homepage)
+                    </Label>
+                  </div>
                 </div>
               </div>
             </div>

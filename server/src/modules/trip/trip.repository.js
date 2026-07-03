@@ -129,3 +129,26 @@ export const remove = async (id) => {
     where: { id },
   });
 };
+
+// ============ V2 apis for User ====================
+
+export const getFeaturedTrips = async () => {
+  let featuredTrips = await prisma.trip.findMany({
+    where : { isFeatured : true, isActive: true, isPublished: true },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      overview: true,
+      location: true,
+      duration: true,
+      price: true,
+      isActive: true,
+      isPublished: true,
+      isFeatured: true,
+      bannerImages: true
+    }
+  })
+
+  return featuredTrips;
+}
