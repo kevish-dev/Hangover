@@ -230,8 +230,13 @@ export const verifyPayment = async (userId, { razorpayOrderId, razorpayPaymentId
         name: userName,
         bookingRef: booking.bookingReference,
         tripTitle,
-        totalAmount: intent.amount,
+        amountPaid: intent.amount,
+        totalAmount: booking.totalAmount,
+        amountDue: intent.type === "FULL" || intent.type === "BALANCE" ? 0 : Number(booking.totalAmount) - Number(booking.tokenAmount),
         paymentType: intent.type,
+        receiptNumber: payment.receiptNumber,
+        invoiceDate: payment.paidAt,
+        travelersCount: booking.numberOfTravelers,
       });
     }
   } catch (_) {

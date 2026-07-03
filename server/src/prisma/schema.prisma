@@ -46,8 +46,7 @@ model UserProfile {
   medicalNotes             String?
   govtIdType               GovtIdType?
   govtIdNumber             String?
-  govtIdFrontImageUrl      String?
-  govtIdBackImageUrl       String?
+  govtIdImageUrl           String?
   createdAt                DateTime    @default(now())
   updatedAt                DateTime    @updatedAt
   user                     User        @relation(fields: [userId], references: [id], onDelete: Cascade)

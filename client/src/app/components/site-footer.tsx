@@ -4,6 +4,8 @@ import logoSrc from "../../imports/final-logo_png_transparent.png";
 import { useState } from "react";
 import { motion } from "motion/react";
 import { MapPin, Mail, Phone, Instagram, ArrowRight, Send, CheckCircle } from "lucide-react";
+import { apiClient } from "../../lib/axios";
+import { toast } from "sonner";
 
 const TRIP_TYPES = [
   "Mountain Trek",
@@ -40,10 +42,30 @@ export function SiteFooter() {
   const [submitted, setSubmitted] = useState(false);
   const [focused, setFocused] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.email || !form.message) return;
-    setSubmitted(true);
+
+    let mappedTripType: string | undefined;
+    if (form.trip) {
+      if (form.trip === "Jungle & Wildlife") mappedTripType = "JUNGLE_WILDLIFE";
+      else if (form.trip === "Institute / College Trip") mappedTripType = "INSTITUTE_COLLEGE_TRIP";
+      else if (form.trip === "Cultural Festival") mappedTripType = undefined; // Not in backend enum
+      else mappedTripType = form.trip.toUpperCase().replace(/\s+/g, '_');
+    }
+
+    try {
+      await apiClient.post("/inquiries", {
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        tripType: mappedTripType,
+        message: form.message
+      });
+      setSubmitted(true);
+    } catch (error) {
+      toast.error("Failed to send inquiry. Please try again.");
+    }
   };
 
   const inputStyle = (field: string) => ({

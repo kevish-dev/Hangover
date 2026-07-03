@@ -39,37 +39,19 @@ export const updateUserStatus = async (id, isActive) => {
   return userRepo.updateUserStatus(id, isActive);
 };
 
-export const uploadGovtIdImages = async (userId, govtIdType, frontImageBuffer, backImageBuffer) => {
+export const uploadGovtIdImage = async (userId, govtIdType, imageBuffer) => {
   const folder = `uploads/users/${userId}/govtid/${govtIdType}`;
   
-  const uploadPromises = [];
-  
-  if (frontImageBuffer) {
-    uploadPromises.push(uploadToCloudinary(frontImageBuffer, {
-      folder,
-      publicId: "front",
-      optimize: true,
-    }).then(url => ({ frontUrl: url })));
-  }
-  
-  if (backImageBuffer) {
-    uploadPromises.push(uploadToCloudinary(backImageBuffer, {
-      folder,
-      publicId: "back",
-      optimize: true,
-    }).then(url => ({ backUrl: url })));
-  }
-  
-  const results = await Promise.all(uploadPromises);
+  const url = await uploadToCloudinary(imageBuffer, {
+    folder,
+    publicId: "doc",
+    optimize: true,
+  });
   
   const updateData = {
-    govtIdType
+    govtIdType,
+    govtIdImageUrl: url
   };
-  
-  results.forEach(res => {
-    if (res.frontUrl) updateData.govtIdFrontImageUrl = res.frontUrl;
-    if (res.backUrl) updateData.govtIdBackImageUrl = res.backUrl;
-  });
   
   return userRepo.updateUserProfile(userId, updateData);
 };

@@ -57,7 +57,6 @@ function PaymentStatusBadge({ status }: { status: string }) {
 // ── Trip bookings drawer ──────────────────────────────────────────
 function TripBookingsDrawer({ tripId }: { tripId: string }) {
   const queryClient = useQueryClient();
-  const [processingRefundId, setProcessingRefundId] = useState<string | null>(null);
 
   const { data: bookings, isLoading } = useQuery({
     queryKey: ["admin", "bookings", "trip", tripId],
@@ -66,29 +65,6 @@ function TripBookingsDrawer({ tripId }: { tripId: string }) {
       return res.data as any[];
     },
   });
-
-  const handleRefund = (paymentId: string) => {
-    toast("Issue Refund", {
-      description: "Are you sure you want to refund this payment? It will attempt a full refund.",
-      position: "bottom-right",
-      action: {
-        label: "Refund",
-        onClick: async () => {
-          setProcessingRefundId(paymentId);
-          try {
-            await apiClient.post(`/payments/${paymentId}/refund`);
-            toast.success("Refund initiated successfully");
-            queryClient.invalidateQueries({ queryKey: ["admin", "bookings", "trip", tripId] });
-          } catch (error: any) {
-            toast.error(error.response?.data?.message || "Failed to initiate refund");
-          } finally {
-            setProcessingRefundId(null);
-          }
-        },
-      },
-      cancel: { label: "Cancel", onClick: () => {} },
-    });
-  };
 
   if (isLoading) {
     return (
@@ -163,19 +139,9 @@ function TripBookingsDrawer({ tripId }: { tripId: string }) {
                   <span className="font-medium text-gray-700">{p.type}</span>
                   <span className="text-gray-400">·</span>
                   <span className={p.status === "SUCCESS" ? "text-green-600 font-medium" : "text-gray-500"}>{p.status}</span>
-                  <span className="text-gray-400">·</span>
                   <span className="text-gray-600 flex items-center gap-0.5">
                     <IndianRupee className="w-2.5 h-2.5" />{Number(p.amount).toLocaleString("en-IN")}
                   </span>
-                  {p.status === "SUCCESS" && (
-                    <button
-                      onClick={() => handleRefund(p.id)}
-                      disabled={processingRefundId === p.id}
-                      className="ml-2 px-2 py-0.5 text-[0.65rem] font-semibold bg-red-50 text-red-600 border border-red-100 rounded hover:bg-red-100 disabled:opacity-50 transition-colors"
-                    >
-                      {processingRefundId === p.id ? "Refunding..." : "Refund"}
-                    </button>
-                  )}
                 </div>
               ))}
             </div>

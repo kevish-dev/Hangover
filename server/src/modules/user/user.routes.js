@@ -14,7 +14,7 @@ router.get("/me/profile", userController.getMyProfile);
 router.put("/me/profile", userController.updateMyProfile);
 router.post(
   "/me/govt-id",
-  uploadMiddleware.fields([{ name: "frontImage", maxCount: 1 }, { name: "backImage", maxCount: 1 }]),
+  uploadMiddleware.single("image"),
   userController.uploadGovtId
 );
 

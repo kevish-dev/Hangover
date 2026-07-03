@@ -26,6 +26,7 @@ import {
 import { apiClient, API_URL } from "../../lib/axios";
 import { useAuth } from "../../contexts/AuthContext";
 import { SiteFooter } from "../components/site-footer";
+import { toast } from "sonner";
 
 // Razorpay is loaded as a static <script> in index.html
 declare const Razorpay: any;
@@ -430,22 +431,22 @@ function TravelerForm({
         className="grid-cols-1 sm:grid-cols-2"
       >
         <Field label="First Name" required>
-          <Input type="text" placeholder="First name" />
+          <Input type="text" placeholder="First name" required />
         </Field>
         <Field label="Last Name" required>
-          <Input type="text" placeholder="Last name" />
+          <Input type="text" placeholder="Last name" required />
         </Field>
         <Field label="Email ID" required>
-          <Input type="email" placeholder="email@example.com" />
+          <Input type="email" placeholder="email@example.com" required />
         </Field>
         <Field label="Contact Number" required>
-          <Input type="tel" placeholder="+91 98765 43210" />
+          <Input type="tel" placeholder="+91 98765 43210" required />
         </Field>
         <Field label="Date of Birth" required>
-          <Input type="date" />
+          <Input type="date" required />
         </Field>
         <Field label="Gender" required>
-          <Select>
+          <Select required>
             <option value="">Select gender</option>
             <option>Male</option>
             <option>Female</option>
@@ -474,18 +475,25 @@ export default function BookingPage() {
   const [loading, setLoading] = useState(true);
 
   // Form state
-  const [solo, setSolo] = useState<"yes" | "no" | null>(null);
+  const [solo, setSolo] = useState<"yes" | "no" | null>("yes");
   const [travelers, setTravelers] = useState<number[]>([]);
   const [primaryEmail, setPrimaryEmail] = useState("");
   const [primaryPhone, setPrimaryPhone] = useState("");
   const [specialRequests, setSpecialRequests] = useState("");
 
   // Govt ID upload state
-  const [govtIdFront, setGovtIdFront] = useState<File | null>(null);
-  const [govtIdBack, setGovtIdBack] = useState<File | null>(null);
+  const [govtIdImage, setGovtIdImage] = useState<File | null>(null);
+
+  // Check if already booked
+  const [hasBooked, setHasBooked] = useState(false);
+
+  // Payment choice
+  const [paymentChoice, setPaymentChoice] = useState<"FULL" | "TOKEN">("FULL");
 
   // Booking flow state
-  const [bookingStep, setBookingStep] = useState<"form" | "paying" | "verifying" | "success" | "failed">("form");
+  const [bookingStep, setBookingStep] = useState<
+    "form" | "paying" | "verifying" | "success" | "failed"
+  >("form");
   const [submitting, setSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [pendingVerify, setPendingVerify] = useState<{
@@ -511,15 +519,32 @@ export default function BookingPage() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // On return from Google OAuth, check if we saved a redirect intent
   useEffect(() => {
-    if (user && slug) {
-      const intent = localStorage.getItem("booking_redirect_intent");
-      if (intent === `/book/${slug}`) {
-        localStorage.removeItem("booking_redirect_intent");
-      }
+    if (user && trip) {
+      apiClient
+        .get(`/bookings/me?limit=100`)
+        .then((res) => {
+          const bookings = res.data?.data || [];
+          const isBooked = bookings.some(
+            (b: any) => b.tripId === trip.id && b.status !== "CANCELLED",
+          );
+          setHasBooked(isBooked);
+        })
+        .catch(console.error);
     }
-  }, [user, slug]);
+  }, [user, trip]);
+
+  // Prevent scrolling when forced login is active
+  useEffect(() => {
+    if (!authLoading && !user) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [user, authLoading]);
 
   const addTraveler = () => setTravelers((t) => [...t, Date.now()]);
   const removeTraveler = (id: number) =>
@@ -538,8 +563,15 @@ export default function BookingPage() {
     }
 
     // Validate Govt ID uploaded
-    if (!govtIdFront && !govtIdBack) {
-      setBookingError("Please upload at least one side of your Aadhaar / Govt ID before proceeding.");
+    if (!govtIdImage) {
+      const msg =
+        "Please upload a clear picture of your Aadhaar / Govt ID before proceeding.";
+      setBookingError(msg);
+      toast.error(msg);
+      const govtSection = document.getElementById("govt-id-section");
+      if (govtSection) {
+        govtSection.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
       return;
     }
 
@@ -547,14 +579,26 @@ export default function BookingPage() {
     setBookingStep("paying");
 
     try {
-      // 2. Upload Govt ID to profile first
+      // 2. Upload Govt ID & Update Profile
       const idForm = new FormData();
       idForm.append("govtIdType", "AADHAAR");
-      if (govtIdFront) idForm.append("frontImage", govtIdFront);
-      if (govtIdBack) idForm.append("backImage", govtIdBack);
+      if (govtIdImage) idForm.append("image", govtIdImage);
       await apiClient.post("/users/me/govt-id", idForm, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+
+      const formData = new FormData(e.currentTarget);
+      const addressVal = formData.get("address") as string;
+      const pinCodeVal = formData.get("pinCode") as string;
+      
+      const profileData = {
+        fullName: `${formData.get("firstName") || ""} ${formData.get("lastName") || ""}`.trim(),
+        phone: formData.get("phoneNumber"),
+        addressLine1: addressVal ? `${addressVal}, ${pinCodeVal}` : undefined,
+        gender: formData.get("gender") || undefined,
+        dateOfBirth: formData.get("dateOfBirth") ? new Date(formData.get("dateOfBirth") as string).toISOString() : undefined,
+      };
+      await apiClient.put("/users/me/profile", profileData);
 
       // 3. Create the booking
       const numberOfTravelers = 1 + travelers.length;
@@ -562,9 +606,15 @@ export default function BookingPage() {
         tripId: trip!.id,
         numberOfTravelers,
         specialRequests: specialRequests || undefined,
+        initialPaymentType: isTokenZero ? "FULL" : paymentChoice,
       });
-      const { id: bookingId, bookingReference, initialPaymentType, tokenAmount, totalAmount } =
-        bookingRes.data;
+      const {
+        id: bookingId,
+        bookingReference,
+        initialPaymentType,
+        tokenAmount,
+        totalAmount,
+      } = bookingRes.data;
 
       // 4. Initiate Razorpay payment — TOKEN or FULL based on backend decision
       const paymentType = initialPaymentType; // "TOKEN" or "FULL"
@@ -572,7 +622,8 @@ export default function BookingPage() {
         bookingId,
         type: paymentType,
       });
-      const { razorpayOrderId, razorpayKeyId, amount, currency } = initiateRes.data;
+      const { razorpayOrderId, razorpayKeyId, amount, currency } =
+        initiateRes.data;
 
       // 4. Open Razorpay checkout (SDK already loaded in index.html)
       await new Promise<void>((resolve, reject) => {
@@ -649,26 +700,130 @@ export default function BookingPage() {
       })
       .catch((err: any) => {
         setBookingError(
-          err?.response?.data?.message || "Payment verification failed. Please contact support."
+          err?.response?.data?.message ||
+            "Payment verification failed. Please contact support.",
         );
         setBookingStep("failed");
       });
   }, [pendingVerify, bookingStep]);
 
-  // ── Loading states ─────────────────────────────────────────────
   if (loading || authLoading) {
     return (
       <div
         style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
           background: "#f5f0e6",
+          minHeight: "100vh",
           fontFamily: "'Poppins', sans-serif",
         }}
       >
-        <p style={{ color: "rgba(30,26,20,0.4)" }}>Loading trip…</p>
+        {/* Banner Skeleton */}
+        <div
+          style={{
+            background: "#1e1a14",
+            paddingTop: "100px",
+            paddingBottom: "clamp(2rem,4vw,3rem)",
+            paddingLeft: "clamp(1.5rem,5vw,6rem)",
+            paddingRight: "clamp(1.5rem,5vw,6rem)",
+          }}
+        >
+          <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
+            <motion.div
+              className="h-4 w-24 rounded mb-6"
+              style={{ background: "rgba(255,255,255,0.06)" }}
+              animate={{ opacity: [0.3, 0.6, 0.3] }}
+              transition={{
+                duration: 1.5,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            />
+            <motion.div
+              className="h-10 w-64 md:w-96 rounded"
+              style={{ background: "rgba(255,255,255,0.08)" }}
+              animate={{ opacity: [0.3, 0.6, 0.3] }}
+              transition={{
+                duration: 1.5,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 0.2,
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Content Skeleton */}
+        <div
+          style={{
+            maxWidth: "1280px",
+            margin: "0 auto",
+            padding: "clamp(2rem,4vw,4rem) clamp(1.5rem,5vw,6rem)",
+          }}
+        >
+          <div className="flex flex-col lg:flex-row gap-12">
+            {/* Left Column Form */}
+            <div className="flex-1 space-y-10">
+              <motion.div
+                className="h-[300px] rounded-xl"
+                style={{
+                  background: "rgba(30,26,20,0.03)",
+                  border: "1px solid rgba(30,26,20,0.05)",
+                }}
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              />
+              <motion.div
+                className="h-[200px] rounded-xl"
+                style={{
+                  background: "rgba(30,26,20,0.03)",
+                  border: "1px solid rgba(30,26,20,0.05)",
+                }}
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 0.1,
+                }}
+              />
+              <motion.div
+                className="h-[150px] rounded-xl"
+                style={{
+                  background: "rgba(30,26,20,0.03)",
+                  border: "1px solid rgba(30,26,20,0.05)",
+                }}
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 0.2,
+                }}
+              />
+            </div>
+
+            {/* Right Column Summary */}
+            <div className="w-full lg:w-[400px] shrink-0">
+              <motion.div
+                className="h-[500px] rounded-2xl"
+                style={{
+                  background: "rgba(30,26,20,0.04)",
+                  border: "1px solid rgba(30,26,20,0.06)",
+                }}
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 0.3,
+                }}
+              />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -711,7 +866,8 @@ export default function BookingPage() {
 
   // Map backend fields to display values
   const tripName = trip.title;
-  const tripImage = trip.bannerImages?.[0] || trip.highlights?.[0]?.imageUrl || "";
+  const tripImage =
+    trip.bannerImages?.[0] || trip.highlights?.[0]?.imageUrl || "";
   const tripPrice = formatPrice(trip.price);
   const tripDuration = formatDuration(trip.duration);
   const tripDestination = trip.location;
@@ -739,16 +895,49 @@ export default function BookingPage() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4 }}
-          style={{ textAlign: "center", maxWidth: "400px", padding: "3rem 2rem" }}
+          style={{
+            textAlign: "center",
+            maxWidth: "400px",
+            padding: "3rem 2rem",
+          }}
         >
-          <div style={{ position: "relative", width: "60px", height: "60px", margin: "0 auto 24px" }}>
-            <Loader2 size={60} color="#781216" strokeWidth={1} style={{ animation: "spin 1s linear infinite" }} />
+          <div
+            style={{
+              position: "relative",
+              width: "60px",
+              height: "60px",
+              margin: "0 auto 24px",
+            }}
+          >
+            <Loader2
+              size={60}
+              color="#781216"
+              strokeWidth={1}
+              style={{ animation: "spin 1s linear infinite" }}
+            />
           </div>
-          <h2 style={{ color: "#1e1a14", fontSize: "1.4rem", fontWeight: 300, letterSpacing: "-0.02em", margin: "0 0 10px" }}>
+          <h2
+            style={{
+              color: "#1e1a14",
+              fontSize: "1.4rem",
+              fontWeight: 300,
+              letterSpacing: "-0.02em",
+              margin: "0 0 10px",
+            }}
+          >
             Confirming your booking…
           </h2>
-          <p style={{ color: "rgba(30,26,20,0.5)", fontSize: "0.82rem", fontWeight: 300, lineHeight: 1.7, margin: 0 }}>
-            Your payment was received. We're confirming your booking — this takes just a moment.
+          <p
+            style={{
+              color: "rgba(30,26,20,0.5)",
+              fontSize: "0.82rem",
+              fontWeight: 300,
+              lineHeight: 1.7,
+              margin: 0,
+            }}
+          >
+            Your payment was received. We're confirming your booking — this
+            takes just a moment.
           </p>
         </motion.div>
       </div>
@@ -772,27 +961,68 @@ export default function BookingPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          style={{ textAlign: "center", maxWidth: "480px", padding: "3rem 2rem" }}
+          style={{
+            textAlign: "center",
+            maxWidth: "480px",
+            padding: "3rem 2rem",
+          }}
         >
-          <AlertCircle size={52} color="#c0392b" strokeWidth={1.2} style={{ margin: "0 auto 20px" }} />
-          <h2 style={{ color: "#1e1a14", fontSize: "1.5rem", fontWeight: 300, letterSpacing: "-0.02em", margin: "0 0 12px" }}>
+          <AlertCircle
+            size={52}
+            color="#c0392b"
+            strokeWidth={1.2}
+            style={{ margin: "0 auto 20px" }}
+          />
+          <h2
+            style={{
+              color: "#1e1a14",
+              fontSize: "1.5rem",
+              fontWeight: 300,
+              letterSpacing: "-0.02em",
+              margin: "0 0 12px",
+            }}
+          >
             Verification Issue
           </h2>
-          <p style={{ color: "rgba(30,26,20,0.6)", fontSize: "0.85rem", fontWeight: 300, lineHeight: 1.8, margin: "0 0 8px" }}>
+          <p
+            style={{
+              color: "rgba(30,26,20,0.6)",
+              fontSize: "0.85rem",
+              fontWeight: 300,
+              lineHeight: 1.8,
+              margin: "0 0 8px",
+            }}
+          >
             {bookingError}
           </p>
-          <p style={{ color: "rgba(30,26,20,0.45)", fontSize: "0.75rem", fontWeight: 300, lineHeight: 1.7, margin: "0 0 28px" }}>
-            Your payment may have been captured. Please contact us on WhatsApp with your payment details and we'll resolve it immediately.
+          <p
+            style={{
+              color: "rgba(30,26,20,0.45)",
+              fontSize: "0.75rem",
+              fontWeight: 300,
+              lineHeight: 1.7,
+              margin: "0 0 28px",
+            }}
+          >
+            Your payment may have been captured. Please contact us on WhatsApp
+            with your payment details and we'll resolve it immediately.
           </p>
           <a
             href="https://wa.me/917374898467?text=Hi, I need help with a payment verification issue."
             target="_blank"
             rel="noopener noreferrer"
             style={{
-              display: "inline-flex", alignItems: "center", gap: "7px",
-              background: "#25D366", color: "#fff", borderRadius: "8px",
-              padding: "12px 24px", textDecoration: "none", fontSize: "0.8rem",
-              fontWeight: 600, fontFamily: "'Poppins', sans-serif",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "7px",
+              background: "#25D366",
+              color: "#fff",
+              borderRadius: "8px",
+              padding: "12px 24px",
+              textDecoration: "none",
+              fontSize: "0.8rem",
+              fontWeight: 600,
+              fontFamily: "'Poppins', sans-serif",
             }}
           >
             Contact Support on WhatsApp
@@ -883,6 +1113,79 @@ export default function BookingPage() {
             <strong style={{ fontWeight: 600 }}>
               ₹{successData.amountPaid.toLocaleString("en-IN")}
             </strong>
+          </p>
+          <Link
+            to={`/trips/${slug}`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              color: "#781216",
+              fontSize: "0.78rem",
+              fontWeight: 600,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              textDecoration: "none",
+              borderBottom: "1.5px solid rgba(120,18,22,0.25)",
+              paddingBottom: "3px",
+            }}
+          >
+            ← Back to Trip Details
+          </Link>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (hasBooked) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f5f0e6",
+          fontFamily: "'Poppins', sans-serif",
+        }}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          style={{
+            textAlign: "center",
+            maxWidth: "480px",
+            padding: "3rem 2rem",
+          }}
+        >
+          <CheckCircle
+            size={52}
+            color="#781216"
+            strokeWidth={1.2}
+            style={{ margin: "0 auto 20px" }}
+          />
+          <h2
+            style={{
+              color: "#1e1a14",
+              fontSize: "1.6rem",
+              fontWeight: 300,
+              letterSpacing: "-0.02em",
+              margin: "0 0 8px",
+            }}
+          >
+            Already Booked
+          </h2>
+          <p
+            style={{
+              color: "rgba(30,26,20,0.55)",
+              fontSize: "0.88rem",
+              fontWeight: 300,
+              lineHeight: 1.8,
+              margin: "0 0 28px",
+            }}
+          >
+            You have already booked this trip. Your spot is reserved.
           </p>
           <Link
             to={`/trips/${slug}`}
@@ -1015,6 +1318,44 @@ export default function BookingPage() {
           {/* ══ LEFT: Form ══ */}
           <form
             onSubmit={handleSubmit}
+            onInvalid={(e) => {
+              e.preventDefault();
+              const form = e.currentTarget;
+              const firstInvalid = form.querySelector(
+                ":invalid",
+              ) as HTMLElement;
+              if (firstInvalid && e.target === firstInvalid) {
+                const input = firstInvalid as HTMLInputElement;
+                let fieldName = "";
+
+                // Try to extract the field name from the closest label
+                const parentDiv = input.closest("div");
+                const labelEl = parentDiv?.querySelector("label");
+                if (labelEl && labelEl.textContent) {
+                  fieldName = labelEl.textContent.replace("*", "").trim();
+                }
+
+                if (!fieldName) {
+                  fieldName =
+                    input.name || input.placeholder || "a required field";
+                }
+
+                let errorMessage = `Please fill out: ${fieldName}`;
+                if (
+                  input.validity.typeMismatch ||
+                  input.validity.patternMismatch
+                ) {
+                  errorMessage = `Please enter a valid ${fieldName}.`;
+                }
+
+                toast.error(errorMessage);
+                firstInvalid.focus();
+                firstInvalid.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                });
+              }
+            }}
             style={{
               display: "flex",
               flexDirection: "column",
@@ -1038,8 +1379,21 @@ export default function BookingPage() {
                     padding: "14px 16px",
                   }}
                 >
-                  <AlertCircle size={16} color="#c0392b" strokeWidth={1.5} style={{ flexShrink: 0, marginTop: "1px" }} />
-                  <p style={{ color: "#c0392b", fontSize: "0.82rem", fontWeight: 400, margin: 0, lineHeight: 1.6 }}>
+                  <AlertCircle
+                    size={16}
+                    color="#c0392b"
+                    strokeWidth={1.5}
+                    style={{ flexShrink: 0, marginTop: "1px" }}
+                  />
+                  <p
+                    style={{
+                      color: "#c0392b",
+                      fontSize: "0.82rem",
+                      fontWeight: 400,
+                      margin: 0,
+                      lineHeight: 1.6,
+                    }}
+                  >
                     {bookingError}
                   </p>
                 </motion.div>
@@ -1059,10 +1413,26 @@ export default function BookingPage() {
                   padding: "14px 16px",
                 }}
               >
-                <Info size={15} color="#b8943a" strokeWidth={1.5} style={{ flexShrink: 0, marginTop: "1px" }} />
-                <p style={{ color: "rgba(30,26,20,0.7)", fontSize: "0.78rem", fontWeight: 300, margin: 0, lineHeight: 1.65 }}>
-                  <span style={{ color: "#b8943a", fontWeight: 600 }}>You're not signed in.</span>{" "}
-                  Clicking "Confirm Booking" will redirect you to Google login, then bring you back here automatically.
+                <Info
+                  size={15}
+                  color="#b8943a"
+                  strokeWidth={1.5}
+                  style={{ flexShrink: 0, marginTop: "1px" }}
+                />
+                <p
+                  style={{
+                    color: "rgba(30,26,20,0.7)",
+                    fontSize: "0.78rem",
+                    fontWeight: 300,
+                    margin: 0,
+                    lineHeight: 1.65,
+                  }}
+                >
+                  <span style={{ color: "#b8943a", fontWeight: 600 }}>
+                    You're not signed in.
+                  </span>{" "}
+                  Clicking "Confirm Booking" will redirect you to Google login,
+                  then bring you back here automatically.
                 </p>
               </div>
             )}
@@ -1079,13 +1449,13 @@ export default function BookingPage() {
             >
               <FormSection title="Primary Traveler" icon={User}>
                 <Field label="First Name" required>
-                  <Input type="text" placeholder="Arjun" />
+                  <Input type="text" name="firstName" placeholder="Arjun" required />
                 </Field>
                 <Field label="Middle Name">
-                  <Input type="text" placeholder="Optional" />
+                  <Input type="text" name="middleName" placeholder="Optional" />
                 </Field>
                 <Field label="Last Name" required>
-                  <Input type="text" placeholder="Sharma" />
+                  <Input type="text" name="lastName" placeholder="Sharma" required />
                 </Field>
                 <Field
                   label="Email ID"
@@ -1094,6 +1464,7 @@ export default function BookingPage() {
                 >
                   <Input
                     type="email"
+                    name="email"
                     placeholder="arjun@email.com"
                     value={primaryEmail}
                     onChange={(e) => setPrimaryEmail(e.target.value)}
@@ -1102,11 +1473,22 @@ export default function BookingPage() {
                 </Field>
                 <div className="sm:col-span-2">
                   <Field label="Address" required>
-                    <Input type="text" placeholder="House / Street / Colony" />
+                    <Input
+                      type="text"
+                      name="address"
+                      placeholder="House / Street / Colony"
+                      required
+                    />
                   </Field>
                 </div>
                 <Field label="PIN Code" required>
-                  <Input type="text" placeholder="400001" maxLength={6} />
+                  <Input
+                    type="text"
+                    name="pinCode"
+                    placeholder="400001"
+                    maxLength={6}
+                    required
+                  />
                 </Field>
                 <Field
                   label="Contact Number"
@@ -1115,6 +1497,7 @@ export default function BookingPage() {
                 >
                   <Input
                     type="tel"
+                    name="phoneNumber"
                     placeholder="+91 98765 43210"
                     value={primaryPhone}
                     onChange={(e) => setPrimaryPhone(e.target.value)}
@@ -1122,32 +1505,24 @@ export default function BookingPage() {
                   />
                 </Field>
                 <Field label="Date of Birth" required>
-                  <Input type="date" />
+                  <Input type="date" name="dateOfBirth" required />
                 </Field>
                 <Field label="Gender" required>
-                  <Select>
+                  <Select name="gender" required>
                     <option value="">Select gender</option>
-                    <option>Male</option>
-                    <option>Female</option>
-                    <option>Non-binary</option>
-                    <option>Prefer not to say</option>
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                    <option value="OTHER">Non-binary</option>
+                    <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
                   </Select>
                 </Field>
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-2" id="govt-id-section">
                   <FilePickerField
-                    label="Aadhaar / Govt ID — Front Side"
+                    label="Aadhaar / Govt ID"
                     required
-                    hint="Clear photo or scan of the front — max 5 MB"
-                    file={govtIdFront}
-                    onChange={setGovtIdFront}
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <FilePickerField
-                    label="Aadhaar / Govt ID — Back Side"
-                    hint="Clear photo or scan of the back — max 5 MB"
-                    file={govtIdBack}
-                    onChange={setGovtIdBack}
+                    hint="Clear photo or scan — max 5 MB"
+                    file={govtIdImage}
+                    onChange={setGovtIdImage}
                   />
                 </div>
               </FormSection>
@@ -1401,7 +1776,10 @@ export default function BookingPage() {
                 boxShadow: "0 2px 10px rgba(30,26,20,0.04)",
               }}
             >
-              <Field label="Special Requests" hint="Dietary preferences, accessibility needs, room preferences, etc.">
+              <Field
+                label="Special Requests"
+                hint="Dietary preferences, accessibility needs, room preferences, etc."
+              >
                 <textarea
                   value={specialRequests}
                   onChange={(e) => setSpecialRequests(e.target.value)}
@@ -1488,7 +1866,7 @@ export default function BookingPage() {
                   },
                   {
                     label: `Travelers`,
-                    val: `× ${numTravelers}`,
+                    val: `x ${numTravelers}`,
                   },
                 ].map(({ label, val }) => (
                   <div
@@ -1540,9 +1918,7 @@ export default function BookingPage() {
                       fontWeight: 600,
                     }}
                   >
-                    {isTokenZero
-                      ? "Total Payment Due Now"
-                      : "Token / Partial Payment Due Now"}
+                    Payment Due Now
                   </span>
                   <span
                     style={{
@@ -1552,12 +1928,106 @@ export default function BookingPage() {
                       letterSpacing: "-0.02em",
                     }}
                   >
-                    {isTokenZero
+                    {paymentChoice === "FULL" || isTokenZero
                       ? formatPrice(totalAmountDue)
                       : formatPrice(tokenAmountDue)}
                   </span>
                 </div>
               </div>
+
+              {/* Payment choice */}
+              {!isTokenZero && (
+                <div style={{ marginBottom: "20px" }}>
+                  <h4
+                    style={{
+                      color: "#1e1a14",
+                      fontSize: "0.9rem",
+                      fontWeight: 600,
+                      margin: "0 0 12px",
+                    }}
+                  >
+                    Select Payment Option
+                  </h4>
+                  <div
+                    style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}
+                  >
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        cursor: "pointer",
+                        background:
+                          paymentChoice === "FULL"
+                            ? "rgba(120,18,22,0.06)"
+                            : "#faf8f4",
+                        border:
+                          paymentChoice === "FULL"
+                            ? "1.5px solid #781216"
+                            : "1.5px solid rgba(30,26,20,0.1)",
+                        padding: "12px 16px",
+                        borderRadius: "8px",
+                        flex: 1,
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="paymentChoice"
+                        value="FULL"
+                        checked={paymentChoice === "FULL"}
+                        onChange={() => setPaymentChoice("FULL")}
+                        style={{ accentColor: "#781216" }}
+                      />
+                      <span
+                        style={{
+                          fontSize: "0.85rem",
+                          fontWeight: 500,
+                          color: "#1e1a14",
+                        }}
+                      >
+                        Full Payment ({formatPrice(totalAmountDue)})
+                      </span>
+                    </label>
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        cursor: "pointer",
+                        background:
+                          paymentChoice === "TOKEN"
+                            ? "rgba(120,18,22,0.06)"
+                            : "#faf8f4",
+                        border:
+                          paymentChoice === "TOKEN"
+                            ? "1.5px solid #781216"
+                            : "1.5px solid rgba(30,26,20,0.1)",
+                        padding: "12px 16px",
+                        borderRadius: "8px",
+                        flex: 1,
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="paymentChoice"
+                        value="TOKEN"
+                        checked={paymentChoice === "TOKEN"}
+                        onChange={() => setPaymentChoice("TOKEN")}
+                        style={{ accentColor: "#781216" }}
+                      />
+                      <span
+                        style={{
+                          fontSize: "0.85rem",
+                          fontWeight: 500,
+                          color: "#1e1a14",
+                        }}
+                      >
+                        Token Payment ({formatPrice(tokenAmountDue)})
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              )}
 
               {/* Payment info banner */}
               <div
@@ -1565,12 +2035,14 @@ export default function BookingPage() {
                   display: "flex",
                   alignItems: "flex-start",
                   gap: "9px",
-                  background: isTokenZero
-                    ? "rgba(120,18,22,0.06)"
-                    : "rgba(184,148,58,0.06)",
-                  border: isTokenZero
-                    ? "1px solid rgba(120,18,22,0.18)"
-                    : "1px solid rgba(184,148,58,0.18)",
+                  background:
+                    paymentChoice === "FULL" || isTokenZero
+                      ? "rgba(120,18,22,0.06)"
+                      : "rgba(184,148,58,0.06)",
+                  border:
+                    paymentChoice === "FULL" || isTokenZero
+                      ? "1px solid rgba(120,18,22,0.18)"
+                      : "1px solid rgba(184,148,58,0.18)",
                   borderRadius: "8px",
                   padding: "12px 14px",
                   marginBottom: "20px",
@@ -1578,7 +2050,11 @@ export default function BookingPage() {
               >
                 <Info
                   size={14}
-                  color={isTokenZero ? "#781216" : "#b8943a"}
+                  color={
+                    paymentChoice === "FULL" || isTokenZero
+                      ? "#781216"
+                      : "#b8943a"
+                  }
                   strokeWidth={1.5}
                   style={{ flexShrink: 0, marginTop: "1px" }}
                 />
@@ -1593,42 +2069,20 @@ export default function BookingPage() {
                 >
                   <span
                     style={{
-                      color: isTokenZero ? "#781216" : "#b8943a",
+                      color:
+                        paymentChoice === "FULL" || isTokenZero
+                          ? "#781216"
+                          : "#b8943a",
                       fontWeight: 600,
                     }}
                   >
-                    {isTokenZero
-                      ? "Full payment required."
-                      : "Partial payment accepted."}
+                    {paymentChoice === "FULL" || isTokenZero
+                      ? "Full payment selected."
+                      : "Partial payment selected."}
                   </span>{" "}
-                  {isTokenZero
+                  {paymentChoice === "FULL" || isTokenZero
                     ? `Pay ${formatPrice(totalAmountDue)} now to confirm your booking.`
                     : `Pay ${formatPrice(tokenAmountDue)} now to confirm your spot. The remaining ${formatPrice(totalAmountDue - tokenAmountDue)} is due before departure.`}
-                </p>
-              </div>
-
-              {/* Razorpay badge */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "10px 14px",
-                  background: "#faf8f4",
-                  borderRadius: "8px",
-                  border: "1px solid rgba(30,26,20,0.07)",
-                }}
-              >
-                <CreditCard size={14} color="rgba(30,26,20,0.35)" strokeWidth={1.5} />
-                <p
-                  style={{
-                    color: "rgba(30,26,20,0.45)",
-                    fontSize: "0.7rem",
-                    fontWeight: 300,
-                    margin: 0,
-                  }}
-                >
-                  Secured by <strong style={{ fontWeight: 500 }}>Razorpay</strong> — UPI · Cards · Net Banking
                 </p>
               </div>
             </div>
@@ -1666,7 +2120,10 @@ export default function BookingPage() {
               >
                 {submitting ? (
                   <>
-                    <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+                    <Loader2
+                      size={16}
+                      style={{ animation: "spin 1s linear infinite" }}
+                    />
                     Processing…
                   </>
                 ) : user ? (
@@ -1814,7 +2271,14 @@ export default function BookingPage() {
                       borderTop: "1px solid rgba(30,26,20,0.06)",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "6px" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "baseline",
+                        marginBottom: "6px",
+                      }}
+                    >
                       <p
                         style={{
                           color: "rgba(30,26,20,0.38)",
@@ -1839,11 +2303,32 @@ export default function BookingPage() {
                       </p>
                     </div>
                     {numTravelers > 1 && (
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <p style={{ color: "rgba(30,26,20,0.38)", fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", margin: 0 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <p
+                          style={{
+                            color: "rgba(30,26,20,0.38)",
+                            fontSize: "0.58rem",
+                            letterSpacing: "0.14em",
+                            textTransform: "uppercase",
+                            margin: 0,
+                          }}
+                        >
                           Total ({numTravelers} travelers)
                         </p>
-                        <p style={{ color: "#1e1a14", fontSize: "0.9rem", fontWeight: 600, margin: 0 }}>
+                        <p
+                          style={{
+                            color: "#1e1a14",
+                            fontSize: "0.9rem",
+                            fontWeight: 600,
+                            margin: 0,
+                          }}
+                        >
                           {formatPrice(totalAmountDue)}
                         </p>
                       </div>
@@ -1918,6 +2403,111 @@ export default function BookingPage() {
           </div>
         </div>
       </div>
+      {/* Forced Login Overlay if not logged in */}
+      {!authLoading && !user && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            background: "rgba(0,0,0,0.6)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1rem",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              width: "100%",
+              maxWidth: "425px",
+              borderRadius: "12px",
+              padding: "2.5rem 2rem",
+              fontFamily: "'Poppins', sans-serif",
+              boxShadow:
+                "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+              textAlign: "center",
+            }}
+          >
+            <h2
+              style={{
+                fontSize: "1.25rem",
+                fontWeight: 600,
+                color: "#1e1a14",
+                marginBottom: "0.5rem",
+              }}
+            >
+              Sign In to Book
+            </h2>
+            <p
+              style={{
+                fontSize: "0.875rem",
+                color: "rgba(30,26,20,0.6)",
+                marginBottom: "2rem",
+              }}
+            >
+              Welcome back! Please sign in to your account to continue booking
+              this trip.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.setItem(
+                  "booking_redirect_intent",
+                  `/book/${slug}`,
+                );
+                window.location.href = `${API_URL}/auth/google`;
+              }}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.5rem",
+                padding: "0.75rem",
+                border: "1px solid #e2e8f0",
+                borderRadius: "8px",
+                background: "#fff",
+                color: "#0f172a",
+                fontSize: "0.9rem",
+                fontWeight: 500,
+                cursor: "pointer",
+                transition: "background 0.2s",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "#f8fafc")
+              }
+              onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                style={{ width: "1.25rem", height: "1.25rem" }}
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  fill="#4285F4"
+                />
+                <path
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  fill="#34A853"
+                />
+                <path
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  fill="#FBBC05"
+                />
+                <path
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  fill="#EA4335"
+                />
+              </svg>
+              Continue with Google
+            </button>
+          </div>
+        </div>
+      )}
 
       <SiteFooter />
     </div>

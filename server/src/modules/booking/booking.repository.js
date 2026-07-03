@@ -48,7 +48,7 @@ export const getUserBookings = async (userId, skip, take) => {
 export const getAllBookings = async (skip, take) => {
   const [bookings, total] = await Promise.all([
     prisma.booking.findMany({
-      include: { trip: true, user: true, payments: true },
+      include: { trip: true, user: { include: { profile: true } }, payments: true },
       orderBy: { createdAt: "desc" },
       skip,
       take,
