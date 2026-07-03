@@ -22,8 +22,7 @@ export const createBooking = async (userId, data) => {
   }
 
   const hasGovtId =
-    user.profile.govtIdNumber ||
-    (user.profile.govtIdFrontImageUrl && user.profile.govtIdBackImageUrl);
+    user.profile.govtIdNumber || user.profile.govtIdImageUrl;
 
   if (!hasGovtId) {
     throw new ForbiddenError(

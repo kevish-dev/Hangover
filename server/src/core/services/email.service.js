@@ -6,22 +6,79 @@ const FROM = env.SMTP_FROM;
 /**
  * Send booking confirmation email
  */
-export const sendBookingConfirmedEmail = async ({ to, name, bookingRef, tripTitle, totalAmount, paymentType }) => {
+export const sendBookingConfirmedEmail = async ({ to, name, bookingRef, tripTitle, amountPaid, totalAmount, amountDue, paymentType, receiptNumber, invoiceDate, travelersCount }) => {
+  const dateStr = new Date(invoiceDate).toLocaleDateString("en-IN", {
+    day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+  });
+
   await transport.sendMail({
     from: FROM,
     to,
-    subject: `Booking Confirmed – ${tripTitle}`,
+    subject: `Booking Confirmed & Invoice – ${tripTitle}`,
     html: `
-      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9f9f9;border-radius:8px;">
-        <h2 style="color:#1a1a2e;">🎉 You're all set, ${name}!</h2>
-        <p>Your booking for <strong>${tripTitle}</strong> has been confirmed.</p>
-        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
-          <tr><td style="padding:8px;color:#555;">Booking Reference</td><td style="padding:8px;font-weight:bold;">${bookingRef}</td></tr>
-          <tr><td style="padding:8px;color:#555;">Amount Paid</td><td style="padding:8px;font-weight:bold;">₹${totalAmount}</td></tr>
-          <tr><td style="padding:8px;color:#555;">Payment Type</td><td style="padding:8px;">${paymentType}</td></tr>
+      <div style="font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;max-width:650px;margin:0 auto;padding:30px;background:#ffffff;border:1px solid #eaeaea;border-radius:12px;color:#333;">
+        <!-- Header -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #f0f0f0;padding-bottom:20px;margin-bottom:20px;">
+          <div>
+            <h1 style="color:#781216;margin:0;font-size:24px;letter-spacing:1px;text-transform:uppercase;">Hangover</h1>
+            <p style="margin:4px 0 0;font-size:12px;color:#777;">Trip Booking Invoice & Receipt</p>
+          </div>
+          <div style="text-align:right;">
+            <p style="margin:0;font-size:14px;font-weight:bold;color:#333;">INVOICE #${receiptNumber}</p>
+            <p style="margin:4px 0 0;font-size:12px;color:#777;">Date: ${dateStr}</p>
+          </div>
+        </div>
+
+        <!-- Greeting -->
+        <h2 style="font-size:18px;margin-bottom:15px;">🎉 You're all set, ${name}!</h2>
+        <p style="font-size:14px;line-height:1.6;color:#555;">Your booking for <strong>${tripTitle}</strong> has been successfully confirmed. Please find your invoice and payment details below.</p>
+
+        <!-- Booking Details -->
+        <div style="background:#fcfcfc;padding:20px;border-radius:8px;margin:25px 0;">
+          <h3 style="margin-top:0;font-size:15px;border-bottom:1px solid #eaeaea;padding-bottom:10px;margin-bottom:15px;">Booking Information</h3>
+          <table style="width:100%;font-size:14px;line-height:1.8;">
+            <tr><td style="color:#666;width:40%;">Booking Reference:</td><td style="font-weight:bold;color:#222;">${bookingRef}</td></tr>
+            <tr><td style="color:#666;">Trip Name:</td><td style="font-weight:bold;color:#222;">${tripTitle}</td></tr>
+            <tr><td style="color:#666;">Number of Travelers:</td><td style="font-weight:bold;color:#222;">${travelersCount}</td></tr>
+          </table>
+        </div>
+
+        <!-- Invoice Table -->
+        <h3 style="font-size:15px;margin-bottom:15px;">Payment Summary</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:30px;">
+          <thead>
+            <tr style="background:#f5f5f5;text-align:left;">
+              <th style="padding:12px;border:1px solid #ddd;">Description</th>
+              <th style="padding:12px;border:1px solid #ddd;text-align:right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding:12px;border:1px solid #ddd;color:#444;">${tripTitle} Package (x${travelersCount})</td>
+              <td style="padding:12px;border:1px solid #ddd;text-align:right;color:#444;">₹${Number(totalAmount).toLocaleString('en-IN')}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td style="padding:12px;border:1px solid #ddd;text-align:right;font-weight:bold;">Total Amount</td>
+              <td style="padding:12px;border:1px solid #ddd;text-align:right;font-weight:bold;">₹${Number(totalAmount).toLocaleString('en-IN')}</td>
+            </tr>
+            <tr style="background:#fdfdfd;">
+              <td style="padding:12px;border:1px solid #ddd;text-align:right;color:#781216;">Amount Paid (${paymentType})</td>
+              <td style="padding:12px;border:1px solid #ddd;text-align:right;font-weight:bold;color:#781216;">- ₹${Number(amountPaid).toLocaleString('en-IN')}</td>
+            </tr>
+            <tr style="background:#f4f4f4;">
+              <td style="padding:12px;border:1px solid #ddd;text-align:right;font-weight:bold;font-size:15px;">Balance Due</td>
+              <td style="padding:12px;border:1px solid #ddd;text-align:right;font-weight:bold;font-size:15px;">₹${Number(amountDue).toLocaleString('en-IN')}</td>
+            </tr>
+          </tfoot>
         </table>
-        <p style="color:#555;">We'll be in touch with more details closer to the trip date. If you have any questions, reply to this email.</p>
-        <p style="margin-top:24px;color:#999;font-size:12px;">Hangover Trips</p>
+
+        <!-- Footer Note -->
+        <div style="padding-top:20px;border-top:1px solid #eaeaea;text-align:center;">
+          <p style="font-size:13px;color:#666;line-height:1.5;">Thank you for choosing Hangover Trips!<br/>We'll be in touch with more details closer to the trip date. If you have any questions, simply reply to this email.</p>
+          <p style="margin-top:15px;color:#aaa;font-size:11px;">Hangover Trips • Contact: +91 98765 43210</p>
+        </div>
       </div>
     `,
   });

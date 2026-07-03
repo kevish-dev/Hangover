@@ -37,6 +37,8 @@ import {
   type ApiFaq,
 } from "../../lib/tripApi";
 import { SiteFooter } from "../components/site-footer";
+import { useAuth } from "../../contexts/AuthContext";
+import { apiClient } from "../../lib/axios";
 
 // ── "Not Available" inline label ──────────────────────────────────
 function NA({ text = "Not Available" }: { text?: string }) {
@@ -1071,9 +1073,11 @@ function DetailLoadingSkeleton() {
 
 export default function TripDetail() {
   const { slug } = useParams();
+  const { user } = useAuth();
   const [trip, setTrip] = useState<ApiTrip | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasBooked, setHasBooked] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
@@ -1088,6 +1092,21 @@ export default function TripDetail() {
       )
       .finally(() => setLoading(false));
   }, [slug]);
+
+  useEffect(() => {
+    if (user && trip) {
+      apiClient
+        .get(`/bookings/me?limit=100`)
+        .then((res) => {
+          const bookings = res.data?.data || [];
+          const isBooked = bookings.some(
+            (b: any) => b.tripId === trip.id && b.status !== "CANCELLED"
+          );
+          setHasBooked(isBooked);
+        })
+        .catch(console.error);
+    }
+  }, [user, trip]);
 
   if (loading) return <DetailLoadingSkeleton />;
 
@@ -1179,6 +1198,7 @@ export default function TripDetail() {
       stayItems={stayItems}
       itineraryDays={itineraryDays}
       waLink={waLink}
+      hasBooked={hasBooked}
     />
   );
 }
@@ -1425,6 +1445,7 @@ function TripDetailContent({
   stayItems,
   itineraryDays,
   waLink,
+  hasBooked,
 }: {
   trip: ApiTrip;
   heroImage: string;
@@ -1443,6 +1464,7 @@ function TripDetailContent({
     activities: { title: string }[];
   }[];
   waLink: string;
+  hasBooked: boolean;
 }) {
   const [heroIndex, setHeroIndex] = useState(0);
   const [lightbox, setLightbox] = useState<number | null>(null);
@@ -2311,39 +2333,64 @@ function TripDetailContent({
                 </div>
 
                 {/* Book button */}
-                <Link
-                  to={`/book/${trip.slug}`}
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    background: "#781216",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: "8px",
-                    padding: "14px",
-                    fontFamily: "'Poppins', sans-serif",
-                    fontSize: "0.82rem",
-                    fontWeight: 600,
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
-                    cursor: "pointer",
-                    marginBottom: "10px",
-                    transition: "background 0.25s ease",
-                    textDecoration: "none",
-                    textAlign: "center",
-                    boxSizing: "border-box",
-                  }}
-                  onMouseEnter={(e) =>
-                    ((e.currentTarget as HTMLAnchorElement).style.background =
-                      "#9a1a1f")
-                  }
-                  onMouseLeave={(e) =>
-                    ((e.currentTarget as HTMLAnchorElement).style.background =
-                      "#781216")
-                  }
-                >
-                  Book This Trip
-                </Link>
+                {hasBooked ? (
+                  <div
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      background: "rgba(30,26,20,0.1)",
+                      color: "rgba(30,26,20,0.5)",
+                      border: "1px solid rgba(30,26,20,0.1)",
+                      borderRadius: "8px",
+                      padding: "14px",
+                      fontFamily: "'Poppins', sans-serif",
+                      fontSize: "0.82rem",
+                      fontWeight: 600,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      cursor: "not-allowed",
+                      marginBottom: "10px",
+                      textAlign: "center",
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    Already Booked
+                  </div>
+                ) : (
+                  <Link
+                    to={`/book/${trip.slug}`}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      background: "#781216",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "8px",
+                      padding: "14px",
+                      fontFamily: "'Poppins', sans-serif",
+                      fontSize: "0.82rem",
+                      fontWeight: 600,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      cursor: "pointer",
+                      marginBottom: "10px",
+                      transition: "background 0.25s ease",
+                      textDecoration: "none",
+                      textAlign: "center",
+                      boxSizing: "border-box",
+                    }}
+                    onMouseEnter={(e) =>
+                      ((e.currentTarget as HTMLAnchorElement).style.background =
+                        "#9a1a1f")
+                    }
+                    onMouseLeave={(e) =>
+                      ((e.currentTarget as HTMLAnchorElement).style.background =
+                        "#781216")
+                    }
+                  >
+                    Book This Trip
+                  </Link>
+                )}
 
                 {/* WhatsApp button */}
                 <a

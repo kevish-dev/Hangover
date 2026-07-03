@@ -1,4 +1,4 @@
-import { createContext, useContext, ReactNode } from "react";
+import { createContext, useContext, ReactNode, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../lib/axios";
 
@@ -37,6 +37,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const user = data?.user || null;
+
+  useEffect(() => {
+    if (user) {
+      const intent = localStorage.getItem("booking_redirect_intent");
+      if (intent) {
+        localStorage.removeItem("booking_redirect_intent");
+        window.location.href = intent;
+      }
+    }
+  }, [user]);
 
   const logout = async () => {
     try {

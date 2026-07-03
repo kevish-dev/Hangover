@@ -41,7 +41,7 @@ export const getInquiryById = async (req, res, next) => {
 
 export const resolveInquiry = async (req, res, next) => {
   try {
-    const { adminNotes } = req.body;
+    const { adminNotes } = req.body || {};
     const inquiry = await inquiryService.resolveInquiry(req.params.id, req.user.id, adminNotes);
     res.status(200).json(inquiry);
   } catch (error) {

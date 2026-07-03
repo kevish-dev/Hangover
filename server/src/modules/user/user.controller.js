@@ -26,18 +26,16 @@ export const uploadGovtId = async (req, res, next) => {
       return res.status(400).json({ message: "govtIdType is required" });
     }
 
-    const frontImageBuffer = req.files?.frontImage?.[0]?.buffer;
-    const backImageBuffer = req.files?.backImage?.[0]?.buffer;
+    const imageBuffer = req.file?.buffer;
 
-    if (!frontImageBuffer && !backImageBuffer) {
-      return res.status(400).json({ message: "At least one image (front or back) is required" });
+    if (!imageBuffer) {
+      return res.status(400).json({ message: "Govt ID image is required" });
     }
 
-    const profile = await userService.uploadGovtIdImages(
+    const profile = await userService.uploadGovtIdImage(
       req.user.id,
       govtIdType,
-      frontImageBuffer,
-      backImageBuffer
+      imageBuffer
     );
     
     res.status(200).json({ message: "Govt ID uploaded successfully", profile });

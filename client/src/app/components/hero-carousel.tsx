@@ -16,11 +16,7 @@ interface FeaturedTrip {
   bannerImages: string; // first banner image URL
 }
 
-const API_V2_URL =
-  (import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1").replace(
-    /\/api\/v1$/,
-    "/api/v2"
-  );
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 
 // Hardcoded fallback in case no featured trips exist
 const FALLBACK_TRIPS: FeaturedTrip[] = [
@@ -48,7 +44,7 @@ export function HeroCarousel() {
     let cancelled = false;
     const fetchFeatured = async () => {
       try {
-        const res = await axios.get(`${API_V2_URL}/trips`, {
+        const res = await axios.get(`${API_URL}/trips/featured`, {
           withCredentials: true,
         });
         const data = res.data?.result?.data;

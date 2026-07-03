@@ -14,6 +14,7 @@ router.use("/:tripId/faqs", faqRoutes);
 
 
 // Public routes (with optional auth for admin view)
+router.get("/featured", optionalAuth, tripController.getFeaturedTrips);
 router.get("/", optionalAuth, tripController.getTrips);
 router.get("/:id", optionalAuth, tripController.getTripById);
 
