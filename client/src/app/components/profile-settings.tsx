@@ -83,8 +83,7 @@ export function ProfileSettings() {
 
   // Govt ID local state
   const [govtIdType, setGovtIdType] = useState<"AADHAAR" | "PASSPORT">("AADHAAR");
-  const [frontFile, setFrontFile] = useState<File | null>(null);
-  const [backFile, setBackFile] = useState<File | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   useEffect(() => {
     getMyProfile()
@@ -132,21 +131,19 @@ export function ProfileSettings() {
   };
 
   const handleUploadGovtId = async () => {
-    if (!frontFile && !backFile) {
-      toast.error("Please select at least one image to upload.");
+    if (!imageFile) {
+      toast.error("Please select an image to upload.");
       return;
     }
     setUploading(true);
     try {
-      const updated = await uploadGovtId(govtIdType, frontFile, backFile);
+      const updated = await uploadGovtId(govtIdType, imageFile);
       setProfile((prev) => ({
         ...prev,
         govtIdType: updated.govtIdType,
-        govtIdFrontImageUrl: updated.govtIdFrontImageUrl,
-        govtIdBackImageUrl: updated.govtIdBackImageUrl,
+        govtIdImageUrl: updated.govtIdImageUrl,
       }));
-      setFrontFile(null);
-      setBackFile(null);
+      setImageFile(null);
       toast.success("Government ID uploaded successfully!");
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Failed to upload Government ID");
@@ -361,8 +358,7 @@ export function ProfileSettings() {
             </select>
           </Field>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }} className="grid-cols-1 md:grid-cols-2">
-            {/* Front Image */}
+          <div style={{ display: "flex", justifyContent: "center" }}>
             <div
               style={{
                 border: "2px dashed rgba(30,26,20,0.15)",
@@ -375,19 +371,21 @@ export function ProfileSettings() {
                 gap: "10px",
                 position: "relative",
                 background: "#faf8f4",
+                width: "100%",
+                maxWidth: "400px",
               }}
             >
-              {profile.govtIdFrontImageUrl ? (
+              {profile.govtIdImageUrl ? (
                 <>
-                  <div style={{ width: "100%", height: "140px", borderRadius: "8px", overflow: "hidden", marginBottom: "10px" }}>
-                    <img src={profile.govtIdFrontImageUrl} alt="Front ID" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <div style={{ width: "100%", height: "200px", borderRadius: "8px", overflow: "hidden", marginBottom: "10px" }}>
+                    <img src={profile.govtIdImageUrl} alt="Government ID" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   </div>
                   <span style={{ fontSize: "0.75rem", color: "#228b22", fontWeight: 500 }}>✓ Uploaded</span>
                 </>
               ) : (
                 <>
-                  <ImageIcon size={32} color="rgba(30,26,20,0.2)" />
-                  <span style={{ fontSize: "0.85rem", color: "rgba(30,26,20,0.6)" }}>Front Side</span>
+                  <ImageIcon size={40} color="rgba(30,26,20,0.2)" />
+                  <span style={{ fontSize: "0.85rem", color: "rgba(30,26,20,0.6)" }}>ID Image</span>
                 </>
               )}
               <label
@@ -401,63 +399,12 @@ export function ProfileSettings() {
                   marginTop: "8px",
                 }}
               >
-                {frontFile ? frontFile.name : (profile.govtIdFrontImageUrl ? "Replace Image" : "Select Image")}
+                {imageFile ? imageFile.name : (profile.govtIdImageUrl ? "Replace Image" : "Select Image")}
                 <input
                   type="file"
                   accept="image/jpeg, image/png, image/webp"
                   onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) setFrontFile(e.target.files[0]);
-                  }}
-                  style={{ display: "none" }}
-                />
-              </label>
-            </div>
-
-            {/* Back Image */}
-            <div
-              style={{
-                border: "2px dashed rgba(30,26,20,0.15)",
-                borderRadius: "12px",
-                padding: "20px",
-                textAlign: "center",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "10px",
-                position: "relative",
-                background: "#faf8f4",
-              }}
-            >
-              {profile.govtIdBackImageUrl ? (
-                <>
-                  <div style={{ width: "100%", height: "140px", borderRadius: "8px", overflow: "hidden", marginBottom: "10px" }}>
-                    <img src={profile.govtIdBackImageUrl} alt="Back ID" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  </div>
-                  <span style={{ fontSize: "0.75rem", color: "#228b22", fontWeight: 500 }}>✓ Uploaded</span>
-                </>
-              ) : (
-                <>
-                  <ImageIcon size={32} color="rgba(30,26,20,0.2)" />
-                  <span style={{ fontSize: "0.85rem", color: "rgba(30,26,20,0.6)" }}>Back Side</span>
-                </>
-              )}
-              <label
-                style={{
-                  background: "#ffffff",
-                  border: "1px solid rgba(30,26,20,0.2)",
-                  padding: "6px 16px",
-                  borderRadius: "6px",
-                  fontSize: "0.75rem",
-                  cursor: "pointer",
-                  marginTop: "8px",
-                }}
-              >
-                {backFile ? backFile.name : (profile.govtIdBackImageUrl ? "Replace Image" : "Select Image")}
-                <input
-                  type="file"
-                  accept="image/jpeg, image/png, image/webp"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) setBackFile(e.target.files[0]);
+                    if (e.target.files && e.target.files[0]) setImageFile(e.target.files[0]);
                   }}
                   style={{ display: "none" }}
                 />
@@ -465,7 +412,7 @@ export function ProfileSettings() {
             </div>
           </div>
 
-          {(frontFile || backFile) && (
+          {imageFile && (
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "10px" }}>
               <button
                 onClick={handleUploadGovtId}
@@ -487,7 +434,7 @@ export function ProfileSettings() {
                 }}
               >
                 {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-                {uploading ? "Uploading..." : "Upload Selected Images"}
+                {uploading ? "Uploading..." : "Upload Selected Image"}
               </button>
             </div>
           )}

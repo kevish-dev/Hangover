@@ -109,8 +109,7 @@ export interface UserProfile {
   medicalNotes: string | null;
   govtIdType: "AADHAAR" | "PASSPORT" | null;
   govtIdNumber: string | null;
-  govtIdFrontImageUrl: string | null;
-  govtIdBackImageUrl: string | null;
+  govtIdImageUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -127,11 +126,10 @@ export async function updateMyProfile(data: Partial<UserProfile>): Promise<UserP
   return res.data.profile;
 }
 
-export async function uploadGovtId(govtIdType: string, frontImage?: File | null, backImage?: File | null): Promise<UserProfile> {
+export async function uploadGovtId(govtIdType: string, image?: File | null): Promise<UserProfile> {
   const formData = new FormData();
   formData.append("govtIdType", govtIdType);
-  if (frontImage) formData.append("frontImage", frontImage);
-  if (backImage) formData.append("backImage", backImage);
+  if (image) formData.append("image", image);
 
   const res = await apiClient.post<{ message: string; profile: UserProfile }>("/users/me/govt-id", formData, {
     headers: {
