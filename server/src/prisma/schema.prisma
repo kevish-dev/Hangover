@@ -62,17 +62,17 @@ model Trip {
   location            String
   bannerImages        String[]
   duration            Int
-  groupSizeMin        Int
-  groupSizeMax        Int
+  groupSizeMin        Int             @default(1)
+  groupSizeMax        Int             @default(10)
   difficultyLevel     String
   bestTimeToVisit     String
   maxAltitude         Int
   overview            String
-  highlights          String[]
+  highlights          Json            @default("[]")
   galleryImages       String[]
   inclusions          String[]
   exclusions          String[]
-  stayTransportImages String[]
+  stayTransportImages Json            @default("[]")
   price               Decimal         @db.Decimal(10, 2)
   tokenAmount         Decimal         @db.Decimal(10, 2)
   capacity            Int
@@ -82,6 +82,8 @@ model Trip {
   tripType            TripType
   isActive            Boolean         @default(true)
   isFeatured          Boolean         @default(false)
+  isPublished         Boolean         @default(false)
+  destinationId       String?
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
   bookings            Booking[]
@@ -90,12 +92,28 @@ model Trip {
   itineraries         Itinerary[]
   TripFormField       TripFormField[]
   tripTags            TripTag[]       @relation("TripToTripTag")
+  destination         Destination?    @relation(fields: [destinationId], references: [id])
 
   @@index([tripType])
   @@index([startDate])
   @@index([isActive])
   @@index([isFeatured])
+  @@index([isPublished])
   @@index([location])
+  @@index([destinationId])
+}
+
+model Destination {
+  id          String   @id @default(uuid())
+  name        String
+  state       String
+  subheading  String?
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  trips       Trip[]
+
+  @@index([isPublished])
 }
 
 model Booking {
