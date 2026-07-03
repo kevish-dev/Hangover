@@ -5,6 +5,7 @@ import { useState, useEffect, forwardRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router";
 import { LoginDialog } from "./auth/LoginDialog";
 import { useAuth } from "../../contexts/AuthContext";
+import { User } from "lucide-react";
 
 function NavLink({ label, scrolled }: { label: string; scrolled: boolean }) {
   const [hovered, setHovered] = useState(false);
@@ -202,12 +203,37 @@ export function Navbar() {
         {isLoading ? (
           <AuthButton label="Loading..." scrolled={scrolled} />
         ) : user ? (
-          <>
-            {user.role === "ADMIN" && (
-              <AuthButton label="Dashboard" onClick={() => navigate("/dashboard")} scrolled={scrolled} />
-            )}
-            <AuthButton label="Logout" onClick={logout} scrolled={scrolled} />
-          </>
+          <button
+            onClick={() => {
+              if (user.role === "ADMIN") {
+                navigate("/dashboard");
+              } else {
+                navigate("/profile");
+              }
+            }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "40px",
+              height: "40px",
+              borderRadius: "50%",
+              background: scrolled ? "rgba(30,26,20,0.05)" : "rgba(255,255,255,0.1)",
+              color: scrolled ? "#1e1a14" : "#ffffff",
+              border: `1px solid ${scrolled ? "rgba(30,26,20,0.1)" : "rgba(255,255,255,0.2)"}`,
+              cursor: "pointer",
+              transition: "all 0.3s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = scrolled ? "rgba(30,26,20,0.1)" : "rgba(255,255,255,0.2)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = scrolled ? "rgba(30,26,20,0.05)" : "rgba(255,255,255,0.1)";
+            }}
+            title={user.role === "ADMIN" ? "Admin Dashboard" : "My Profile"}
+          >
+            <User size={20} />
+          </button>
         ) : (
           <LoginDialog>
             <AuthButton label="Sign In" scrolled={scrolled} />

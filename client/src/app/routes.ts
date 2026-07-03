@@ -12,6 +12,7 @@ import AdminTripsPage from "./pages/admin/trips";
 import AdminDestinationsPage from "./pages/admin/destinations";
 import AdminPaymentsPage from "./pages/admin/payments";
 import AdminBookingsPage from "./pages/admin/bookings";
+import ProfilePage from "./pages/profile";
 
 
 export const router = createBrowserRouter([
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
       { path: "festivals", Component: FestivalsPage },
       { path: "book/:slug", Component: BookingPage },
       { path: "about", Component: AboutPage },
+      { path: "profile", Component: ProfilePage },
     ],
   },
   {

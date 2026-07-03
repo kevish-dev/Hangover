@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../lib/axios";
 
 export interface User {
+  name: string;
   id: string;
   email: string;
   googleId: string;

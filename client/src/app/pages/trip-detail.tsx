@@ -405,8 +405,10 @@ function SectionNav() {
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       style={{
-        position: "sticky",
+        position: "fixed",
         top: "72px",
+        left: 0,
+        right: 0,
         zIndex: 80,
         background: "rgba(245,240,230,0.96)",
         backdropFilter: "blur(16px)",
