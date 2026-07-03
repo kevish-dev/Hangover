@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 
 const STATS = [
-  { value: 100, suffix: "+", label: "Travelers Hosted", sublabel: "and counting" },
-  { value: 12,  suffix: "+", label: "Trips Conducted", sublabel: "across India" },
-  { value: 3,   suffix: "+", label: "Institutes Collaborated", sublabel: "edu partnerships" },
-  { value: 4.9, suffix: "/5", label: "Customer Rating", sublabel: "average score", decimals: 1 },
-  { value: 10,  suffix: "+", label: "Solo Travelers", sublabel: "found their tribe" },
-  { value: 90,  suffix: "+", label: "Group Travelers", sublabel: "lifetime memories" },
+  { value: 100, suffix: "+", label: "Travellers", sublabel: "and counting" },
+  { value: 15,  suffix: "+", label: "Trips Completed", sublabel: "across India" },
+  { value: 5,   suffix: "",  label: "Institutes Collaborated", sublabel: "edu partnerships" },
+  { value: 5,   suffix: "/5", label: "Customer Rating", sublabel: "average score" },
+  { value: 10,  suffix: "+", label: "Solo Travellers", sublabel: "found their tribe" },
+  { value: 90,  suffix: "+", label: "Group Travellers", sublabel: "lifetime memories" },
 ];
 
 /* ── animated counter hook ─────────────────────────────────────── */
@@ -260,7 +260,7 @@ export function OurFootprints() {
               </svg>
             ))}
             <span style={{ color: "rgba(30,26,20,0.55)", fontSize: "0.72rem", letterSpacing: "0.1em", fontWeight: 400 }}>
-              4.9 / 5 — Verified traveler reviews
+              5 / 5 — Verified traveler reviews
             </span>
           </div>
 
