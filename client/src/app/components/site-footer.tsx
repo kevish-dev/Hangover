@@ -148,11 +148,19 @@ export function SiteFooter() {
               style={{ display: "flex", flexDirection: "column", gap: "14px" }}
             >
               {[
-                { icon: Mail, text: "hello@hangovertrails.com" },
-                { icon: Phone, text: "+91 98765 43210" },
-                { icon: MapPin, text: "Northeast India & Beyond" },
-              ].map(({ icon: Icon, text }) => (
-                <div key={text} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                { icon: Mail, text: "hello@hangovertrails.com", href: "mailto:hello@hangovertrails.com" },
+                { icon: Phone, text: "+91 84159 29069", href: "tel:+918415929069" },
+                { icon: MapPin, text: "Northeast India & Beyond", href: "https://maps.app.goo.gl/D1eC1BV9xyoP8iP56?g_st=aw" },
+              ].map(({ icon: Icon, text, href }) => (
+                <a
+                  key={text}
+                  href={href}
+                  target={href.startsWith("http") ? "_blank" : undefined}
+                  rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
+                  style={{ display: "flex", alignItems: "center", gap: "12px", textDecoration: "none", cursor: "pointer" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.7")}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+                >
                   <div style={{
                     width: "32px", height: "32px", borderRadius: "50%",
                     background: "rgba(184,148,58,0.12)",
@@ -162,7 +170,7 @@ export function SiteFooter() {
                     <Icon size={13} color="#b8943a" strokeWidth={1.5} />
                   </div>
                   <span style={{ color: "rgba(242,237,228,0.68)", fontSize: "0.82rem", fontWeight: 300 }}>{text}</span>
-                </div>
+                </a>
               ))}
             </motion.div>
 
@@ -273,7 +281,7 @@ export function SiteFooter() {
                       <label style={labelStyle}>Phone</label>
                       <input
                         type="tel"
-                        placeholder="+91 98765 43210"
+                        placeholder="+91 84159 29069"
                         value={form.phone}
                         onChange={(e) => setForm({ ...form, phone: e.target.value })}
                         onFocus={() => setFocused("phone")}

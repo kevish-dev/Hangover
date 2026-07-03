@@ -1181,6 +1181,235 @@ export default function TripDetail() {
   );
 }
 
+function HighlightAccordionPanel({
+  highlight,
+  index,
+  isActive,
+  onEnter,
+}: {
+  highlight: { text: string; imageUrl: string };
+  index: number;
+  isActive: boolean;
+  onEnter: () => void;
+}) {
+  return (
+    <motion.div
+      onMouseEnter={onEnter}
+      animate={{ flex: isActive ? 5 : 1 }}
+      transition={{ duration: 0.65, ease: [0.25, 0.46, 0.45, 0.94] }}
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        cursor: "pointer",
+        borderRadius: "4px",
+        minWidth: 0,
+      }}
+    >
+      <img
+        src={highlight.imageUrl}
+        alt={`Highlight ${index + 1}`}
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          objectPosition: "center",
+          transition: "transform 0.65s ease",
+          transform: isActive ? "scale(1.04)" : "scale(1)",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: isActive
+            ? "linear-gradient(to top, rgba(11,11,11,0.85) 0%, rgba(11,11,11,0.2) 60%, rgba(11,11,11,0.05) 100%)"
+            : "linear-gradient(to top, rgba(11,11,11,0.8) 0%, rgba(11,11,11,0.5) 100%)",
+          transition: "background 0.5s ease",
+        }}
+      />
+      <motion.div
+        animate={{ opacity: isActive ? 0 : 1 }}
+        transition={{ duration: 0.25 }}
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "center",
+          paddingBottom: "16px",
+          pointerEvents: "none",
+        }}
+      >
+        <span
+          style={{
+            color: "rgba(242,237,228,0.9)",
+            fontSize: "0.75rem",
+            fontWeight: 500,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            writingMode: "vertical-rl",
+            transform: "rotate(180deg)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {`Highlight 0${index + 1}`}
+        </span>
+      </motion.div>
+      <motion.div
+        animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 12 }}
+        transition={{ duration: 0.45, delay: isActive ? 0.2 : 0 }}
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: "20px 16px",
+        }}
+      >
+        <p style={{ color: "#fff", fontSize: "0.82rem", fontWeight: 300, lineHeight: 1.5, margin: 0 }}>
+          {highlight.text}
+        </p>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function HighlightMobilePanel({
+  highlight,
+  index,
+  isActive,
+  onToggle,
+}: {
+  highlight: { text: string; imageUrl: string };
+  index: number;
+  isActive: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div
+      onClick={onToggle}
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: "4px",
+        cursor: "pointer",
+        height: isActive ? "220px" : "56px",
+        transition: "height 0.55s cubic-bezier(0.25,0.46,0.45,0.94)",
+      }}
+    >
+      <img
+        src={highlight.imageUrl}
+        alt={`Highlight ${index + 1}`}
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "linear-gradient(to top, rgba(11,11,11,0.85) 0%, rgba(11,11,11,0.4) 100%)",
+        }}
+      />
+      {!isActive && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 16px",
+          }}
+        >
+          <span
+            style={{
+              color: "#f2ede4",
+              fontSize: "0.85rem",
+              fontWeight: 500,
+              letterSpacing: "0.04em",
+            }}
+          >
+            Highlight {`0${index + 1}`}
+          </span>
+          <ChevronRight size={14} color="rgba(242,237,228,0.6)" />
+        </div>
+      )}
+      {isActive && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: "20px 16px",
+          }}
+        >
+          <p style={{ color: "#fff", fontSize: "0.85rem", fontWeight: 300, lineHeight: 1.5, margin: 0 }}>
+            {highlight.text}
+          </p>
+        </div>
+      )}
+      <motion.div
+        animate={{ scaleX: isActive ? 1 : 0 }}
+        transition={{ duration: 0.55, ease: [0.25, 0.46, 0.45, 0.94] }}
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: "2.5px",
+          background: "#b8943a",
+          transformOrigin: "left",
+        }}
+      />
+    </div>
+  );
+}
+
+function TripHighlightsAccordion({ highlights }: { highlights: any[] }) {
+  const [active, setActive] = useState(0);
+
+  return (
+    <div style={{ width: "100%" }}>
+      {/* Desktop */}
+      <div
+        className="hidden md:flex"
+        style={{ height: "320px", gap: "6px", overflow: "hidden" }}
+      >
+        {highlights.map((h, index) => (
+          <HighlightAccordionPanel
+            key={index}
+            highlight={h}
+            index={index}
+            isActive={active === index}
+            onEnter={() => setActive(index)}
+          />
+        ))}
+      </div>
+
+      {/* Mobile */}
+      <div className="flex flex-col md:hidden" style={{ gap: "6px" }}>
+        {highlights.map((h, index) => (
+          <HighlightMobilePanel
+            key={index}
+            highlight={h}
+            index={index}
+            isActive={active === index}
+            onToggle={() => setActive(active === index ? -1 : index)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TripDetailContent({
   trip,
   heroImage,
@@ -1787,59 +2016,7 @@ function TripDetailContent({
             <div id="highlights">
               <SectionTitle>Trip Highlights</SectionTitle>
               {trip.highlights && trip.highlights.length > 0 ? (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(2, 1fr)",
-                    gap: "10px",
-                  }}
-                  className="grid-cols-2 sm:grid-cols-3"
-                >
-                  {trip.highlights.map((h: any, i: number) => (
-                    <div
-                      key={i}
-                      style={{
-                        borderRadius: "8px",
-                        overflow: "hidden",
-                        position: "relative",
-                        aspectRatio: "4/3",
-                      }}
-                    >
-                      <img
-                        src={h.imageUrl}
-                        alt={`Highlight ${i + 1}`}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                        }}
-                      />
-                      <div
-                        style={{
-                          position: "absolute",
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          padding: "24px 12px 10px",
-                          background:
-                            "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%)",
-                          color: "#fff",
-                        }}
-                      >
-                        <p
-                          style={{
-                            margin: 0,
-                            fontSize: "0.75rem",
-                            fontWeight: 400,
-                            lineHeight: 1.3,
-                          }}
-                        >
-                          {h.text}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <TripHighlightsAccordion highlights={trip.highlights} />
               ) : (
                 <p
                   style={{
