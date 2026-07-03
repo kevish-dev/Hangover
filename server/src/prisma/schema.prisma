@@ -56,77 +56,77 @@ model UserProfile {
 }
 
 model Trip {
-  id                  String       @id @default(uuid())
+  id                  String          @id @default(uuid())
   title               String
-  slug                String       @unique
+  slug                String          @unique
   location            String
   bannerImages        String[]
   duration            Int
+  groupSizeMin        Int
+  groupSizeMax        Int
   difficultyLevel     String
   bestTimeToVisit     String
-  maxAltitude         Int?
+  maxAltitude         Int
   overview            String
+  highlights          String[]
+  galleryImages       String[]
   inclusions          String[]
   exclusions          String[]
-  price               Decimal      @db.Decimal(10, 2)
-  tokenAmount         Decimal      @db.Decimal(10, 2)
+  stayTransportImages String[]
+  price               Decimal         @db.Decimal(10, 2)
+  tokenAmount         Decimal         @db.Decimal(10, 2)
   capacity            Int
-  filledSpots         Int          @default(0)
+  filledSpots         Int             @default(0)
   startDate           DateTime
   endDate             DateTime
   tripType            TripType
-  isActive            Boolean      @default(true)
-  isPublished         Boolean      @default(false)
-  isFeatured          Boolean      @default(false)
-  destinationId       String?
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
-  stayTransportImages Json
-  highlights          Json         @default("[]")
+  isActive            Boolean         @default(true)
+  isFeatured          Boolean         @default(false)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
   bookings            Booking[]
   faqs                FAQ[]
   inquiries           Inquiry[]
   itineraries         Itinerary[]
-  destination         Destination? @relation(fields: [destinationId], references: [id])
-  tripTags            TripTag[]    @relation("TripToTripTag")
+  TripFormField       TripFormField[]
+  tripTags            TripTag[]       @relation("TripToTripTag")
 
   @@index([tripType])
   @@index([startDate])
   @@index([isActive])
   @@index([isFeatured])
   @@index([location])
-  @@index([createdAt])
-  @@index([isPublished])
 }
 
 model Booking {
-  id                 String            @id @default(uuid())
-  bookingReference   String            @unique
-  userId             String
-  tripId             String
-  status             BookingStatus     @default(PENDING)
-  paymentStatus      PaymentStatus     @default(PENDING)
-  numberOfTravelers  Int               @default(1)
-  totalAmount        Decimal           @db.Decimal(10, 2)
-  tokenAmount        Decimal           @db.Decimal(10, 2)
-  amountPaid         Decimal           @default(0) @db.Decimal(10, 2)
-  amountDue          Decimal           @db.Decimal(10, 2)
-  initialPaymentType PaymentType
-  balanceDueDate     DateTime?
-  reservedAt         DateTime?
-  confirmedAt        DateTime?
-  cancelledAt        DateTime?
-  completedAt        DateTime?
-  cancellationReason String?
-  cancelledBy        String?
-  specialRequests    String?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  trip               Trip              @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  user               User              @relation(fields: [userId], references: [id])
-  payments           Payment[]
-  paymentIntents     PaymentIntent[]
-  reminders          PaymentReminder[]
+  id                  String                @id @default(uuid())
+  bookingReference    String                @unique
+  userId              String
+  tripId              String
+  status              BookingStatus         @default(PENDING)
+  paymentStatus       PaymentStatus         @default(PENDING)
+  numberOfTravelers   Int                   @default(1)
+  totalAmount         Decimal               @db.Decimal(10, 2)
+  tokenAmount         Decimal               @db.Decimal(10, 2)
+  amountPaid          Decimal               @default(0) @db.Decimal(10, 2)
+  amountDue           Decimal               @db.Decimal(10, 2)
+  initialPaymentType  PaymentType
+  balanceDueDate      DateTime?
+  reservedAt          DateTime?
+  confirmedAt         DateTime?
+  cancelledAt         DateTime?
+  completedAt         DateTime?
+  cancellationReason  String?
+  cancelledBy         String?
+  specialRequests     String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  trip                Trip                  @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user                User                  @relation(fields: [userId], references: [id])
+  BookingFormResponse BookingFormResponse[]
+  payments            Payment[]
+  paymentIntents      PaymentIntent[]
+  reminders           PaymentReminder[]
 
   @@unique([userId, tripId])
   @@index([tripId])
@@ -138,9 +138,9 @@ model Booking {
 
 model Itinerary {
   id          String         @id @default(uuid())
+  tripId      String?
   title       String
   description String?
-  tripId      String?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   trip        Trip?          @relation(fields: [tripId], references: [id])
@@ -333,17 +333,45 @@ model Refund {
   @@index([createdAt])
 }
 
-model Destination {
-  id          String   @id @default(uuid())
-  name        String
-  state       String
-  subheading  String?
-  isPublished Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  trips       Trip[]
+model BookingFormResponse {
+  id            String        @id
+  bookingId     String
+  fieldId       String
+  value         String?
+  fileUrl       String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime
+  Booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  TripFormField TripFormField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
 
-  @@index([name])
+  @@unique([bookingId, fieldId])
+  @@index([bookingId])
+  @@index([fieldId])
+}
+
+model TripFormField {
+  id                  String                @id
+  tripId              String
+  label               String
+  fieldKey            String
+  fieldType           FormFieldType
+  placeholder         String?
+  helpText            String?
+  options             String[]
+  isRequired          Boolean               @default(false)
+  order               Int                   @default(0)
+  validationRegex     String?
+  minValue            Int?
+  maxValue            Int?
+  isActive            Boolean               @default(true)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  BookingFormResponse BookingFormResponse[]
+  Trip                Trip                  @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, fieldKey])
+  @@index([order])
+  @@index([tripId])
 }
 
 enum UserRole {
@@ -439,4 +467,18 @@ enum RefundStatus {
   PENDING
   SUCCESS
   FAILED
+}
+
+enum FormFieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  EMAIL
+  PHONE
+  DATE
+  SELECT
+  MULTI_SELECT
+  CHECKBOX
+  RADIO
+  FILE_UPLOAD
 }
