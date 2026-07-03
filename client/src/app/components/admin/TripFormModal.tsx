@@ -199,30 +199,38 @@ export function TripFormModal({
                 question: f.question,
                 answer: f.answer,
               }))
-            : [{ question: "", answer: "" }],
+            : [],
           isPublished: trip.isPublished || false,
         });
 
         // Initialize Highlight items
+        let parsedHighlights = trip.highlights || [];
+        if (typeof parsedHighlights === "string") {
+          try { parsedHighlights = JSON.parse(parsedHighlights); } catch(e) { parsedHighlights = []; }
+        }
         setHighlightItems(
-          trip.highlights?.map((item: any) => ({
+          Array.isArray(parsedHighlights) ? parsedHighlights.map((item: any) => ({
             id: Math.random().toString(),
             text: item.text || "",
             type: "EXISTING",
             url: item.imageUrl,
             preview: item.imageUrl,
-          })) || [],
+          })) : []
         );
 
         // Initialize Stay items
+        let parsedStay = trip.stayTransportImages || [];
+        if (typeof parsedStay === "string") {
+          try { parsedStay = JSON.parse(parsedStay); } catch(e) { parsedStay = []; }
+        }
         setStayItems(
-          trip.stayTransportImages?.map((item: any) => ({
+          Array.isArray(parsedStay) ? parsedStay.map((item: any) => ({
             id: Math.random().toString(),
             text: item.text || "",
             type: "EXISTING",
             url: item.imageUrl,
             preview: item.imageUrl,
-          })) || [],
+          })) : []
         );
       } else {
         form.reset({
@@ -245,11 +253,11 @@ export function TripFormModal({
           isPublished: false,
         });
         setStayItems([]);
+        setHighlightItems([]);
       }
       setStep(0);
       setImages([]);
       setImagePreviews([]);
-      setHighlightItems([]);
     }
   }, [trip, open, form]);
 
@@ -305,23 +313,6 @@ export function TripFormModal({
     });
   };
 
-  const handleGalleryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files);
-      setGalleryImages((prev) => [...prev, ...newFiles]);
-      const newPreviews = newFiles.map((file) => URL.createObjectURL(file));
-      setGalleryPreviews((prev) => [...prev, ...newPreviews]);
-    }
-    e.target.value = "";
-  };
-
-  const removeGalleryImage = (index: number) => {
-    setGalleryImages((prev) => prev.filter((_, i) => i !== index));
-    setGalleryPreviews((prev) => {
-      URL.revokeObjectURL(prev[index]);
-      return prev.filter((_, i) => i !== index);
-    });
-  };
 
   // --- Highlights Handlers ---
   const addHighlightItem = () => {

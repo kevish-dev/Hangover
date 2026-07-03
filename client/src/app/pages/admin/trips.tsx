@@ -266,9 +266,19 @@ export default function AdminTripsPage() {
     setIsModalOpen(true);
   };
 
-  const openEditModal = (trip: any) => {
-    setEditingTrip(trip);
-    setIsModalOpen(true);
+  const openEditModal = async (trip: any) => {
+    setProcessingId(trip.id);
+    setProcessingAction("edit" as any);
+    try {
+      const res = await apiClient.get(`/trips/${trip.id}`);
+      setEditingTrip(res.data);
+      setIsModalOpen(true);
+    } catch (error) {
+      toast.error("Failed to fetch full trip details");
+    } finally {
+      setProcessingId(null);
+      setProcessingAction(null);
+    }
   };
 
   const toggleBookings = (tripId: string) => {
@@ -370,7 +380,12 @@ export default function AdminTripsPage() {
                     disabled={processingId === trip.id}
                     className="text-xs font-medium text-gray-500 hover:text-[#c8a96e] transition-colors flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-50 border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Edit2 className="w-3.5 h-3.5" /> Edit
+                    {processingId === trip.id && processingAction === ("edit" as any) ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Edit2 className="w-3.5 h-3.5" />
+                    )}
+                    Edit
                   </button>
                   <button
                     onClick={() => handleDelete(trip.id)}

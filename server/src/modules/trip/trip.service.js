@@ -50,7 +50,7 @@ export const createTrip = async (data) => {
     const start = new Date(data.startDate);
     const end = new Date(data.endDate);
     const diffTime = Math.abs(end - start);
-    data.duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    data.duration = diffTime
   }
   return tripRepo.create(data);
 };
@@ -68,7 +68,7 @@ export const updateTrip = async (id, data) => {
       const s = new Date(start);
       const e = new Date(end);
       const diffTime = Math.abs(e - s);
-      data.duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      data.duration = diffTime
     }
   }
   return tripRepo.update(id, data);

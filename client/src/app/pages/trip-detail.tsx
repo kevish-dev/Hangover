@@ -2015,20 +2015,26 @@ function TripDetailContent({
             {/* Highlights */}
             <div id="highlights">
               <SectionTitle>Trip Highlights</SectionTitle>
-              {trip.highlights && trip.highlights.length > 0 ? (
-                <TripHighlightsAccordion highlights={trip.highlights} />
-              ) : (
-                <p
-                  style={{
-                    color: "#c0392b",
-                    fontSize: "0.85rem",
-                    fontWeight: 500,
-                    fontStyle: "italic",
-                  }}
-                >
-                  Not Available
-                </p>
-              )}
+              {(() => {
+                let h = trip.highlights || [];
+                if (typeof h === 'string') {
+                  try { h = JSON.parse(h); } catch(e) { h = []; }
+                }
+                return h && h.length > 0 ? (
+                  <TripHighlightsAccordion highlights={h} />
+                ) : (
+                  <p
+                    style={{
+                      color: "#c0392b",
+                      fontSize: "0.85rem",
+                      fontWeight: 500,
+                      fontStyle: "italic",
+                    }}
+                  >
+                    Not Available
+                  </p>
+                );
+              })()}
             </div>
 
             {/* Itinerary */}
