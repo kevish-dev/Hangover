@@ -280,7 +280,7 @@ export function HeroCarousel() {
 
       {/* HERO CONTENT */}
       <div className="absolute inset-0 z-30 flex items-center">
-        <div className="px-10 md:px-16 lg:px-24 max-w-2xl">
+        <div className="px-6 md:px-10 lg:px-12 max-w-2xl">
           <AnimatePresence mode="wait">
             <motion.div
               key={slide.id}
