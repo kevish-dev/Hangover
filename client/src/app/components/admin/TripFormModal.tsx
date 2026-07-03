@@ -62,7 +62,18 @@ const tripSchema = z.object({
     )
     .optional(),
   isPublished: z.boolean().default(false),
-});
+}).refine(
+  (data) => {
+    if (data.startDate && data.endDate) {
+      return new Date(data.endDate) > new Date(data.startDate);
+    }
+    return true;
+  },
+  {
+    message: "End date must be after start date",
+    path: ["endDate"],
+  }
+);
 
 type TripFormValues = z.infer<typeof tripSchema>;
 

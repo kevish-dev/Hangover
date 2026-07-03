@@ -49,8 +49,11 @@ export const createTrip = async (data) => {
   if (data.startDate && data.endDate) {
     const start = new Date(data.startDate);
     const end = new Date(data.endDate);
+    if (end <= start) {
+      throw new Error("End date must be strictly after start date");
+    }
     const diffTime = Math.abs(end - start);
-    data.duration = diffTime
+    data.duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }
   return tripRepo.create(data);
 };
@@ -67,8 +70,11 @@ export const updateTrip = async (id, data) => {
     if (start && end) {
       const s = new Date(start);
       const e = new Date(end);
+      if (e <= s) {
+        throw new Error("End date must be strictly after start date");
+      }
       const diffTime = Math.abs(e - s);
-      data.duration = diffTime
+      data.duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     }
   }
   return tripRepo.update(id, data);
