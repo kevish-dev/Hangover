@@ -86,21 +86,15 @@ export const createBooking = async (userId, data) => {
     specialRequests: data.specialRequests || null,
   };
 
-  if (data.additionalTravelers && Array.isArray(data.additionalTravelers) && data.additionalTravelers.length > 0) {
-    // For nested create/update
-    bookingData.travelers = {
-      deleteMany: {}, // Clear any previous travelers if updating an existing pending booking
-      create: data.additionalTravelers.map(t => ({
+  const travelersCreateData = (data.additionalTravelers && Array.isArray(data.additionalTravelers) && data.additionalTravelers.length > 0)
+    ? data.additionalTravelers.map(t => ({
         fullName: t.fullName,
         gender: t.gender,
         dateOfBirth: t.dateOfBirth ? new Date(t.dateOfBirth) : null,
         phone: t.phone,
         aadhaar: t.aadhaar,
       }))
-    };
-  } else {
-    bookingData.travelers = { deleteMany: {} }; // Clear if none
-  }
+    : [];
 
   // Check if there is an existing PENDING booking to reuse
   const existingPending = await prisma.booking.findFirst({
@@ -112,6 +106,10 @@ export const createBooking = async (userId, data) => {
   });
 
   if (existingPending) {
+    bookingData.travelers = {
+      deleteMany: {}, // Clear any previous travelers if updating an existing pending booking
+      ...(travelersCreateData.length > 0 && { create: travelersCreateData })
+    };
     return repo.updateBooking(existingPending.id, bookingData);
   }
 
@@ -121,6 +119,10 @@ export const createBooking = async (userId, data) => {
   bookingData.tripId = data.tripId;
   bookingData.status = "PENDING";
   bookingData.paymentStatus = "PENDING";
+
+  if (travelersCreateData.length > 0) {
+    bookingData.travelers = { create: travelersCreateData };
+  }
 
   return repo.createBooking(bookingData);
 };
