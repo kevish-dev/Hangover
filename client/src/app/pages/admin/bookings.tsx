@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../lib/axios";
-import { CalendarCheck, IndianRupee, Loader2, Bell, X, User, MapPin, Mail, Phone, Image as ImageIcon, MoreVertical, Search, ArrowUpDown, Filter } from "lucide-react";
+import { CalendarCheck, IndianRupee, Loader2, Bell, X, User, MapPin, Mail, Phone, Image as ImageIcon, MoreVertical, Search, ArrowUpDown, Filter, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
@@ -35,7 +35,7 @@ function PaymentStatusBadge({ status }: { status: string }) {
   );
 }
 
-function ActionMenu({ booking, onRemind, onRefund }: { booking: any, onRemind: () => void, onRefund: () => void }) {
+function ActionMenu({ booking, onRemind, onCancelAndRefund }: { booking: any, onRemind: () => void, onCancelAndRefund: () => void }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -50,8 +50,9 @@ function ActionMenu({ booking, onRemind, onRefund }: { booking: any, onRemind: (
   }, [open]);
 
   const hasSuccessfulPayments = booking.payments?.some((p: any) => p.status === "SUCCESS");
+  const isCancellable = booking.status !== "CANCELLED" && booking.status !== "COMPLETED";
 
-  if (booking.paymentStatus !== "PARTIALLY_PAID" && !hasSuccessfulPayments) {
+  if (booking.paymentStatus !== "PARTIALLY_PAID" && !hasSuccessfulPayments && !isCancellable) {
     return <div className="text-gray-400 text-xs italic">No actions</div>;
   }
 
@@ -65,23 +66,24 @@ function ActionMenu({ booking, onRemind, onRefund }: { booking: any, onRemind: (
       </button>
       
       {open && (
-        <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 shadow-xl rounded-md overflow-hidden z-20 text-left">
+        <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 shadow-xl rounded-md overflow-hidden z-20 text-left">
           {booking.paymentStatus === "PARTIALLY_PAID" && (
             <button 
               onClick={(e) => { e.stopPropagation(); setOpen(false); onRemind(); }}
               className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors border-b border-gray-50"
             >
               <Bell className="w-4 h-4 text-blue-600" />
-              Remind
+              Remind Balance
             </button>
           )}
-          {hasSuccessfulPayments && (
+
+          {isCancellable && (
             <button 
-              onClick={(e) => { e.stopPropagation(); setOpen(false); onRefund(); }}
-              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+              onClick={(e) => { e.stopPropagation(); setOpen(false); onCancelAndRefund(); }}
+              className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
             >
-              <IndianRupee className="w-4 h-4 text-purple-600" />
-              Refund
+              <X className="w-4 h-4" />
+              Cancel & Refund All
             </button>
           )}
         </div>
@@ -90,187 +92,39 @@ function ActionMenu({ booking, onRemind, onRefund }: { booking: any, onRemind: (
   );
 }
 
-function RefundModal({ booking, onClose, refetch }: { booking: any, onClose: () => void, refetch: () => void }) {
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  // Custom amount & reason state per payment: { [paymentId]: { amount: string, reason: string } }
-  const [refundInputs, setRefundInputs] = useState<Record<string, { amount: string; reason: string }>>({});
-
-  const getInput = (paymentId: string, maxAmount: number) => {
-    return refundInputs[paymentId] ?? { amount: String(maxAmount), reason: "" };
-  };
-
-  const setInput = (paymentId: string, key: "amount" | "reason", value: string) => {
-    setRefundInputs(prev => ({
-      ...prev,
-      [paymentId]: { ...getInput(paymentId, 0), [key]: value },
-    }));
-  };
-
-  const handleRefund = async (paymentId: string, maxAmount: number) => {
-    const input = getInput(paymentId, maxAmount);
-    const refundAmount = parseFloat(input.amount);
-
-    if (!refundAmount || refundAmount <= 0) {
-      toast.error("Please enter a valid refund amount.");
-      return;
-    }
-    if (refundAmount > maxAmount) {
-      toast.error(`Refund amount cannot exceed ₹${maxAmount.toLocaleString("en-IN")}.`);
-      return;
-    }
-
-    setProcessingId(paymentId);
-    try {
-      await apiClient.post(`/payments/${paymentId}/refund`, {
-        amount: refundAmount,
-        reason: input.reason || undefined,
-      });
-      toast.success("Refund initiated successfully!");
-      refetch();
-      onClose();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to initiate refund.");
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  // Show SUCCESS and REFUNDED payments (partial refunds keep payment status as SUCCESS)
-  const refundablePayments = booking.payments?.filter(
-    (p: any) => p.status === "SUCCESS" || p.status === "REFUNDED"
-  ) || [];
-
+function ConfirmCancelModal({ onConfirm, onClose }: { onConfirm: () => void, onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="px-6 py-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <IndianRupee className="w-5 h-5 text-purple-600" />
-            Issue Refund
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 bg-red-50 border-b border-red-100 flex justify-between items-center">
+          <h2 className="text-lg font-bold text-red-900 flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-red-600" />
+            Confirm Cancellation
           </h2>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-200 rounded-full text-gray-500 transition-colors">
+          <button onClick={onClose} className="p-1.5 hover:bg-red-100 rounded-full text-red-500 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-6 max-h-[75vh] overflow-y-auto">
-          <p className="text-sm text-gray-600 mb-1">
-            Booking: <strong className="font-mono text-gray-900">{booking.bookingReference}</strong>
+        <div className="p-6">
+          <p className="text-sm text-gray-700 mb-6 leading-relaxed">
+            Are you sure you want to cancel this booking? This will immediately issue a full refund for all successful payments and free up the spots on the trip.
           </p>
-          <p className="text-xs text-gray-400 mb-5">Enter a custom refund amount per payment. Leave the amount at max to issue a full refund.</p>
-
-          <div className="space-y-4">
-            {refundablePayments.length === 0 ? (
-              <div className="p-4 bg-gray-50 rounded-lg text-center border border-gray-200">
-                <p className="text-gray-500 text-sm">No refundable payments found.</p>
-              </div>
-            ) : (
-              refundablePayments.map((p: any) => {
-                const alreadyRefunded = (p.refunds || [])
-                  .filter((r: any) => r.status === "PENDING" || r.status === "SUCCESS")
-                  .reduce((sum: number, r: any) => sum + Number(r.amount), 0);
-                const refundableRemaining = Math.max(0, Number(p.amount) - alreadyRefunded);
-                const isFullyRefunded = refundableRemaining <= 0 || p.status === "REFUNDED";
-                const hasPendingRefund = (p.refunds || []).some((r: any) => r.status === "PENDING");
-                const input = getInput(p.id, refundableRemaining);
-                const enteredAmount = parseFloat(input.amount) || 0;
-                const isInvalid = enteredAmount <= 0 || enteredAmount > refundableRemaining;
-
-                return (
-                  <div key={p.id} className={`border rounded-xl p-4 transition-colors ${
-                    isFullyRefunded ? "border-gray-200 bg-gray-50 opacity-70" : "border-purple-200 bg-purple-50/20"
-                  }`}>
-                    {/* Payment summary row */}
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <p className="font-bold text-gray-900 text-sm flex items-center gap-1">
-                          <IndianRupee className="w-3.5 h-3.5 text-gray-600" />
-                          {Number(p.amount).toLocaleString("en-IN")}
-                          <span className="ml-2 px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs font-medium uppercase tracking-wider">{p.type}</span>
-                        </p>
-                        <p className="text-xs text-gray-400 mt-0.5">{format(new Date(p.createdAt), "MMM d, yyyy · HH:mm")}</p>
-                      </div>
-                      {isFullyRefunded ? (
-                        <span className="px-3 py-1 bg-gray-200 text-gray-500 rounded-full text-xs font-bold">Fully Refunded</span>
-                      ) : hasPendingRefund ? (
-                        <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold">Pending...</span>
-                      ) : (
-                        <span className="text-xs text-purple-700 font-semibold bg-purple-100 px-2 py-1 rounded-full">
-                          Max: ₹{refundableRemaining.toLocaleString("en-IN")}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Already refunded info */}
-                    {alreadyRefunded > 0 && !isFullyRefunded && (
-                      <div className="flex items-center gap-1.5 mb-3 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-1.5 border border-amber-200">
-                        <span>₹{alreadyRefunded.toLocaleString("en-IN")} already refunded</span>
-                        <span className="text-amber-400">·</span>
-                        <span>₹{refundableRemaining.toLocaleString("en-IN")} remaining</span>
-                      </div>
-                    )}
-
-                    {/* Custom amount & reason inputs */}
-                    {!isFullyRefunded && !hasPendingRefund && (
-                      <div className="space-y-2.5">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-600 mb-1">Refund Amount (₹)</label>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">₹</span>
-                            <input
-                              type="number"
-                              min={1}
-                              max={refundableRemaining}
-                              step={0.01}
-                              value={input.amount}
-                              onChange={(e) => setInput(p.id, "amount", e.target.value)}
-                              className={`w-full pl-7 pr-3 py-2 border rounded-lg text-sm font-medium focus:outline-none focus:ring-2 ${
-                                isInvalid && input.amount !== String(refundableRemaining)
-                                  ? "border-red-300 focus:ring-red-200 text-red-700"
-                                  : "border-gray-300 focus:ring-purple-200 focus:border-purple-400 text-gray-900"
-                              }`}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setInput(p.id, "amount", String(refundableRemaining))}
-                              className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-purple-600 font-bold hover:text-purple-800 transition-colors"
-                            >
-                              Max
-                            </button>
-                          </div>
-                          {isInvalid && parseFloat(input.amount) > refundableRemaining && (
-                            <p className="text-xs text-red-500 mt-1">Cannot exceed ₹{refundableRemaining.toLocaleString("en-IN")}</p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-600 mb-1">Reason <span className="text-gray-400 font-normal">(optional)</span></label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Trip cancelled, customer request..."
-                            value={input.reason}
-                            onChange={(e) => setInput(p.id, "reason", e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400 placeholder-gray-300"
-                          />
-                        </div>
-                        <button
-                          onClick={() => handleRefund(p.id, refundableRemaining)}
-                          disabled={processingId === p.id || isInvalid}
-                          className="w-full flex items-center justify-center gap-2 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white text-sm font-bold rounded-lg transition-colors"
-                        >
-                          {processingId === p.id ? (
-                            <><Loader2 className="w-4 h-4 animate-spin" /> Processing...</>
-                          ) : (
-                            <>
-                              <IndianRupee className="w-4 h-4" />
-                              Refund ₹{(parseFloat(input.amount) || 0).toLocaleString("en-IN")}
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
+          <div className="flex gap-3 justify-end">
+            <button 
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              No, keep booking
+            </button>
+            <button 
+              onClick={() => {
+                onConfirm();
+                onClose();
+              }}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors shadow-sm"
+            >
+              Yes, cancel & refund
+            </button>
           </div>
         </div>
       </div>
@@ -281,7 +135,7 @@ function RefundModal({ booking, onClose, refetch }: { booking: any, onClose: () 
 export default function AdminBookingsPage() {
   const queryClient = useQueryClient();
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
-  const [refundBooking, setRefundBooking] = useState<any | null>(null);
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
   
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
@@ -303,6 +157,17 @@ export default function AdminBookingsPage() {
       toast.success("Reminder email sent successfully!", { id: toastId });
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to send reminder.", { id: toastId });
+    }
+  };
+
+  const handleCancelAndRefund = async (bookingId: string) => {
+    const toastId = toast.loading("Processing full cancellation and refund...");
+    try {
+      await apiClient.post(`/bookings/${bookingId}/cancel-and-refund`, { reason: "Admin initiated cancellation and refund" });
+      toast.success("Booking cancelled and refunded successfully!", { id: toastId });
+      refetch();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to cancel and refund.", { id: toastId });
     }
   };
 
@@ -460,7 +325,7 @@ export default function AdminBookingsPage() {
                       <ActionMenu 
                         booking={b} 
                         onRemind={() => handleRemind(b.id)} 
-                        onRefund={() => setRefundBooking(b)} 
+                        onCancelAndRefund={() => setConfirmCancelId(b.id)}
                       />
                     </td>
                   </tr>
@@ -471,11 +336,10 @@ export default function AdminBookingsPage() {
         </div>
       </div>
 
-      {refundBooking && (
-        <RefundModal 
-          booking={refundBooking} 
-          onClose={() => setRefundBooking(null)} 
-          refetch={() => { refetch(); }} 
+      {confirmCancelId && (
+        <ConfirmCancelModal 
+          onConfirm={() => handleCancelAndRefund(confirmCancelId)} 
+          onClose={() => setConfirmCancelId(null)} 
         />
       )}
 

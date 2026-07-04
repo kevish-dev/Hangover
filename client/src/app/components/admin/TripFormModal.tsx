@@ -741,10 +741,18 @@ export function TripFormModal({
                 </div>
                 <div className="space-y-2">
                   <Label>Difficulty Level</Label>
-                  <Input
+                  <select
                     {...form.register("difficultyLevel")}
-                    placeholder="e.g. Moderate to Difficult"
-                  />
+                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  >
+                    <option value="" disabled>Select Difficulty</option>
+                    <option value="Easy">Easy</option>
+                    <option value="Easy to Moderate">Easy to Moderate</option>
+                    <option value="Moderate">Moderate</option>
+                    <option value="Moderate to Difficult">Moderate to Difficult</option>
+                    <option value="Difficult">Difficult</option>
+                    <option value="Expert">Expert</option>
+                  </select>
                   {form.formState.errors.difficultyLevel && (
                     <p className="text-sm text-red-500">
                       {form.formState.errors.difficultyLevel.message}

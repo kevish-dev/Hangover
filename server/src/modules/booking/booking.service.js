@@ -86,6 +86,22 @@ export const createBooking = async (userId, data) => {
     specialRequests: data.specialRequests || null,
   };
 
+  if (data.additionalTravelers && Array.isArray(data.additionalTravelers) && data.additionalTravelers.length > 0) {
+    // For nested create/update
+    bookingData.travelers = {
+      deleteMany: {}, // Clear any previous travelers if updating an existing pending booking
+      create: data.additionalTravelers.map(t => ({
+        fullName: t.fullName,
+        gender: t.gender,
+        dateOfBirth: t.dateOfBirth ? new Date(t.dateOfBirth) : null,
+        phone: t.phone,
+        aadhaar: t.aadhaar,
+      }))
+    };
+  } else {
+    bookingData.travelers = { deleteMany: {} }; // Clear if none
+  }
+
   // Check if there is an existing PENDING booking to reuse
   const existingPending = await prisma.booking.findFirst({
     where: {
@@ -170,4 +186,99 @@ export const getAllBookings = async (page = 1, limit = 10) => {
 
 export const getBookingsByTripId = async (tripId) => {
   return repo.getBookingsByTripId(tripId);
+};
+
+export const cancelAndRefundBooking = async (bookingId, adminId, reason) => {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: {
+      trip: true,
+      user: { include: { profile: true } },
+      payments: {
+        where: { status: "SUCCESS" }
+      }
+    }
+  });
+
+  if (!booking) throw new NotFoundError("Booking not found");
+  if (booking.status === "CANCELLED") {
+    throw new ValidationError("Booking is already cancelled.");
+  }
+
+  // Import razorpay dynamically to avoid circular dependencies if any
+  const razorpay = await import("../../core/services/razorpay.service.js");
+
+  // 1. Process refunds via Razorpay first (outside DB transaction)
+  const refundsData = [];
+  for (const payment of booking.payments) {
+    if (payment.razorpayPaymentId) {
+      const amountPaise = Math.round(Number(payment.amount) * 100);
+      const rzpRefund = await razorpay.createRefund(
+        payment.razorpayPaymentId,
+        amountPaise,
+        { reason: reason || "Admin initiated cancellation and refund", admin_id: adminId }
+      );
+      refundsData.push({
+        payment,
+        rzpRefund
+      });
+    }
+  }
+
+  // 2. Perform DB updates in a transaction
+  await prisma.$transaction(async (tx) => {
+    // Record refunds
+    for (const { payment, rzpRefund } of refundsData) {
+      await tx.refund.create({
+        data: {
+          paymentId: payment.id,
+          amount: payment.amount,
+          status: "SUCCESS",
+          reason: reason || "Admin initiated cancellation and refund",
+          razorpayRefundId: rzpRefund.id,
+          initiatedBy: adminId,
+          metadata: { razorpayRefund: rzpRefund },
+        }
+      });
+
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: { status: "REFUNDED" }
+      });
+    }
+
+    // Cancel booking
+    await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        status: "CANCELLED",
+        paymentStatus: booking.payments.length > 0 ? "REFUNDED" : "CANCELLED",
+        cancelledAt: new Date(),
+        cancelledBy: adminId,
+        cancellationReason: reason || "Admin initiated full refund and cancellation",
+      }
+    });
+
+    // Free up trip spots
+    await tx.trip.update({
+      where: { id: booking.tripId },
+      data: {
+        filledSpots: Math.max(0, booking.trip.filledSpots - booking.numberOfTravelers)
+      }
+    });
+  });
+
+  // Send Email (Fire and forget)
+  import("../../core/services/email.service.js").then((emailService) => {
+    if (emailService.sendBookingCancelledRefundedEmail) {
+      emailService.sendBookingCancelledRefundedEmail(booking.user.email, {
+        name: booking.user.profile?.fullName || "Traveler",
+        tripTitle: booking.trip.title,
+        bookingRef: booking.bookingReference,
+        refundAmount: booking.amountPaid
+      }).catch(err => console.error("Failed to send cancellation email:", err));
+    }
+  }).catch(err => console.error("Failed to import email service:", err));
+
+  return { success: true, message: "Booking cancelled and refunded successfully." };
 };

@@ -451,22 +451,22 @@ function TravelerForm({
         className="grid-cols-1 sm:grid-cols-2"
       >
         <Field label="First Name" required>
-          <Input type="text" placeholder="First name" required />
+          <Input name={`traveler-${index}-firstName`} type="text" placeholder="First name" required />
         </Field>
         <Field label="Last Name" required>
-          <Input type="text" placeholder="Last name" required />
+          <Input name={`traveler-${index}-lastName`} type="text" placeholder="Last name" required />
         </Field>
         <Field label="Email ID" required>
-          <Input type="email" placeholder="email@example.com" required />
+          <Input name={`traveler-${index}-email`} type="email" placeholder="email@example.com" required />
         </Field>
         <Field label="Contact Number" required>
-          <Input type="tel" placeholder="+91 98765 43210" required />
+          <Input name={`traveler-${index}-phone`} type="tel" placeholder="+91 98765 43210" required />
         </Field>
         <Field label="Date of Birth" required>
-          <Input type="date" required />
+          <Input name={`traveler-${index}-dob`} type="date" required />
         </Field>
         <Field label="Gender" required>
-          <Select required>
+          <Select name={`traveler-${index}-gender`} required>
             <option value="">Select gender</option>
             <option>Male</option>
             <option>Female</option>
@@ -616,6 +616,22 @@ export default function BookingPage() {
   // ── Submit handler ────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Extract additional traveler data synchronously before any await
+    const form = e.currentTarget as HTMLFormElement;
+    const formData = new FormData(form);
+    const additionalTravelers = travelers.map((_, index) => {
+      const tFirstName = formData.get(`traveler-${index}-firstName`) as string;
+      const tLastName = formData.get(`traveler-${index}-lastName`) as string;
+      return {
+        fullName: `${tFirstName || ""} ${tLastName || ""}`.trim(),
+        email: formData.get(`traveler-${index}-email`) as string,
+        phone: formData.get(`traveler-${index}-phone`) as string,
+        dateOfBirth: formData.get(`traveler-${index}-dob`) as string,
+        gender: formData.get(`traveler-${index}-gender`) as string,
+      };
+    });
+
     setBookingError(null);
 
     // 1. Auth guard — redirect to Google login if not logged in
@@ -670,6 +686,7 @@ export default function BookingPage() {
         numberOfTravelers,
         specialRequests: specialRequests || undefined,
         initialPaymentType: isTokenZero ? "FULL" : paymentChoice,
+        additionalTravelers,
       });
       const {
         id: bookingId,

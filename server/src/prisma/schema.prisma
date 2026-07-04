@@ -61,8 +61,6 @@ model Trip {
   location            String
   bannerImages        String[]
   duration            Int
-  groupSizeMin        Int             @default(1)
-  groupSizeMax        Int             @default(10)
   difficultyLevel     String
   bestTimeToVisit     String
   maxAltitude         Int
@@ -89,7 +87,6 @@ model Trip {
   faqs                FAQ[]
   inquiries           Inquiry[]
   itineraries         Itinerary[]
-  TripFormField       TripFormField[]
   tripTags            TripTag[]       @relation("TripToTripTag")
   destination         Destination?    @relation(fields: [destinationId], references: [id])
 
@@ -100,6 +97,44 @@ model Trip {
   @@index([isPublished])
   @@index([location])
   @@index([destinationId])
+}
+
+
+model Festival {
+  id                  String          @id @default(uuid())
+  title               String
+  slug                String          @unique
+  location            String
+  bannerImages        String[]
+  duration            Int
+  stageDays          Int
+  numberOfArtists      Int
+  difficultyLevel     String
+  bestTimeToVisit     String
+  maxAltitude         Int
+  overview            String
+  highlights          Json            @default("[]")
+  galleryImages       String[]
+  inclusions          String[]
+  exclusions          String[]
+  stayTransportImages Json            @default("[]")
+  price               Decimal         @db.Decimal(10, 2)
+  tokenAmount         Decimal         @db.Decimal(10, 2)
+  capacity            Int
+  filledSpots         Int             @default(0)
+  startDate           DateTime
+  endDate             DateTime
+  isActive            Boolean         @default(true)
+  isFeatured          Boolean         @default(false)
+  isPublished         Boolean         @default(false)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  
+  @@index([startDate])
+  @@index([isActive])
+  @@index([isFeatured])
+  @@index([isPublished])
+  @@index([location])
 }
 
 model Destination {
@@ -140,10 +175,10 @@ model Booking {
   updatedAt           DateTime              @updatedAt
   trip                Trip                  @relation(fields: [tripId], references: [id], onDelete: Cascade)
   user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  BookingFormResponse BookingFormResponse[]
   payments            Payment[]
   paymentIntents      PaymentIntent[]
   reminders           PaymentReminder[]
+  travelers           Traveler[]
 
   
   @@index([tripId])
@@ -151,6 +186,21 @@ model Booking {
   @@index([status])
   @@index([paymentStatus])
   @@index([balanceDueDate])
+}
+
+model Traveler {
+  id          String    @id @default(uuid())
+  bookingId   String
+  fullName    String
+  gender      String?
+  dateOfBirth DateTime?
+  phone       String?
+  aadhaar     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
 }
 
 model Itinerary {
@@ -350,46 +400,7 @@ model Refund {
   @@index([createdAt])
 }
 
-model BookingFormResponse {
-  id            String        @id
-  bookingId     String
-  fieldId       String
-  value         String?
-  fileUrl       String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime
-  Booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  TripFormField TripFormField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
 
-  @@unique([bookingId, fieldId])
-  @@index([bookingId])
-  @@index([fieldId])
-}
-
-model TripFormField {
-  id                  String                @id
-  tripId              String
-  label               String
-  fieldKey            String
-  fieldType           FormFieldType
-  placeholder         String?
-  helpText            String?
-  options             String[]
-  isRequired          Boolean               @default(false)
-  order               Int                   @default(0)
-  validationRegex     String?
-  minValue            Int?
-  maxValue            Int?
-  isActive            Boolean               @default(true)
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime
-  BookingFormResponse BookingFormResponse[]
-  Trip                Trip                  @relation(fields: [tripId], references: [id], onDelete: Cascade)
-
-  @@unique([tripId, fieldKey])
-  @@index([order])
-  @@index([tripId])
-}
 
 enum UserRole {
   USER
@@ -487,16 +498,4 @@ enum RefundStatus {
   FAILED
 }
 
-enum FormFieldType {
-  TEXT
-  TEXTAREA
-  NUMBER
-  EMAIL
-  PHONE
-  DATE
-  SELECT
-  MULTI_SELECT
-  CHECKBOX
-  RADIO
-  FILE_UPLOAD
-}
+

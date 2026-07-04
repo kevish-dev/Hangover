@@ -152,3 +152,24 @@ export const sendPaymentFailedEmail = async ({ to, name, bookingRef, tripTitle, 
     `,
   });
 };
+
+/**
+ * Send booking cancelled and refunded notification
+ */
+export const sendBookingCancelledRefundedEmail = async (to, { name, bookingRef, tripTitle, refundAmount }) => {
+  await transport.sendMail({
+    from: FROM,
+    to,
+    subject: `Booking Cancelled & Refunded – ${tripTitle} (${bookingRef})`,
+    html: `
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9f9f9;border-radius:8px;">
+        <h2 style="color:#c0392b;">Booking Cancelled & Refunded</h2>
+        <p>Hi ${name},</p>
+        <p>Your booking <strong>${bookingRef}</strong> for <strong>${tripTitle}</strong> has been cancelled.</p>
+        <p>A full refund of <strong>₹${refundAmount}</strong> has been initiated and should reflect in your original payment method within 5–7 business days.</p>
+        <p>If you have any questions or if you'd like to book another trip, please don't hesitate to contact us.</p>
+        <p style="margin-top:24px;color:#999;font-size:12px;">Hangover Trips</p>
+      </div>
+    `,
+  });
+};
