@@ -36,6 +36,18 @@ export const createBooking = async (userId, data) => {
   if (!trip.isActive)
     throw new ValidationError("This trip is no longer available for booking.");
 
+  // Check if user already has an active booking for this trip
+  const existingActive = await prisma.booking.findFirst({
+    where: {
+      userId,
+      tripId: data.tripId,
+      status: { in: ["CONFIRMED", "COMPLETED"] },
+    },
+  });
+  if (existingActive) {
+    throw new ValidationError("You have already booked this trip.");
+  }
+
   // 3. Pricing calculation (per-person)
   const numberOfTravelers = data.numberOfTravelers || 1;
 

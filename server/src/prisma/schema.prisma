@@ -145,7 +145,7 @@ model Booking {
   paymentIntents      PaymentIntent[]
   reminders           PaymentReminder[]
 
-  @@unique([userId, tripId])
+  
   @@index([tripId])
   @@index([userId])
   @@index([status])

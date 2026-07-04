@@ -8,10 +8,7 @@ import {
   Trash2,
   Info,
   User,
-  Mail,
-  Phone,
   MapPin,
-  Calendar,
   CreditCard,
   CheckCircle,
   AlertCircle,
@@ -504,15 +501,35 @@ export default function BookingPage() {
   const [primaryPhone, setPrimaryPhone] = useState("");
   const [specialRequests, setSpecialRequests] = useState("");
 
+  // Primary traveler controlled fields (uncontrolled inputs fail after await in submit handler)
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [address, setAddress] = useState("");
+  const [pinCode, setPinCode] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [gender, setGender] = useState("");
+
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["profile"],
     queryFn: getMyProfile,
     enabled: !!user,
   });
 
+  // Pre-fill from profile once loaded
   useEffect(() => {
     if (user && !primaryEmail) setPrimaryEmail(user.email);
     if (profile?.phone && !primaryPhone) setPrimaryPhone(profile.phone);
+    if (profile?.fullName) {
+      const parts = profile.fullName.trim().split(" ");
+      if (!firstName) setFirstName(parts[0] || "");
+      if (!lastName)  setLastName(parts.slice(1).join(" ") || "");
+    }
+    if (profile?.addressLine1 && !address) {
+      setAddress([profile.addressLine1, profile.addressLine2, profile.city, profile.state].filter(Boolean).join(", "));
+    }
+    if (profile?.postalCode && !pinCode) setPinCode(profile.postalCode);
+    if (profile?.dateOfBirth && !dateOfBirth) setDateOfBirth(new Date(profile.dateOfBirth).toISOString().split("T")[0]);
+    if (profile?.gender && !gender) setGender(profile.gender);
   }, [user, profile]);
 
   // Govt ID upload state
@@ -560,7 +577,7 @@ export default function BookingPage() {
         .then((res) => {
           const bookings = res.data?.data || [];
           const isBooked = bookings.some(
-            (b: any) => b.tripId === trip.id && b.status !== "CANCELLED",
+            (b: any) => b.tripId === trip.id && (b.status == "CONFIRMED" || b.status == "COMPLETED"),
           );
           setHasBooked(isBooked);
         })
@@ -623,16 +640,13 @@ export default function BookingPage() {
         });
       }
 
-      const formData = new FormData(e.currentTarget as HTMLFormElement);
-      const addressVal = formData.get("address") as string;
-      const pinCodeVal = formData.get("pinCode") as string;
-      
+      // Read profile data from controlled state — NOT from e.currentTarget (null after await)
       const profileData = {
-        fullName: `${formData.get("firstName") || ""} ${formData.get("lastName") || ""}`.trim(),
-        phone: formData.get("phoneNumber"),
-        addressLine1: addressVal ? `${addressVal}, ${pinCodeVal}` : undefined,
-        gender: formData.get("gender") || undefined,
-        dateOfBirth: formData.get("dateOfBirth") ? new Date(formData.get("dateOfBirth") as string).toISOString() : undefined,
+        fullName: `${firstName} ${lastName}`.trim(),
+        phone: primaryPhone,
+        addressLine1: address ? `${address}${pinCode ? ", " + pinCode : ""}` : undefined,
+        gender: gender || undefined,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth).toISOString() : undefined,
       };
       await apiClient.put("/users/me/profile", profileData);
 
@@ -678,7 +692,15 @@ export default function BookingPage() {
             color: "#781216",
           },
           modal: {
-            ondismiss: () => {
+            ondismiss: async () => {
+              // Cancel the pending booking so it doesn't clutter the user's dashboard
+              try {
+                await apiClient.patch(`/bookings/${bookingId}/cancel`, {
+                  reason: "Payment aborted by user",
+                });
+              } catch (e) {
+                // Ignore error if it fails
+              }
               reject(new Error("Payment cancelled. You can try again."));
             },
           },
@@ -702,6 +724,22 @@ export default function BookingPage() {
         };
 
         const rzp = new Razorpay(options);
+
+        // Listen for failed attempts within the modal (user can still retry after this)
+        rzp.on("payment.failed", async function (response: any) {
+          try {
+            await apiClient.post("/payments/failed", {
+              razorpayOrderId: response.error.metadata.order_id,
+              razorpayPaymentId: response.error.metadata.payment_id,
+              reason: response.error.description,
+              code: response.error.code,
+            });
+          } catch (e) {
+            // Ignore if the backend call fails, the webhook might catch it anyway
+          }
+          toast.error(`Payment failed: ${response.error.description}`);
+        });
+
         rzp.open();
       });
     } catch (err: any) {
@@ -1486,13 +1524,13 @@ export default function BookingPage() {
             >
               <FormSection title="Primary Traveler" icon={User}>
                 <Field label="First Name" required>
-                  <Input type="text" name="firstName" placeholder="Arjun" defaultValue={profile?.fullName?.split(" ")[0] || ""} required />
+                  <Input type="text" name="firstName" placeholder="Arjun" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
                 </Field>
                 <Field label="Middle Name">
                   <Input type="text" name="middleName" placeholder="Optional" />
                 </Field>
                 <Field label="Last Name" required>
-                  <Input type="text" name="lastName" placeholder="Sharma" defaultValue={profile?.fullName?.split(" ").slice(1).join(" ") || ""} required />
+                  <Input type="text" name="lastName" placeholder="Sharma" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
                 </Field>
                 <Field
                   label="Email ID"
@@ -1514,7 +1552,8 @@ export default function BookingPage() {
                       type="text"
                       name="address"
                       placeholder="House / Street / Colony"
-                      defaultValue={[profile?.addressLine1, profile?.addressLine2, profile?.city, profile?.state].filter(Boolean).join(", ") || ""}
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
                       required
                     />
                   </Field>
@@ -1525,7 +1564,8 @@ export default function BookingPage() {
                     name="pinCode"
                     placeholder="400001"
                     maxLength={6}
-                    defaultValue={profile?.postalCode || ""}
+                    value={pinCode}
+                    onChange={(e) => setPinCode(e.target.value)}
                     required
                   />
                 </Field>
@@ -1544,10 +1584,10 @@ export default function BookingPage() {
                   />
                 </Field>
                 <Field label="Date of Birth" required>
-                  <Input type="date" name="dateOfBirth" defaultValue={profile?.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().split('T')[0] : ""} required />
+                  <Input type="date" name="dateOfBirth" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} required />
                 </Field>
                 <Field label="Gender" required>
-                  <Select name="gender" defaultValue={profile?.gender || ""} required>
+                  <Select name="gender" value={gender} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setGender(e.target.value)} required>
                     <option value="">Select gender</option>
                     <option value="MALE">Male</option>
                     <option value="FEMALE">Female</option>
@@ -2269,8 +2309,10 @@ export default function BookingPage() {
                       val: tripDifficulty,
                     },
                     {
-                      label: "Best Time",
-                      val: trip.bestTimeToVisit || "Not Available",
+                      label: "Dates",
+                      val: trip.startDate && trip.endDate
+                        ? `${new Date(trip.startDate).toLocaleDateString("en-IN", { month: "short", day: "numeric" })} – ${new Date(trip.endDate).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}`
+                        : "Not Available",
                     },
                   ].map(({ label, val }) => (
                     <div

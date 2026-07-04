@@ -1100,7 +1100,7 @@ export default function TripDetail() {
         .then((res) => {
           const bookings = res.data?.data || [];
           const isBooked = bookings.some(
-            (b: any) => b.tripId === trip.id && b.status !== "CANCELLED"
+            (b: any) => b.tripId === trip.id && (b.status == "CONFIRMED" || b.status == "COMPLETED")
           );
           setHasBooked(isBooked);
         })

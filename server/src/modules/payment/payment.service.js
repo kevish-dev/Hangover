@@ -246,6 +246,55 @@ export const verifyPayment = async (userId, { razorpayOrderId, razorpayPaymentId
   return payment;
 };
 
+// ─── Record Failed Payment ────────────────────────────────────────────────────
+
+/**
+ * Record a payment failure (called from frontend on payment.failed or from webhook).
+ */
+export const recordFailedPayment = async (userId, { razorpayOrderId, razorpayPaymentId, reason, code }) => {
+  const intent = await repo.getPaymentIntentByOrderId(razorpayOrderId);
+  if (!intent) throw new NotFoundError("Payment intent not found");
+
+  const { booking } = intent;
+  if (userId) assertBookingOwner(booking, userId);
+
+  // Check if a payment record already exists for this attempt
+  const idempotencyKey = `fail-${booking.id}-${intent.type}-${razorpayOrderId}-${razorpayPaymentId || "no_pmt"}`;
+  const existing = await prisma.payment.findUnique({ where: { idempotencyKey } });
+  if (existing) return existing;
+
+  const payment = await prisma.$transaction(async (tx) => {
+    // 1. Create FAILED payment record
+    const pmt = await tx.payment.create({
+      data: {
+        bookingId: booking.id,
+        paymentIntentId: intent.id,
+        type: intent.type,
+        status: "FAILED",
+        amount: intent.amount,
+        currency: intent.currency,
+        razorpayOrderId,
+        razorpayPaymentId,
+        idempotencyKey,
+        failureReason: reason || "Payment failed",
+        failureCode: code || null,
+        notes: { paymentType: intent.type, failed: true },
+      },
+    });
+
+    // 2. Mark intent as FAILED
+    await tx.paymentIntent.update({
+      where: { id: intent.id },
+      data: { status: "FAILED" },
+    });
+
+    return pmt;
+  });
+
+  return payment;
+};
+
+
 // ─── Webhook Handler ──────────────────────────────────────────────────────────
 
 /**
@@ -298,9 +347,15 @@ export const handleWebhook = async (rawBody, signature) => {
       case "payment.failed": {
         const rzpPayment = payload.payload?.payment?.entity;
         if (rzpPayment?.order_id) {
-          const intent = await repo.getPaymentIntentByOrderId(rzpPayment.order_id);
-          if (intent) {
-            await repo.updatePaymentIntent(intent.id, { status: "CANCELLED" });
+          try {
+            await recordFailedPayment(null, {
+              razorpayOrderId: rzpPayment.order_id,
+              razorpayPaymentId: rzpPayment.id,
+              reason: rzpPayment.error_description || "Webhook payment.failed",
+              code: rzpPayment.error_code,
+            });
+          } catch (e) {
+            // Error handling already covers skipping if it's processed, etc.
           }
         }
         break;
@@ -482,12 +537,19 @@ export const issueRefund = async (paymentId, amount, reason, adminId) => {
       },
     });
 
-    // 5. Decrement filledSpots if the booking is fully refunded (capacity freed)
-    if (isBookingFullyRefunded && ["CONFIRMED", "RESERVED"].includes(booking.status)) {
-      await tx.trip.update({
-        where: { id: booking.tripId },
-        data: { filledSpots: { decrement: booking.numberOfTravelers } },
-      });
+    // 5. Free up trip capacity when the booking is fully refunded.
+    //    filledSpots is only incremented on FULL or BALANCE payment (i.e. when booking reaches CONFIRMED).
+    //    RESERVED (token-only) bookings never had their spots counted, so we must NOT decrement for them.
+    if (isBookingFullyRefunded && booking.status === "CONFIRMED") {
+      // Clamp to 0 to avoid negative filledSpots from any data inconsistency
+      const currentTrip = await tx.trip.findUnique({ where: { id: booking.tripId }, select: { filledSpots: true } });
+      const safeDecrement = Math.min(booking.numberOfTravelers, currentTrip?.filledSpots ?? 0);
+      if (safeDecrement > 0) {
+        await tx.trip.update({
+          where: { id: booking.tripId },
+          data: { filledSpots: { decrement: safeDecrement } },
+        });
+      }
     }
 
     return record;

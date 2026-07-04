@@ -21,6 +21,7 @@ router.use(requireAuth);
 router.post("/initiate", paymentController.initiatePayment);
 router.post("/balance/initiate", paymentController.initiateBalancePayment);
 router.post("/verify", paymentController.verifyPayment);
+router.post("/failed", paymentController.recordFailedPayment);
 router.get("/booking/:bookingId", paymentController.getPaymentHistory);
 
 // Admin routes

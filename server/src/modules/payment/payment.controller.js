@@ -35,6 +35,21 @@ export const verifyPayment = async (req, res, next) => {
   }
 };
 
+export const recordFailedPayment = async (req, res, next) => {
+  try {
+    const { razorpayOrderId, razorpayPaymentId, reason, code } = req.body;
+    const payment = await paymentService.recordFailedPayment(req.user.id, {
+      razorpayOrderId,
+      razorpayPaymentId,
+      reason,
+      code,
+    });
+    res.status(200).json(payment);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const handleWebhook = async (req, res, next) => {
   try {
     const signature = req.headers["x-razorpay-signature"];
