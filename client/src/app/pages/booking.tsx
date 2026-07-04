@@ -609,7 +609,14 @@ export default function BookingPage() {
     };
   }, [user, authLoading]);
 
-  const addTraveler = () => setTravelers((t) => [...t, Date.now()]);
+  const spotsLeft = trip ? trip.capacity - trip.filledSpots : 0;
+  const canAddMoreTravelers = 1 + travelers.length < spotsLeft;
+
+  const addTraveler = () => {
+    if (canAddMoreTravelers) {
+      setTravelers((t) => [...t, Date.now()]);
+    }
+  };
   const removeTraveler = (id: number) =>
     setTravelers((t) => t.filter((x) => x !== id));
 
@@ -1984,40 +1991,38 @@ export default function BookingPage() {
                     <button
                       type="button"
                       onClick={addTraveler}
+                      disabled={!canAddMoreTravelers}
                       style={{
                         display: "flex",
                         alignItems: "center",
                         gap: "6px",
-                        background: "rgba(120,18,22,0.06)",
-                        border: "1.5px solid rgba(120,18,22,0.2)",
+                        background: canAddMoreTravelers ? "rgba(120,18,22,0.06)" : "rgba(30,26,20,0.05)",
+                        border: canAddMoreTravelers ? "1.5px solid rgba(120,18,22,0.2)" : "1.5px solid rgba(30,26,20,0.1)",
                         borderRadius: "6px",
                         padding: "9px 18px",
-                        color: "#781216",
+                        color: canAddMoreTravelers ? "#781216" : "rgba(30,26,20,0.4)",
                         fontFamily: "'Poppins', sans-serif",
                         fontSize: "0.74rem",
                         fontWeight: 600,
-                        cursor: "pointer",
+                        cursor: canAddMoreTravelers ? "pointer" : "not-allowed",
                         letterSpacing: "0.04em",
-                        transition: "background 0.2s, border-color 0.2s",
+                        transition: "background 0.2s, border-color 0.2s, opacity 0.2s",
+                        opacity: canAddMoreTravelers ? 1 : 0.7,
                       }}
                       onMouseEnter={(e) => {
-                        (
-                          e.currentTarget as HTMLButtonElement
-                        ).style.background = "rgba(120,18,22,0.1)";
-                        (
-                          e.currentTarget as HTMLButtonElement
-                        ).style.borderColor = "#781216";
+                        if (canAddMoreTravelers) {
+                          (e.currentTarget as HTMLButtonElement).style.background = "rgba(120,18,22,0.1)";
+                          (e.currentTarget as HTMLButtonElement).style.borderColor = "#781216";
+                        }
                       }}
                       onMouseLeave={(e) => {
-                        (
-                          e.currentTarget as HTMLButtonElement
-                        ).style.background = "rgba(120,18,22,0.06)";
-                        (
-                          e.currentTarget as HTMLButtonElement
-                        ).style.borderColor = "rgba(120,18,22,0.2)";
+                        if (canAddMoreTravelers) {
+                          (e.currentTarget as HTMLButtonElement).style.background = "rgba(120,18,22,0.06)";
+                          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(120,18,22,0.2)";
+                        }
                       }}
                     >
-                      <Plus size={14} /> Add Traveler
+                      <Plus size={14} /> {canAddMoreTravelers ? "Add Traveler" : "No Spots Left"}
                     </button>
                   </div>
 
