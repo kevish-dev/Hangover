@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router";
+import { useParams, Link, useSearchParams } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowLeft,
@@ -489,6 +489,8 @@ function TravelerForm({
 // ── Page ──────────────────────────────────────────────────────────
 export default function BookingPage() {
   const { slug } = useParams();
+  const [searchParams] = useSearchParams();
+  const resumeBookingId = searchParams.get("resume"); // set when coming from "Complete Payment" CTA
   const { user, isLoading: authLoading } = useAuth();
 
   const [trip, setTrip] = useState<ApiTrip | null>(null);
@@ -525,7 +527,12 @@ export default function BookingPage() {
       if (!lastName)  setLastName(parts.slice(1).join(" ") || "");
     }
     if (profile?.addressLine1 && !address) {
-      setAddress([profile.addressLine1, profile.addressLine2, profile.city, profile.state].filter(Boolean).join(", "));
+      let addr = profile.addressLine1;
+      // Auto-clean the corrupted data where pincode was saved into addressLine1
+      if (profile.postalCode && addr.endsWith(", " + profile.postalCode)) {
+        addr = addr.slice(0, -(profile.postalCode.length + 2));
+      }
+      setAddress(addr);
     }
     if (profile?.postalCode && !pinCode) setPinCode(profile.postalCode);
     if (profile?.dateOfBirth && !dateOfBirth) setDateOfBirth(new Date(profile.dateOfBirth).toISOString().split("T")[0]);
@@ -535,8 +542,9 @@ export default function BookingPage() {
   // Govt ID upload state
   const [govtIdImage, setGovtIdImage] = useState<File | null>(null);
 
-  // Check if already booked
+  // Check if already booked or just reserved (partial payment)
   const [hasBooked, setHasBooked] = useState(false);
+  const [reservedBooking, setReservedBooking] = useState<any>(null);
 
   // Payment choice
   const [paymentChoice, setPaymentChoice] = useState<"FULL" | "TOKEN">("FULL");
@@ -576,10 +584,14 @@ export default function BookingPage() {
         .get(`/bookings/me?limit=100`)
         .then((res) => {
           const bookings = res.data?.data || [];
-          const isBooked = bookings.some(
-            (b: any) => b.tripId === trip.id && (b.status == "CONFIRMED" || b.status == "COMPLETED"),
+          const confirmed = bookings.find(
+            (b: any) => b.tripId === trip.id && (b.status === "CONFIRMED" || b.status === "COMPLETED"),
           );
-          setHasBooked(isBooked);
+          const reserved = bookings.find(
+            (b: any) => b.tripId === trip.id && b.status === "RESERVED",
+          );
+          setHasBooked(!!confirmed);
+          setReservedBooking(reserved || null);
         })
         .catch(console.error);
     }
@@ -644,7 +656,8 @@ export default function BookingPage() {
       const profileData = {
         fullName: `${firstName} ${lastName}`.trim(),
         phone: primaryPhone,
-        addressLine1: address ? `${address}${pinCode ? ", " + pinCode : ""}` : undefined,
+        addressLine1: address || undefined,
+        postalCode: pinCode || undefined,
         gender: gender || undefined,
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth).toISOString() : undefined,
       };
@@ -693,14 +706,6 @@ export default function BookingPage() {
           },
           modal: {
             ondismiss: async () => {
-              // Cancel the pending booking so it doesn't clutter the user's dashboard
-              try {
-                await apiClient.patch(`/bookings/${bookingId}/cancel`, {
-                  reason: "Payment aborted by user",
-                });
-              } catch (e) {
-                // Ignore error if it fails
-              }
               reject(new Error("Payment cancelled. You can try again."));
             },
           },
@@ -1211,6 +1216,195 @@ export default function BookingPage() {
     );
   }
 
+  // ── RESERVED booking: show balance payment screen ──────────────
+  // This fires if the user navigated here via "Complete Payment" from trip-detail
+  // OR if they somehow landed here while already having a RESERVED booking.
+  const activeReservedBooking = reservedBooking || (resumeBookingId ? { id: resumeBookingId } : null);
+
+  if (!hasBooked && activeReservedBooking && !submitting && bookingStep === "form") {
+    const booking = reservedBooking; // may be null if only resumeBookingId is set
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f5f0e6",
+          fontFamily: "'Poppins', sans-serif",
+        }}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          style={{
+            textAlign: "center",
+            maxWidth: "480px",
+            padding: "3rem 2rem",
+          }}
+        >
+          <div
+            style={{
+              width: "60px",
+              height: "60px",
+              borderRadius: "50%",
+              background: "rgba(184,148,58,0.1)",
+              border: "1px solid rgba(184,148,58,0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 20px",
+            }}
+          >
+            <CreditCard size={26} color="#b8943a" strokeWidth={1.5} />
+          </div>
+          <h2
+            style={{
+              color: "#1e1a14",
+              fontSize: "1.5rem",
+              fontWeight: 300,
+              letterSpacing: "-0.02em",
+              margin: "0 0 8px",
+            }}
+          >
+            Token Payment Received
+          </h2>
+          <p
+            style={{
+              color: "rgba(30,26,20,0.55)",
+              fontSize: "0.88rem",
+              fontWeight: 300,
+              lineHeight: 1.8,
+              margin: "0 0 8px",
+            }}
+          >
+            Your spot is reserved. Complete the balance payment to confirm your booking.
+          </p>
+          {booking && (
+            <p
+              style={{
+                color: "#b8943a",
+                fontSize: "0.95rem",
+                fontWeight: 600,
+                margin: "0 0 28px",
+              }}
+            >
+              Balance due: ₹{Number(booking.amountDue).toLocaleString("en-IN")}
+            </p>
+          )}
+          {bookingError && (
+            <p style={{ color: "#c0392b", fontSize: "0.82rem", marginBottom: "16px" }}>
+              {bookingError}
+            </p>
+          )}
+          <button
+            disabled={submitting}
+            onClick={async () => {
+              setSubmitting(true);
+              setBookingError(null);
+              setBookingStep("paying");
+              try {
+                const bookingIdToUse = activeReservedBooking.id;
+                const initiateRes = await apiClient.post("/payments/balance/initiate", {
+                  bookingId: bookingIdToUse,
+                });
+                const { razorpayOrderId, razorpayKeyId, amount, currency } = initiateRes.data;
+                // Fetch bookingReference
+                const bookingRef = reservedBooking?.bookingReference || "";
+
+                await new Promise<void>((resolve, reject) => {
+                  const options = {
+                    key: razorpayKeyId,
+                    amount,
+                    currency,
+                    name: "Hangover Trails",
+                    description: `${trip!.title} — Balance Payment`,
+                    order_id: razorpayOrderId,
+                    prefill: { email: user?.email, contact: primaryPhone },
+                    theme: { color: "#b8943a" },
+                    modal: {
+                      ondismiss: () => {
+                        reject(new Error("Payment cancelled. You can try again."));
+                      },
+                    },
+                    handler: (response: any) => {
+                      setBookingStep("verifying");
+                      setPendingVerify({
+                        razorpayOrderId: response.razorpay_order_id,
+                        razorpayPaymentId: response.razorpay_payment_id,
+                        razorpaySignature: response.razorpay_signature,
+                        bookingReference: bookingRef,
+                        amountPaid: amount / 100,
+                        paymentType: "BALANCE",
+                      });
+                      resolve();
+                    },
+                  };
+                  const rzp = new Razorpay(options);
+                  rzp.on("payment.failed", async (response: any) => {
+                    try {
+                      await apiClient.post("/payments/failed", {
+                        razorpayOrderId: response.error.metadata.order_id,
+                        razorpayPaymentId: response.error.metadata.payment_id,
+                        reason: response.error.description,
+                        code: response.error.code,
+                      });
+                    } catch (e) {}
+                    toast.error(`Payment failed: ${response.error.description}`);
+                  });
+                  rzp.open();
+                });
+              } catch (err: any) {
+                const msg = err?.response?.data?.message || err?.message || "Something went wrong.";
+                setBookingError(msg);
+                setBookingStep("form");
+              } finally {
+                setSubmitting(false);
+              }
+            }}
+            style={{
+              background: submitting ? "rgba(184,148,58,0.5)" : "#b8943a",
+              color: "#fff",
+              border: "none",
+              borderRadius: "8px",
+              padding: "14px 32px",
+              fontSize: "0.85rem",
+              fontWeight: 600,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              cursor: submitting ? "not-allowed" : "pointer",
+              fontFamily: "'Poppins', sans-serif",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              marginBottom: "16px",
+            }}
+          >
+            {submitting ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> : null}
+            {submitting ? "Processing..." : "Pay Balance Now"}
+          </button>
+          <br />
+          <Link
+            to={`/trips/${slug}`}
+            style={{
+              color: "#781216",
+              fontSize: "0.78rem",
+              fontWeight: 600,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              textDecoration: "none",
+              borderBottom: "1.5px solid rgba(120,18,22,0.25)",
+              paddingBottom: "3px",
+            }}
+          >
+            ← Back to Trip Details
+          </Link>
+        </motion.div>
+      </div>
+    );
+  }
+
   if (hasBooked) {
     return (
       <div
@@ -1259,7 +1453,7 @@ export default function BookingPage() {
               margin: "0 0 28px",
             }}
           >
-            You have already booked this trip. Your spot is reserved.
+            You have already booked this trip. Your spot is confirmed.
           </p>
           <Link
             to={`/trips/${slug}`}

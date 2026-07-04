@@ -3,7 +3,7 @@ import transport from "../core/smtp/client.js";
 
 const sendMail = async (to, subject, text, html) => {
   try {
-    const info = await transporter.sendMail({
+    const info = await transport.sendMail({
       from: env.SMTP_FROM,
       to: to,
       subject: subject,

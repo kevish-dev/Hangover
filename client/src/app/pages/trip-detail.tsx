@@ -1078,6 +1078,7 @@ export default function TripDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasBooked, setHasBooked] = useState(false);
+  const [reservedBookingId, setReservedBookingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -1099,10 +1100,14 @@ export default function TripDetail() {
         .get(`/bookings/me?limit=100`)
         .then((res) => {
           const bookings = res.data?.data || [];
-          const isBooked = bookings.some(
-            (b: any) => b.tripId === trip.id && (b.status == "CONFIRMED" || b.status == "COMPLETED")
+          const confirmed = bookings.find(
+            (b: any) => b.tripId === trip.id && (b.status === "CONFIRMED" || b.status === "COMPLETED")
           );
-          setHasBooked(isBooked);
+          const reserved = bookings.find(
+            (b: any) => b.tripId === trip.id && b.status === "RESERVED"
+          );
+          setHasBooked(!!confirmed);
+          setReservedBookingId(reserved?.id || null);
         })
         .catch(console.error);
     }
@@ -1199,6 +1204,7 @@ export default function TripDetail() {
       itineraryDays={itineraryDays}
       waLink={waLink}
       hasBooked={hasBooked}
+      reservedBookingId={reservedBookingId}
     />
   );
 }
@@ -1446,6 +1452,7 @@ function TripDetailContent({
   itineraryDays,
   waLink,
   hasBooked,
+  reservedBookingId,
 }: {
   trip: ApiTrip;
   heroImage: string;
@@ -1465,6 +1472,7 @@ function TripDetailContent({
   }[];
   waLink: string;
   hasBooked: boolean;
+  reservedBookingId: string | null;
 }) {
   const [heroIndex, setHeroIndex] = useState(0);
   const [lightbox, setLightbox] = useState<number | null>(null);
@@ -2363,6 +2371,30 @@ function TripDetailContent({
                   >
                     Already Booked
                   </div>
+                ) : reservedBookingId ? (
+                  <Link
+                    to={`/book/${trip.slug}?resume=${reservedBookingId}`}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      background: "#b8943a",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "8px",
+                      padding: "14px",
+                      fontFamily: "'Poppins', sans-serif",
+                      fontSize: "0.82rem",
+                      fontWeight: 600,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      textDecoration: "none",
+                      marginBottom: "10px",
+                      textAlign: "center",
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    Complete Payment
+                  </Link>
                 ) : (
                   <Link
                     to={`/book/${trip.slug}`}

@@ -467,6 +467,7 @@ enum PaymentIntentStatus {
   COMPLETED
   CANCELLED
   EXPIRED
+  FAILED
 }
 
 enum ReminderType {

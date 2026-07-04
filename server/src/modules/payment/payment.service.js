@@ -17,11 +17,104 @@ const assertBookingOwner = (booking, userId, isAdmin = false) => {
   if (!isAdmin && booking.userId !== userId) throw new ForbiddenError("Forbidden");
 };
 
+// ─── Core: Process Successful Payment ────────────────────────────────────────
+
+/**
+ * Atomic, idempotent function that finalises a successful payment.
+ * Called by BOTH verifyPayment (frontend path) AND handleWebhook (backend path).
+ * Whichever fires first wins; the second call is a guaranteed no-op.
+ *
+ * Availability rule:
+ *   - TOKEN payment  -> filledSpots++ (spot is immediately reserved)
+ *   - FULL  payment  -> filledSpots++ (spot is immediately confirmed)
+ *   - BALANCE payment -> NO increment (spot was already counted at TOKEN time)
+ */
+const _processSuccessfulPayment = async (intent, rzpPaymentId, rzpSignature, rzpMethod) => {
+  const { booking } = intent;
+  const idempotencyKey = `${booking.id}-${intent.type}-${intent.razorpayOrderId}`;
+
+  // Idempotency — if already processed, return existing record
+  const existing = await repo.getPaymentByIdempotencyKey(idempotencyKey);
+  if (existing) return existing;
+
+  const receiptNumber = `RCPT-${crypto.randomBytes(5).toString("hex").toUpperCase()}`;
+
+  const payment = await prisma.$transaction(async (tx) => {
+    // 1. Create Payment record
+    const pmt = await tx.payment.create({
+      data: {
+        bookingId: booking.id,
+        paymentIntentId: intent.id,
+        type: intent.type,
+        status: "SUCCESS",
+        amount: intent.amount,
+        currency: intent.currency,
+        razorpayOrderId: intent.razorpayOrderId,
+        razorpayPaymentId: rzpPaymentId || null,
+        razorpaySignature: rzpSignature || null,
+        paymentMethod: rzpMethod || null,
+        idempotencyKey,
+        receiptNumber,
+        notes: { paymentType: intent.type },
+        paidAt: new Date(),
+      },
+    });
+
+    // 2. Mark PaymentIntent as COMPLETED
+    await tx.paymentIntent.update({
+      where: { id: intent.id },
+      data: { status: "COMPLETED" },
+    });
+
+    // 3. Update Booking status, payment status, and amounts
+    let bookingUpdate = {};
+    if (intent.type === "FULL") {
+      bookingUpdate = {
+        status: "CONFIRMED",
+        paymentStatus: "PAID",
+        amountPaid: { increment: Number(intent.amount) },
+        amountDue: 0,
+        confirmedAt: new Date(),
+      };
+    } else if (intent.type === "TOKEN") {
+      bookingUpdate = {
+        status: "RESERVED",
+        paymentStatus: "PARTIALLY_PAID",
+        amountPaid: { increment: Number(intent.amount) },
+        reservedAt: new Date(),
+      };
+    } else if (intent.type === "BALANCE") {
+      bookingUpdate = {
+        status: "CONFIRMED",
+        paymentStatus: "PAID",
+        amountPaid: { increment: Number(intent.amount) },
+        amountDue: 0,
+        confirmedAt: new Date(),
+      };
+    }
+    await tx.booking.update({ where: { id: booking.id }, data: bookingUpdate });
+
+    // 4. Decrement availability:
+    //    TOKEN -> spot reserved now; FULL -> spot confirmed now; BALANCE -> already counted at TOKEN time.
+    if (intent.type === "TOKEN" || intent.type === "FULL") {
+      await tx.trip.update({
+        where: { id: booking.tripId },
+        data: { filledSpots: { increment: booking.numberOfTravelers } },
+      });
+    }
+
+    return pmt;
+  });
+
+  return payment;
+};
+
 // ─── Initiate Payment ─────────────────────────────────────────────────────────
 
 /**
- * Initiate a TOKEN or FULL payment for a booking.
+ * Initiate a TOKEN or FULL payment for a PENDING booking.
  * Creates a Razorpay order + PaymentIntent record.
+ * Expires any stale CREATED intents before creating a new one.
  */
 export const initiatePayment = async (userId, bookingId, type) => {
   const booking = await bookingRepo.getBookingById(bookingId);
@@ -36,6 +129,12 @@ export const initiatePayment = async (userId, bookingId, type) => {
       `Cannot initiate payment on a booking with status: ${booking.status}. Only PENDING bookings can be paid.`
     );
   }
+
+  // Expire any stale CREATED intents for this booking (e.g. from a previously abandoned attempt)
+  await prisma.paymentIntent.updateMany({
+    where: { bookingId, status: "CREATED" },
+    data: { status: "EXPIRED" },
+  });
 
   const amount = type === "FULL" ? booking.totalAmount : booking.tokenAmount;
 
@@ -75,7 +174,8 @@ export const initiatePayment = async (userId, bookingId, type) => {
 // ─── Initiate Balance Payment ─────────────────────────────────────────────────
 
 /**
- * Initiate a BALANCE payment for a partially-paid booking.
+ * Initiate a BALANCE payment for a RESERVED / PARTIALLY_PAID booking.
+ * Expires any stale CREATED intents before creating a new one.
  */
 export const initiateBalancePayment = async (userId, bookingId, isAdmin = false) => {
   const booking = await bookingRepo.getBookingById(bookingId);
@@ -96,6 +196,12 @@ export const initiateBalancePayment = async (userId, bookingId, isAdmin = false)
   if (Number(amount) <= 0) {
     throw new ValidationError("No outstanding balance for this booking.");
   }
+
+  // Expire any stale CREATED intents before creating a fresh one
+  await prisma.paymentIntent.updateMany({
+    where: { bookingId, status: "CREATED" },
+    data: { status: "EXPIRED" },
+  });
 
   const order = await razorpay.createOrder(
     toPaise(amount),
@@ -131,7 +237,8 @@ export const initiateBalancePayment = async (userId, bookingId, isAdmin = false)
 // ─── Verify Payment ───────────────────────────────────────────────────────────
 
 /**
- * Verify Razorpay payment signature after client-side checkout.
+ * Frontend path: verify Razorpay payment signature after client-side checkout.
+ * Delegates all DB work to _processSuccessfulPayment (idempotent).
  * Works for TOKEN, FULL, and BALANCE payment types.
  */
 export const verifyPayment = async (userId, { razorpayOrderId, razorpayPaymentId, razorpaySignature }) => {
@@ -146,80 +253,18 @@ export const verifyPayment = async (userId, { razorpayOrderId, razorpayPaymentId
   const { booking } = intent;
   assertBookingOwner(booking, userId);
 
-  // 3. Idempotency — if already processed return existing payment
-  const existing = await repo.getPaymentByRazorpayOrderId(razorpayOrderId);
-  if (existing) return existing;
-
-  // 4. Fetch Razorpay payment details
+  // 3. Fetch Razorpay payment details (method info etc.)
   const rzpPayment = await razorpay.fetchPayment(razorpayPaymentId);
-  const idempotencyKey = `${booking.id}-${intent.type}-${razorpayOrderId}`;
-  const receiptNumber = `RCPT-${crypto.randomBytes(5).toString("hex").toUpperCase()}`;
 
-  // 5. Create Payment record
-  const payment = await prisma.$transaction(async (tx) => {
-    const pmt = await tx.payment.create({
-      data: {
-        bookingId: booking.id,
-        paymentIntentId: intent.id,
-        type: intent.type,
-        status: "SUCCESS",
-        amount: intent.amount,
-        currency: intent.currency,
-        razorpayOrderId,
-        razorpayPaymentId,
-        razorpaySignature,
-        paymentMethod: rzpPayment.method || null,
-        idempotencyKey,
-        receiptNumber,
-        notes: { paymentType: intent.type },
-        paidAt: new Date(),
-      },
-    });
+  // 4. Delegate to shared core logic (fully idempotent)
+  const payment = await _processSuccessfulPayment(
+    intent,
+    razorpayPaymentId,
+    razorpaySignature,
+    rzpPayment.method || null
+  );
 
-    // 6. Update PaymentIntent status
-    await tx.paymentIntent.update({ where: { id: intent.id }, data: { status: "COMPLETED" } });
-
-    // 7. Update Booking status/amounts
-    let bookingUpdate = {};
-    if (intent.type === "FULL") {
-      bookingUpdate = {
-        status: "CONFIRMED",
-        paymentStatus: "PAID",
-        amountPaid: { increment: Number(intent.amount) },
-        amountDue: 0,
-        confirmedAt: new Date(),
-      };
-    } else if (intent.type === "TOKEN") {
-      bookingUpdate = {
-        status: "RESERVED",
-        paymentStatus: "PARTIALLY_PAID",
-        amountPaid: { increment: Number(intent.amount) },
-        reservedAt: new Date(),
-      };
-    } else if (intent.type === "BALANCE") {
-      bookingUpdate = {
-        status: "CONFIRMED",
-        paymentStatus: "PAID",
-        amountPaid: { increment: Number(intent.amount) },
-        amountDue: 0,
-        confirmedAt: new Date(),
-      };
-    }
-
-    await tx.booking.update({ where: { id: booking.id }, data: bookingUpdate });
-
-    // 8. Increment filledSpots on trip for non-token first-time (only on FULL or BALANCE final payment)
-    if (intent.type === "FULL" || intent.type === "BALANCE") {
-      await tx.trip.update({
-        where: { id: booking.tripId },
-        data: { filledSpots: { increment: booking.numberOfTravelers } },
-      });
-    }
-
-    return pmt;
-  });
-
-  // 9. Send confirmation email
+  // 5. Send confirmation email (non-fatal)
   try {
     const userEmail = booking.user?.email;
     const userName = booking.user?.profile?.fullName || "Traveler";
@@ -249,7 +294,9 @@ export const verifyPayment = async (userId, { razorpayOrderId, razorpayPaymentId
 // ─── Record Failed Payment ────────────────────────────────────────────────────
 
 /**
- * Record a payment failure (called from frontend on payment.failed or from webhook).
+ * Record a payment failure.
+ * Called from the frontend on payment.failed event, OR from the webhook handler.
+ * Booking is left in PENDING status so the user can retry.
  */
 export const recordFailedPayment = async (userId, { razorpayOrderId, razorpayPaymentId, reason, code }) => {
   const intent = await repo.getPaymentIntentByOrderId(razorpayOrderId);
@@ -258,7 +305,7 @@ export const recordFailedPayment = async (userId, { razorpayOrderId, razorpayPay
   const { booking } = intent;
   if (userId) assertBookingOwner(booking, userId);
 
-  // Check if a payment record already exists for this attempt
+  // Idempotency — skip if this exact failure was already recorded
   const idempotencyKey = `fail-${booking.id}-${intent.type}-${razorpayOrderId}-${razorpayPaymentId || "no_pmt"}`;
   const existing = await prisma.payment.findUnique({ where: { idempotencyKey } });
   if (existing) return existing;
@@ -274,7 +321,7 @@ export const recordFailedPayment = async (userId, { razorpayOrderId, razorpayPay
         amount: intent.amount,
         currency: intent.currency,
         razorpayOrderId,
-        razorpayPaymentId,
+        razorpayPaymentId: razorpayPaymentId || null,
         idempotencyKey,
         failureReason: reason || "Payment failed",
         failureCode: code || null,
@@ -282,14 +329,37 @@ export const recordFailedPayment = async (userId, { razorpayOrderId, razorpayPay
       },
     });
 
-    // 2. Mark intent as FAILED
+    // 2. Mark PaymentIntent as FAILED (valid after schema migration)
     await tx.paymentIntent.update({
       where: { id: intent.id },
       data: { status: "FAILED" },
     });
 
+    // 3. Ensure booking paymentStatus reflects the failure — stays PENDING for retry
+    //    Only update if not already in a terminal success state
+    if (booking.paymentStatus === "PENDING") {
+      await tx.booking.update({
+        where: { id: booking.id },
+        data: { paymentStatus: "FAILED" },
+      });
+    }
+
     return pmt;
   });
+
+  // Fire failure email — non-blocking so SMTP issues don't affect the response
+  const userEmail = booking.user?.email;
+  const userName = booking.user?.profile?.fullName || booking.user?.email?.split("@")[0] || "Traveller";
+  const tripTitle = booking.trip?.title || "your trip";
+  if (userEmail) {
+    email.sendPaymentFailedEmail({
+      to: userEmail,
+      name: userName,
+      bookingRef: booking.bookingReference,
+      tripTitle,
+      amount: Number(intent.amount).toLocaleString("en-IN"),
+    }).catch((err) => console.error("[Email] Failed to send payment failure email:", err));
+  }
 
   return payment;
 };
@@ -299,6 +369,10 @@ export const recordFailedPayment = async (userId, { razorpayOrderId, razorpayPay
 
 /**
  * Process Razorpay server-side webhook events. Fully idempotent.
+ *
+ * CRITICAL: This is the source of truth for payment confirmation.
+ * The payment.captured handler is self-sufficient — it will fully confirm
+ * a booking even if the frontend /verify call never arrived (e.g. browser closed).
  */
 export const handleWebhook = async (rawBody, signature) => {
   // 1. Verify webhook signature
@@ -331,46 +405,77 @@ export const handleWebhook = async (rawBody, signature) => {
     // 4. Route by event type
     switch (eventType) {
       case "payment.captured": {
+        /**
+         * This is the critical safety net.
+         * If the frontend called /verify before this webhook, _processSuccessfulPayment
+         * is idempotent and will return the existing payment record instantly.
+         * If the frontend never called /verify (browser crash, network drop, etc.),
+         * this handler will fully confirm the booking on its own.
+         */
         const rzpPayment = payload.payload?.payment?.entity;
-        if (rzpPayment?.order_id) {
-          const existingPmt = await repo.getPaymentByRazorpayOrderId(rzpPayment.order_id);
-          if (existingPmt && existingPmt.status !== "SUCCESS") {
-            await repo.updatePayment(existingPmt.id, {
-              status: "SUCCESS",
-              razorpayPaymentId: rzpPayment.id,
-              paidAt: new Date(),
-            });
-          }
-        }
-        break;
-      }
-      case "payment.failed": {
-        const rzpPayment = payload.payload?.payment?.entity;
-        if (rzpPayment?.order_id) {
+        if (!rzpPayment?.order_id) break;
+
+        const intent = await repo.getPaymentIntentByOrderId(rzpPayment.order_id);
+        if (!intent) break; // Not our order — skip
+
+        const payment = await _processSuccessfulPayment(
+          intent,
+          rzpPayment.id,
+          null, // No client signature in webhook context
+          rzpPayment.method || null
+        );
+
+        // Send confirmation email (non-fatal) — only if payment was just now created
+        // (avoid duplicate emails if frontend /verify already sent one)
+        if (payment && payment.createdAt && (Date.now() - new Date(payment.createdAt).getTime()) < 30000) {
           try {
-            await recordFailedPayment(null, {
-              razorpayOrderId: rzpPayment.order_id,
-              razorpayPaymentId: rzpPayment.id,
-              reason: rzpPayment.error_description || "Webhook payment.failed",
-              code: rzpPayment.error_code,
-            });
-          } catch (e) {
-            // Error handling already covers skipping if it's processed, etc.
-          }
+            const { booking } = intent;
+            const userEmail = booking.user?.email;
+            if (userEmail) {
+              await email.sendBookingConfirmedEmail({
+                to: userEmail,
+                name: booking.user?.profile?.fullName || "Traveler",
+                bookingRef: booking.bookingReference,
+                tripTitle: booking.trip?.title || "your trip",
+                amountPaid: intent.amount,
+                totalAmount: booking.totalAmount,
+                amountDue: intent.type === "FULL" || intent.type === "BALANCE" ? 0 : Number(booking.totalAmount) - Number(booking.tokenAmount),
+                paymentType: intent.type,
+                receiptNumber: payment.receiptNumber,
+                invoiceDate: payment.paidAt,
+                travelersCount: booking.numberOfTravelers,
+              });
+            }
+          } catch (_) {}
         }
         break;
       }
+
+      case "payment.failed": {
+        /**
+         * Bank-side failure. Record it and leave the booking PENDING for retry.
+         */
+        const rzpPayment = payload.payload?.payment?.entity;
+        if (!rzpPayment?.order_id) break;
+
+        try {
+          await recordFailedPayment(null, {
+            razorpayOrderId: rzpPayment.order_id,
+            razorpayPaymentId: rzpPayment.id,
+            reason: rzpPayment.error_description || "Webhook payment.failed",
+            code: rzpPayment.error_code,
+          });
+        } catch (e) {
+          // Swallow — recordFailedPayment handles its own idempotency
+        }
+        break;
+      }
+
       case "refund.created": {
-        // refund.created just confirms Razorpay registered the refund — keep status PENDING
-        const rzpRefundCreated = payload.payload?.refund?.entity;
-        if (rzpRefundCreated?.id) {
-          const refund = await repo.getRefundByRazorpayId(rzpRefundCreated.id);
-          if (refund && refund.status === "PENDING") {
-            // No status change needed — it's already PENDING
-          }
-        }
+        // Razorpay confirmed the refund request — status stays PENDING on our side
         break;
       }
+
       case "refund.processed": {
         const rzpRefundProcessed = payload.payload?.refund?.entity;
         if (rzpRefundProcessed?.id) {
@@ -407,6 +512,7 @@ export const handleWebhook = async (rawBody, signature) => {
         }
         break;
       }
+
       case "refund.failed": {
         const rzpRefund = payload.payload?.refund?.entity;
         if (rzpRefund?.id) {
@@ -420,6 +526,7 @@ export const handleWebhook = async (rawBody, signature) => {
         }
         break;
       }
+
       default:
         // Unhandled event — log but don't error
         break;
@@ -482,7 +589,7 @@ export const issueRefund = async (paymentId, amount, reason, adminId) => {
 
   if (refundAmount <= 0) throw new ValidationError("No refundable amount remaining.");
   if (refundAmount > maxRefundable) {
-    throw new ValidationError(`Refund amount ₹${refundAmount} exceeds refundable balance ₹${maxRefundable}.`);
+    throw new ValidationError(`Refund amount Rs.${refundAmount} exceeds refundable balance Rs.${maxRefundable}.`);
   }
 
   const isFullRefund = refundAmount >= Number(payment.amount);
@@ -537,11 +644,10 @@ export const issueRefund = async (paymentId, amount, reason, adminId) => {
       },
     });
 
-    // 5. Free up trip capacity when the booking is fully refunded.
-    //    filledSpots is only incremented on FULL or BALANCE payment (i.e. when booking reaches CONFIRMED).
-    //    RESERVED (token-only) bookings never had their spots counted, so we must NOT decrement for them.
-    if (isBookingFullyRefunded && booking.status === "CONFIRMED") {
-      // Clamp to 0 to avoid negative filledSpots from any data inconsistency
+    // 5. Free up trip capacity on full refund.
+    //    filledSpots is decremented for CONFIRMED (FULL/BALANCE paid) AND RESERVED (TOKEN paid)
+    //    bookings, because both states hold a spot per the availability rule.
+    if (isBookingFullyRefunded && (booking.status === "CONFIRMED" || booking.status === "RESERVED")) {
       const currentTrip = await tx.trip.findUnique({ where: { id: booking.tripId }, select: { filledSpots: true } });
       const safeDecrement = Math.min(booking.numberOfTravelers, currentTrip?.filledSpots ?? 0);
       if (safeDecrement > 0) {
@@ -594,7 +700,7 @@ export const sendBalanceReminder = async (bookingId, adminId) => {
     status: "PENDING",
     sentBy: adminId,
     email: userEmail,
-    subject: `Balance Payment Due – ${tripTitle} (${booking.bookingReference})`,
+    subject: `Balance Payment Due - ${tripTitle} (${booking.bookingReference})`,
   });
 
   try {

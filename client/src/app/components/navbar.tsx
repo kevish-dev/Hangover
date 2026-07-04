@@ -203,37 +203,60 @@ export function Navbar() {
         {isLoading ? (
           <AuthButton label="Loading..." scrolled={scrolled} />
         ) : user ? (
-          <button
-            onClick={() => {
-              if (user.role === "ADMIN") {
-                navigate("/dashboard");
-              } else {
-                navigate("/profile");
-              }
-            }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "40px",
-              height: "40px",
-              borderRadius: "50%",
-              background: scrolled ? "rgba(30,26,20,0.05)" : "rgba(255,255,255,0.1)",
-              color: scrolled ? "#1e1a14" : "#ffffff",
-              border: `1px solid ${scrolled ? "rgba(30,26,20,0.1)" : "rgba(255,255,255,0.2)"}`,
-              cursor: "pointer",
-              transition: "all 0.3s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = scrolled ? "rgba(30,26,20,0.1)" : "rgba(255,255,255,0.2)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = scrolled ? "rgba(30,26,20,0.05)" : "rgba(255,255,255,0.1)";
-            }}
-            title={user.role === "ADMIN" ? "Admin Dashboard" : "My Profile"}
-          >
-            <User size={20} />
-          </button>
+          <>
+            {user.role === "ADMIN" && (
+              <button
+                onClick={() => navigate("/dashboard")}
+                style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 500,
+                  fontSize: "0.75rem",
+                  letterSpacing: "0.08em",
+                  padding: "6px 14px",
+                  cursor: "pointer",
+                  transition: "all 0.3s ease",
+                  background: scrolled ? "rgba(120,18,22,0.08)" : "rgba(255,255,255,0.12)",
+                  color: scrolled ? "#781216" : "#ffffff",
+                  border: `1px solid ${scrolled ? "rgba(120,18,22,0.2)" : "rgba(255,255,255,0.25)"}`,
+                  borderRadius: "4px",
+                  outline: "none",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = scrolled ? "rgba(120,18,22,0.15)" : "rgba(255,255,255,0.2)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = scrolled ? "rgba(120,18,22,0.08)" : "rgba(255,255,255,0.12)";
+                }}
+              >
+                DASHBOARD
+              </button>
+            )}
+            <button
+              onClick={() => navigate("/profile")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "40px",
+                height: "40px",
+                borderRadius: "50%",
+                background: scrolled ? "rgba(30,26,20,0.05)" : "rgba(255,255,255,0.1)",
+                color: scrolled ? "#1e1a14" : "#ffffff",
+                border: `1px solid ${scrolled ? "rgba(30,26,20,0.1)" : "rgba(255,255,255,0.2)"}`,
+                cursor: "pointer",
+                transition: "all 0.3s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = scrolled ? "rgba(30,26,20,0.1)" : "rgba(255,255,255,0.2)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = scrolled ? "rgba(30,26,20,0.05)" : "rgba(255,255,255,0.1)";
+              }}
+              title="My Profile"
+            >
+              <User size={20} />
+            </button>
+          </>
         ) : (
           <LoginDialog>
             <AuthButton label="Sign In" scrolled={scrolled} />

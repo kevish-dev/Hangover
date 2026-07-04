@@ -41,7 +41,7 @@ export const createBooking = async (userId, data) => {
     where: {
       userId,
       tripId: data.tripId,
-      status: { in: ["CONFIRMED", "COMPLETED"] },
+      status: { in: ["RESERVED", "CONFIRMED", "COMPLETED"] },
     },
   });
   if (existingActive) {
@@ -75,24 +75,36 @@ export const createBooking = async (userId, data) => {
   const balanceDueDate = new Date(trip.startDate);
   balanceDueDate.setDate(balanceDueDate.getDate() - 10);
 
-  // Generate booking reference
-  const bookingReference = `HNG-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
-
   // 5. Build booking payload
   const bookingData = {
-    bookingReference,
-    userId,
-    tripId: data.tripId,
     numberOfTravelers,
     initialPaymentType,
     totalAmount,
     tokenAmount,
     amountDue,
     balanceDueDate,
-    status: "PENDING",
-    paymentStatus: "PENDING",
     specialRequests: data.specialRequests || null,
   };
+
+  // Check if there is an existing PENDING booking to reuse
+  const existingPending = await prisma.booking.findFirst({
+    where: {
+      userId,
+      tripId: data.tripId,
+      status: "PENDING",
+    },
+  });
+
+  if (existingPending) {
+    return repo.updateBooking(existingPending.id, bookingData);
+  }
+
+  // Generate booking reference and complete payload for a new booking
+  bookingData.bookingReference = `HNG-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+  bookingData.userId = userId;
+  bookingData.tripId = data.tripId;
+  bookingData.status = "PENDING";
+  bookingData.paymentStatus = "PENDING";
 
   return repo.createBooking(bookingData);
 };

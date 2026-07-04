@@ -2,6 +2,7 @@ import axios from "axios";
 import env from "../../core/env/env.js";
 import * as authRepo from "./auth.repository.js";
 import { generateTokens, verifyRefreshToken } from "../../utils/jwt.util.js";
+import sendMail from "../../utils/sendMail.js";
 
 export const googleLogin = async (code) => {
   // Exchange code for Google tokens
@@ -41,6 +42,11 @@ export const googleLogin = async (code) => {
     } else {
       // Create new user
       user = await authRepo.createUser({ email, googleId, fullName });
+      
+      const subject = "Welcome to Hangover!";
+      const text = `Hi ${fullName},\n\nWelcome to Hangover! We are glad to have you on board.`;
+      const html = `<h3>Hi ${fullName},</h3><p>Welcome to Hangover! We are glad to have you on board.</p>`;
+      sendMail(email, subject, text, html).catch(console.error);
     }
   }
 
