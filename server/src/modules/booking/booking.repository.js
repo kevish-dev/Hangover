@@ -35,7 +35,7 @@ export const getUserBookings = async (userId, skip, take) => {
   const [bookings, total] = await Promise.all([
     prisma.booking.findMany({
       where: { userId },
-      include: { trip: true, payments: true },
+      include: { trip: true, payments: { include: { refunds: true } } },
       orderBy: { createdAt: "desc" },
       skip,
       take,
@@ -48,7 +48,7 @@ export const getUserBookings = async (userId, skip, take) => {
 export const getAllBookings = async (skip, take) => {
   const [bookings, total] = await Promise.all([
     prisma.booking.findMany({
-      include: { trip: true, user: { include: { profile: true } }, payments: true },
+      include: { trip: true, user: { include: { profile: true } }, payments: { include: { refunds: true } } },
       orderBy: { createdAt: "desc" },
       skip,
       take,

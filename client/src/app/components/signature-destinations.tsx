@@ -9,64 +9,44 @@ import {
 
 const SIGNATURES = [
   {
-    id: "maldives",
-    name: "Maldives",
-    region: "Indian Ocean",
-    tagline: "Floating above paradise",
-    duration: "7 Nights",
-    price: "From ₹1,85,000",
-    imageUrl:
-      "https://images.unsplash.com/photo-1590523277543-a94d2e4eb00b?w=900&h=680&fit=crop&auto=format&q=90",
-  },
-  {
-    id: "rajasthan",
-    name: "Rajasthan",
-    region: "India",
-    tagline: "Where royalty never left",
-    duration: "10 Nights",
-    price: "From ₹68,000",
-    imageUrl:
-      "https://images.unsplash.com/photo-1772976455832-9d6b078ac401?w=900&h=680&fit=crop&auto=format&q=90",
-  },
-  {
-    id: "iceland",
-    name: "Iceland",
-    region: "North Atlantic",
-    tagline: "Chasing lights at the edge of the world",
-    duration: "8 Nights",
-    price: "From ₹2,20,000",
-    imageUrl:
-      "https://images.unsplash.com/photo-1488415032361-b7e238421f1b?w=900&h=680&fit=crop&auto=format&q=90",
-  },
-  {
-    id: "bali",
-    name: "Bali",
-    region: "Indonesia",
-    tagline: "Spirit, stone and sacred silence",
+    id: "tawang",
+    name: "Tawang",
+    region: "Arunachal Pradesh",
+    tagline: "Land of Monpas and mystic monasteries",
     duration: "6 Nights",
-    price: "From ₹72,000",
+    price: "From ₹35,000",
     imageUrl:
-      "https://images.unsplash.com/photo-1555400038-63f5ba517a47?w=900&h=680&fit=crop&auto=format&q=90",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/The_buddist_monastry.jpg/1280px-The_buddist_monastry.jpg",
   },
   {
-    id: "morocco",
-    name: "Sahara Morocco",
-    region: "North Africa",
-    tagline: "A thousand dunes, one horizon",
-    duration: "9 Nights",
-    price: "From ₹1,10,000",
+    id: "ziro",
+    name: "Ziro",
+    region: "Arunachal Pradesh",
+    tagline: "Pine-clad hills and tribal heritage",
+    duration: "4 Nights",
+    price: "From ₹28,000",
     imageUrl:
-      "https://images.unsplash.com/photo-1508513268030-f8a9af25721c?w=900&h=680&fit=crop&auto=format&q=90",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/A_cross_section_of_luch_green_valley_of_Ziro.jpg/1280px-A_cross_section_of_luch_green_valley_of_Ziro.jpg",
   },
   {
-    id: "newzealand",
-    name: "New Zealand",
-    region: "South Pacific",
-    tagline: "Fjords carved by ancient giants",
-    duration: "12 Nights",
-    price: "From ₹2,95,000",
+    id: "anini",
+    name: "Anini",
+    region: "Arunachal Pradesh",
+    tagline: "Unexplored pristine valleys",
+    duration: "7 Nights",
+    price: "From ₹45,000",
     imageUrl:
-      "https://images.unsplash.com/photo-1466446105453-d151af699ac7?w=900&h=680&fit=crop&auto=format&q=90",
+      "https://res.cloudinary.com/dzyufud4q/image/upload/v1780495341/destinations/mdjk7tgfvdcybeh6ntue.webp",
+  },
+  {
+    id: "mechuka",
+    name: "Mechuka",
+    region: "Arunachal Pradesh",
+    tagline: "The forgotten valley of wind",
+    duration: "5 Nights",
+    price: "From ₹40,000",
+    imageUrl:
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Mechuka_overview_2.jpg/1280px-Mechuka_overview_2.jpg",
   },
 ];
 
@@ -236,7 +216,7 @@ export function SignatureDestinations() {
           {/* Right: sticky image */}
           <div
             className="w-full lg:w-5/12 sticky top-24 self-start mt-12 lg:mt-0"
-            style={{ aspectRatio: "4/3", position: "relative" }}
+            style={{ aspectRatio: "4/3", }}
           >
             <HoverSliderImageWrap style={{ width: "100%", height: "100%" }}>
               {SIGNATURES.map((dest, index) => (

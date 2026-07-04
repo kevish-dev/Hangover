@@ -305,16 +305,49 @@ export const handleWebhook = async (rawBody, signature) => {
         }
         break;
       }
-      case "refund.created":
+      case "refund.created": {
+        // refund.created just confirms Razorpay registered the refund — keep status PENDING
+        const rzpRefundCreated = payload.payload?.refund?.entity;
+        if (rzpRefundCreated?.id) {
+          const refund = await repo.getRefundByRazorpayId(rzpRefundCreated.id);
+          if (refund && refund.status === "PENDING") {
+            // No status change needed — it's already PENDING
+          }
+        }
+        break;
+      }
       case "refund.processed": {
-        const rzpRefund = payload.payload?.refund?.entity;
-        if (rzpRefund?.id) {
-          const refund = await repo.getRefundByRazorpayId(rzpRefund.id);
-          if (refund) {
+        const rzpRefundProcessed = payload.payload?.refund?.entity;
+        if (rzpRefundProcessed?.id) {
+          const refund = await repo.getRefundByRazorpayId(rzpRefundProcessed.id);
+          if (refund && refund.status !== "SUCCESS") {
+            // Mark refund as completed
             await repo.updateRefundRecord(refund.id, {
-              status: eventType === "refund.processed" ? "SUCCESS" : "PENDING",
-              processedAt: eventType === "refund.processed" ? new Date() : undefined,
+              status: "SUCCESS",
+              processedAt: new Date(),
             });
+
+            // Sync payment and booking statuses based on total refunded amount
+            const payment = await repo.getPaymentById(refund.paymentId);
+            if (payment) {
+              const totalRefunded = payment.refunds
+                .filter((r) => r.status === "SUCCESS" || r.id === refund.id)
+                .reduce((sum, r) => sum + Number(r.amount), 0);
+              const isFullRefund = totalRefunded >= Number(payment.amount);
+
+              await repo.updatePayment(payment.id, {
+                status: isFullRefund ? "REFUNDED" : "SUCCESS",
+              });
+
+              const booking = await bookingRepo.getBookingById(payment.bookingId);
+              if (booking) {
+                const newAmountPaid = toDecimal2(Math.max(0, Number(booking.amountPaid) - Number(refund.amount)));
+                const isBookingFullyRefunded = newAmountPaid === 0;
+                await bookingRepo.updateBooking(payment.bookingId, {
+                  paymentStatus: isBookingFullyRefunded ? "REFUNDED" : "PARTIALLY_REFUNDED",
+                });
+              }
+            }
           }
         }
         break;
@@ -397,6 +430,8 @@ export const issueRefund = async (paymentId, amount, reason, adminId) => {
     throw new ValidationError(`Refund amount ₹${refundAmount} exceeds refundable balance ₹${maxRefundable}.`);
   }
 
+  const isFullRefund = refundAmount >= Number(payment.amount);
+
   // Issue refund via Razorpay
   const rzpRefund = await razorpay.createRefund(
     payment.razorpayPaymentId,
@@ -404,21 +439,58 @@ export const issueRefund = async (paymentId, amount, reason, adminId) => {
     { reason, admin_id: adminId }
   );
 
-  // Record refund
-  const refundRecord = await repo.createRefundRecord({
-    paymentId: payment.id,
-    amount: refundAmount,
-    status: "PENDING",
-    reason,
-    razorpayRefundId: rzpRefund.id,
-    initiatedBy: adminId,
-    metadata: { razorpayRefund: rzpRefund },
-  });
+  // Atomically record refund, update payment status, and update booking
+  const refundRecord = await prisma.$transaction(async (tx) => {
+    // 1. Create refund record
+    const record = await tx.refund.create({
+      data: {
+        paymentId: payment.id,
+        amount: refundAmount,
+        status: "PENDING",
+        reason,
+        razorpayRefundId: rzpRefund.id,
+        initiatedBy: adminId,
+        metadata: { razorpayRefund: rzpRefund },
+      },
+    });
 
-  // Update booking amounts
-  await bookingRepo.updateBooking(payment.bookingId, {
-    amountPaid: { decrement: refundAmount },
-    amountDue: { increment: refundAmount },
+    // 2. Update payment status — REFUNDED for full, stays SUCCESS for partial
+    await tx.payment.update({
+      where: { id: payment.id },
+      data: { status: isFullRefund ? "REFUNDED" : "SUCCESS" },
+    });
+
+    // 3. Fetch the booking's current amountPaid to calculate new values
+    const booking = await tx.booking.findUnique({ where: { id: payment.bookingId } });
+    const newAmountPaid = toDecimal2(Math.max(0, Number(booking.amountPaid) - refundAmount));
+    const newAmountDue = toDecimal2(Number(booking.totalAmount) - newAmountPaid);
+    const isBookingFullyRefunded = newAmountPaid === 0;
+
+    // 4. Update booking payment status and booking status
+    await tx.booking.update({
+      where: { id: payment.bookingId },
+      data: {
+        amountPaid: newAmountPaid,
+        amountDue: newAmountDue,
+        paymentStatus: isBookingFullyRefunded ? "REFUNDED" : "PARTIALLY_REFUNDED",
+        // Cancel the booking if fully refunded
+        ...(isBookingFullyRefunded && {
+          status: "CANCELLED",
+          cancelledAt: new Date(),
+          cancellationReason: reason || "Refunded by admin",
+        }),
+      },
+    });
+
+    // 5. Decrement filledSpots if the booking is fully refunded (capacity freed)
+    if (isBookingFullyRefunded && ["CONFIRMED", "RESERVED"].includes(booking.status)) {
+      await tx.trip.update({
+        where: { id: booking.tripId },
+        data: { filledSpots: { decrement: booking.numberOfTravelers } },
+      });
+    }
+
+    return record;
   });
 
   // Send refund email

@@ -92,25 +92,57 @@ function ActionMenu({ booking, onRemind, onRefund }: { booking: any, onRemind: (
 
 function RefundModal({ booking, onClose, refetch }: { booking: any, onClose: () => void, refetch: () => void }) {
   const [processingId, setProcessingId] = useState<string | null>(null);
+  // Custom amount & reason state per payment: { [paymentId]: { amount: string, reason: string } }
+  const [refundInputs, setRefundInputs] = useState<Record<string, { amount: string; reason: string }>>({});
 
-  const handleRefund = async (paymentId: string) => {
+  const getInput = (paymentId: string, maxAmount: number) => {
+    return refundInputs[paymentId] ?? { amount: String(maxAmount), reason: "" };
+  };
+
+  const setInput = (paymentId: string, key: "amount" | "reason", value: string) => {
+    setRefundInputs(prev => ({
+      ...prev,
+      [paymentId]: { ...getInput(paymentId, 0), [key]: value },
+    }));
+  };
+
+  const handleRefund = async (paymentId: string, maxAmount: number) => {
+    const input = getInput(paymentId, maxAmount);
+    const refundAmount = parseFloat(input.amount);
+
+    if (!refundAmount || refundAmount <= 0) {
+      toast.error("Please enter a valid refund amount.");
+      return;
+    }
+    if (refundAmount > maxAmount) {
+      toast.error(`Refund amount cannot exceed ₹${maxAmount.toLocaleString("en-IN")}.`);
+      return;
+    }
+
     setProcessingId(paymentId);
     try {
-      await apiClient.post(`/payments/${paymentId}/refund`);
-      toast.success("Refund initiated successfully");
+      await apiClient.post(`/payments/${paymentId}/refund`, {
+        amount: refundAmount,
+        reason: input.reason || undefined,
+      });
+      toast.success("Refund initiated successfully!");
       refetch();
+      onClose();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to initiate refund");
+      toast.error(error.response?.data?.message || "Failed to initiate refund.");
     } finally {
       setProcessingId(null);
     }
   };
 
-  const successfulPayments = booking.payments?.filter((p: any) => p.status === "SUCCESS") || [];
+  // Show SUCCESS and REFUNDED payments (partial refunds keep payment status as SUCCESS)
+  const refundablePayments = booking.payments?.filter(
+    (p: any) => p.status === "SUCCESS" || p.status === "REFUNDED"
+  ) || [];
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="px-6 py-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <IndianRupee className="w-5 h-5 text-purple-600" />
@@ -120,40 +152,121 @@ function RefundModal({ booking, onClose, refetch }: { booking: any, onClose: () 
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-6">
-          <p className="text-sm text-gray-600 mb-5">
-            Select a payment to refund for booking <strong className="font-mono">{booking.bookingReference}</strong>.
+        <div className="p-6 max-h-[75vh] overflow-y-auto">
+          <p className="text-sm text-gray-600 mb-1">
+            Booking: <strong className="font-mono text-gray-900">{booking.bookingReference}</strong>
           </p>
-          <div className="space-y-3">
-            {successfulPayments.length === 0 ? (
+          <p className="text-xs text-gray-400 mb-5">Enter a custom refund amount per payment. Leave the amount at max to issue a full refund.</p>
+
+          <div className="space-y-4">
+            {refundablePayments.length === 0 ? (
               <div className="p-4 bg-gray-50 rounded-lg text-center border border-gray-200">
                 <p className="text-gray-500 text-sm">No refundable payments found.</p>
               </div>
             ) : (
-              successfulPayments.map((p: any) => {
-                const hasRefund = 
-                  p.status === "REFUNDED" || 
-                  p.status === "PARTIALLY_REFUNDED" ||
-                  p.refunds?.some((r: any) => r.status === "PENDING" || r.status === "SUCCESS");
+              refundablePayments.map((p: any) => {
+                const alreadyRefunded = (p.refunds || [])
+                  .filter((r: any) => r.status === "PENDING" || r.status === "SUCCESS")
+                  .reduce((sum: number, r: any) => sum + Number(r.amount), 0);
+                const refundableRemaining = Math.max(0, Number(p.amount) - alreadyRefunded);
+                const isFullyRefunded = refundableRemaining <= 0 || p.status === "REFUNDED";
+                const hasPendingRefund = (p.refunds || []).some((r: any) => r.status === "PENDING");
+                const input = getInput(p.id, refundableRemaining);
+                const enteredAmount = parseFloat(input.amount) || 0;
+                const isInvalid = enteredAmount <= 0 || enteredAmount > refundableRemaining;
 
                 return (
-                  <div key={p.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:border-purple-200 hover:bg-purple-50/30 transition-colors">
-                    <div>
-                      <p className="font-semibold text-gray-900 text-sm flex items-center gap-1">
-                        <IndianRupee className="w-3.5 h-3.5 text-gray-500" />
-                        {Number(p.amount).toLocaleString("en-IN")}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1 uppercase tracking-wider font-medium">{p.type} <span className="mx-1 text-gray-300">|</span> {format(new Date(p.createdAt), "MMM d, yyyy")}</p>
+                  <div key={p.id} className={`border rounded-xl p-4 transition-colors ${
+                    isFullyRefunded ? "border-gray-200 bg-gray-50 opacity-70" : "border-purple-200 bg-purple-50/20"
+                  }`}>
+                    {/* Payment summary row */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="font-bold text-gray-900 text-sm flex items-center gap-1">
+                          <IndianRupee className="w-3.5 h-3.5 text-gray-600" />
+                          {Number(p.amount).toLocaleString("en-IN")}
+                          <span className="ml-2 px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs font-medium uppercase tracking-wider">{p.type}</span>
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">{format(new Date(p.createdAt), "MMM d, yyyy · HH:mm")}</p>
+                      </div>
+                      {isFullyRefunded ? (
+                        <span className="px-3 py-1 bg-gray-200 text-gray-500 rounded-full text-xs font-bold">Fully Refunded</span>
+                      ) : hasPendingRefund ? (
+                        <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold">Pending...</span>
+                      ) : (
+                        <span className="text-xs text-purple-700 font-semibold bg-purple-100 px-2 py-1 rounded-full">
+                          Max: ₹{refundableRemaining.toLocaleString("en-IN")}
+                        </span>
+                      )}
                     </div>
-                    <button 
-                      onClick={() => handleRefund(p.id)}
-                      disabled={processingId === p.id || hasRefund}
-                      className={`px-4 py-2 text-xs font-bold rounded-md transition-colors disabled:opacity-50 min-w-[100px] flex justify-center ${
-                        hasRefund ? "bg-gray-100 text-gray-500" : "bg-purple-100 text-purple-700 hover:bg-purple-200"
-                      }`}
-                    >
-                      {processingId === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : hasRefund ? "Pending" : "Refund"}
-                    </button>
+
+                    {/* Already refunded info */}
+                    {alreadyRefunded > 0 && !isFullyRefunded && (
+                      <div className="flex items-center gap-1.5 mb-3 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-1.5 border border-amber-200">
+                        <span>₹{alreadyRefunded.toLocaleString("en-IN")} already refunded</span>
+                        <span className="text-amber-400">·</span>
+                        <span>₹{refundableRemaining.toLocaleString("en-IN")} remaining</span>
+                      </div>
+                    )}
+
+                    {/* Custom amount & reason inputs */}
+                    {!isFullyRefunded && !hasPendingRefund && (
+                      <div className="space-y-2.5">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-600 mb-1">Refund Amount (₹)</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">₹</span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={refundableRemaining}
+                              step={0.01}
+                              value={input.amount}
+                              onChange={(e) => setInput(p.id, "amount", e.target.value)}
+                              className={`w-full pl-7 pr-3 py-2 border rounded-lg text-sm font-medium focus:outline-none focus:ring-2 ${
+                                isInvalid && input.amount !== String(refundableRemaining)
+                                  ? "border-red-300 focus:ring-red-200 text-red-700"
+                                  : "border-gray-300 focus:ring-purple-200 focus:border-purple-400 text-gray-900"
+                              }`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setInput(p.id, "amount", String(refundableRemaining))}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-purple-600 font-bold hover:text-purple-800 transition-colors"
+                            >
+                              Max
+                            </button>
+                          </div>
+                          {isInvalid && parseFloat(input.amount) > refundableRemaining && (
+                            <p className="text-xs text-red-500 mt-1">Cannot exceed ₹{refundableRemaining.toLocaleString("en-IN")}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-600 mb-1">Reason <span className="text-gray-400 font-normal">(optional)</span></label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Trip cancelled, customer request..."
+                            value={input.reason}
+                            onChange={(e) => setInput(p.id, "reason", e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400 placeholder-gray-300"
+                          />
+                        </div>
+                        <button
+                          onClick={() => handleRefund(p.id, refundableRemaining)}
+                          disabled={processingId === p.id || isInvalid}
+                          className="w-full flex items-center justify-center gap-2 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white text-sm font-bold rounded-lg transition-colors"
+                        >
+                          {processingId === p.id ? (
+                            <><Loader2 className="w-4 h-4 animate-spin" /> Processing...</>
+                          ) : (
+                            <>
+                              <IndianRupee className="w-4 h-4" />
+                              Refund ₹{(parseFloat(input.amount) || 0).toLocaleString("en-IN")}
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })

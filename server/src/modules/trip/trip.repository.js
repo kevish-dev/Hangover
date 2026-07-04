@@ -11,6 +11,7 @@ export const findAll = async (skip, take, where = {}) => {
         id: true,
         title: true,
         slug: true,
+        overview: true,
         location: true,
         bannerImages: true,
         duration: true,

@@ -58,27 +58,27 @@ const UPCOMING = [
   {
     name: "Ziro Music Festival",
     place: "Arunachal Pradesh",
-    date: "Oct 2025",
+    date: "24 - 28 September, 2025",
     tag: "Music · Tribal · Indie",
   },
-  {
-    name: "Rann Utsav",
-    place: "Kutch, Gujarat",
-    date: "Nov 2025",
-    tag: "Culture · Desert · Craft",
-  },
-  {
-    name: "Hornbill Festival",
-    place: "Nagaland",
-    date: "Dec 2025",
-    tag: "Tribe · Dance · Heritage",
-  },
-  {
-    name: "Hampi Utsav",
-    place: "Karnataka",
-    date: "Jan 2026",
-    tag: "Ruins · Art · Classical",
-  },
+  // {
+  //   name: "Rann Utsav",
+  //   place: "Kutch, Gujarat",
+  //   date: "Nov 2025",
+  //   tag: "Culture · Desert · Craft",
+  // },
+  // {
+  //   name: "Hornbill Festival",
+  //   place: "Nagaland",
+  //   date: "Dec 2025",
+  //   tag: "Tribe · Dance · Heritage",
+  // },
+  // {
+  //   name: "Hampi Utsav",
+  //   place: "Karnataka",
+  //   date: "Jan 2026",
+  //   tag: "Ruins · Art · Classical",
+  // },
 ];
 
 const VIDEOS = [

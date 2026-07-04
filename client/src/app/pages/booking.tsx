@@ -27,6 +27,8 @@ import { apiClient, API_URL } from "../../lib/axios";
 import { useAuth } from "../../contexts/AuthContext";
 import { SiteFooter } from "../components/site-footer";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { getMyProfile } from "../../lib/profileApi";
 
 // Razorpay is loaded as a static <script> in index.html
 declare const Razorpay: any;
@@ -144,21 +146,42 @@ function Select({
   );
 }
 
+
 function FilePickerField({
   label,
   required,
   hint,
   file,
   onChange,
+  existingUrl,
 }: {
   label: string;
   required?: boolean;
   hint?: string;
   file: File | null;
   onChange: (f: File | null) => void;
+  existingUrl?: string | null;
 }) {
+  const previewUrl = file ? URL.createObjectURL(file) : existingUrl;
+
   return (
     <Field label={label} required={required} hint={hint}>
+      {previewUrl && (
+        <div style={{ marginBottom: "12px" }}>
+          <img
+            src={previewUrl}
+            alt="Govt ID Preview"
+            style={{
+              width: "100%",
+              maxHeight: "160px",
+              objectFit: "cover",
+              borderRadius: "8px",
+              border: "1px solid rgba(30,26,20,0.1)",
+              background: "#f0f0f0"
+            }}
+          />
+        </div>
+      )}
       <label
         style={{
           display: "flex",
@@ -166,8 +189,8 @@ function FilePickerField({
           gap: "10px",
           padding: "11px 14px",
           borderRadius: "8px",
-          border: `1.5px dashed ${file ? "#781216" : "rgba(30,26,20,0.2)"}`,
-          background: file ? "rgba(120,18,22,0.03)" : "#faf8f4",
+          border: `1.5px dashed ${file || existingUrl ? "#781216" : "rgba(30,26,20,0.2)"}`,
+          background: file || existingUrl ? "rgba(120,18,22,0.03)" : "#faf8f4",
           cursor: "pointer",
           transition: "border-color 0.2s, background 0.2s",
           fontFamily: "'Poppins', sans-serif",
@@ -175,17 +198,17 @@ function FilePickerField({
       >
         <Upload
           size={15}
-          color={file ? "#781216" : "rgba(30,26,20,0.38)"}
+          color={file || existingUrl ? "#781216" : "rgba(30,26,20,0.38)"}
           strokeWidth={1.5}
         />
         <span
           style={{
-            color: file ? "#781216" : "rgba(30,26,20,0.5)",
+            color: file || existingUrl ? "#781216" : "rgba(30,26,20,0.5)",
             fontSize: "0.78rem",
             fontWeight: 300,
           }}
         >
-          {file ? file.name : "Choose file…"}
+          {file ? file.name : existingUrl ? "Replace file…" : "Choose file…"}
         </span>
         <input
           type="file"
@@ -481,6 +504,17 @@ export default function BookingPage() {
   const [primaryPhone, setPrimaryPhone] = useState("");
   const [specialRequests, setSpecialRequests] = useState("");
 
+  const { data: profile, isLoading: profileLoading } = useQuery({
+    queryKey: ["profile"],
+    queryFn: getMyProfile,
+    enabled: !!user,
+  });
+
+  useEffect(() => {
+    if (user && !primaryEmail) setPrimaryEmail(user.email);
+    if (profile?.phone && !primaryPhone) setPrimaryPhone(profile.phone);
+  }, [user, profile]);
+
   // Govt ID upload state
   const [govtIdImage, setGovtIdImage] = useState<File | null>(null);
 
@@ -563,7 +597,7 @@ export default function BookingPage() {
     }
 
     // Validate Govt ID uploaded
-    if (!govtIdImage) {
+    if (!govtIdImage && !profile?.govtIdImageUrl) {
       const msg =
         "Please upload a clear picture of your Aadhaar / Govt ID before proceeding.";
       setBookingError(msg);
@@ -579,15 +613,17 @@ export default function BookingPage() {
     setBookingStep("paying");
 
     try {
-      // 2. Upload Govt ID & Update Profile
-      const idForm = new FormData();
-      idForm.append("govtIdType", "AADHAAR");
-      if (govtIdImage) idForm.append("image", govtIdImage);
-      await apiClient.post("/users/me/govt-id", idForm, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      // 2. Upload Govt ID & Update Profile (skip if no new image provided)
+      if (govtIdImage) {
+        const idForm = new FormData();
+        idForm.append("govtIdType", "AADHAAR");
+        idForm.append("image", govtIdImage);
+        await apiClient.post("/users/me/govt-id", idForm, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
 
-      const formData = new FormData(e.currentTarget);
+      const formData = new FormData(e.currentTarget as HTMLFormElement);
       const addressVal = formData.get("address") as string;
       const pinCodeVal = formData.get("pinCode") as string;
       
@@ -1439,6 +1475,7 @@ export default function BookingPage() {
 
             {/* ── 1. Primary Traveler ── */}
             <div
+              key={profile?.id || "loading"}
               style={{
                 background: "#ffffff",
                 borderRadius: "14px",
@@ -1449,13 +1486,13 @@ export default function BookingPage() {
             >
               <FormSection title="Primary Traveler" icon={User}>
                 <Field label="First Name" required>
-                  <Input type="text" name="firstName" placeholder="Arjun" required />
+                  <Input type="text" name="firstName" placeholder="Arjun" defaultValue={profile?.fullName?.split(" ")[0] || ""} required />
                 </Field>
                 <Field label="Middle Name">
                   <Input type="text" name="middleName" placeholder="Optional" />
                 </Field>
                 <Field label="Last Name" required>
-                  <Input type="text" name="lastName" placeholder="Sharma" required />
+                  <Input type="text" name="lastName" placeholder="Sharma" defaultValue={profile?.fullName?.split(" ").slice(1).join(" ") || ""} required />
                 </Field>
                 <Field
                   label="Email ID"
@@ -1477,6 +1514,7 @@ export default function BookingPage() {
                       type="text"
                       name="address"
                       placeholder="House / Street / Colony"
+                      defaultValue={[profile?.addressLine1, profile?.addressLine2, profile?.city, profile?.state].filter(Boolean).join(", ") || ""}
                       required
                     />
                   </Field>
@@ -1487,6 +1525,7 @@ export default function BookingPage() {
                     name="pinCode"
                     placeholder="400001"
                     maxLength={6}
+                    defaultValue={profile?.postalCode || ""}
                     required
                   />
                 </Field>
@@ -1505,10 +1544,10 @@ export default function BookingPage() {
                   />
                 </Field>
                 <Field label="Date of Birth" required>
-                  <Input type="date" name="dateOfBirth" required />
+                  <Input type="date" name="dateOfBirth" defaultValue={profile?.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().split('T')[0] : ""} required />
                 </Field>
                 <Field label="Gender" required>
-                  <Select name="gender" required>
+                  <Select name="gender" defaultValue={profile?.gender || ""} required>
                     <option value="">Select gender</option>
                     <option value="MALE">Male</option>
                     <option value="FEMALE">Female</option>
@@ -1519,10 +1558,11 @@ export default function BookingPage() {
                 <div className="sm:col-span-2" id="govt-id-section">
                   <FilePickerField
                     label="Aadhaar / Govt ID"
-                    required
+                    required={!profile?.govtIdImageUrl}
                     hint="Clear photo or scan — max 5 MB"
                     file={govtIdImage}
                     onChange={setGovtIdImage}
+                    existingUrl={profile?.govtIdImageUrl}
                   />
                 </div>
               </FormSection>

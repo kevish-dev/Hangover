@@ -1954,6 +1954,13 @@ function TripDetailContent({
               {[
                 { icon: Clock, label: "Duration", value: durationStr },
                 {
+                  icon: Calendar,
+                  label: "Dates",
+                  value: trip.startDate && trip.endDate
+                    ? `${new Date(trip.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} - ${new Date(trip.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                    : null,
+                },
+                {
                   icon: Mountain,
                   label: "Difficulty",
                   value: trip.difficultyLevel || null,

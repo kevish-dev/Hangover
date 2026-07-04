@@ -46,8 +46,7 @@ model UserProfile {
   medicalNotes             String?
   govtIdType               GovtIdType?
   govtIdNumber             String?
-  govtIdFrontImageUrl      String?
-  govtIdBackImageUrl       String?
+  govtIdImageUrl           String?
   createdAt                DateTime    @default(now())
   updatedAt                DateTime    @updatedAt
   user                     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -140,7 +139,7 @@ model Booking {
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   trip                Trip                  @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  user                User                  @relation(fields: [userId], references: [id])
+  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   BookingFormResponse BookingFormResponse[]
   payments            Payment[]
   paymentIntents      PaymentIntent[]
@@ -235,9 +234,9 @@ model Inquiry {
   adminNotes   String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
-  resolvedBy   User?     @relation("InquiryResolver", fields: [resolvedById], references: [id])
+  resolvedBy   User?     @relation("InquiryResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
   trip         Trip?     @relation(fields: [tripId], references: [id])
-  user         User?     @relation(fields: [userId], references: [id])
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([email])
   @@index([tripId])

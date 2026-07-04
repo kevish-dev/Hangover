@@ -12,6 +12,8 @@ import {
   ChevronRight,
   Loader2,
   PackageOpen,
+  RotateCcw,
+  ReceiptText,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -30,14 +32,16 @@ import { ProfileSettings } from "../components/profile-settings";
 // ── Status badge styling ──────────────────────────────────────────
 
 const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }> = {
-  PENDING:   { bg: "rgba(200,169,110,0.12)", color: "#b8943a", label: "Pending" },
-  RESERVED:  { bg: "rgba(200,169,110,0.12)", color: "#b8943a", label: "Upcoming" },
-  CONFIRMED: { bg: "rgba(34,139,34,0.10)",   color: "#228b22", label: "Upcoming" },
-  COMPLETED: { bg: "rgba(34,139,34,0.10)",   color: "#228b22", label: "Completed" },
-  CANCELLED: { bg: "rgba(120,18,22,0.08)",   color: "#781216", label: "Cancelled" },
+  PENDING:             { bg: "rgba(200,169,110,0.12)", color: "#b8943a",  label: "Pending" },
+  RESERVED:            { bg: "rgba(200,169,110,0.12)", color: "#b8943a",  label: "Upcoming" },
+  CONFIRMED:           { bg: "rgba(34,139,34,0.10)",   color: "#228b22",  label: "Upcoming" },
+  COMPLETED:           { bg: "rgba(34,139,34,0.10)",   color: "#228b22",  label: "Completed" },
+  CANCELLED:           { bg: "rgba(120,18,22,0.08)",   color: "#781216",  label: "Cancelled" },
+  REFUNDED:            { bg: "rgba(109,40,217,0.08)",  color: "#7c3aed",  label: "Refunded" },
+  PARTIALLY_REFUNDED:  { bg: "rgba(245,158,11,0.10)", color: "#d97706",  label: "Part. Refund" },
 };
 
-function StatusBadge({ status }: { status: BookingStatus }) {
+function StatusBadge({ status }: { status: string }) {
   const s = STATUS_STYLES[status] || STATUS_STYLES.PENDING;
   return (
     <span
@@ -68,7 +72,23 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
   const state = trip.destination?.state || trip.location || "";
   const paid = parseFloat(booking.amountPaid || "0");
   const due = parseFloat(booking.amountDue || "0");
-  const isRefunded = booking.paymentStatus === "REFUNDED" || booking.paymentStatus === "PARTIALLY_REFUNDED";
+  const isFullyRefunded = booking.paymentStatus === "REFUNDED";
+  const isPartiallyRefunded = booking.paymentStatus === "PARTIALLY_REFUNDED";
+  const isRefunded = isFullyRefunded || isPartiallyRefunded;
+
+  // Sum up all successful or pending refunds across payments
+  const totalRefunded = (booking.payments || []).reduce((sum, p) => {
+    return sum + (p.refunds || []).reduce((rSum, r) => {
+      return r.status === "SUCCESS" || r.status === "PENDING" ? rSum + parseFloat(r.amount) : rSum;
+    }, 0);
+  }, 0);
+
+  // Determine the status badge to show — prefer paymentStatus for refunded states
+  const badgeStatus: string = isFullyRefunded
+    ? "REFUNDED"
+    : isPartiallyRefunded
+    ? "PARTIALLY_REFUNDED"
+    : booking.status;
 
   return (
     <motion.div
@@ -80,12 +100,19 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
       style={{
         display: "flex",
         background: "#ffffff",
-        border: `1px solid ${hovered ? "rgba(120,18,22,0.18)" : "rgba(30,26,20,0.07)"}`,
+        border: `1px solid ${
+          isFullyRefunded
+            ? "rgba(109,40,217,0.15)"
+            : hovered
+            ? "rgba(120,18,22,0.18)"
+            : "rgba(30,26,20,0.07)"
+        }`,
         borderRadius: "12px",
         overflow: "hidden",
         transition: "border-color 0.25s ease, box-shadow 0.25s ease",
         boxShadow: hovered ? "0 4px 20px rgba(30,26,20,0.06)" : "0 1px 4px rgba(30,26,20,0.03)",
         fontFamily: "'Poppins', sans-serif",
+        opacity: isFullyRefunded ? 0.85 : 1,
       }}
     >
       {/* Thumbnail */}
@@ -109,6 +136,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
               objectFit: "cover",
               transition: "transform 0.5s ease",
               transform: hovered ? "scale(1.06)" : "scale(1)",
+              filter: isFullyRefunded ? "grayscale(40%)" : "none",
             }}
           />
         ) : (
@@ -134,6 +162,25 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
             background: "linear-gradient(to right, transparent 60%, rgba(255,255,255,0.4) 100%)",
           }}
         />
+        {/* Refunded overlay ribbon */}
+        {isFullyRefunded && (
+          <div style={{
+            position: "absolute",
+            top: "10px",
+            left: "-24px",
+            background: "#7c3aed",
+            color: "#fff",
+            fontSize: "0.52rem",
+            fontWeight: 700,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            padding: "3px 32px",
+            transform: "rotate(-45deg)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+          }}>
+            Refunded
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -165,7 +212,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
                 {state}
               </span>
             </div>
-            <StatusBadge status={booking.status} />
+            <StatusBadge status={badgeStatus} />
           </div>
           <h3
             style={{
@@ -214,6 +261,30 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
           ))}
         </div>
 
+        {/* Refund receipt info — shown for refunded bookings */}
+        {isRefunded && totalRefunded > 0 && (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            background: isFullyRefunded ? "rgba(109,40,217,0.06)" : "rgba(245,158,11,0.07)",
+            border: `1px solid ${isFullyRefunded ? "rgba(109,40,217,0.15)" : "rgba(245,158,11,0.2)"}`,
+            borderRadius: "6px",
+            padding: "6px 10px",
+          }}>
+            <ReceiptText size={11} color={isFullyRefunded ? "#7c3aed" : "#d97706"} strokeWidth={1.5} />
+            <span style={{
+              color: isFullyRefunded ? "#7c3aed" : "#d97706",
+              fontSize: "0.65rem",
+              fontWeight: 600,
+              fontFamily: "'Poppins', sans-serif",
+            }}>
+              {isFullyRefunded ? "Full refund" : "Partial refund"} of {formatPrice(totalRefunded)} initiated
+              {booking.cancellationReason ? ` · ${booking.cancellationReason}` : ""}
+            </span>
+          </div>
+        )}
+
         {/* Price + action */}
         <div
           style={{
@@ -222,10 +293,12 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
             justifyContent: "space-between",
             paddingTop: "10px",
             borderTop: "1px solid rgba(30,26,20,0.06)",
+            flexWrap: "wrap",
+            gap: "8px",
           }}
         >
           <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
-            {paid > 0 && (
+            {paid > 0 && !isFullyRefunded && (
               <div>
                 <span style={{ color: "rgba(30,26,20,0.35)", fontSize: "0.55rem", fontWeight: 400, display: "block", letterSpacing: "0.06em", textTransform: "uppercase" }}>
                   Paid
@@ -235,7 +308,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
                 </span>
               </div>
             )}
-            {due > 0 && booking.status !== "CANCELLED" && (
+            {due > 0 && booking.status !== "CANCELLED" && !isRefunded && (
               <div style={{ marginLeft: "6px" }}>
                 <span style={{ color: "rgba(30,26,20,0.35)", fontSize: "0.55rem", fontWeight: 400, display: "block", letterSpacing: "0.06em", textTransform: "uppercase" }}>
                   Balance Due
@@ -245,17 +318,15 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
                 </span>
               </div>
             )}
-            {isRefunded && (
-              <span
-                style={{
-                  color: "#228b22",
-                  fontSize: "0.78rem",
-                  fontWeight: 600,
-                  fontStyle: "italic",
-                }}
-              >
-                Refunded
-              </span>
+            {isFullyRefunded && (
+              <div>
+                <span style={{ color: "rgba(30,26,20,0.35)", fontSize: "0.55rem", fontWeight: 400, display: "block", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                  Refunded
+                </span>
+                <span style={{ color: "#7c3aed", fontSize: "0.92rem", fontWeight: 700, letterSpacing: "-0.02em" }}>
+                  {formatPrice(totalRefunded)}
+                </span>
+              </div>
             )}
             {paid === 0 && due === 0 && !isRefunded && (
               <span style={{ color: "#1e1a14", fontSize: "0.92rem", fontWeight: 700 }}>
@@ -263,22 +334,51 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
               </span>
             )}
           </div>
-          <Link
-            to={`/trips/${trip.slug}`}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-              color: hovered ? "#781216" : "rgba(30,26,20,0.45)",
-              fontSize: "0.72rem",
-              fontWeight: 500,
-              textDecoration: "none",
-              transition: "color 0.2s ease",
-              whiteSpace: "nowrap",
-            }}
-          >
-            View Trip <ChevronRight size={12} />
-          </Link>
+
+          {/* CTAs */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {/* Book Again — only shown for fully refunded trips */}
+            {isFullyRefunded && (
+              <Link
+                to={`/book/${trip.slug}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  background: "#781216",
+                  color: "#fff",
+                  fontSize: "0.68rem",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  padding: "5px 12px",
+                  borderRadius: "6px",
+                  whiteSpace: "nowrap",
+                  transition: "background 0.2s ease",
+                  letterSpacing: "0.02em",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#5e0e11")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "#781216")}
+              >
+                <RotateCcw size={10} /> Book Again
+              </Link>
+            )}
+            <Link
+              to={`/trips/${trip.slug}`}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                color: hovered ? "#781216" : "rgba(30,26,20,0.45)",
+                fontSize: "0.72rem",
+                fontWeight: 500,
+                textDecoration: "none",
+                transition: "color 0.2s ease",
+                whiteSpace: "nowrap",
+              }}
+            >
+              View Trip <ChevronRight size={12} />
+            </Link>
+          </div>
         </div>
       </div>
     </motion.div>
@@ -440,7 +540,8 @@ export default function ProfilePage() {
   const upcoming = bookings.filter(isUpcomingBooking);
   const past = bookings.filter(isPastBooking);
   const completedCount = bookings.filter((b) => b.status === "COMPLETED").length;
-  const cancelledCount = bookings.filter((b) => b.status === "CANCELLED").length;
+  const cancelledCount = bookings.filter((b) => b.status === "CANCELLED" && b.paymentStatus !== "REFUNDED").length;
+  const refundedCount = bookings.filter((b) => b.paymentStatus === "REFUNDED" || b.paymentStatus === "PARTIALLY_REFUNDED").length;
 
   const displayName = user.name || user.email?.split("@")[0] || "User";
   const initials = displayName.charAt(0).toUpperCase();
@@ -535,6 +636,7 @@ export default function ProfilePage() {
                 { value: upcoming.length, label: "Upcoming" },
                 { value: completedCount, label: "Completed" },
                 { value: cancelledCount, label: "Cancelled" },
+                ...(refundedCount > 0 ? [{ value: refundedCount, label: "Refunded" }] : []),
               ].map(({ value, label }) => (
                 <div
                   key={label}

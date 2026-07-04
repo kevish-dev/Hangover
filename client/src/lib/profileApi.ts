@@ -6,11 +6,22 @@ import type { ApiTrip } from "./tripApi";
 export type BookingStatus = "PENDING" | "RESERVED" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
 export type PaymentStatus = "PENDING" | "PARTIALLY_PAID" | "PAID" | "FAILED" | "OVERDUE" | "REFUNDED" | "PARTIALLY_REFUNDED";
 
+export interface ApiRefund {
+  id: string;
+  amount: string;
+  status: "PENDING" | "SUCCESS" | "FAILED";
+  reason: string | null;
+  processedAt: string | null;
+  createdAt: string;
+}
+
 export interface ApiPayment {
   id: string;
   amount: string;
   status: string;
+  type: string;
   createdAt: string;
+  refunds: ApiRefund[];
 }
 
 export interface ApiBooking {
@@ -61,6 +72,8 @@ export async function fetchMyBookings(): Promise<ApiBooking[]> {
 // ── Helpers ───────────────────────────────────────────────────────
 
 export function isUpcomingBooking(b: ApiBooking): boolean {
+  // CANCELLED bookings (including fully-refunded ones) always go to Past
+  if (b.status === "CANCELLED" || b.status === "COMPLETED") return false;
   const tripStart = new Date(b.trip.startDate);
   const now = new Date();
   const activeStatuses: BookingStatus[] = ["PENDING", "RESERVED", "CONFIRMED"];
