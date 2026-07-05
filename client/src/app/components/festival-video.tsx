@@ -2,6 +2,7 @@
 import video3Src from "../../imports/Lewis_Hamilton_Signing_Camera_Lens_F1_2014_Abu_Dhabi_GP.mp4";
 
 import { useEffect, useRef } from "react";
+import { useNavigate } from "react-router";
 import { MapPin, Calendar, ArrowRight } from "lucide-react";
 import {
   ContainerStagger,
@@ -114,6 +115,7 @@ const VIDEOS = [
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export function FestivalVideo() {
+  const navigate = useNavigate();
   return (
     <div
       style={{
@@ -216,10 +218,10 @@ export function FestivalVideo() {
                 flexWrap: "wrap",
               }}
             >
-              <GoldButton>
+              <GoldButton onClick={() => navigate("/festivals")}>
                 VIEW ALL FESTIVALS <ArrowRight size={13} />
               </GoldButton>
-              <OutlineButton>
+              <OutlineButton onClick={() => navigate("/festivals")}>
                 BOOK A FESTIVAL TRIP
               </OutlineButton>
             </div>
@@ -434,11 +436,14 @@ function VideoLayer({
 
 function GoldButton({
   children,
+  onClick,
 }: {
   children: React.ReactNode;
+  onClick?: () => void;
 }) {
   return (
     <button
+      onClick={onClick}
       style={{
         background: "#f2c97a",
         color: "#781216",
@@ -469,11 +474,14 @@ function GoldButton({
 
 function OutlineButton({
   children,
+  onClick,
 }: {
   children: React.ReactNode;
+  onClick?: () => void;
 }) {
   return (
     <button
+      onClick={onClick}
       style={{
         background: "transparent",
         color: "rgba(249,241,232,0.8)",
