@@ -283,6 +283,7 @@ export function Navbar() {
             onMouseLeave={(e) => {
               e.currentTarget.style.background = scrolled ? "#781216" : "#c8a96e";
             }}
+            onClick={() => navigate("/trips")}
           >
             BOOK A TRIP
           </button>

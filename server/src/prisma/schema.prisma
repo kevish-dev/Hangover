@@ -107,8 +107,8 @@ model Festival {
   location            String
   bannerImages        String[]
   duration            Int
-  stageDays          Int
-  numberOfArtists      Int
+  stageDays           Int
+  numberOfArtists     Int
   difficultyLevel     String
   bestTimeToVisit     String
   maxAltitude         Int

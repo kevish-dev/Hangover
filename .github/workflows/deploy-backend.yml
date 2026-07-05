@@ -4,9 +4,15 @@ on:
     push:
         branches:
             - main
+        paths:
+            - 'server/**'
+            - '.github/workflows/deploy-backend.yml'
     pull_request:
         branches:
             - main
+        paths:
+            - 'server/**'
+            - '.github/workflows/deploy-backend.yml'
 
 jobs:
     build-and-deploy:
@@ -73,6 +79,13 @@ jobs:
 
                       # Install production dependencies
                       npm ci --omit=dev
+                      
+                      # Ensure database docker container is running
+                      docker compose down
+                      docker compose up -d
+                      
+                      # Wait a few seconds for the database to be fully ready
+                      sleep 5
                       
                       # Generate Prisma Client and apply migrations
                       npx prisma generate
