@@ -1280,9 +1280,12 @@ function HighlightAccordionPanel({
             writingMode: "vertical-rl",
             transform: "rotate(180deg)",
             whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            maxHeight: "90%",
           }}
         >
-          {`Highlight 0${index + 1}`}
+          {highlight.text}
         </span>
       </motion.div>
       <motion.div
@@ -1362,9 +1365,13 @@ function HighlightMobilePanel({
               fontSize: "0.85rem",
               fontWeight: 500,
               letterSpacing: "0.04em",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              maxWidth: "85%",
             }}
           >
-            Highlight {`0${index + 1}`}
+            {highlight.text}
           </span>
           <ChevronRight size={14} color="rgba(242,237,228,0.6)" />
         </div>
