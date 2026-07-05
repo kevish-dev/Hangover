@@ -25,7 +25,7 @@ const TRIPS = [
     id: "couple",
     label: "Couple Trip",
     icon: Heart,
-    image: "https://images.unsplash.com/photo-1522851411545-21d4c207a9ee?w=700&h=900&fit=crop&auto=format&q=90",
+    image: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=700&h=900&fit=crop&auto=format&q=90",
     description: "Romantic getaways designed for just the two of you.",
     tag: "Romantic · 3–7 Days",
   },
