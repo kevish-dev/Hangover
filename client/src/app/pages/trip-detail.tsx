@@ -2516,7 +2516,7 @@ function TripDetailContent({
                     <span style={{ color: "#b8943a", fontWeight: 600 }}>
                       Partial payment available
                     </span>{" "}
-                    — pay a token amount now and settle the rest before
+                    — pay a booking amount now and settle the rest before
                     departure. Details at the booking page.
                   </p>
                 </div>

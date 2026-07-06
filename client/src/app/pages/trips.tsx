@@ -21,9 +21,7 @@ function NA({ text = "Not Available" }: { text?: string }) {
 }
 
 // ── Filter option definitions ─────────────────────────────────────
-const DURATIONS    = ["Weekend", "5 Days", "6 Days", "7 Days", "8 Days"];
 const MONTHS       = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const DIFFICULTIES = ["Easy", "Moderate", "Challenging"];
 const PRICE_RANGES = [
   { label: "Under ₹10,000",  min: 0,     max: 10000 },
   { label: "₹10k – ₹20k",   min: 10000, max: 20000 },
@@ -310,11 +308,22 @@ function MonthCalendar({
 }
 
 // ── Filter sidebar ─────────────────────────────────────────────────
-function FilterSidebar({ filters, setFilters, availableDestinations, availableCategories }: {
+function FilterSidebar({ 
+  filters, 
+  setFilters, 
+  availableDestinations, 
+  availableCategories,
+  availableDurations,
+  availableDifficulties,
+  availablePriceRanges
+}: {
   filters: Filters;
   setFilters: React.Dispatch<React.SetStateAction<Filters>>;
   availableDestinations: string[];
   availableCategories: string[];
+  availableDurations: string[];
+  availableDifficulties: string[];
+  availablePriceRanges: { label: string, min: number, max: number }[];
 }) {
   const toggle = (key: keyof Omit<Filters, "priceRange">, val: string) => {
     setFilters((f) => ({
@@ -363,25 +372,29 @@ function FilterSidebar({ filters, setFilters, availableDestinations, availableCa
       )}
 
       {/* Duration */}
-      <FilterGroup title="Duration">
-        <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
-          {DURATIONS.map((d) => (
-            <CheckPill key={d} label={d} active={filters.durations.includes(d)} onToggle={() => toggle("durations", d)} />
-          ))}
-        </div>
-      </FilterGroup>
+      {availableDurations.length > 0 && (
+        <FilterGroup title="Duration">
+          <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
+            {availableDurations.map((d) => (
+              <CheckPill key={d} label={d} active={filters.durations.includes(d)} onToggle={() => toggle("durations", d)} />
+            ))}
+          </div>
+        </FilterGroup>
+      )}
 
       {/* Price Range */}
-      <FilterGroup title="Price Range">
-        <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
-          {PRICE_RANGES.map((r) => (
-            <CheckPill key={r.label} label={r.label}
-              active={filters.priceRange === r.label}
-              onToggle={() => setFilters((f) => ({ ...f, priceRange: f.priceRange === r.label ? null : r.label }))}
-            />
-          ))}
-        </div>
-      </FilterGroup>
+      {availablePriceRanges.length > 0 && (
+        <FilterGroup title="Price Range">
+          <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
+            {availablePriceRanges.map((r) => (
+              <CheckPill key={r.label} label={r.label}
+                active={filters.priceRange === r.label}
+                onToggle={() => setFilters((f) => ({ ...f, priceRange: f.priceRange === r.label ? null : r.label }))}
+              />
+            ))}
+          </div>
+        </FilterGroup>
+      )}
 
       {/* Month — calendar picker */}
       <FilterGroup title="Travel Month">
@@ -392,13 +405,15 @@ function FilterSidebar({ filters, setFilters, availableDestinations, availableCa
       </FilterGroup>
 
       {/* Difficulty */}
-      <FilterGroup title="Difficulty" defaultOpen={false}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "7px" }}>
-          {DIFFICULTIES.map((d) => (
-            <CheckPill key={d} label={d} active={filters.difficulties.includes(d)} onToggle={() => toggle("difficulties", d)} />
-          ))}
-        </div>
-      </FilterGroup>
+      {availableDifficulties.length > 0 && (
+        <FilterGroup title="Difficulty" defaultOpen={false}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "7px" }}>
+            {availableDifficulties.map((d) => (
+              <CheckPill key={d} label={d} active={filters.difficulties.includes(d)} onToggle={() => toggle("difficulties", d)} />
+            ))}
+          </div>
+        </FilterGroup>
+      )}
     </div>
   );
 }
@@ -762,6 +777,26 @@ export default function TripsPage() {
     return Array.from(catSet).sort();
   }, [trips]);
 
+  const availableDurations = useMemo(() => {
+    const durSet = new Set<number>();
+    trips.forEach(t => { if (t.duration) durSet.add(t.duration); });
+    const sorted = Array.from(durSet).sort((a,b) => a - b);
+    return sorted.map(d => formatDuration(d));
+  }, [trips]);
+
+  const availableDifficulties = useMemo(() => {
+    const diffSet = new Set<string>();
+    trips.forEach(t => { if (t.difficultyLevel) diffSet.add(t.difficultyLevel); });
+    return Array.from(diffSet).sort();
+  }, [trips]);
+
+  const availablePriceRanges = useMemo(() => {
+    return PRICE_RANGES.filter(r => trips.some(t => {
+      const price = priceToNumber(t.price);
+      return price >= r.min && price <= r.max;
+    }));
+  }, [trips]);
+
   const activeCount = Object.values(filters).flat().filter(Boolean).length;
 
   const filtered = useMemo(() => {
@@ -785,12 +820,7 @@ export default function TripsPage() {
 
       // Duration
       if (filters.durations.length > 0) {
-        const days = t.duration;
-        const match = filters.durations.some((d) => {
-          if (d === "Weekend") return days <= 3;
-          return d === formatDuration(days);
-        });
-        if (!match) return false;
+        if (!filters.durations.includes(formatDuration(t.duration))) return false;
       }
 
       // Price
@@ -902,7 +932,7 @@ export default function TripsPage() {
 
           {/* Sidebar — desktop */}
           <div className="hidden lg:block" style={{ width: "240px", flexShrink: 0, position: "sticky", top: "155px", background: "#ffffff", border: "1px solid rgba(30,26,20,0.07)", borderRadius: "12px", padding: "20px 20px 8px" }}>
-            <FilterSidebar filters={filters} setFilters={setFilters} availableDestinations={availableDestinations} availableCategories={availableCategories} />
+            <FilterSidebar filters={filters} setFilters={setFilters} availableDestinations={availableDestinations} availableCategories={availableCategories} availableDurations={availableDurations} availableDifficulties={availableDifficulties} availablePriceRanges={availablePriceRanges} />
           </div>
 
           {/* Mobile filter drawer */}
@@ -922,7 +952,7 @@ export default function TripsPage() {
                     <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, color: "#1e1a14", fontSize: "0.9rem" }}>Filters</span>
                     <button onClick={() => setMobileFiltersOpen(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#1e1a14" /></button>
                   </div>
-                  <FilterSidebar filters={filters} setFilters={setFilters} availableDestinations={availableDestinations} availableCategories={availableCategories} />
+                  <FilterSidebar filters={filters} setFilters={setFilters} availableDestinations={availableDestinations} availableCategories={availableCategories} availableDurations={availableDurations} availableDifficulties={availableDifficulties} availablePriceRanges={availablePriceRanges} />
                 </motion.div>
               </>
             )}
