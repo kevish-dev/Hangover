@@ -10,6 +10,8 @@ const sendMail = async (to, subject, text, html) => {
       text: text,
       html: html,
     });
+    console.log("=====mail sent")
+    console.log(info)
   } catch (err) {
     console.error("Error while sending mail:", err);
   }

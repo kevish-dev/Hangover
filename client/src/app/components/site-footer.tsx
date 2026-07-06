@@ -100,7 +100,7 @@ export function SiteFooter() {
       {/* ═══════════════════════════════════════════════════
           CONTACT SECTION — full-bleed image + form
       ═══════════════════════════════════════════════════ */}
-      <section style={{ position: "relative", minHeight: "100vh", overflow: "hidden", fontFamily: "'Poppins', sans-serif" }}>
+      <section id="contact" style={{ position: "relative", minHeight: "100vh", overflow: "hidden", fontFamily: "'Poppins', sans-serif" }}>
 
         {/* Background photo */}
         <img

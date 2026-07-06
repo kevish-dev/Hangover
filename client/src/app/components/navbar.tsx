@@ -7,7 +7,7 @@ import { LoginDialog } from "./auth/LoginDialog";
 import { useAuth } from "../../contexts/AuthContext";
 import { User } from "lucide-react";
 
-function NavLink({ label, scrolled }: { label: string; scrolled: boolean }) {
+function NavLink({ label, scrolled, onClick }: { label: string; scrolled: boolean; onClick?: () => void }) {
   const [hovered, setHovered] = useState(false);
 
   const restColor = scrolled
@@ -18,6 +18,7 @@ function NavLink({ label, scrolled }: { label: string; scrolled: boolean }) {
 
   return (
     <button
+      onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -194,6 +195,16 @@ export function Navbar() {
             ? <PageNavLink key={item} label="Festivals" to="/festivals" scrolled={scrolled} />
             : item === "About"
             ? <PageNavLink key={item} label="About" to="/about" scrolled={scrolled} />
+            : item === "Contact"
+            ? <NavLink key={item} label={item} scrolled={scrolled} onClick={() => {
+                const contactEl = document.getElementById("contact");
+                if (contactEl) {
+                  contactEl.scrollIntoView({ behavior: "smooth" });
+                } else {
+                  navigate("/");
+                  setTimeout(() => document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" }), 300);
+                }
+              }} />
             : <NavLink key={item} label={item} scrolled={scrolled} />
         ))}
       </div>
