@@ -37,7 +37,7 @@ const tripSchema = z.object({
   difficultyLevel: z.string().min(1, "Difficulty is required"),
   bestTimeToVisit: z.string().min(1, "Best time is required"),
   price: z.coerce.number().min(0, "Price must be positive"),
-  tokenAmount: z.coerce.number().min(0, "Token amount must be positive"),
+  tokenAmount: z.coerce.number().min(0, "Booking amount must be positive"),
   capacity: z.coerce.number().min(1, "Capacity must be at least 1"),
 
   startDate: z.string().min(1, "Start date is required"),
@@ -690,7 +690,7 @@ export function TripFormModal({
         <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
           <form
             id="trip-form"
-            onSubmit={form.handleSubmit(onSubmit)}
+            onSubmit={form.handleSubmit(onSubmit as any)}
             onKeyDown={handleKeyDown}
             className="space-y-6"
           >
@@ -781,7 +781,7 @@ export function TripFormModal({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Token Amount (₹)</Label>
+                  <Label>Booking Amount (₹)</Label>
                   <Input type="number" {...form.register("tokenAmount")} />
                   {form.formState.errors.tokenAmount && (
                     <p className="text-sm text-red-500">

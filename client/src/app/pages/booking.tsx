@@ -719,7 +719,7 @@ export default function BookingPage() {
           amount,
           currency,
           name: "Hangover Trails",
-          description: `${trip!.title} — ${paymentType === "TOKEN" ? "Token Payment" : "Full Payment"}`,
+          description: `${trip!.title} — ${paymentType === "TOKEN" ? "Booking Payment" : "Full Payment"}`,
           order_id: razorpayOrderId,
           prefill: {
             email: primaryEmail,
@@ -1202,7 +1202,7 @@ export default function BookingPage() {
           >
             {successData.paymentType === "FULL"
               ? "Full payment received."
-              : "Token payment received. Your spot is reserved."}{" "}
+              : "Booking payment received. Your spot is reserved."}{" "}
             A confirmation has been sent to{" "}
             <strong style={{ color: "#781216" }}>
               {primaryEmail || "your email"}
@@ -1297,7 +1297,7 @@ export default function BookingPage() {
               margin: "0 0 8px",
             }}
           >
-            Token Payment Received
+            Booking Payment Received
           </h2>
           <p
             style={{
@@ -2327,7 +2327,7 @@ export default function BookingPage() {
                           color: "#1e1a14",
                         }}
                       >
-                        Token Payment ({formatPrice(tokenAmountDue)})
+                        Booking Payment ({formatPrice(tokenAmountDue)})
                       </span>
                     </label>
                   </div>

@@ -11,6 +11,8 @@ export const sendBookingConfirmedEmail = async ({ to, name, bookingRef, tripTitl
     day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
   });
 
+  const displayPaymentType = paymentType === "TOKEN" ? "Booking Payment" : paymentType;
+
   await transport.sendMail({
     from: FROM,
     to,
@@ -70,7 +72,7 @@ export const sendBookingConfirmedEmail = async ({ to, name, bookingRef, tripTitl
               <td style="padding:12px;border:1px solid #ddd;text-align:right;font-weight:bold;">₹${Number(totalAmount).toLocaleString('en-IN')}</td>
             </tr>
             <tr style="background:#fdfdfd;">
-              <td style="padding:12px;border:1px solid #ddd;text-align:right;color:#781216;">Amount Paid (${paymentType})</td>
+              <td style="padding:12px;border:1px solid #ddd;text-align:right;color:#781216;">Amount Paid (${displayPaymentType})</td>
               <td style="padding:12px;border:1px solid #ddd;text-align:right;font-weight:bold;color:#781216;">- ₹${Number(amountPaid).toLocaleString('en-IN')}</td>
             </tr>
             <tr style="background:#f4f4f4;">
