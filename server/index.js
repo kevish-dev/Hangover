@@ -22,9 +22,10 @@ app.use((req, res, next) => {
   if (req.path === "/api/v1/payments/webhook") {
     express.raw({ type: "application/json" })(req, res, next);
   } else {
-    express.json()(req, res, next);
+    express.json({ limit: "50mb" })(req, res, next);
   }
 });
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(morgan("dev"));
 app.use(
   cors({

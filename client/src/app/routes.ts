@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, redirect } from "react-router";
 import Root from "./root";
 import Home from "./pages/home";
 import TripsPage from "./pages/trips";
@@ -42,7 +42,10 @@ export const router = createBrowserRouter([
       { path: "bookings", Component: AdminBookingsPage },
       { path: "payments", Component: AdminPaymentsPage },
       { path: "inquiries", Component: AdminInquiriesPage },
-
     ],
+  },
+  {
+    path: "*",
+    loader: () => redirect("/trips"),
   },
 ]);

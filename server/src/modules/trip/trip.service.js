@@ -105,7 +105,7 @@ export const uploadBannerImages = async (tripId, imageBuffers) => {
     uploadToCloudinary(buffer, {
       folder,
       publicId: randomUUID(), // Generate a unique ID for each banner
-      optimize: false, // Admin upload - no resize or optimization
+      optimize: true, // Resize and compress banner images
     })
   );
 
@@ -127,11 +127,9 @@ export const syncHighlights = async (tripId, payloadStr, files) => {
   const payload = JSON.parse(payloadStr); 
   const folder = `uploads/trips/${tripId}/highlights`;
   
-  const finalArray = [];
-  
-  for (const item of payload) {
+  const uploadPromises = payload.map(async (item) => {
     if (item.type === "EXISTING") {
-      finalArray.push({ text: item.text, imageUrl: item.url });
+      return { text: item.text, imageUrl: item.url };
     } else if (item.type === "NEW") {
       const file = files[item.fileIndex];
       if (file) {
@@ -139,10 +137,14 @@ export const syncHighlights = async (tripId, payloadStr, files) => {
            folder,
            publicId: randomUUID(),
          });
-         finalArray.push({ text: item.text, imageUrl: url });
+         return { text: item.text, imageUrl: url };
       }
     }
-  }
+    return null;
+  });
+
+  const results = await Promise.all(uploadPromises);
+  const finalArray = results.filter(item => item !== null);
 
   return tripRepo.update(tripId, { highlights: finalArray });
 };
@@ -154,11 +156,9 @@ export const syncStayTransport = async (tripId, payloadStr, files) => {
   const payload = JSON.parse(payloadStr); 
   const folder = `uploads/trips/${tripId}/staytransport`;
   
-  const finalArray = [];
-  
-  for (const item of payload) {
+  const uploadPromises = payload.map(async (item) => {
     if (item.type === "EXISTING") {
-      finalArray.push({ text: item.text, imageUrl: item.url });
+      return { text: item.text, imageUrl: item.url };
     } else if (item.type === "NEW") {
       const file = files[item.fileIndex];
       if (file) {
@@ -166,10 +166,14 @@ export const syncStayTransport = async (tripId, payloadStr, files) => {
            folder,
            publicId: randomUUID(),
          });
-         finalArray.push({ text: item.text, imageUrl: url });
+         return { text: item.text, imageUrl: url };
       }
     }
-  }
+    return null;
+  });
+
+  const results = await Promise.all(uploadPromises);
+  const finalArray = results.filter(item => item !== null);
 
   return tripRepo.update(tripId, { stayTransportImages: finalArray });
 };
