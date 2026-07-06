@@ -58,6 +58,15 @@ export const getBookingsByTrip = async (req, res, next) => {
   }
 };
 
+export const getBookingsByFestival = async (req, res, next) => {
+  try {
+    const bookings = await bookingService.getBookingsByFestivalId(req.params.festivalId);
+    res.status(200).json(bookings);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const cancelAndRefundBooking = async (req, res, next) => {
   try {
     const { reason, refundAmount } = req.body;

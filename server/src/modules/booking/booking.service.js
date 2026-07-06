@@ -30,22 +30,35 @@ export const createBooking = async (userId, data) => {
     );
   }
 
-  // 2. Fetch trip
-  const trip = await prisma.trip.findUnique({ where: { id: data.tripId } });
-  if (!trip) throw new NotFoundError("Trip not found");
-  if (!trip.isActive)
-    throw new ValidationError("This trip is no longer available for booking.");
+  if (!data.tripId && !data.festivalId) {
+    throw new ValidationError("Must provide either tripId or festivalId");
+  }
 
-  // Check if user already has an active booking for this trip
+  // 2. Fetch trip or festival
+  let item = null;
+  let isTrip = false;
+  
+  if (data.tripId) {
+    item = await prisma.trip.findUnique({ where: { id: data.tripId } });
+    isTrip = true;
+  } else {
+    item = await prisma.festival.findUnique({ where: { id: data.festivalId } });
+  }
+
+  if (!item) throw new NotFoundError("Booking item not found");
+  if (!item.isActive)
+    throw new ValidationError("This item is no longer available for booking.");
+
+  // Check if user already has an active booking for this item
   const existingActive = await prisma.booking.findFirst({
     where: {
       userId,
-      tripId: data.tripId,
+      ...(isTrip ? { tripId: data.tripId } : { festivalId: data.festivalId }),
       status: { in: ["RESERVED", "CONFIRMED", "COMPLETED"] },
     },
   });
   if (existingActive) {
-    throw new ValidationError("You have already booked this trip.");
+    throw new ValidationError("You have already booked this item.");
   }
 
   // 3. Pricing calculation (per-person)
@@ -54,17 +67,17 @@ export const createBooking = async (userId, data) => {
   // Validate traveler count against group size limits
 
   // Check capacity
-  const spotsLeft = trip.capacity - trip.filledSpots;
+  const spotsLeft = item.capacity - item.filledSpots;
   if (numberOfTravelers > spotsLeft) {
     throw new ValidationError(
-      `Only ${spotsLeft} spot(s) remaining on this trip.`,
+      `Only ${spotsLeft} spot(s) remaining.`,
     );
   }
 
-  const baseTotalAmount = Number(trip.price) * numberOfTravelers;
+  const baseTotalAmount = Number(item.price) * numberOfTravelers;
   const totalAmount = baseTotalAmount + (baseTotalAmount * 0.05);
 
-  const baseTokenAmount = Number(trip.tokenAmount) * numberOfTravelers;
+  const baseTokenAmount = Number(item.tokenAmount) * numberOfTravelers;
   const tokenAmount = baseTokenAmount + (baseTokenAmount * 0.05);
 
   let initialPaymentType = data.initialPaymentType || "TOKEN";
@@ -74,8 +87,8 @@ export const createBooking = async (userId, data) => {
   const amountDue =
     initialPaymentType === "FULL" ? 0 : totalAmount - tokenAmount;
 
-  // 4. Calculate balance due date: 10 days before trip start
-  const balanceDueDate = new Date(trip.startDate);
+  // 4. Calculate balance due date: 10 days before start
+  const balanceDueDate = new Date(item.startDate);
   balanceDueDate.setDate(balanceDueDate.getDate() - 10);
 
   // 5. Build booking payload
@@ -103,7 +116,7 @@ export const createBooking = async (userId, data) => {
   const existingPending = await prisma.booking.findFirst({
     where: {
       userId,
-      tripId: data.tripId,
+      ...(isTrip ? { tripId: data.tripId } : { festivalId: data.festivalId }),
       status: "PENDING",
     },
   });
@@ -119,7 +132,8 @@ export const createBooking = async (userId, data) => {
   // Generate booking reference and complete payload for a new booking
   bookingData.bookingReference = `HNG-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
   bookingData.userId = userId;
-  bookingData.tripId = data.tripId;
+  if (isTrip) bookingData.tripId = data.tripId;
+  else bookingData.festivalId = data.festivalId;
   bookingData.status = "PENDING";
   bookingData.paymentStatus = "PENDING";
 
@@ -198,6 +212,7 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
     where: { id: bookingId },
     include: {
       trip: true,
+      festival: true,
       user: { include: { profile: true } },
       payments: {
         where: { status: "SUCCESS" }
@@ -303,21 +318,31 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
       }
     });
 
-    // Free up trip spots
-    await tx.trip.update({
-      where: { id: booking.tripId },
-      data: {
-        filledSpots: Math.max(0, booking.trip.filledSpots - booking.numberOfTravelers)
-      }
-    });
+    // Free up spots
+    if (booking.tripId) {
+      await tx.trip.update({
+        where: { id: booking.tripId },
+        data: {
+          filledSpots: Math.max(0, booking.trip.filledSpots - booking.numberOfTravelers)
+        }
+      });
+    } else if (booking.festivalId) {
+      await tx.festival.update({
+        where: { id: booking.festivalId },
+        data: {
+          filledSpots: Math.max(0, booking.festival.filledSpots - booking.numberOfTravelers)
+        }
+      });
+    }
   });
 
   // Send Email (Fire and forget)
   import("../../core/services/email.service.js").then((emailService) => {
     if (emailService.sendBookingCancelledRefundedEmail) {
+      const itemTitle = booking.trip ? booking.trip.title : booking.festival.title;
       emailService.sendBookingCancelledRefundedEmail(booking.user.email, {
         name: booking.user.profile?.fullName || "Traveler",
-        tripTitle: booking.trip.title,
+        tripTitle: itemTitle,
         bookingRef: booking.bookingReference,
         refundAmount: validRefundAmount
       }).catch(err => console.error("Failed to send cancellation email:", err));

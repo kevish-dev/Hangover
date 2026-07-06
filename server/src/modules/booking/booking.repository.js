@@ -2,6 +2,7 @@ import { prisma } from "../../prisma/client.js";
 
 const bookingInclude = {
   trip: true,
+  festival: true,
   travelers: true,
   payments: { include: { refunds: true } },
 };
@@ -35,7 +36,7 @@ export const getUserBookings = async (userId, skip, take) => {
   const [bookings, total] = await Promise.all([
     prisma.booking.findMany({
       where: { userId },
-      include: { trip: true, travelers: true, payments: { include: { refunds: true } } },
+      include: { trip: true, festival: true, travelers: true, payments: { include: { refunds: true } } },
       orderBy: { createdAt: "desc" },
       skip,
       take,
@@ -48,7 +49,7 @@ export const getUserBookings = async (userId, skip, take) => {
 export const getAllBookings = async (skip, take) => {
   const [bookings, total] = await Promise.all([
     prisma.booking.findMany({
-      include: { trip: true, travelers: true, user: { include: { profile: true } }, payments: { include: { refunds: true } } },
+      include: { trip: true, festival: true, travelers: true, user: { include: { profile: true } }, payments: { include: { refunds: true } } },
       orderBy: { createdAt: "desc" },
       skip,
       take,
@@ -61,6 +62,18 @@ export const getAllBookings = async (skip, take) => {
 export const getBookingsByTripId = async (tripId) => {
   return prisma.booking.findMany({
     where: { tripId },
+    include: {
+      user: { include: { profile: true } },
+      travelers: true,
+      payments: { include: { refunds: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+};
+
+export const getBookingsByFestivalId = async (festivalId) => {
+  return prisma.booking.findMany({
+    where: { festivalId },
     include: {
       user: { include: { profile: true } },
       travelers: true,
