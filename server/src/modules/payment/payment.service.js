@@ -37,8 +37,6 @@ const _processSuccessfulPayment = async (intent, rzpPaymentId, rzpSignature, rzp
   const existing = await repo.getPaymentByIdempotencyKey(idempotencyKey);
   if (existing) return existing;
 
-  const receiptNumber = `RCPT-${crypto.randomBytes(5).toString("hex").toUpperCase()}`;
-
   const payment = await prisma.$transaction(async (tx) => {
     // 1. Create Payment record
     const pmt = await tx.payment.create({
@@ -54,7 +52,6 @@ const _processSuccessfulPayment = async (intent, rzpPaymentId, rzpSignature, rzp
         razorpaySignature: rzpSignature || null,
         paymentMethod: rzpMethod || null,
         idempotencyKey,
-        receiptNumber,
         notes: { paymentType: intent.type },
         paidAt: new Date(),
       },
@@ -281,7 +278,7 @@ export const verifyPayment = async (userId, { razorpayOrderId, razorpayPaymentId
         totalAmount: booking.totalAmount,
         amountDue: intent.type === "FULL" || intent.type === "BALANCE" ? 0 : Number(booking.totalAmount) - Number(booking.tokenAmount),
         paymentType: intent.type,
-        receiptNumber: payment.receiptNumber,
+        receiptNumber: payment.receiptNumberInt,
         invoiceDate: payment.paidAt,
         travelersCount: booking.numberOfTravelers,
       });
@@ -445,7 +442,7 @@ export const handleWebhook = async (rawBody, signature) => {
                 totalAmount: booking.totalAmount,
                 amountDue: intent.type === "FULL" || intent.type === "BALANCE" ? 0 : Number(booking.totalAmount) - Number(booking.tokenAmount),
                 paymentType: intent.type,
-                receiptNumber: payment.receiptNumber,
+                receiptNumber: payment.receiptNumberInt,
                 invoiceDate: payment.paidAt,
                 travelersCount: booking.numberOfTravelers,
               });
@@ -742,7 +739,6 @@ export const manualAdjustment = async (bookingId, amount, notes, adminId) => {
   if (adjustAmount <= 0) throw new ValidationError("Adjustment amount must be positive.");
 
   const idempotencyKey = `manual-${bookingId}-${Date.now()}-${adminId}`;
-  const receiptNumber = `MANUAL-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
 
   // Create a manual payment record (no Razorpay IDs)
   const payment = await prisma.$transaction(async (tx) => {
@@ -755,7 +751,6 @@ export const manualAdjustment = async (bookingId, amount, notes, adminId) => {
         currency: "INR",
         razorpayOrderId: `MANUAL-${crypto.randomBytes(8).toString("hex")}`,
         idempotencyKey,
-        receiptNumber,
         notes: { adminNotes: notes, recordedBy: adminId, isManual: true },
         paidAt: new Date(),
       },

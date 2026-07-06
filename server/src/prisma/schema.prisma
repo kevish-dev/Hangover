@@ -55,9 +55,9 @@ model UserProfile {
 }
 
 model Trip {
-  id                  String          @id @default(uuid())
+  id                  String       @id @default(uuid())
   title               String
-  slug                String          @unique
+  slug                String       @unique
   location            String
   bannerImages        String[]
   duration            Int
@@ -65,30 +65,30 @@ model Trip {
   bestTimeToVisit     String
   maxAltitude         Int
   overview            String
-  highlights          Json            @default("[]")
+  highlights          Json         @default("[]")
   galleryImages       String[]
   inclusions          String[]
   exclusions          String[]
-  stayTransportImages Json            @default("[]")
-  price               Decimal         @db.Decimal(10, 2)
-  tokenAmount         Decimal         @db.Decimal(10, 2)
+  stayTransportImages Json         @default("[]")
+  price               Decimal      @db.Decimal(10, 2)
+  tokenAmount         Decimal      @db.Decimal(10, 2)
   capacity            Int
-  filledSpots         Int             @default(0)
+  filledSpots         Int          @default(0)
   startDate           DateTime
   endDate             DateTime
   tripType            TripType
-  isActive            Boolean         @default(true)
-  isFeatured          Boolean         @default(false)
-  isPublished         Boolean         @default(false)
+  isActive            Boolean      @default(true)
+  isFeatured          Boolean      @default(false)
+  isPublished         Boolean      @default(false)
   destinationId       String?
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
   bookings            Booking[]
   faqs                FAQ[]
   inquiries           Inquiry[]
   itineraries         Itinerary[]
-  tripTags            TripTag[]       @relation("TripToTripTag")
-  destination         Destination?    @relation(fields: [destinationId], references: [id])
+  tripTags            TripTag[]    @relation("TripToTripTag")
+  destination         Destination? @relation(fields: [destinationId], references: [id])
 
   @@index([tripType])
   @@index([startDate])
@@ -99,11 +99,10 @@ model Trip {
   @@index([destinationId])
 }
 
-
 model Festival {
-  id                  String          @id @default(uuid())
+  id                  String   @id @default(uuid())
   title               String
-  slug                String          @unique
+  slug                String   @unique
   location            String
   bannerImages        String[]
   duration            Int
@@ -113,23 +112,23 @@ model Festival {
   bestTimeToVisit     String
   maxAltitude         Int
   overview            String
-  highlights          Json            @default("[]")
+  highlights          Json     @default("[]")
   galleryImages       String[]
   inclusions          String[]
   exclusions          String[]
-  stayTransportImages Json            @default("[]")
-  price               Decimal         @db.Decimal(10, 2)
-  tokenAmount         Decimal         @db.Decimal(10, 2)
+  stayTransportImages Json     @default("[]")
+  price               Decimal  @db.Decimal(10, 2)
+  tokenAmount         Decimal  @db.Decimal(10, 2)
   capacity            Int
-  filledSpots         Int             @default(0)
+  filledSpots         Int      @default(0)
   startDate           DateTime
   endDate             DateTime
-  isActive            Boolean         @default(true)
-  isFeatured          Boolean         @default(false)
-  isPublished         Boolean         @default(false)
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
-  
+  isActive            Boolean  @default(true)
+  isFeatured          Boolean  @default(false)
+  isPublished         Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
   @@index([startDate])
   @@index([isActive])
   @@index([isFeatured])
@@ -151,36 +150,35 @@ model Destination {
 }
 
 model Booking {
-  id                  String                @id @default(uuid())
-  bookingReference    String                @unique
-  userId              String
-  tripId              String
-  status              BookingStatus         @default(PENDING)
-  paymentStatus       PaymentStatus         @default(PENDING)
-  numberOfTravelers   Int                   @default(1)
-  totalAmount         Decimal               @db.Decimal(10, 2)
-  tokenAmount         Decimal               @db.Decimal(10, 2)
-  amountPaid          Decimal               @default(0) @db.Decimal(10, 2)
-  amountDue           Decimal               @db.Decimal(10, 2)
-  initialPaymentType  PaymentType
-  balanceDueDate      DateTime?
-  reservedAt          DateTime?
-  confirmedAt         DateTime?
-  cancelledAt         DateTime?
-  completedAt         DateTime?
-  cancellationReason  String?
-  cancelledBy         String?
-  specialRequests     String?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  trip                Trip                  @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  payments            Payment[]
-  paymentIntents      PaymentIntent[]
-  reminders           PaymentReminder[]
-  travelers           Traveler[]
+  id                 String            @id @default(uuid())
+  bookingReference   String            @unique
+  userId             String
+  tripId             String
+  status             BookingStatus     @default(PENDING)
+  paymentStatus      PaymentStatus     @default(PENDING)
+  numberOfTravelers  Int               @default(1)
+  totalAmount        Decimal           @db.Decimal(10, 2)
+  tokenAmount        Decimal           @db.Decimal(10, 2)
+  amountPaid         Decimal           @default(0) @db.Decimal(10, 2)
+  amountDue          Decimal           @db.Decimal(10, 2)
+  initialPaymentType PaymentType
+  balanceDueDate     DateTime?
+  reservedAt         DateTime?
+  confirmedAt        DateTime?
+  cancelledAt        DateTime?
+  completedAt        DateTime?
+  cancellationReason String?
+  cancelledBy        String?
+  specialRequests    String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  trip               Trip              @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments           Payment[]
+  paymentIntents     PaymentIntent[]
+  reminders          PaymentReminder[]
+  travelers          Traveler[]
 
-  
   @@index([tripId])
   @@index([userId])
   @@index([status])
@@ -328,7 +326,8 @@ model Payment {
   idempotencyKey    String                   @unique
   failureCode       String?
   failureReason     String?
-  receiptNumber     Int?                     @default(autoincrement())
+  receiptNumber     String?                  @unique
+  receiptNumberInt  Int?                     @default(autoincrement())
   notes             Json?
   paidAt            DateTime?
   createdAt         DateTime                 @default(now())
@@ -399,8 +398,6 @@ model Refund {
   @@index([status])
   @@index([createdAt])
 }
-
-
 
 enum UserRole {
   USER
@@ -497,5 +494,3 @@ enum RefundStatus {
   SUCCESS
   FAILED
 }
-
-
