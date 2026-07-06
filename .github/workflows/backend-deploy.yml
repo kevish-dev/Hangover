@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: backend-production
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -44,19 +44,19 @@ jobs:
         run: npm ci
 
       - name: Generate Production .env
-        shell: bash
+        env:
+          PROD_ENV: ${{ secrets.ENV }}
         run: |
-          cat << 'EOF' > .env
-          ${{ secrets.ENV }}
-          EOF
+          echo "$PROD_ENV" > .env
 
       - name: Create Deployment Package
         run: |
           tar \
             --exclude=node_modules \
             --exclude=.git \
-            -czf backend.tar.gz \
+            -czf /tmp/backend.tar.gz \
             .
+          mv /tmp/backend.tar.gz ./backend.tar.gz
 
       - name: Upload Deployment Package
         uses: appleboy/scp-action@v0.1.7
@@ -75,6 +75,8 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
+            set -e
+
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
@@ -95,7 +97,15 @@ jobs:
 
             docker compose up -d
 
-            sleep 5
+            echo "Waiting for PostgreSQL to be ready..."
+            for i in {1..30}; do
+              if docker compose exec -T postgres pg_isready -U admin -d hangover > /dev/null 2>&1; then
+                echo "PostgreSQL is ready!"
+                break
+              fi
+              echo "Waiting..."
+              sleep 2
+            done
 
             npx prisma generate
             npx prisma migrate deploy
