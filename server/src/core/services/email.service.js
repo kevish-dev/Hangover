@@ -55,7 +55,11 @@ export const sendBookingConfirmedEmail = async ({ to, name, bookingRef, tripTitl
           <tbody>
             <tr>
               <td style="padding:12px;border:1px solid #ddd;color:#444;">${tripTitle} Package (x${travelersCount})</td>
-              <td style="padding:12px;border:1px solid #ddd;text-align:right;color:#444;">₹${Number(totalAmount).toLocaleString('en-IN')}</td>
+              <td style="padding:12px;border:1px solid #ddd;text-align:right;color:#444;">₹${Number(totalAmount / 1.05).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            </tr>
+            <tr>
+              <td style="padding:12px;border:1px solid #ddd;color:#444;">GST (5%)</td>
+              <td style="padding:12px;border:1px solid #ddd;text-align:right;color:#444;">₹${Number(totalAmount - (totalAmount / 1.05)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
             </tr>
           </tbody>
           <tfoot>
@@ -78,6 +82,7 @@ export const sendBookingConfirmedEmail = async ({ to, name, bookingRef, tripTitl
         <div style="padding-top:20px;border-top:1px solid #eaeaea;text-align:center;">
           <p style="font-size:13px;color:#666;line-height:1.5;">Thank you for choosing Hangover Trips!<br/>We'll be in touch with more details closer to the trip date. If you have any questions, simply reply to this email.</p>
           <p style="margin-top:15px;color:#aaa;font-size:11px;">Hangover Trips • Contact: +91 98765 43210</p>
+          <p style="margin-top:4px;color:#aaa;font-size:11px;">GSTIN: 12BSPPT9347F1Z8</p>
         </div>
       </div>
     `,

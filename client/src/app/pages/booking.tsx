@@ -977,8 +977,13 @@ export default function BookingPage() {
   const tripDifficulty = trip.difficultyLevel;
 
   const numTravelers = 1 + travelers.length;
-  const totalAmountDue = Number(trip.price) * numTravelers;
-  const tokenAmountDue = Number(trip.tokenAmount) * numTravelers;
+  const baseTotalAmount = Number(trip.price) * numTravelers;
+  const totalGst = baseTotalAmount * 0.05;
+  const totalAmountDue = baseTotalAmount + totalGst;
+
+  const baseTokenTotal = Number(trip.tokenAmount) * numTravelers;
+  const tokenGst = baseTokenTotal * 0.05;
+  const tokenAmountDue = baseTokenTotal + tokenGst;
   const isTokenZero = tokenAmountDue === 0;
 
   // ── Verifying screen (shown immediately after Razorpay handler fires) ─
@@ -2164,6 +2169,10 @@ export default function BookingPage() {
                     label: `Travelers`,
                     val: `x ${numTravelers}`,
                   },
+                  {
+                    label: `GST (5%)`,
+                    val: formatPrice(totalGst),
+                  },
                 ].map(({ label, val }) => (
                   <div
                     key={label}
@@ -2600,37 +2609,66 @@ export default function BookingPage() {
                         {tripPrice}
                       </p>
                     </div>
-                    {numTravelers > 1 && (
-                      <div
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginTop: "12px",
+                      }}
+                    >
+                      <p
                         style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
+                          color: "rgba(30,26,20,0.38)",
+                          fontSize: "0.58rem",
+                          letterSpacing: "0.14em",
+                          textTransform: "uppercase",
+                          margin: 0,
                         }}
                       >
-                        <p
-                          style={{
-                            color: "rgba(30,26,20,0.38)",
-                            fontSize: "0.58rem",
-                            letterSpacing: "0.14em",
-                            textTransform: "uppercase",
-                            margin: 0,
-                          }}
-                        >
-                          Total ({numTravelers} travelers)
-                        </p>
-                        <p
-                          style={{
-                            color: "#1e1a14",
-                            fontSize: "0.9rem",
-                            fontWeight: 600,
-                            margin: 0,
-                          }}
-                        >
-                          {formatPrice(totalAmountDue)}
-                        </p>
-                      </div>
-                    )}
+                        GST (5%)
+                      </p>
+                      <p
+                        style={{
+                          color: "#1e1a14",
+                          fontSize: "0.9rem",
+                          fontWeight: 500,
+                          margin: 0,
+                        }}
+                      >
+                        {formatPrice(totalGst)}
+                      </p>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginTop: "8px",
+                      }}
+                    >
+                      <p
+                        style={{
+                          color: "rgba(30,26,20,0.38)",
+                          fontSize: "0.58rem",
+                          letterSpacing: "0.14em",
+                          textTransform: "uppercase",
+                          margin: 0,
+                        }}
+                      >
+                        Total{numTravelers > 1 ? ` (${numTravelers} travelers)` : ""}
+                      </p>
+                      <p
+                        style={{
+                          color: "#1e1a14",
+                          fontSize: "0.9rem",
+                          fontWeight: 600,
+                          margin: 0,
+                        }}
+                      >
+                        {formatPrice(totalAmountDue)}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>

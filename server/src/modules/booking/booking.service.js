@@ -61,8 +61,11 @@ export const createBooking = async (userId, data) => {
     );
   }
 
-  const totalAmount = Number(trip.price) * numberOfTravelers;
-  const tokenAmount = Number(trip.tokenAmount) * numberOfTravelers;
+  const baseTotalAmount = Number(trip.price) * numberOfTravelers;
+  const totalAmount = baseTotalAmount + (baseTotalAmount * 0.05);
+
+  const baseTokenAmount = Number(trip.tokenAmount) * numberOfTravelers;
+  const tokenAmount = baseTokenAmount + (baseTokenAmount * 0.05);
 
   let initialPaymentType = data.initialPaymentType || "TOKEN";
   if (tokenAmount === 0) {
