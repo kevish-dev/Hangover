@@ -34,20 +34,32 @@ export const createBooking = async (userId, data) => {
     throw new ValidationError("Must provide either tripId or festivalId");
   }
 
+  if (!data.slotId) {
+    throw new ValidationError("Must provide a slotId to book a specific date.");
+  }
+
   // 2. Fetch trip or festival
   let item = null;
   let isTrip = false;
   
   if (data.tripId) {
-    item = await prisma.trip.findUnique({ where: { id: data.tripId } });
+    item = await prisma.trip.findUnique({ where: { id: data.tripId }, include: { packages: true } });
     isTrip = true;
   } else {
-    item = await prisma.festival.findUnique({ where: { id: data.festivalId } });
+    item = await prisma.festival.findUnique({ where: { id: data.festivalId }, include: { packages: true } });
   }
 
   if (!item) throw new NotFoundError("Booking item not found");
   if (!item.isActive)
     throw new ValidationError("This item is no longer available for booking.");
+
+  const slot = await prisma.slot.findUnique({ where: { id: data.slotId } });
+  if (!slot) {
+    throw new NotFoundError("Booking slot not found");
+  }
+  if (slot.tripId !== data.tripId && slot.festivalId !== data.festivalId) {
+    throw new ValidationError("Selected slot does not belong to this trip or festival.");
+  }
 
   // Check if user already has an active booking for this item
   const existingActive = await prisma.booking.findFirst({
@@ -66,18 +78,29 @@ export const createBooking = async (userId, data) => {
 
   // Validate traveler count against group size limits
 
-  // Check capacity
-  const spotsLeft = item.capacity - item.filledSpots;
+  // Check capacity on the slot
+  const spotsLeft = slot.capacity - slot.filledSpots;
   if (numberOfTravelers > spotsLeft) {
     throw new ValidationError(
-      `Only ${spotsLeft} spot(s) remaining.`,
+      `Only ${spotsLeft} spot(s) remaining for the selected dates.`,
     );
   }
 
-  const baseTotalAmount = Number(item.price) * numberOfTravelers;
+  let selectedPackage = null;
+  if (data.packageId) {
+    selectedPackage = item.packages?.find(p => p.id === data.packageId);
+    if (!selectedPackage) {
+      throw new ValidationError("Selected package not found for this item.");
+    }
+  }
+
+  const itemPrice = selectedPackage ? Number(selectedPackage.price) : Number(item.price);
+  const itemToken = selectedPackage ? Number(selectedPackage.tokenAmount) : Number(item.tokenAmount);
+
+  const baseTotalAmount = itemPrice * numberOfTravelers;
   const totalAmount = baseTotalAmount + (baseTotalAmount * 0.05);
 
-  const baseTokenAmount = Number(item.tokenAmount) * numberOfTravelers;
+  const baseTokenAmount = itemToken * numberOfTravelers;
   const tokenAmount = baseTokenAmount + (baseTokenAmount * 0.05);
 
   let initialPaymentType = data.initialPaymentType || "TOKEN";
@@ -88,7 +111,7 @@ export const createBooking = async (userId, data) => {
     initialPaymentType === "FULL" ? 0 : totalAmount - tokenAmount;
 
   // 4. Calculate balance due date: 10 days before start
-  const balanceDueDate = new Date(item.startDate);
+  const balanceDueDate = new Date(slot.startDate);
   balanceDueDate.setDate(balanceDueDate.getDate() - 10);
 
   // 5. Build booking payload
@@ -134,6 +157,8 @@ export const createBooking = async (userId, data) => {
   bookingData.userId = userId;
   if (isTrip) bookingData.tripId = data.tripId;
   else bookingData.festivalId = data.festivalId;
+  bookingData.slotId = data.slotId;
+  if (selectedPackage) bookingData.packageId = selectedPackage.id;
   bookingData.status = "PENDING";
   bookingData.paymentStatus = "PENDING";
 
@@ -213,6 +238,7 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
     include: {
       trip: true,
       festival: true,
+      slot: true,
       user: { include: { profile: true } },
       payments: {
         where: { status: "SUCCESS" }
@@ -319,18 +345,11 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
     });
 
     // Free up spots
-    if (booking.tripId) {
-      await tx.trip.update({
-        where: { id: booking.tripId },
+    if (booking.slotId) {
+      await tx.slot.update({
+        where: { id: booking.slotId },
         data: {
-          filledSpots: Math.max(0, booking.trip.filledSpots - booking.numberOfTravelers)
-        }
-      });
-    } else if (booking.festivalId) {
-      await tx.festival.update({
-        where: { id: booking.festivalId },
-        data: {
-          filledSpots: Math.max(0, booking.festival.filledSpots - booking.numberOfTravelers)
+          filledSpots: Math.max(0, (booking.slot.filledSpots || 0) - booking.numberOfTravelers)
         }
       });
     }

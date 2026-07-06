@@ -79,6 +79,15 @@ registry.registerPath({
                   }),
                 )
                 .optional(),
+              packages: z
+                .array(
+                  z.object({
+                    title: z.string(),
+                    price: z.number(),
+                    tokenAmount: z.number(),
+                  })
+                )
+                .optional(),
             })
             .passthrough(),
         },
@@ -124,6 +133,15 @@ registry.registerPath({
                     answer: z.string(),
                     order: z.number().optional(),
                   }),
+                )
+                .optional(),
+              packages: z
+                .array(
+                  z.object({
+                    title: z.string(),
+                    price: z.number(),
+                    tokenAmount: z.number(),
+                  })
                 )
                 .optional(),
             })

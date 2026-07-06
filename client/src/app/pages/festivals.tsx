@@ -3,8 +3,9 @@ import logoSrc from "../../imports/final-logo_png_transparent.png";
 // @ts-ignore
 import heroVideo from "../../imports/compressed-hero.mp4";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router";
+import { fetchAllFestivals, formatPrice, ApiFestival } from "../../lib/festivalApi";
 import { motion } from "motion/react";
 import { MapPin, Calendar, Clock, Users, ArrowRight, ChevronRight } from "lucide-react";
 import { SiteFooter } from "../components/site-footer";
@@ -115,9 +116,28 @@ function HangoverBadge({ large = false }: { large?: boolean }) {
 }
 
 // ── Festival card — mirrors trip card design language ─────────────
-function FestivalCard({ festival, index }: { festival: typeof OTHER_FESTIVALS[0]; index: number }) {
+function FestivalCard({ festival, index }: { festival: any; index: number }) {
   const [hovered, setHovered] = useState(false);
-  const isOpen = festival.status === "Bookings Open";
+  
+  // Determine if it's an ApiFestival or static
+  const isApi = !!festival.slug;
+  const slug = isApi ? festival.slug : festival.slug;
+  const name = isApi ? festival.title : festival.name;
+  const location = isApi ? festival.location : festival.location;
+  const price = isApi ? formatPrice(festival.price) : festival.price;
+  const image = isApi ? (festival.bannerImages?.[0] || OTHER_FESTIVALS[0].image) : festival.image;
+  const tagline = isApi ? (festival.overview?.substring(0, 60) + "...") : festival.tagline;
+  const type = isApi ? (festival.tags?.[0]?.tag || "Festival") : festival.type;
+  
+  let status = festival.status;
+  if (isApi) {
+    if (festival.filledSpots >= festival.capacity) status = "Sold Out";
+    else if (new Date(festival.startDate) < new Date()) status = "Closed";
+    else status = "Bookings Open";
+  }
+  const isOpen = status === "Bookings Open";
+
+  const dates = isApi ? `${new Date(festival.startDate).getDate()} ${new Date(festival.startDate).toLocaleString('default', { month: 'short' })} - ${new Date(festival.endDate).getDate()} ${new Date(festival.endDate).toLocaleString('default', { month: 'short' })} ${new Date(festival.startDate).getFullYear()}` : festival.dates;
 
   return (
     <motion.div
@@ -140,7 +160,7 @@ function FestivalCard({ festival, index }: { festival: typeof OTHER_FESTIVALS[0]
     >
       {/* Image */}
       <div style={{ position: "relative", aspectRatio: "16/10", overflow: "hidden" }}>
-        <img src={festival.image} alt={festival.name}
+        <img src={image} alt={name}
           style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.55s ease", transform: hovered ? "scale(1.05)" : "scale(1)" }} />
         {/* Bottom gradient — makes text readable */}
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(11,11,11,0.72) 0%, rgba(11,11,11,0.18) 50%, transparent 75%)", pointerEvents: "none" }} />
@@ -162,7 +182,7 @@ function FestivalCard({ festival, index }: { festival: typeof OTHER_FESTIVALS[0]
           fontSize: "0.55rem", fontWeight: 600, letterSpacing: "0.13em", textTransform: "uppercase",
           fontFamily: "'Poppins', sans-serif",
         }}>
-          {festival.status}
+          {status}
         </span>
 
         {/* Type — bottom-left of image */}
@@ -173,7 +193,7 @@ function FestivalCard({ festival, index }: { festival: typeof OTHER_FESTIVALS[0]
           fontSize: "0.55rem", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase",
           fontFamily: "'Poppins', sans-serif",
         }}>
-          {festival.type}
+          {type}
         </span>
       </div>
 
@@ -182,29 +202,29 @@ function FestivalCard({ festival, index }: { festival: typeof OTHER_FESTIVALS[0]
         <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "6px" }}>
           <MapPin size={10} color="#781216" />
           <span style={{ color: "#781216", fontSize: "0.6rem", fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-            {festival.location}
+            {location}
           </span>
         </div>
 
         <h3 style={{ color: "#1e1a14", fontSize: "1rem", fontWeight: 500, letterSpacing: "-0.02em", lineHeight: 1.3, margin: "0 0 5px" }}>
-          {festival.name}
+          {name}
         </h3>
 
         <p style={{ color: "rgba(30,26,20,0.52)", fontSize: "0.78rem", fontWeight: 300, lineHeight: 1.6, margin: "0 0 12px" }}>
-          {festival.tagline}
+          {tagline}
         </p>
 
         <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "16px" }}>
           <Calendar size={10} color="rgba(30,26,20,0.35)" />
-          <span style={{ color: "rgba(30,26,20,0.5)", fontSize: "0.68rem", fontWeight: 300 }}>{festival.dates}</span>
+          <span style={{ color: "rgba(30,26,20,0.5)", fontSize: "0.68rem", fontWeight: 300 }}>{dates}</span>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "14px", borderTop: "1px solid rgba(30,26,20,0.07)" }}>
           <div>
             <p style={{ color: "rgba(30,26,20,0.35)", fontSize: "0.55rem", letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 2px" }}>From</p>
-            <p style={{ color: "#1e1a14", fontSize: "0.9rem", fontWeight: 600, letterSpacing: "-0.01em", margin: 0 }}>{festival.price}</p>
+            <p style={{ color: "#1e1a14", fontSize: "0.9rem", fontWeight: 600, letterSpacing: "-0.01em", margin: 0 }}>{price}</p>
           </div>
-          <Link to={`/trips/${festival.slug}`} style={{
+          <Link to={`/festivals/${slug}`} style={{
             background: hovered ? "#C8A96E" : "transparent",
             border: `1.5px solid ${hovered ? "#C8A96E" : "rgba(30,26,20,0.14)"}`,
             color: hovered ? "#1e1a14" : "rgba(30,26,20,0.58)",
@@ -224,6 +244,40 @@ function FestivalCard({ festival, index }: { festival: typeof OTHER_FESTIVALS[0]
 
 // ── Page ──────────────────────────────────────────────────────────
 export default function FestivalsPage() {
+  const [festivals, setFestivals] = useState<ApiFestival[]>([]);
+
+  useEffect(() => {
+    fetchAllFestivals()
+      .then(data => setFestivals(data.filter(f => f.isActive && f.isPublished)))
+      .catch(console.error);
+  }, []);
+
+  const dbFeatured = festivals.find(f => f.isFeatured);
+  const others = dbFeatured ? festivals.filter(f => f.id !== dbFeatured.id) : festivals;
+
+  const featured = dbFeatured ? {
+    name: dbFeatured.title,
+    year: new Date(dbFeatured.startDate).getFullYear().toString(),
+    dates: `${new Date(dbFeatured.startDate).getDate()} ${new Date(dbFeatured.startDate).toLocaleString('default', { month: 'short' })} - ${new Date(dbFeatured.endDate).getDate()} ${new Date(dbFeatured.endDate).toLocaleString('default', { month: 'short' })} ${new Date(dbFeatured.startDate).getFullYear()}`,
+    location: dbFeatured.location,
+    tagline: dbFeatured.overview?.substring(0, 100) + "...",
+    description: dbFeatured.overview || FEATURED.description,
+    extraText: FEATURED.extraText, // Fallback for extra text
+    price: formatPrice(dbFeatured.price),
+    spotsLeft: Math.max(0, dbFeatured.capacity - dbFeatured.filledSpots),
+    duration: `${dbFeatured.duration} Days`,
+    image: dbFeatured.bannerImages?.[0] || FEATURED.image,
+    tripSlug: dbFeatured.slug,
+    stats: [
+      { num: `${dbFeatured.numberOfArtists || "10+"}`, label: "Artists", detail: "Curated lineup" },
+      { num: `${dbFeatured.stageDays || "3"}`, label: "Stage Days", detail: "Full festival passes included" },
+      { num: `${dbFeatured.duration || "6"}`, label: "Day Trip", detail: "Camping and homestay" },
+      { num: `${dbFeatured.capacity || "12"}`, label: "People Max", detail: "Small group experience" },
+    ]
+  } : FEATURED;
+
+  const displayOthers = others.length > 0 ? others : OTHER_FESTIVALS;
+
   return (
     <div style={{ background: "#f5f0e6", minHeight: "100vh", fontFamily: "'Poppins', sans-serif" }}>
 
@@ -231,15 +285,23 @@ export default function FestivalsPage() {
           FEATURED HERO
       ════════════════════ */}
       <section style={{ position: "relative", height: "100vh", minHeight: "640px", overflow: "hidden" }}>
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-        >
-          <source src={heroVideo as string} type="video/mp4" />
-        </video>
+        {dbFeatured?.bannerImages?.[0] ? (
+          <img 
+            src={dbFeatured.bannerImages[0]} 
+            alt={featured.name}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        ) : (
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          >
+            <source src={heroVideo as string} type="video/mp4" />
+          </video>
+        )}
 
         {/* Rich crimson-to-dark diagonal — ties into brand color */}
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(125deg, rgba(55,7,9,0.96) 0%, rgba(44,5,8,0.84) 32%, rgba(20,14,10,0.52) 62%, rgba(11,11,11,0.06) 100%)" }} />
@@ -253,24 +315,24 @@ export default function FestivalsPage() {
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
               <div style={{ width: "24px", height: "1.5px", background: "#C8A96E" }} />
               <span style={{ color: "#C8A96E", fontSize: "0.65rem", fontWeight: 500, letterSpacing: "0.3em", textTransform: "uppercase" }}>
-                Featured Festival {FEATURED.year}
+                Featured Festival {featured.year}
               </span>
             </div>
 
             <h1 style={{ color: "#f9f4ec", fontSize: "clamp(2.6rem,7vw,5.5rem)", fontWeight: 300, letterSpacing: "-0.03em", lineHeight: 1.06, margin: "0 0 14px" }}>
-              {FEATURED.name}
+              {featured.name}
             </h1>
 
             <p style={{ color: "rgba(242,237,228,0.65)", fontSize: "clamp(0.88rem,1.5vw,1.05rem)", fontWeight: 300, fontStyle: "italic", lineHeight: 1.75, margin: "0 0 28px", maxWidth: "500px" }}>
-              "{FEATURED.tagline}"
+              "{featured.tagline}"
             </p>
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: "18px", marginBottom: "30px" }}>
               {[
-                { icon: Calendar, text: FEATURED.dates },
-                { icon: MapPin,   text: FEATURED.location },
-                { icon: Clock,    text: FEATURED.duration },
-                { icon: Users,    text: `${FEATURED.spotsLeft} spots left` },
+                { icon: Calendar, text: featured.dates },
+                { icon: MapPin,   text: featured.location },
+                { icon: Clock,    text: featured.duration },
+                { icon: Users,    text: `${featured.spotsLeft} spots left` },
               ].map(({ icon: Icon, text }) => (
                 <div key={text} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <Icon size={12} color="rgba(200,169,110,0.8)" strokeWidth={1.5} />
@@ -282,19 +344,19 @@ export default function FestivalsPage() {
             <div style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
               <div>
                 <p style={{ color: "rgba(242,237,228,0.32)", fontSize: "0.57rem", letterSpacing: "0.16em", textTransform: "uppercase", margin: "0 0 3px" }}>Starting from</p>
-                <p style={{ color: "#f9f4ec", fontSize: "clamp(1.4rem,3vw,2rem)", fontWeight: 600, letterSpacing: "-0.04em", margin: 0, lineHeight: 1 }}>{FEATURED.price}</p>
+                <p style={{ color: "#f9f4ec", fontSize: "clamp(1.4rem,3vw,2rem)", fontWeight: 600, letterSpacing: "-0.04em", margin: 0, lineHeight: 1 }}>{featured.price}</p>
               </div>
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                <Link to={`/trips/${FEATURED.tripSlug}`} style={{ background: "#C8A96E", color: "#1a1612", padding: "12px 26px", fontFamily: "'Poppins', sans-serif", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "7px", transition: "background 0.25s ease" }}
+                <Link to={`/book/${featured.tripSlug}?type=festival`} style={{ background: "#C8A96E", color: "#1a1612", padding: "12px 26px", fontFamily: "'Poppins', sans-serif", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "7px", transition: "background 0.25s ease" }}
                   onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.background = "#dfc080")}
                   onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.background = "#C8A96E")}>
                   Book Your Spot <ArrowRight size={13} />
                 </Link>
-                <a href="#more-about" style={{ background: "rgba(242,237,228,0.07)", color: "rgba(242,237,228,0.75)", border: "1px solid rgba(242,237,228,0.16)", padding: "12px 22px", fontFamily: "'Poppins', sans-serif", fontSize: "0.76rem", fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none", display: "inline-flex", alignItems: "center", backdropFilter: "blur(6px)", transition: "border-color 0.2s, color 0.2s" }}
+                <Link to={`/festivals/${featured.tripSlug}`} style={{ background: "rgba(242,237,228,0.07)", color: "rgba(242,237,228,0.75)", border: "1px solid rgba(242,237,228,0.16)", padding: "12px 22px", fontFamily: "'Poppins', sans-serif", fontSize: "0.76rem", fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none", display: "inline-flex", alignItems: "center", backdropFilter: "blur(6px)", transition: "border-color 0.2s, color 0.2s" }}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(200,169,110,0.4)"; (e.currentTarget as HTMLAnchorElement).style.color = "#C8A96E"; }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(242,237,228,0.16)"; (e.currentTarget as HTMLAnchorElement).style.color = "rgba(242,237,228,0.75)"; }}>
                   Explore the Trip
-                </a>
+                </Link>
               </div>
             </div>
           </motion.div>
@@ -334,10 +396,10 @@ export default function FestivalsPage() {
             {/* Left: editorial body */}
             <motion.div initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.55, delay: 0.08 }}>
               <p style={{ color: "rgba(30,26,20,0.68)", fontSize: "clamp(0.88rem,1.3vw,0.98rem)", fontWeight: 300, lineHeight: 1.9, marginBottom: "22px" }}>
-                {FEATURED.description}
+                {featured.description}
               </p>
               <p style={{ color: "rgba(30,26,20,0.68)", fontSize: "clamp(0.88rem,1.3vw,0.98rem)", fontWeight: 300, lineHeight: 1.9, marginBottom: "28px" }}>
-                {FEATURED.extraText}
+                {featured.extraText}
               </p>
 
               {/* Pull quote */}
@@ -350,7 +412,7 @@ export default function FestivalsPage() {
                 </span>
               </div>
 
-              <Link to={`/trips/${FEATURED.tripSlug}`} style={{ display: "inline-flex", alignItems: "center", gap: "7px", color: "#781216", fontSize: "0.75rem", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", textDecoration: "none", borderBottom: "1.5px solid rgba(120,18,22,0.22)", paddingBottom: "3px", transition: "border-color 0.2s" }}
+              <Link to={`/festivals/${featured.tripSlug}`} style={{ display: "inline-flex", alignItems: "center", gap: "7px", color: "#781216", fontSize: "0.75rem", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", textDecoration: "none", borderBottom: "1.5px solid rgba(120,18,22,0.22)", paddingBottom: "3px", transition: "border-color 0.2s" }}
                 onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.borderColor = "#781216")}
                 onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(120,18,22,0.22)")}>
                 View Full Trip Details <ChevronRight size={13} />
@@ -360,7 +422,7 @@ export default function FestivalsPage() {
             {/* Right: stat cards + valley photo */}
             <motion.div initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.55, delay: 0.16 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
-                {FEATURED.stats.map((s, i) => (
+                {featured.stats.map((s, i) => (
                   <motion.div key={s.label}
                     initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
                     transition={{ duration: 0.4, delay: 0.2 + i * 0.06 }}
@@ -403,7 +465,7 @@ export default function FestivalsPage() {
           </motion.div>
 
           <div style={{ display: "grid", gap: "20px" }} className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-            {OTHER_FESTIVALS.map((fest, i) => (
+            {displayOthers.map((fest: any, i) => (
               <FestivalCard key={fest.id} festival={fest} index={i} />
             ))}
           </div>

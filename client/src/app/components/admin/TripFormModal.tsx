@@ -23,6 +23,7 @@ import {
   ArrowLeft,
   ArrowUp,
   ArrowDown,
+  Trash,
 } from "lucide-react";
 import { apiClient } from "../../../lib/axios";
 import { useQueryClient } from "@tanstack/react-query";
@@ -38,10 +39,14 @@ const tripSchema = z.object({
   bestTimeToVisit: z.string().min(1, "Best time is required"),
   price: z.coerce.number().min(0, "Price must be positive"),
   tokenAmount: z.coerce.number().min(0, "Booking amount must be positive"),
-  capacity: z.coerce.number().min(1, "Capacity must be at least 1"),
-
-  startDate: z.string().min(1, "Start date is required"),
-  endDate: z.string().min(1, "End date is required"),
+  slots: z.array(
+    z.object({
+      id: z.string().optional(),
+      startDate: z.string().min(1, "Start date is required"),
+      endDate: z.string().min(1, "End date is required"),
+      capacity: z.coerce.number().min(1, "Capacity must be at least 1"),
+    })
+  ).min(1, "At least one slot is required"),
 
   maxAltitude: z.coerce.number().optional(),
 
@@ -61,18 +66,15 @@ const tripSchema = z.object({
       }),
     )
     .optional(),
+  packages: z.array(
+    z.object({
+      title: z.string().min(1, "Title is required"),
+      price: z.coerce.number().min(0, "Price must be positive"),
+      tokenAmount: z.coerce.number().min(0, "Booking amount must be positive"),
+    })
+  ).optional(),
   isPublished: z.boolean().default(false),
   isFeatured: z.boolean().default(false),
-}).refine(
-  (data) => {
-    if (data.startDate && data.endDate) {
-      return new Date(data.endDate) > new Date(data.startDate);
-    }
-    return true;
-  },
-  {
-    message: "End date must be after start date",
-    path: ["endDate"],
   }
 );
 
@@ -165,14 +167,13 @@ export function TripFormModal({
       bestTimeToVisit: "",
       price: 0,
       tokenAmount: 0,
-      capacity: 10,
-      startDate: "",
-      endDate: "",
+      slots: [{ startDate: "", endDate: "", capacity: 10 }],
       maxAltitude: 0,
       overview: "",
       inclusions: [],
       exclusions: [],
       tripTags: [],
+      packages: [],
       faqs: [],
       isPublished: false,
       isFeatured: false,
@@ -192,10 +193,12 @@ export function TripFormModal({
           bestTimeToVisit: trip.bestTimeToVisit || "",
           price: trip.price || 0,
           tokenAmount: trip.tokenAmount || 0,
-          capacity: trip.capacity || 10,
-          startDate: formatDateForInput(trip.startDate),
-          endDate: formatDateForInput(trip.endDate),
-
+          slots: trip.slots && trip.slots.length > 0 ? trip.slots.map((s: any) => ({
+            id: s.id,
+            startDate: formatDateForInput(s.startDate),
+            endDate: formatDateForInput(s.endDate),
+            capacity: s.capacity
+          })) : [{ startDate: "", endDate: "", capacity: 10 }],
           maxAltitude: trip.maxAltitude || 0,
           overview: trip.overview || "",
           inclusions: trip.inclusions?.length
@@ -211,6 +214,13 @@ export function TripFormModal({
             ? trip.faqs.map((f: any) => ({
                 question: f.question,
                 answer: f.answer,
+              }))
+            : [],
+          packages: trip.packages?.length
+            ? trip.packages.map((p: any) => ({
+                title: p.title,
+                price: p.price,
+                tokenAmount: p.tokenAmount,
               }))
             : [],
           isPublished: trip.isPublished || false,
@@ -255,14 +265,13 @@ export function TripFormModal({
           bestTimeToVisit: "",
           price: 0,
           tokenAmount: 0,
-          capacity: 10,
-          startDate: "",
-          endDate: "",
+          slots: [{ startDate: "", endDate: "", capacity: 10 }],
           maxAltitude: 0,
           overview: "",
           inclusions: [],
           exclusions: [],
           tripTags: [],
+          packages: [],
           faqs: [],
           isPublished: false,
           isFeatured: false,
@@ -299,6 +308,22 @@ export function TripFormModal({
   } = useFieldArray({
     control: form.control,
     name: "tripTags",
+  });
+  const {
+    fields: packageFields,
+    append: appendPackage,
+    remove: removePackage,
+  } = useFieldArray({
+    name: "packages",
+    control: form.control,
+  });
+  const {
+    fields: slotFields,
+    append: appendSlot,
+    remove: removeSlot,
+  } = useFieldArray({
+    name: "slots",
+    control: form.control,
   });
   const {
     fields: faqFields,
@@ -472,12 +497,12 @@ export function TripFormModal({
         "bestTimeToVisit",
         "price",
         "tokenAmount",
-        "capacity",
       ];
-    if (step === 1)
-      fieldsToValidate = ["startDate", "endDate", "maxAltitude"];
-    if (step === 2)
+    else if (step === 1) {
+      fieldsToValidate = ["slots", "maxAltitude"];
+    } else if (step === 2) {
       fieldsToValidate = ["overview", "inclusions", "exclusions"];
+    }
     if (step === 3) fieldsToValidate = ["faqs", "tripTags"];
     if (step === 4) return true; // Stay & Transport has local state, basic validation can be skipped or added if needed
 
@@ -528,8 +553,11 @@ export function TripFormModal({
     try {
       const payload = {
         ...data,
-        startDate: new Date(data.startDate).toISOString(),
-        endDate: new Date(data.endDate).toISOString(),
+        slots: data.slots.map(s => ({
+            ...s,
+            startDate: new Date(s.startDate).toISOString(),
+            endDate: new Date(s.endDate).toISOString(),
+        })),
         inclusions: data.inclusions
           .map((i) => i.value)
           .filter((i) => i.trim() !== ""),
@@ -539,6 +567,7 @@ export function TripFormModal({
         tripTags: data.tripTags
           ?.map((t) => t.value)
           .filter((t) => t.trim() !== ""),
+        packages: data.packages,
         faqs: data.faqs?.filter(
           (f) => f.question.trim() !== "" && f.answer.trim() !== "",
         ),
@@ -790,13 +819,75 @@ export function TripFormModal({
                   )}
                 </div>
                 <div className="space-y-2 col-span-2">
-                  <Label>Total Capacity (Pax)</Label>
-                  <Input type="number" {...form.register("capacity")} />
-                  {form.formState.errors.capacity && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.capacity.message}
-                    </p>
-                  )}
+                </div>
+
+                {/* Packages Section */}
+                <div className="col-span-2 space-y-4 border p-4 rounded-md mt-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-semibold">Packages (Optional)</h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        addPackage({ title: "", price: 0, tokenAmount: 0 })
+                      }
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Package
+                    </Button>
+                  </div>
+                  <p className="text-sm text-gray-500 mb-2">
+                    If added, users will choose a package during booking. Otherwise, the Base Price is used.
+                  </p>
+                  {packageFields.map((field, index) => (
+                    <div key={field.id} className="flex gap-4 items-start relative p-3 border rounded-md">
+                      <div className="flex-1 space-y-2">
+                        <Label>Title</Label>
+                        <Input
+                          placeholder="e.g. VIP Package"
+                          {...form.register(`packages.${index}.title` as const)}
+                        />
+                        {form.formState.errors.packages?.[index]?.title && (
+                          <p className="text-sm text-red-500">
+                            {form.formState.errors.packages[index]?.title?.message}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <Label>Price (₹)</Label>
+                        <Input
+                          type="number"
+                          {...form.register(`packages.${index}.price` as const)}
+                        />
+                        {form.formState.errors.packages?.[index]?.price && (
+                          <p className="text-sm text-red-500">
+                            {form.formState.errors.packages[index]?.price?.message}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <Label>Booking Amount (₹)</Label>
+                        <Input
+                          type="number"
+                          {...form.register(`packages.${index}.tokenAmount` as const)}
+                        />
+                        {form.formState.errors.packages?.[index]?.tokenAmount && (
+                          <p className="text-sm text-red-500">
+                            {form.formState.errors.packages[index]?.tokenAmount?.message}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="text-red-500 mt-7"
+                        onClick={() => removePackage(index)}
+                      >
+                        <Trash className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
                 <div className="space-y-2 col-span-2 flex flex-col sm:flex-row sm:items-center gap-4 mt-2">
                   <div className="flex items-center gap-2">
@@ -825,29 +916,81 @@ export function TripFormModal({
               </div>
             </div>
 
-            {/* STEP 1: LOGISTICS */}
+          {/* STEP 1: LOGISTICS (SLOTS & ALTITUDE) */}
             <div className={step === 1 ? "block" : "hidden"}>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Start Date</Label>
-                  <Input
-                    type="datetime-local"
-                    {...form.register("startDate")}
-                  />
-                  {form.formState.errors.startDate && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.startDate.message}
+              <div className="space-y-6">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Slots (Dates & Capacity)</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => appendSlot({ startDate: "", endDate: "", capacity: 10 })}
+                    >
+                      <Plus className="w-4 h-4 mr-2" /> Add Slot
+                    </Button>
+                  </div>
+                  {form.formState.errors.slots?.root && (
+                    <p className="text-sm text-red-500 mb-2">
+                      {form.formState.errors.slots.root.message}
                     </p>
                   )}
-                </div>
-                <div className="space-y-2">
-                  <Label>End Date</Label>
-                  <Input type="datetime-local" {...form.register("endDate")} />
-                  {form.formState.errors.endDate && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.endDate.message}
-                    </p>
-                  )}
+                  <div className="space-y-4">
+                    {slotFields.map((field, index) => (
+                      <div key={field.id} className="flex items-start gap-4 p-4 border rounded-md relative group">
+                        <div className="flex-1 space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Start Date</Label>
+                              <Input
+                                type="datetime-local"
+                                {...form.register(`slots.${index}.startDate`)}
+                              />
+                              {form.formState.errors.slots?.[index]?.startDate && (
+                                <p className="text-sm text-red-500">
+                                  {form.formState.errors.slots[index]?.startDate?.message}
+                                </p>
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              <Label>End Date</Label>
+                              <Input
+                                type="datetime-local"
+                                {...form.register(`slots.${index}.endDate`)}
+                              />
+                              {form.formState.errors.slots?.[index]?.endDate && (
+                                <p className="text-sm text-red-500">
+                                  {form.formState.errors.slots[index]?.endDate?.message}
+                                </p>
+                              )}
+                            </div>
+                            <div className="space-y-2 col-span-2">
+                              <Label>Capacity for this Slot</Label>
+                              <Input
+                                type="number"
+                                {...form.register(`slots.${index}.capacity`)}
+                              />
+                              {form.formState.errors.slots?.[index]?.capacity && (
+                                <p className="text-sm text-red-500">
+                                  {form.formState.errors.slots[index]?.capacity?.message}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity absolute top-2 right-2"
+                          onClick={() => removeSlot(index)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="space-y-2">

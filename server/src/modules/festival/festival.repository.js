@@ -22,16 +22,16 @@ export const findAll = async (skip, take, where = {}) => {
         maxAltitude: true,
         price: true,
         tokenAmount: true,
-        capacity: true,
-        filledSpots: true,
-        startDate: true,
-        endDate: true,
         isActive: true,
         isPublished: true,
         isFeatured: true,
         createdAt: true,
         destination: true,
         tags: true,
+        packages: true,
+        slots: {
+          orderBy: { startDate: 'asc' }
+        },
       }
     }),
     prisma.festival.count({ where }),
@@ -58,13 +58,17 @@ export const findById = async (whereObj) => {
         }
       },
       tags: true,
+      packages: true,
+      slots: {
+        orderBy: { startDate: 'asc' }
+      },
       destination: true,
     }
   });
 };
 
 export const create = async (data) => {
-  const { tags, faqs, ...rest } = data;
+  const { tags, faqs, packages, slots, ...rest } = data;
   const payload = { ...rest };
   
   if (tags && Array.isArray(tags)) {
@@ -85,12 +89,33 @@ export const create = async (data) => {
       }))
     };
   }
+
+  if (packages && Array.isArray(packages)) {
+    payload.packages = {
+      create: packages.map(pkg => ({
+        title: pkg.title,
+        price: pkg.price,
+        tokenAmount: pkg.tokenAmount
+      }))
+    };
+  }
   
+  if (slots && Array.isArray(slots)) {
+    payload.slots = {
+      create: slots.map(slot => ({
+        startDate: new Date(slot.startDate),
+        endDate: new Date(slot.endDate),
+        capacity: parseInt(slot.capacity, 10),
+        filledSpots: 0
+      }))
+    };
+  }
+
   return prisma.festival.create({ data: payload });
 };
 
 export const update = async (id, data) => {
-  const { tags, faqs, ...rest } = data;
+  const { tags, faqs, packages, slots, ...rest } = data;
   const payload = { ...rest };
   
   if (tags && Array.isArray(tags)) {
@@ -119,7 +144,51 @@ export const update = async (id, data) => {
       }))
     };
   }
+
+  if (packages && Array.isArray(packages)) {
+    payload.packages = {
+      deleteMany: {},
+      create: packages.map(pkg => ({
+        title: pkg.title,
+        price: pkg.price,
+        tokenAmount: pkg.tokenAmount
+      }))
+    };
+  }
   
+  if (slots && Array.isArray(slots)) {
+    const existingSlots = await prisma.slot.findMany({ where: { festivalId: id } });
+    const incomingSlotIds = slots.map(s => s.id).filter(Boolean);
+    const slotsToDelete = existingSlots.filter(s => !incomingSlotIds.includes(s.id));
+    
+    if (slotsToDelete.length > 0) {
+      const slotsWithBookings = await prisma.booking.findFirst({
+        where: { slotId: { in: slotsToDelete.map(s => s.id) } }
+      });
+      if (slotsWithBookings) {
+        throw new Error("Cannot delete slots that have existing bookings");
+      }
+    }
+
+    payload.slots = {
+      deleteMany: { id: { in: slotsToDelete.map(s => s.id) } },
+      upsert: slots.map(slot => ({
+        where: { id: slot.id || "00000000-0000-0000-0000-000000000000" },
+        update: {
+          startDate: new Date(slot.startDate),
+          endDate: new Date(slot.endDate),
+          capacity: parseInt(slot.capacity, 10)
+        },
+        create: {
+          startDate: new Date(slot.startDate),
+          endDate: new Date(slot.endDate),
+          capacity: parseInt(slot.capacity, 10),
+          filledSpots: 0
+        }
+      }))
+    };
+  }
+
   return prisma.festival.update({
     where: { id },
     data: payload,
@@ -150,7 +219,11 @@ export const getFeaturedFestivals = async () => {
       isActive: true,
       isPublished: true,
       isFeatured: true,
-      bannerImages: true
+      bannerImages: true,
+      packages: true,
+      slots: {
+        orderBy: { startDate: 'asc' }
+      }
     }
   })
 

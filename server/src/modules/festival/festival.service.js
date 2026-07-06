@@ -42,9 +42,9 @@ export const createFestival = async (data) => {
   if (!data.stayTransportImages) {
     data.stayTransportImages = [];
   }
-  if (data.startDate && data.endDate) {
-    const start = new Date(data.startDate);
-    const end = new Date(data.endDate);
+  if (data.slots && data.slots.length > 0) {
+    const start = new Date(data.slots[0].startDate);
+    const end = new Date(data.slots[0].endDate);
     if (end <= start) {
       throw new Error("End date must be strictly after start date");
     }
@@ -55,21 +55,11 @@ export const createFestival = async (data) => {
 };
 
 export const updateFestival = async (id, data) => {
-  if (data.startDate || data.endDate) {
-    let start = data.startDate;
-    let end = data.endDate;
-    if (!start || !end) {
-      const festival = await festivalRepo.findById(id);
-      start = start || festival.startDate;
-      end = end || festival.endDate;
-    }
-    if (start && end) {
-      const s = new Date(start);
-      const e = new Date(end);
-      if (e <= s) {
-        throw new Error("End date must be strictly after start date");
-      }
-      const diffTime = Math.abs(e - s);
+  if (data.slots && data.slots.length > 0) {
+    const start = new Date(data.slots[0].startDate);
+    const end = new Date(data.slots[0].endDate);
+    if (end > start) {
+      const diffTime = Math.abs(end - start);
       data.duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     }
   }

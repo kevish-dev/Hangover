@@ -25,8 +25,8 @@ const assertBookingOwner = (booking, userId, isAdmin = false) => {
  * Whichever fires first wins; the second call is a guaranteed no-op.
  *
  * Availability rule:
- *   - TOKEN payment  -> filledSpots++ (spot is immediately reserved)
- *   - FULL  payment  -> filledSpots++ (spot is immediately confirmed)
+ *   - TOKEN payment  -> filledSpots++ on slot (spot is immediately reserved)
+ *   - FULL  payment  -> filledSpots++ on slot (spot is immediately confirmed)
  *   - BALANCE payment -> NO increment (spot was already counted at TOKEN time)
  */
 const _processSuccessfulPayment = async (intent, rzpPaymentId, rzpSignature, rzpMethod) => {
@@ -94,10 +94,12 @@ const _processSuccessfulPayment = async (intent, rzpPaymentId, rzpSignature, rzp
     // 4. Decrement availability:
     //    TOKEN -> spot reserved now; FULL -> spot confirmed now; BALANCE -> already counted at TOKEN time.
     if (intent.type === "TOKEN" || intent.type === "FULL") {
-      await tx.trip.update({
-        where: { id: booking.tripId },
-        data: { filledSpots: { increment: booking.numberOfTravelers } },
-      });
+      if (booking.slotId) {
+        await tx.slot.update({
+          where: { id: booking.slotId },
+          data: { filledSpots: { increment: booking.numberOfTravelers } },
+        });
+      }
     }
 
     return pmt;
@@ -649,13 +651,15 @@ export const issueRefund = async (paymentId, amount, reason, adminId) => {
     //    filledSpots is decremented for CONFIRMED (FULL/BALANCE paid) AND RESERVED (TOKEN paid)
     //    bookings, because both states hold a spot per the availability rule.
     if (isBookingFullyRefunded && (booking.status === "CONFIRMED" || booking.status === "RESERVED")) {
-      const currentTrip = await tx.trip.findUnique({ where: { id: booking.tripId }, select: { filledSpots: true } });
-      const safeDecrement = Math.min(booking.numberOfTravelers, currentTrip?.filledSpots ?? 0);
-      if (safeDecrement > 0) {
-        await tx.trip.update({
-          where: { id: booking.tripId },
-          data: { filledSpots: { decrement: safeDecrement } },
-        });
+      if (booking.slotId) {
+        const currentSlot = await tx.slot.findUnique({ where: { id: booking.slotId }, select: { filledSpots: true } });
+        const safeDecrement = Math.min(booking.numberOfTravelers, currentSlot?.filledSpots ?? 0);
+        if (safeDecrement > 0) {
+          await tx.slot.update({
+            where: { id: booking.slotId },
+            data: { filledSpots: { decrement: safeDecrement } },
+          });
+        }
       }
     }
 

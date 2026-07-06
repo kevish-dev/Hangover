@@ -235,7 +235,8 @@ export default function AdminBookingsPage() {
         b.bookingReference?.toLowerCase().includes(q) ||
         b.user?.profile?.fullName?.toLowerCase().includes(q) ||
         b.user?.email?.toLowerCase().includes(q) ||
-        b.trip?.title?.toLowerCase().includes(q)
+        b.trip?.title?.toLowerCase().includes(q) ||
+        b.festival?.title?.toLowerCase().includes(q)
       );
     }
 
@@ -278,7 +279,7 @@ export default function AdminBookingsPage() {
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input 
               type="text"
-              placeholder="Search by name, ref, trip..."
+              placeholder="Search by name, ref, trip/festival..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e] focus:border-transparent w-full sm:w-64"
@@ -317,7 +318,7 @@ export default function AdminBookingsPage() {
             <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-medium">
               <tr>
                 <th className="px-6 py-4">Reference</th>
-                <th className="px-6 py-4">Trip</th>
+                <th className="px-6 py-4">Item</th>
                 <th className="px-6 py-4">User</th>
                 <th className="px-6 py-4 text-center">Travelers</th>
                 <th className="px-6 py-4">Booking Status</th>
@@ -346,7 +347,7 @@ export default function AdminBookingsPage() {
                       {b.bookingReference}
                     </td>
                     <td className="px-6 py-4 text-gray-700 max-w-[200px] truncate">
-                      {b.trip?.title}
+                      {b.trip?.title || b.festival?.title}
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-gray-900 font-medium">{b.user?.profile?.fullName || "N/A"}</div>
@@ -509,15 +510,15 @@ export default function AdminBookingsPage() {
 
               {/* Right Column */}
               <div className="space-y-8">
-                {/* Trip Details */}
+                {/* Item Details */}
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-[#781216]" /> Trip Details
+                    <MapPin className="w-4 h-4 text-[#781216]" /> Item Details
                   </h3>
                   <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                     <div className="grid grid-cols-3 gap-2 text-sm">
-                      <span className="text-gray-500">Trip:</span>
-                      <span className="col-span-2 font-medium text-gray-900">{selectedBooking.trip?.title || "N/A"}</span>
+                      <span className="text-gray-500">Item:</span>
+                      <span className="col-span-2 font-medium text-gray-900">{selectedBooking.trip?.title || selectedBooking.festival?.title || "N/A"}</span>
                       
                       <span className="text-gray-500">Travelers:</span>
                       <span className="col-span-2 text-gray-900">{selectedBooking.numberOfTravelers} Person(s)</span>

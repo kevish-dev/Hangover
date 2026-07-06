@@ -20,6 +20,7 @@ import {
   formatDuration,
   type ApiTrip,
 } from "../../lib/tripApi";
+import { fetchFestivalBySlug } from "../../lib/festivalApi";
 import { apiClient, API_URL } from "../../lib/axios";
 import { useAuth } from "../../contexts/AuthContext";
 import { SiteFooter } from "../components/site-footer";
@@ -491,9 +492,11 @@ export default function BookingPage() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
   const resumeBookingId = searchParams.get("resume"); // set when coming from "Complete Payment" CTA
+  const isFestival = searchParams.get("type") === "festival";
+  const slotId = searchParams.get("slotId");
   const { user, isLoading: authLoading } = useAuth();
 
-  const [trip, setTrip] = useState<ApiTrip | null>(null);
+  const [trip, setTrip] = useState<any>(null); // polymorphic
   const [loading, setLoading] = useState(true);
 
   // Form state
@@ -548,6 +551,7 @@ export default function BookingPage() {
 
   // Payment choice
   const [paymentChoice, setPaymentChoice] = useState<"FULL" | "TOKEN">("FULL");
+  const [selectedPackageId, setSelectedPackageId] = useState<string>("");
 
   // Booking flow state
   const [bookingStep, setBookingStep] = useState<
@@ -572,7 +576,8 @@ export default function BookingPage() {
   useEffect(() => {
     if (!slug) return;
     setLoading(true);
-    fetchTripBySlug(slug)
+    const fetcher = isFestival ? fetchFestivalBySlug : fetchTripBySlug;
+    fetcher(slug)
       .then((data) => setTrip(data))
       .catch(() => setTrip(null))
       .finally(() => setLoading(false));
@@ -585,10 +590,10 @@ export default function BookingPage() {
         .then((res) => {
           const bookings = res.data?.data || [];
           const confirmed = bookings.find(
-            (b: any) => b.tripId === trip.id && (b.status === "CONFIRMED" || b.status === "COMPLETED"),
+            (b: any) => (isFestival ? b.festivalId === trip.id : b.tripId === trip.id) && (b.status === "CONFIRMED" || b.status === "COMPLETED"),
           );
           const reserved = bookings.find(
-            (b: any) => b.tripId === trip.id && b.status === "RESERVED",
+            (b: any) => (isFestival ? b.festivalId === trip.id : b.tripId === trip.id) && b.status === "RESERVED",
           );
           setHasBooked(!!confirmed);
           setReservedBooking(reserved || null);
@@ -596,6 +601,12 @@ export default function BookingPage() {
         .catch(console.error);
     }
   }, [user, trip]);
+
+  useEffect(() => {
+    if (trip?.packages?.length > 0 && !selectedPackageId) {
+      setSelectedPackageId(trip.packages[0].id);
+    }
+  }, [trip, selectedPackageId]);
 
   // Prevent scrolling when forced login is active
   useEffect(() => {
@@ -688,13 +699,27 @@ export default function BookingPage() {
 
       // 3. Create the booking
       const numberOfTravelers = 1 + travelers.length;
-      const bookingRes = await apiClient.post("/bookings", {
-        tripId: trip!.id,
+      
+      const payload: any = {
         numberOfTravelers,
         specialRequests: specialRequests || undefined,
         initialPaymentType: isTokenZero ? "FULL" : paymentChoice,
         additionalTravelers,
-      });
+      };
+      if (selectedPackageId) {
+        payload.packageId = selectedPackageId;
+      }
+      
+      if (isFestival) {
+        payload.festivalId = trip!.id;
+      } else {
+        payload.tripId = trip!.id;
+      }
+      if (slotId) {
+        payload.slotId = slotId;
+      }
+      
+      const bookingRes = await apiClient.post("/bookings", payload);
       const {
         id: bookingId,
         bookingReference,
@@ -971,17 +996,22 @@ export default function BookingPage() {
   const tripName = trip.title;
   const tripImage =
     trip.bannerImages?.[0] || trip.highlights?.[0]?.imageUrl || "";
-  const tripPrice = formatPrice(trip.price);
   const tripDuration = formatDuration(trip.duration);
   const tripDestination = trip.location;
   const tripDifficulty = trip.difficultyLevel;
 
+  const activePackage = trip.packages?.find((p: any) => p.id === selectedPackageId);
+  const basePrice = activePackage ? Number(activePackage.price) : Number(trip.price || 0);
+  const baseToken = activePackage ? Number(activePackage.tokenAmount) : Number(trip.tokenAmount || 0);
+
+  const tripPrice = formatPrice(basePrice);
+
   const numTravelers = 1 + travelers.length;
-  const baseTotalAmount = Number(trip.price) * numTravelers;
+  const baseTotalAmount = basePrice * numTravelers;
   const totalGst = baseTotalAmount * 0.05;
   const totalAmountDue = baseTotalAmount + totalGst;
 
-  const baseTokenTotal = Number(trip.tokenAmount) * numTravelers;
+  const baseTokenTotal = baseToken * numTravelers;
   const tokenGst = baseTokenTotal * 0.05;
   const tokenAmountDue = baseTokenTotal + tokenGst;
   const isTokenZero = tokenAmountDue === 0;
@@ -2151,6 +2181,33 @@ export default function BookingPage() {
                 </div>
               </div>
 
+              {trip.packages?.length > 0 && (
+                <div style={{ marginBottom: "20px" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      color: "#1e1a14",
+                      fontSize: "0.8rem",
+                      fontWeight: 500,
+                      marginBottom: "8px",
+                      fontFamily: "'Poppins', sans-serif",
+                    }}
+                  >
+                    Select Package
+                  </label>
+                  <Select
+                    value={selectedPackageId}
+                    onChange={(e) => setSelectedPackageId(e.target.value)}
+                  >
+                    {trip.packages.map((pkg: any) => (
+                      <option key={pkg.id} value={pkg.id}>
+                        {pkg.title} ({formatPrice(pkg.price)})
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              )}
+
               {/* Price breakdown */}
               <div
                 style={{
@@ -2162,8 +2219,8 @@ export default function BookingPage() {
               >
                 {[
                   {
-                    label: "Trip Price (per person)",
-                    val: tripPrice,
+                    label: "Price (per person)",
+                    val: formatPrice(basePrice),
                   },
                   {
                     label: `Travelers`,

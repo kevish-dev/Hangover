@@ -72,10 +72,6 @@ model Trip {
   stayTransportImages Json         @default("[]")
   price               Decimal      @db.Decimal(10, 2)
   tokenAmount         Decimal      @db.Decimal(10, 2)
-  capacity            Int
-  filledSpots         Int          @default(0)
-  startDate           DateTime
-  endDate             DateTime
   tripType            TripType
   isActive            Boolean      @default(true)
   isFeatured          Boolean      @default(false)
@@ -88,10 +84,11 @@ model Trip {
   inquiries           Inquiry[]
   itineraries         Itinerary[]
   tripTags            TripTag[]    @relation("TripToTripTag")
+  packages            Package[]
+  slots               Slot[]
   destination         Destination? @relation(fields: [destinationId], references: [id])
 
   @@index([tripType])
-  @@index([startDate])
   @@index([isActive])
   @@index([isFeatured])
   @@index([isPublished])
@@ -127,10 +124,6 @@ model Festival {
   stayTransportImages Json          @default("[]")
   price               Decimal       @db.Decimal(10, 2)
   tokenAmount         Decimal       @db.Decimal(10, 2)
-  capacity            Int
-  filledSpots         Int           @default(0)
-  startDate           DateTime
-  endDate             DateTime
   isActive            Boolean       @default(true)
   isFeatured          Boolean       @default(false)
   isPublished         Boolean       @default(false)
@@ -142,9 +135,10 @@ model Festival {
   inquiries           Inquiry[]
   itineraries         Itinerary[]
   tags                FestivalTag[] @relation("FestivalToFestivalTag")
+  packages            Package[]
+  slots               Slot[]
   destination         Destination?  @relation(fields: [destinationId], references: [id])
 
-  @@index([startDate])
   @@index([isActive])
   @@index([isFeatured])
   @@index([isPublished])
@@ -166,12 +160,53 @@ model Destination {
   @@index([isPublished])
 }
 
+model Package {
+  id          String    @id @default(uuid())
+  tripId      String?
+  festivalId  String?
+  title       String
+  price       Decimal   @db.Decimal(10, 2)
+  tokenAmount Decimal   @db.Decimal(10, 2)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  trip        Trip?     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  festival    Festival? @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  bookings    Booking[]
+
+  @@index([tripId])
+  @@index([festivalId])
+}
+
+model Slot {
+  id          String   @id @default(uuid())
+  tripId      String?
+  festivalId  String?
+  startDate   DateTime
+  endDate     DateTime
+  capacity    Int
+  filledSpots Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trip        Trip?     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  festival    Festival? @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  bookings    Booking[]
+
+  @@index([tripId])
+  @@index([festivalId])
+  @@index([startDate])
+}
+
+
 model Booking {
   id                 String            @id @default(uuid())
   bookingReference   String            @unique
   userId             String
   tripId             String?
   festivalId         String?
+  packageId          String?
+  slotId             String?
   status             BookingStatus     @default(PENDING)
   paymentStatus      PaymentStatus     @default(PENDING)
   numberOfTravelers  Int               @default(1)
@@ -192,6 +227,8 @@ model Booking {
   updatedAt          DateTime          @updatedAt
   trip               Trip?             @relation(fields: [tripId], references: [id], onDelete: Cascade)
   festival           Festival?         @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  package            Package?          @relation(fields: [packageId], references: [id])
+  slot               Slot?             @relation(fields: [slotId], references: [id])
   user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   payments           Payment[]
   paymentIntents     PaymentIntent[]
@@ -200,6 +237,7 @@ model Booking {
 
   @@index([tripId])
   @@index([festivalId])
+  @@index([packageId])
   @@index([userId])
   @@index([status])
   @@index([paymentStatus])

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams, Link } from "react-router";
+import { useParams, Link, useLocation } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import {
   MapPin,
@@ -36,6 +36,7 @@ import {
   type ApiTrip,
   type ApiFaq,
 } from "../../lib/tripApi";
+import { fetchFestivalBySlug } from "../../lib/festivalApi";
 import { SiteFooter } from "../components/site-footer";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiClient } from "../../lib/axios";
@@ -67,6 +68,7 @@ function RelatedTrips({
   const [related, setRelated] = useState<ApiTrip[]>([]);
 
   useEffect(() => {
+    if (!currentType) return;
     fetchAllTrips()
       .then((all) => {
         const sameType = all.filter(
@@ -186,7 +188,7 @@ function RelatedTrips({
 function RelatedCard({ trip }: { trip: ApiTrip }) {
   const [hovered, setHovered] = useState(false);
   const heroImage = trip.bannerImages?.[0] || "";
-  const typeLabel = formatTripType(trip.tripType);
+  const typeLabel = trip.tripType ? formatTripType(trip.tripType) : "Trip";
 
   return (
     <Link
@@ -1073,22 +1075,26 @@ function DetailLoadingSkeleton() {
 
 export default function TripDetail() {
   const { slug } = useParams();
+  const location = useLocation();
+  const isFestival = location.pathname.startsWith("/festivals");
   const { user } = useAuth();
-  const [trip, setTrip] = useState<ApiTrip | null>(null);
+  const [trip, setTrip] = useState<any>(null); // polymorphic: ApiTrip | ApiFestival
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasBooked, setHasBooked] = useState(false);
   const [reservedBookingId, setReservedBookingId] = useState<string | null>(null);
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) return;
     setLoading(true);
     setError(null);
-    fetchTripBySlug(slug)
+    const fetcher = isFestival ? fetchFestivalBySlug : fetchTripBySlug;
+    fetcher(slug)
       .then((data) => setTrip(data))
       .catch((err) =>
         setError(
-          err?.response?.data?.message || err?.message || "Trip not found",
+          err?.response?.data?.message || err?.message || (isFestival ? "Festival not found" : "Trip not found"),
         ),
       )
       .finally(() => setLoading(false));
@@ -1101,10 +1107,10 @@ export default function TripDetail() {
         .then((res) => {
           const bookings = res.data?.data || [];
           const confirmed = bookings.find(
-            (b: any) => b.tripId === trip.id && (b.status === "CONFIRMED" || b.status === "COMPLETED")
+            (b: any) => (isFestival ? b.festivalId === trip.id : b.tripId === trip.id) && (b.status === "CONFIRMED" || b.status === "COMPLETED")
           );
           const reserved = bookings.find(
-            (b: any) => b.tripId === trip.id && b.status === "RESERVED"
+            (b: any) => (isFestival ? b.festivalId === trip.id : b.tripId === trip.id) && b.status === "RESERVED"
           );
           setHasBooked(!!confirmed);
           setReservedBookingId(reserved?.id || null);
@@ -1145,14 +1151,15 @@ export default function TripDetail() {
             {error || "Trip not found"}
           </p>
           <Link
-            to="/trips"
+            to={isFestival ? "/festivals" : "/trips"}
             style={{
               color: "#781216",
               fontSize: "0.82rem",
+              fontWeight: 500,
               textDecoration: "none",
             }}
           >
-            ← Back to all trips
+            ← Back to {isFestival ? "festivals" : "trips"}
           </Link>
         </div>
       </div>
@@ -1162,7 +1169,7 @@ export default function TripDetail() {
   // Derived values
   const heroImage = trip.bannerImages?.[0] || "";
   const allImages = trip.bannerImages || [];
-  const typeLabel = formatTripType(trip.tripType);
+  const typeLabel = trip.tripType ? formatTripType(trip.tripType) : "Festival";
   const priceStr = formatPrice(trip.price);
   const durationStr = formatDuration(trip.duration);
   const altitudeStr = formatAltitude(trip?.maxAltitude || null);
@@ -1205,6 +1212,8 @@ export default function TripDetail() {
       waLink={waLink}
       hasBooked={hasBooked}
       reservedBookingId={reservedBookingId}
+      selectedSlotId={selectedSlotId}
+      setSelectedSlotId={setSelectedSlotId}
     />
   );
 }
@@ -1460,6 +1469,7 @@ function TripDetailContent({
   waLink,
   hasBooked,
   reservedBookingId,
+  isFestival,
 }: {
   trip: ApiTrip;
   heroImage: string;
@@ -1480,7 +1490,10 @@ function TripDetailContent({
   waLink: string;
   hasBooked: boolean;
   reservedBookingId: string | null;
+  selectedSlotId: string | null;
+  setSelectedSlotId: (id: string | null) => void;
 }) {
+  const isFestival = trip.hasOwnProperty("stageDays");
   const [heroIndex, setHeroIndex] = useState(0);
   const [lightbox, setLightbox] = useState<number | null>(null);
 
@@ -1971,8 +1984,10 @@ function TripDetailContent({
                 {
                   icon: Calendar,
                   label: "Dates",
-                  value: trip.startDate && trip.endDate
-                    ? `${new Date(trip.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} - ${new Date(trip.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                  value: trip.slots && trip.slots.length > 0
+                    ? trip.slots.length === 1 
+                      ? `${new Date(trip.slots[0].startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` 
+                      : `${trip.slots.length} Slots Available`
                     : null,
                 },
                 {
@@ -2305,6 +2320,37 @@ function TripDetailContent({
                   </p>
                 </div>
 
+                {trip.packages && trip.packages.length > 0 && (
+                  <div
+                    style={{
+                      marginBottom: "24px",
+                      padding: "16px",
+                      background: "rgba(30,26,20,0.02)",
+                      border: "1px solid rgba(30,26,20,0.06)",
+                      borderRadius: "10px",
+                    }}
+                  >
+                    <p
+                      style={{
+                        color: "#1e1a14",
+                        fontSize: "0.75rem",
+                        fontWeight: 600,
+                        margin: "0 0 12px",
+                      }}
+                    >
+                      Available Packages
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      {trip.packages.map((pkg: any) => (
+                        <div key={pkg.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.7rem", color: "rgba(30,26,20,0.6)" }}>{pkg.title}</span>
+                          <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#781216" }}>{formatPrice(pkg.price)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Key info */}
                 <div
                   style={{
@@ -2354,6 +2400,50 @@ function TripDetailContent({
                   ))}
                 </div>
 
+                {/* Slot Selection */}
+                {trip.slots && trip.slots.length > 0 && (
+                  <div style={{ marginBottom: "20px" }}>
+                    <label style={{
+                      display: "block",
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      color: "rgba(30,26,20,0.6)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      marginBottom: "8px"
+                    }}>
+                      Select a Date
+                    </label>
+                    <select
+                      value={selectedSlotId || ""}
+                      onChange={(e) => setSelectedSlotId(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "12px",
+                        borderRadius: "8px",
+                        border: "1px solid rgba(30,26,20,0.1)",
+                        background: "#fff",
+                        fontFamily: "'Poppins', sans-serif",
+                        fontSize: "0.9rem",
+                        color: "#1e1a14",
+                        outline: "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <option value="" disabled>Select Date</option>
+                      {trip.slots.map((slot) => {
+                        const available = slot.capacity - (slot.filledSpots || 0);
+                        return (
+                          <option key={slot.id} value={slot.id} disabled={available <= 0}>
+                            {new Date(slot.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} - {new Date(slot.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                            {available <= 0 ? " (Sold Out)" : ` (${available} spots left)`}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                )}
+
                 {/* Book button */}
                 {hasBooked ? (
                   <div
@@ -2380,7 +2470,7 @@ function TripDetailContent({
                   </div>
                 ) : reservedBookingId ? (
                   <Link
-                    to={`/book/${trip.slug}?resume=${reservedBookingId}`}
+                    to={`/book/${trip.slug}?resume=${reservedBookingId}${isFestival ? '&type=festival' : ''}`}
                     style={{
                       display: "block",
                       width: "100%",
@@ -2404,7 +2494,13 @@ function TripDetailContent({
                   </Link>
                 ) : (
                   <Link
-                    to={`/book/${trip.slug}`}
+                    to={selectedSlotId ? `/book/${trip.slug}${isFestival ? '?type=festival&slotId=' : '?slotId='}${selectedSlotId}` : "#"}
+                    onClick={(e) => {
+                      if (!selectedSlotId) {
+                        e.preventDefault();
+                        toast.error("Please select a date first");
+                      }
+                    }}
                     style={{
                       display: "block",
                       width: "100%",
@@ -2566,7 +2662,7 @@ function TripDetailContent({
       </div>
 
       {/* ── Related Trips ── */}
-      <RelatedTrips currentId={trip.id} currentType={trip.tripType} />
+      {!isFestival && <RelatedTrips currentId={trip.id} currentType={trip.tripType} />}
 
       {/* ── WhatsApp FAB — always visible ── */}
       <a
