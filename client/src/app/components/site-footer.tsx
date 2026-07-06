@@ -204,8 +204,13 @@ export function SiteFooter() {
               transition={{ duration: 0.5, delay: 0.45 }}
               style={{ display: "flex", gap: "10px", marginTop: "clamp(1.5rem,3vw,2.5rem)" }}
             >
-              {["Instagram", "WhatsApp", "YouTube"].map((s) => (
-                <button key={s} style={{
+              {[
+                { name: "Instagram", url: "https://www.instagram.com/hangovertrails/" },
+                { name: "LinkedIn", url: "https://www.linkedin.com/company/hangover-trails/" },
+                { name: "Facebook", url: "https://www.facebook.com/hangovertrails/" },
+                { name: "WhatsApp", url: "https://wa.me/918415929069" }
+              ].map((s) => (
+                <a key={s.name} href={s.url} target="_blank" rel="noopener noreferrer" style={{
                   padding: "7px 16px",
                   border: "1px solid rgba(242,237,228,0.14)",
                   borderRadius: "999px",
@@ -216,12 +221,14 @@ export function SiteFooter() {
                   letterSpacing: "0.1em",
                   cursor: "pointer",
                   transition: "all 0.25s ease",
+                  textDecoration: "none",
+                  display: "inline-block"
                 }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(184,148,58,0.45)"; e.currentTarget.style.color = "#b8943a"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(242,237,228,0.14)"; e.currentTarget.style.color = "rgba(242,237,228,0.55)"; }}
                 >
-                  {s}
-                </button>
+                  {s.name}
+                </a>
               ))}
             </motion.div>
           </div>
