@@ -51,6 +51,7 @@ function ActionMenu({ booking, onRemind, onCancelAndRefund }: { booking: any, on
 
   const hasSuccessfulPayments = booking.payments?.some((p: any) => p.status === "SUCCESS");
   const isCancellable = booking.status !== "CANCELLED" && booking.status !== "COMPLETED";
+  const totalPaid = Number(booking.amountPaid) || 0;
 
   if (booking.paymentStatus !== "PARTIALLY_PAID" && !hasSuccessfulPayments && !isCancellable) {
     return <div className="text-gray-400 text-xs italic">No actions</div>;
@@ -83,7 +84,7 @@ function ActionMenu({ booking, onRemind, onCancelAndRefund }: { booking: any, on
               className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
             >
               <X className="w-4 h-4" />
-              Cancel & Refund All
+              {totalPaid > 0 ? "Cancel & Refund" : "Cancel Booking"}
             </button>
           )}
         </div>
@@ -92,7 +93,10 @@ function ActionMenu({ booking, onRemind, onCancelAndRefund }: { booking: any, on
   );
 }
 
-function ConfirmCancelModal({ onConfirm, onClose }: { onConfirm: () => void, onClose: () => void }) {
+function ConfirmCancelModal({ booking, onConfirm, onClose }: { booking: any, onConfirm: (refundAmount?: number) => void, onClose: () => void }) {
+  const totalPaid = Number(booking?.amountPaid) || 0;
+  const [refundAmount, setRefundAmount] = useState<string>("");
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -106,9 +110,35 @@ function ConfirmCancelModal({ onConfirm, onClose }: { onConfirm: () => void, onC
           </button>
         </div>
         <div className="p-6">
-          <p className="text-sm text-gray-700 mb-6 leading-relaxed">
-            Are you sure you want to cancel this booking? This will immediately issue a full refund for all successful payments and free up the spots on the trip.
-          </p>
+          {totalPaid > 0 ? (
+            <>
+              <p className="text-sm text-gray-700 mb-4 leading-relaxed">
+                This booking has received payments totaling <strong>₹{totalPaid.toLocaleString("en-IN")}</strong>. Please specify the amount to refund.
+              </p>
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Refund Amount (Max: ₹{totalPaid.toLocaleString("en-IN")})
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
+                  <input
+                    type="number"
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(e.target.value)}
+                    placeholder="Enter amount"
+                    max={totalPaid}
+                    min={0}
+                    className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-gray-700 mb-6 leading-relaxed">
+              Are you sure you want to cancel this booking? This action cannot be undone.
+            </p>
+          )}
+
           <div className="flex gap-3 justify-end">
             <button 
               onClick={onClose}
@@ -118,12 +148,24 @@ function ConfirmCancelModal({ onConfirm, onClose }: { onConfirm: () => void, onC
             </button>
             <button 
               onClick={() => {
-                onConfirm();
-                onClose();
+                if (totalPaid > 0) {
+                  if (refundAmount === "") {
+                    toast.error("Please enter a refund amount.");
+                    return;
+                  }
+                  const amount = Number(refundAmount);
+                  if (isNaN(amount) || amount < 0 || amount > totalPaid) {
+                    toast.error("Please enter a valid refund amount.");
+                    return;
+                  }
+                  onConfirm(amount);
+                } else {
+                  onConfirm();
+                }
               }}
               className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors shadow-sm"
             >
-              Yes, cancel & refund
+              {totalPaid > 0 ? "Cancel & Refund" : "Yes, Cancel Booking"}
             </button>
           </div>
         </div>
@@ -160,14 +202,18 @@ export default function AdminBookingsPage() {
     }
   };
 
-  const handleCancelAndRefund = async (bookingId: string) => {
-    const toastId = toast.loading("Processing full cancellation and refund...");
+  const handleCancelAndRefund = async (bookingId: string, refundAmount?: number) => {
+    const toastId = toast.loading("Processing cancellation...");
     try {
-      await apiClient.post(`/bookings/${bookingId}/cancel-and-refund`, { reason: "Admin initiated cancellation and refund" });
-      toast.success("Booking cancelled and refunded successfully!", { id: toastId });
+      await apiClient.post(`/bookings/${bookingId}/cancel-and-refund`, { 
+        reason: "Admin initiated cancellation",
+        ...(refundAmount !== undefined && { refundAmount })
+      });
+      toast.success("Booking cancelled successfully!", { id: toastId });
+      setConfirmCancelId(null);
       refetch();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to cancel and refund.", { id: toastId });
+      toast.error(err.response?.data?.message || "Failed to cancel booking.", { id: toastId });
     }
   };
 
@@ -277,6 +323,7 @@ export default function AdminBookingsPage() {
                 <th className="px-6 py-4">Booking Status</th>
                 <th className="px-6 py-4">Payment Status</th>
                 <th className="px-6 py-4">Total Amount</th>
+                <th className="px-6 py-4">Amount Received</th>
                 <th className="px-6 py-4">Date</th>
                 <th className="px-6 py-4 text-center">Actions</th>
               </tr>
@@ -314,9 +361,17 @@ export default function AdminBookingsPage() {
                     <td className="px-6 py-4">
                       <PaymentStatusBadge status={b.paymentStatus} />
                     </td>
-                    <td className="px-6 py-4 font-medium text-gray-900 flex items-center gap-1">
-                      <IndianRupee className="w-3.5 h-3.5 text-gray-500" />
-                      {Number(b.totalAmount).toLocaleString("en-IN")}
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-gray-900 flex items-center gap-1">
+                        <IndianRupee className="w-3.5 h-3.5 text-gray-500" />
+                        {Number(b.totalAmount).toLocaleString("en-IN")}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-green-600 flex items-center gap-1">
+                        <IndianRupee className="w-3.5 h-3.5 text-green-500" />
+                        {Number(b.amountPaid || 0).toLocaleString("en-IN")}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-gray-500 text-xs whitespace-nowrap">
                       {format(new Date(b.createdAt), "MMM d, yyyy HH:mm")}
@@ -338,7 +393,8 @@ export default function AdminBookingsPage() {
 
       {confirmCancelId && (
         <ConfirmCancelModal 
-          onConfirm={() => handleCancelAndRefund(confirmCancelId)} 
+          booking={allBookings.find((b: any) => b.id === confirmCancelId)}
+          onConfirm={(refundAmount) => handleCancelAndRefund(confirmCancelId, refundAmount)} 
           onClose={() => setConfirmCancelId(null)} 
         />
       )}
@@ -418,6 +474,37 @@ export default function AdminBookingsPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Other Travelers */}
+                {selectedBooking.travelers && selectedBooking.travelers.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <User className="w-4 h-4 text-[#781216]" /> Other Travelers
+                    </h3>
+                    <div className="space-y-3">
+                      {selectedBooking.travelers.map((traveler: any, idx: number) => (
+                        <div key={traveler.id || idx} className="bg-gray-50 p-4 rounded-lg text-sm">
+                          <div className="font-medium text-gray-900 mb-2">Traveler {idx + 1}: {traveler.fullName}</div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <span className="text-gray-500">Gender:</span>
+                            <span className="col-span-2 text-gray-900">{traveler.gender || "N/A"}</span>
+                            
+                            <span className="text-gray-500">DOB:</span>
+                            <span className="col-span-2 text-gray-900">
+                              {traveler.dateOfBirth ? format(new Date(traveler.dateOfBirth), "PP") : "N/A"}
+                            </span>
+                            
+                            <span className="text-gray-500">Phone:</span>
+                            <span className="col-span-2 text-gray-900">{traveler.phone || "N/A"}</span>
+                            
+                            <span className="text-gray-500">Aadhaar:</span>
+                            <span className="col-span-2 text-gray-900">{traveler.aadhaar || "N/A"}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Right Column */}

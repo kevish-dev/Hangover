@@ -60,8 +60,8 @@ export const getBookingsByTrip = async (req, res, next) => {
 
 export const cancelAndRefundBooking = async (req, res, next) => {
   try {
-    const { reason } = req.body;
-    const result = await bookingService.cancelAndRefundBooking(req.params.id, req.user.id, reason);
+    const { reason, refundAmount } = req.body;
+    const result = await bookingService.cancelAndRefundBooking(req.params.id, req.user.id, reason, refundAmount);
     res.status(200).json(result);
   } catch (error) {
     next(error);

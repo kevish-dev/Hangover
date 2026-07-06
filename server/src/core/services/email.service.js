@@ -6,7 +6,7 @@ const FROM = env.SMTP_FROM;
 /**
  * Send booking confirmation email
  */
-export const sendBookingConfirmedEmail = async ({ to, name, bookingRef, tripTitle, amountPaid, totalAmount, amountDue, paymentType, receiptNumber, invoiceDate, travelersCount }) => {
+export const sendBookingConfirmedEmail = async ({ to, name, bookingRef, tripTitle, tripStartDate, tripEndDate, amountPaid, totalAmount, amountDue, paymentType, receiptNumber, invoiceDate, travelersCount }) => {
   const dateStr = new Date(invoiceDate).toLocaleDateString("en-IN", {
     day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
   });
@@ -20,12 +20,13 @@ export const sendBookingConfirmedEmail = async ({ to, name, bookingRef, tripTitl
         <!-- Header -->
         <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #f0f0f0;padding-bottom:20px;margin-bottom:20px;">
           <div>
-            <h1 style="color:#781216;margin:0;font-size:24px;letter-spacing:1px;text-transform:uppercase;">Hangover</h1>
-            <p style="margin:4px 0 0;font-size:12px;color:#777;">Trip Booking Invoice & Receipt</p>
+            <h1 style="color:#781216;margin:0;font-size:24px;letter-spacing:1px;text-transform:uppercase;line-height:1.2;">Hangover</h1>
+            <p style="margin:4px 0 0;font-size:12px;color:#777;line-height:1.2;">Trip Booking Invoice & Receipt</p>
           </div>
           <div style="text-align:right;">
-            <p style="margin:0;font-size:14px;font-weight:bold;color:#333;">INVOICE #${receiptNumber}</p>
-            <p style="margin:4px 0 0;font-size:12px;color:#777;">Date: ${dateStr}</p>
+            <p style="margin:0;font-size:14px;font-weight:bold;color:#333;line-height:1.2;">INVOICE #${receiptNumber}</p>
+            <p style="margin:4px 0 0;font-size:12px;color:#777;line-height:1.2;">Date: ${dateStr}</p>
+            <p style="margin:4px 0 0;font-size:12px;color:#777;line-height:1.2;font-weight:bold;">GSTIN: 12BSPPT9347F1Z8</p>
           </div>
         </div>
 
@@ -39,6 +40,7 @@ export const sendBookingConfirmedEmail = async ({ to, name, bookingRef, tripTitl
           <table style="width:100%;font-size:14px;line-height:1.8;">
             <tr><td style="color:#666;width:40%;">Booking Reference:</td><td style="font-weight:bold;color:#222;">${bookingRef}</td></tr>
             <tr><td style="color:#666;">Trip Name:</td><td style="font-weight:bold;color:#222;">${tripTitle}</td></tr>
+            ${tripStartDate && tripEndDate ? `<tr><td style="color:#666;">Trip Dates:</td><td style="font-weight:bold;color:#222;">${new Date(tripStartDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} - ${new Date(tripEndDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td></tr>` : ''}
             <tr><td style="color:#666;">Number of Travelers:</td><td style="font-weight:bold;color:#222;">${travelersCount}</td></tr>
           </table>
         </div>

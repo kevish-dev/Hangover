@@ -193,7 +193,7 @@ export const getBookingsByTripId = async (tripId) => {
   return repo.getBookingsByTripId(tripId);
 };
 
-export const cancelAndRefundBooking = async (bookingId, adminId, reason) => {
+export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundAmount) => {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
     include: {
@@ -210,14 +210,36 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason) => {
     throw new ValidationError("Booking is already cancelled.");
   }
 
+  const totalPaid = Number(booking.amountPaid) || 0;
+  
+  let validRefundAmount = 0;
+  if (refundAmount !== undefined && refundAmount !== null && refundAmount !== "") {
+    validRefundAmount = Number(refundAmount);
+    if (isNaN(validRefundAmount) || validRefundAmount < 0) {
+      throw new ValidationError("Invalid refund amount.");
+    }
+    if (validRefundAmount > totalPaid) {
+      throw new ValidationError(`Refund amount cannot exceed the total amount paid (₹${totalPaid}).`);
+    }
+  } else if (totalPaid > 0) {
+    throw new ValidationError("Refund amount is required.");
+  }
+
   // Import razorpay dynamically to avoid circular dependencies if any
   const razorpay = await import("../../core/services/razorpay.service.js");
 
   // 1. Process refunds via Razorpay first (outside DB transaction)
   const refundsData = [];
+  let remainingRefundAmount = validRefundAmount;
+
   for (const payment of booking.payments) {
+    if (remainingRefundAmount <= 0) break;
+
     if (payment.razorpayPaymentId) {
-      const amountPaise = Math.round(Number(payment.amount) * 100);
+      const maxRefundForPayment = Number(payment.amount);
+      const amountToRefund = Math.min(remainingRefundAmount, maxRefundForPayment);
+      
+      const amountPaise = Math.round(amountToRefund * 100);
       const rzpRefund = await razorpay.createRefund(
         payment.razorpayPaymentId,
         amountPaise,
@@ -225,19 +247,21 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason) => {
       );
       refundsData.push({
         payment,
-        rzpRefund
+        rzpRefund,
+        amountRefunded: amountToRefund
       });
+      remainingRefundAmount -= amountToRefund;
     }
   }
 
   // 2. Perform DB updates in a transaction
   await prisma.$transaction(async (tx) => {
     // Record refunds
-    for (const { payment, rzpRefund } of refundsData) {
+    for (const { payment, rzpRefund, amountRefunded } of refundsData) {
       await tx.refund.create({
         data: {
           paymentId: payment.id,
-          amount: payment.amount,
+          amount: amountRefunded,
           status: "SUCCESS",
           reason: reason || "Admin initiated cancellation and refund",
           razorpayRefundId: rzpRefund.id,
@@ -246,10 +270,25 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason) => {
         }
       });
 
-      await tx.payment.update({
-        where: { id: payment.id },
-        data: { status: "REFUNDED" }
-      });
+      const isFullyRefunded = amountRefunded === Number(payment.amount);
+      if (isFullyRefunded) {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: "REFUNDED" }
+        });
+      }
+    }
+
+    // Determine new paymentStatus for booking
+    let newPaymentStatus = "CANCELLED";
+    if (totalPaid > 0) {
+      if (validRefundAmount === totalPaid) {
+        newPaymentStatus = "REFUNDED";
+      } else if (validRefundAmount > 0) {
+        newPaymentStatus = "PARTIALLY_REFUNDED";
+      } else {
+        newPaymentStatus = booking.paymentStatus;
+      }
     }
 
     // Cancel booking
@@ -257,10 +296,10 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason) => {
       where: { id: bookingId },
       data: {
         status: "CANCELLED",
-        paymentStatus: booking.payments.length > 0 ? "REFUNDED" : "CANCELLED",
+        paymentStatus: newPaymentStatus,
         cancelledAt: new Date(),
         cancelledBy: adminId,
-        cancellationReason: reason || "Admin initiated full refund and cancellation",
+        cancellationReason: reason || "Admin initiated cancellation",
       }
     });
 
@@ -280,10 +319,10 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason) => {
         name: booking.user.profile?.fullName || "Traveler",
         tripTitle: booking.trip.title,
         bookingRef: booking.bookingReference,
-        refundAmount: booking.amountPaid
+        refundAmount: validRefundAmount
       }).catch(err => console.error("Failed to send cancellation email:", err));
     }
   }).catch(err => console.error("Failed to import email service:", err));
 
-  return { success: true, message: "Booking cancelled and refunded successfully." };
+  return { success: true, message: `Booking cancelled${validRefundAmount > 0 ? ` and ₹${validRefundAmount} refunded` : ""} successfully.` };
 };
