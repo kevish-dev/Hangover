@@ -15,9 +15,10 @@ import {
   SidebarTrigger,
   SidebarInset,
 } from "../../components/ui/sidebar";
-import { LayoutDashboard, Map, MapPin, CalendarCheck, Users, Settings, LogOut, CreditCard, MessageSquare } from "lucide-react";
+import { LayoutDashboard, Map, MapPin, CalendarCheck, Users, Settings, LogOut, CreditCard, MessageSquare, Home } from "lucide-react";
 
 const navItems = [
+  { title: "Home", url: "/", icon: Home },
   { title: "Destinations", url: "/dashboard/destinations", icon: MapPin },
   { title: "Trips", url: "/dashboard/trips", icon: Map },
   { title: "Bookings", url: "/dashboard/bookings", icon: CalendarCheck },
@@ -62,7 +63,7 @@ export default function AdminLayout() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {navItems.map((item) => {
-                  const isActive = location.pathname.startsWith(item.url);
+                  const isActive = item.url === "/" ? location.pathname === "/" : location.pathname.startsWith(item.url);
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
