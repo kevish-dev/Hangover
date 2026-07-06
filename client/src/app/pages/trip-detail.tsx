@@ -1470,6 +1470,8 @@ function TripDetailContent({
   hasBooked,
   reservedBookingId,
   isFestival,
+  selectedSlotId,
+  setSelectedSlotId,
 }: {
   trip: ApiTrip;
   heroImage: string;
@@ -1492,8 +1494,8 @@ function TripDetailContent({
   reservedBookingId: string | null;
   selectedSlotId: string | null;
   setSelectedSlotId: (id: string | null) => void;
+  isFestival?: boolean;
 }) {
-  const isFestival = trip.hasOwnProperty("stageDays");
   const [heroIndex, setHeroIndex] = useState(0);
   const [lightbox, setLightbox] = useState<number | null>(null);
 
