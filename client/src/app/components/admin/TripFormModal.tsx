@@ -36,7 +36,6 @@ const tripSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
   location: z.string().min(2, "Location is required"),
   tripType: z.string().min(1, "Trip type is required"),
-  difficultyLevel: z.string().min(1, "Difficulty is required"),
   bestTimeToVisit: z.string().min(1, "Best time is required"),
   price: z.coerce.number().min(0, "Price must be positive"),
   tokenAmount: z.coerce.number().min(0, "Booking amount must be positive"),
@@ -48,8 +47,6 @@ const tripSchema = z.object({
       capacity: z.coerce.number().min(1, "Capacity must be at least 1"),
     })
   ).min(1, "At least one slot is required"),
-
-  maxAltitude: z.coerce.number().optional(),
 
   overview: z.string().min(10, "Overview must be detailed"),
   inclusions: z
@@ -188,12 +185,10 @@ export function TripFormModal({
       title: "",
       location: "",
       tripType: "MOUNTAIN_TREK",
-      difficultyLevel: "Moderate",
       bestTimeToVisit: "",
       price: 0,
       tokenAmount: 0,
       slots: [{ startDate: "", endDate: "", capacity: 10 }],
-      maxAltitude: 0,
       overview: "",
       inclusions: [],
       exclusions: [],
@@ -214,7 +209,6 @@ export function TripFormModal({
           title: trip.title || "",
           location: trip.location || "",
           tripType: trip.tripType || "MOUNTAIN_TREK",
-          difficultyLevel: trip.difficultyLevel || "",
           bestTimeToVisit: trip.bestTimeToVisit || "",
           price: trip.price || 0,
           tokenAmount: trip.tokenAmount || 0,
@@ -224,7 +218,6 @@ export function TripFormModal({
             endDate: formatDateForInput(s.endDate),
             capacity: s.capacity
           })) : [{ startDate: "", endDate: "", capacity: 10 }],
-          maxAltitude: trip.maxAltitude || 0,
           overview: trip.overview || "",
           inclusions: trip.inclusions?.length
             ? trip.inclusions.map((i: string) => ({ value: i }))
@@ -305,12 +298,10 @@ export function TripFormModal({
           title: "",
           location: "",
           tripType: "MOUNTAIN_TREK",
-          difficultyLevel: "Moderate",
           bestTimeToVisit: "",
           price: 0,
           tokenAmount: 0,
           slots: [{ startDate: "", endDate: "", capacity: 10 }],
-          maxAltitude: 0,
           overview: "",
           inclusions: [],
           exclusions: [],
@@ -538,13 +529,12 @@ export function TripFormModal({
         "title",
         "location",
         "tripType",
-        "difficultyLevel",
         "bestTimeToVisit",
         "price",
         "tokenAmount",
       ];
     else if (step === 1) {
-      fieldsToValidate = ["slots", "maxAltitude"];
+      fieldsToValidate = ["slots"];
     } else if (step === 2) {
       fieldsToValidate = ["overview", "inclusions", "exclusions"];
     }
@@ -585,7 +575,7 @@ export function TripFormModal({
     if (await validateStep()) {
       setStep((s) => Math.min(STEPS.length - 1, s + 1));
     } else {
-      toast.error("Please fill in all required fields correctly to continue.", {
+      toast.error("Validation Error: Please fill in all required fields marked with * to continue.", {
         position: "bottom-right",
       });
     }
@@ -774,7 +764,7 @@ export function TripFormModal({
             <div className={step === 0 ? "block" : "hidden"}>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 space-y-2">
-                  <Label>Trip Title</Label>
+                  <Label>Trip Title <span className="text-red-500">*</span></Label>
                   <Input
                     {...form.register("title")}
                     placeholder="e.g. Kedarkantha Winter Trek"
@@ -786,7 +776,7 @@ export function TripFormModal({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Location</Label>
+                  <Label>Location <span className="text-red-500">*</span></Label>
                   <Input
                     {...form.register("location")}
                     placeholder="e.g. Uttarakhand, India"
@@ -798,7 +788,7 @@ export function TripFormModal({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Trip Type</Label>
+                  <Label>Trip Type <span className="text-red-500">*</span></Label>
                   <select
                     {...form.register("tripType")}
                     className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
@@ -816,27 +806,7 @@ export function TripFormModal({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Difficulty Level</Label>
-                  <select
-                    {...form.register("difficultyLevel")}
-                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  >
-                    <option value="" disabled>Select Difficulty</option>
-                    <option value="Easy">Easy</option>
-                    <option value="Easy to Moderate">Easy to Moderate</option>
-                    <option value="Moderate">Moderate</option>
-                    <option value="Moderate to Difficult">Moderate to Difficult</option>
-                    <option value="Difficult">Difficult</option>
-                    <option value="Expert">Expert</option>
-                  </select>
-                  {form.formState.errors.difficultyLevel && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.difficultyLevel.message}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Best Time to Visit</Label>
+                  <Label>Best Time to Visit <span className="text-red-500">*</span></Label>
                   <Input
                     {...form.register("bestTimeToVisit")}
                     placeholder="e.g. Dec to March"
@@ -848,7 +818,7 @@ export function TripFormModal({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Price (₹)</Label>
+                  <Label>Price (₹) <span className="text-red-500">*</span></Label>
                   <Input type="number" {...form.register("price")} />
                   {form.formState.errors.price && (
                     <p className="text-sm text-red-500">
@@ -857,7 +827,7 @@ export function TripFormModal({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Booking Amount (₹)</Label>
+                  <Label>Booking Amount (₹) <span className="text-red-500">*</span></Label>
                   <Input type="number" {...form.register("tokenAmount")} />
                   {form.formState.errors.tokenAmount && (
                     <p className="text-sm text-red-500">
@@ -870,19 +840,8 @@ export function TripFormModal({
 
                 {/* Packages Section */}
                 <div className="col-span-2 space-y-4 border p-4 rounded-md mt-4">
-                  <div className="flex justify-between items-center">
+                  <div>
                     <h3 className="font-semibold">Packages (Optional)</h3>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        addPackage({ title: "", price: 0, tokenAmount: 0 })
-                      }
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Package
-                    </Button>
                   </div>
                   <p className="text-sm text-gray-500 mb-2">
                     If added, users will choose a package during booking. Otherwise, the Base Price is used.
@@ -902,7 +861,7 @@ export function TripFormModal({
                         )}
                       </div>
                       <div className="flex-1 space-y-2">
-                        <Label>Price (₹)</Label>
+                        <Label>Price (₹) <span className="text-red-500">*</span></Label>
                         <Input
                           type="number"
                           {...form.register(`packages.${index}.price` as const)}
@@ -914,7 +873,7 @@ export function TripFormModal({
                         )}
                       </div>
                       <div className="flex-1 space-y-2">
-                        <Label>Booking Amount (₹)</Label>
+                        <Label>Booking Amount (₹) <span className="text-red-500">*</span></Label>
                         <Input
                           type="number"
                           {...form.register(`packages.${index}.tokenAmount` as const)}
@@ -967,16 +926,8 @@ export function TripFormModal({
             <div className={step === 1 ? "block" : "hidden"}>
               <div className="space-y-6">
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <Label>Slots (Dates & Capacity)</Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => appendSlot({ startDate: "", endDate: "", capacity: 10 })}
-                    >
-                      <Plus className="w-4 h-4 mr-2" /> Add Slot
-                    </Button>
+                  <div className="mb-2">
+                    <Label>Slots (Dates & Capacity) <span className="text-red-500">*</span></Label>
                   </div>
                   {form.formState.errors.slots?.root && (
                     <p className="text-sm text-red-500 mb-2">
@@ -989,7 +940,7 @@ export function TripFormModal({
                         <div className="flex-1 space-y-4">
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label>Start Date</Label>
+                              <Label>Start Date <span className="text-red-500">*</span></Label>
                               <Input
                                 type="datetime-local"
                                 {...form.register(`slots.${index}.startDate`)}
@@ -1001,7 +952,7 @@ export function TripFormModal({
                               )}
                             </div>
                             <div className="space-y-2">
-                              <Label>End Date</Label>
+                              <Label>End Date <span className="text-red-500">*</span></Label>
                               <Input
                                 type="datetime-local"
                                 {...form.register(`slots.${index}.endDate`)}
@@ -1013,7 +964,7 @@ export function TripFormModal({
                               )}
                             </div>
                             <div className="space-y-2 col-span-2">
-                              <Label>Capacity for this Slot</Label>
+                              <Label>Capacity for this Slot <span className="text-red-500">*</span></Label>
                               <Input
                                 type="number"
                                 {...form.register(`slots.${index}.capacity`)}
@@ -1040,23 +991,14 @@ export function TripFormModal({
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Max Altitude (ft)</Label>
-                  <Input type="number" {...form.register("maxAltitude")} />
-                  {form.formState.errors.maxAltitude && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.maxAltitude.message}
-                    </p>
-                  )}
                 </div>
-              </div>
             </div>
 
             {/* STEP 2: CONTENT */}
             <div className={step === 2 ? "block" : "hidden"}>
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <Label>Overview</Label>
+                  <Label>Overview <span className="text-red-500">*</span></Label>
                   <Textarea
                     {...form.register("overview")}
                     rows={4}
@@ -1072,18 +1014,10 @@ export function TripFormModal({
 
                 {/* HIGHLIGHTS */}
                 <div className="space-y-4 pt-2">
-                  <div className="flex items-center justify-between">
+                  <div>
                     <Label className="text-base font-semibold">
                       Highlights
                     </Label>
-                    <Button
-                      type="button"
-                      onClick={addHighlightItem}
-                      className="bg-gray-900 hover:bg-gray-800 text-white flex items-center gap-2"
-                      size="sm"
-                    >
-                      <Plus className="w-4 h-4 mr-1" /> Add Highlight
-                    </Button>
                   </div>
                   {highlightItems.length === 0 ? (
                     <div className="py-6 text-center border-2 border-dashed border-gray-200 rounded-lg bg-gray-50 text-gray-500">
@@ -1136,22 +1070,22 @@ export function TripFormModal({
                       </div>
                     ))
                   )}
+                  <Button
+                    type="button"
+                    onClick={addHighlightItem}
+                    className="bg-gray-900 hover:bg-gray-800 text-white flex items-center gap-2 mt-2 w-fit"
+                    size="sm"
+                  >
+                    <Plus className="w-4 h-4 mr-1" /> Add Highlight
+                  </Button>
                 </div>
 
                 {/* INCLUSIONS */}
                 <div className="space-y-3 p-4 border rounded-lg bg-green-50/30 border-green-100">
-                  <div className="flex items-center justify-between">
+                  <div>
                     <Label className="text-base font-semibold text-green-800">
-                      Inclusions
+                      Inclusions <span className="text-red-500">*</span>
                     </Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => addInclusion({ value: "" })}
-                    >
-                      <Plus className="w-4 h-4 mr-1" /> Add
-                    </Button>
                   </div>
                   {inclusionFields.map((field, index) => (
                     <div key={field.id} className="flex items-center gap-2">
@@ -1180,18 +1114,10 @@ export function TripFormModal({
 
                 {/* EXCLUSIONS */}
                 <div className="space-y-3 p-4 border rounded-lg bg-red-50/30 border-red-100">
-                  <div className="flex items-center justify-between">
+                  <div>
                     <Label className="text-base font-semibold text-red-800">
-                      Exclusions
+                      Exclusions <span className="text-red-500">*</span>
                     </Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => addExclusion({ value: "" })}
-                    >
-                      <Plus className="w-4 h-4 mr-1" /> Add
-                    </Button>
                   </div>
                   {exclusionFields.map((field, index) => (
                     <div key={field.id} className="flex items-center gap-2">
@@ -1223,7 +1149,7 @@ export function TripFormModal({
             {/* STEP 3: FAQs */}
             <div className={step === 3 ? "block" : "hidden"}>
               <div className="space-y-4">
-                <div className="flex items-center justify-between border-b pb-3">
+                <div className="border-b pb-3">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">
                       Frequently Asked Questions
@@ -1232,13 +1158,6 @@ export function TripFormModal({
                       Add common questions and answers for this trip.
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    onClick={() => addFaq({ question: "", answer: "" })}
-                    className="bg-gray-900 hover:bg-gray-800 text-white flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" /> Add FAQ
-                  </Button>
                 </div>
 
                 <div className="space-y-4">
@@ -1329,18 +1248,10 @@ export function TripFormModal({
 
                 {/* TRIP TAGS */}
                 <div className="space-y-3 p-4 mt-6 border rounded-lg bg-blue-50/30 border-blue-100">
-                  <div className="flex items-center justify-between">
+                  <div>
                     <Label className="text-base font-semibold text-blue-800">
                       Trip Tags
                     </Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => addTripTag({ value: "" })}
-                    >
-                      <Plus className="w-4 h-4 mr-1" /> Add Tag
-                    </Button>
                   </div>
                   <p className="text-xs text-gray-500">
                     Add tags to categorize this trip (e.g. Adventure, Couples,
@@ -1378,7 +1289,7 @@ export function TripFormModal({
             {/* STEP 5: STAY & TRANSPORT */}
             <div className={step === 5 ? "block" : "hidden"}>
               <div className="space-y-4">
-                <div className="flex items-center justify-between border-b pb-3">
+                <div className="border-b pb-3">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">
                       Stay & Transport Options
@@ -1388,13 +1299,6 @@ export function TripFormModal({
                       transport.
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    onClick={addStayItem}
-                    className="bg-[#781216] hover:bg-[#5a0d10] text-white flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" /> Add Item
-                  </Button>
                 </div>
 
                 <div className="space-y-4 pt-2">
@@ -1450,6 +1354,13 @@ export function TripFormModal({
                       </div>
                     ))
                   )}
+                  <Button
+                    type="button"
+                    onClick={addStayItem}
+                    className="bg-[#781216] hover:bg-[#5a0d10] text-white flex items-center gap-2 mt-2 w-fit"
+                  >
+                    <Plus className="w-4 h-4" /> Add Item
+                  </Button>
                 </div>
               </div>
             </div>
