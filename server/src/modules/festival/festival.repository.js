@@ -23,6 +23,7 @@ export const findAll = async (skip, take, where = {}) => {
         isActive: true,
         isPublished: true,
         isFeatured: true,
+        videoUrl: true,
         createdAt: true,
         destination: true,
         tags: true,
@@ -216,6 +217,7 @@ export const getFeaturedFestivals = async () => {
       isActive: true,
       isPublished: true,
       isFeatured: true,
+      videoUrl: true,
       bannerImages: true,
       packages: true,
       slots: {

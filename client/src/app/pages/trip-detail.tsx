@@ -2406,7 +2406,7 @@ function TripDetailContent({
 
                 {/* Slot Selection */}
                 {trip.slots && trip.slots.length > 0 && (
-                  <div style={{ marginBottom: "20px" }}>
+                  <div style={{ marginBottom: "24px" }}>
                     <label style={{
                       display: "block",
                       fontSize: "0.8rem",
@@ -2414,37 +2414,68 @@ function TripDetailContent({
                       color: "rgba(30,26,20,0.6)",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
-                      marginBottom: "8px"
+                      marginBottom: "12px"
                     }}>
                       Select a Slot
                     </label>
-                    <select
-                      value={selectedSlotId || ""}
-                      onChange={(e) => setSelectedSlotId(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "12px",
-                        borderRadius: "8px",
-                        border: "1px solid rgba(30,26,20,0.1)",
-                        background: "#fff",
-                        fontFamily: "'Poppins', sans-serif",
-                        fontSize: "0.9rem",
-                        color: "#1e1a14",
-                        outline: "none",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <option value="" disabled>Select Date</option>
+                    
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                       {trip.slots.map((slot) => {
                         const available = slot.capacity - (slot.filledSpots || 0);
+                        const isSoldOut = available <= 0;
+                        const isSelected = selectedSlotId === slot.id;
+                        
                         return (
-                          <option key={slot.id} value={slot.id} disabled={available <= 0}>
-                            {new Date(slot.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} - {new Date(slot.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                            {available <= 0 ? " (Sold Out)" : ` (${available} spots left)`}
-                          </option>
+                          <div
+                            key={slot.id}
+                            onClick={() => !isSoldOut && setSelectedSlotId(slot.id)}
+                            style={{
+                              padding: "14px 16px",
+                              borderRadius: "12px",
+                              border: isSelected ? "2px solid #c8a96e" : "1px solid rgba(30,26,20,0.1)",
+                              background: isSelected ? "rgba(200,169,110,0.05)" : "#fff",
+                              cursor: isSoldOut ? "not-allowed" : "pointer",
+                              opacity: isSoldOut ? 0.6 : 1,
+                              transition: "all 0.2s ease",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center"
+                            }}
+                          >
+                            <div>
+                              <div style={{ 
+                                fontWeight: 600, 
+                                fontSize: "0.95rem", 
+                                color: "#1e1a14", 
+                                marginBottom: "4px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px"
+                              }}>
+                                <Calendar className="w-4 h-4 text-[#c8a96e]" />
+                                {new Date(slot.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - {new Date(slot.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                              </div>
+                              <div style={{ 
+                                fontSize: "0.8rem", 
+                                color: isSoldOut ? "#ef4444" : "#c8a96e", 
+                                fontWeight: 500,
+                                marginLeft: "24px"
+                              }}>
+                                {isSoldOut ? "Sold Out" : `${available} spots left`}
+                              </div>
+                            </div>
+                            <div style={{ 
+                              width: "20px", 
+                              height: "20px", 
+                              borderRadius: "50%", 
+                              border: isSelected ? "6px solid #c8a96e" : "2px solid rgba(30,26,20,0.2)",
+                              background: "#fff",
+                              flexShrink: 0
+                            }} />
+                          </div>
                         );
                       })}
-                    </select>
+                    </div>
                   </div>
                 )}
 

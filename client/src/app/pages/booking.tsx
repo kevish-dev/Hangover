@@ -1253,7 +1253,7 @@ export default function BookingPage() {
             </strong>
           </p>
           <Link
-            to={`/trips/${slug}`}
+            to={`/profile`}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -1268,7 +1268,7 @@ export default function BookingPage() {
               paddingBottom: "3px",
             }}
           >
-            ← Back to Trip Details
+            Go to Profile Dashboard →
           </Link>
         </motion.div>
       </div>
@@ -1445,7 +1445,7 @@ export default function BookingPage() {
           </button>
           <br />
           <Link
-            to={`/trips/${slug}`}
+            to={`/profile`}
             style={{
               color: "#781216",
               fontSize: "0.78rem",
@@ -1457,7 +1457,7 @@ export default function BookingPage() {
               paddingBottom: "3px",
             }}
           >
-            ← Back to Trip Details
+            Go to Profile Dashboard →
           </Link>
         </motion.div>
       </div>
@@ -1515,7 +1515,7 @@ export default function BookingPage() {
             You have already booked this trip. Your spot is confirmed.
           </p>
           <Link
-            to={`/trips/${slug}`}
+            to={`/profile`}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -1530,7 +1530,7 @@ export default function BookingPage() {
               paddingBottom: "3px",
             }}
           >
-            ← Back to Trip Details
+            Go to Profile Dashboard →
           </Link>
         </motion.div>
       </div>
