@@ -103,6 +103,8 @@ export function FestivalFormModal({
   const [step, setStep] = useState(0);
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
 
   // Highlight State
   const [highlightItems, setHighlightItems] = useState<
@@ -269,6 +271,8 @@ export function FestivalFormModal({
       setStep(0);
       setImages([]);
       setImagePreviews([]);
+      setVideoFile(null);
+      setVideoPreview(null);
     }
   }, [festival, open, form]);
 
@@ -340,6 +344,33 @@ export function FestivalFormModal({
       URL.revokeObjectURL(prev[index]);
       return prev.filter((_, i) => i !== index);
     });
+  };
+
+  const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setVideoFile(file);
+      setVideoPreview(URL.createObjectURL(file));
+    }
+    e.target.value = "";
+  };
+
+  const removeVideo = () => {
+    setVideoFile(null);
+    if (videoPreview) URL.revokeObjectURL(videoPreview);
+    setVideoPreview(null);
+  };
+
+  const deleteExistingVideo = async () => {
+    if (!festival?.id || !window.confirm("Delete this video permanently?")) return;
+    try {
+      await apiClient.delete(`/festivals/${festival.id}/video`);
+      toast.success("Video deleted");
+      queryClient.invalidateQueries({ queryKey: ["admin", "festivals"] });
+      onOpenChange(false);
+    } catch (error) {
+      toast.error("Failed to delete video");
+    }
   };
 
   // --- Highlights Handlers ---
@@ -630,6 +661,16 @@ export function FestivalFormModal({
           headers: { "Content-Type": "multipart/form-data" },
         });
         toast.success("Banner images uploaded!");
+      }
+
+      // Sync Video
+      if (videoFile) {
+        const videoFormData = new FormData();
+        videoFormData.append("video", videoFile);
+        await apiClient.post(`/festivals/${festivalId}/video`, videoFormData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        toast.success("Video uploaded!");
       }
 
       queryClient.invalidateQueries({ queryKey: ["admin", "festivals"] });
@@ -1459,6 +1500,76 @@ export function FestivalFormModal({
                           </div>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Video Upload Section */}
+              <div className="mt-8 pt-8 border-t space-y-4">
+                {isEdit && festival?.videoUrl && (
+                  <div className="mb-6">
+                    <h4 className="font-medium mb-3 text-sm text-gray-500">
+                      Current Video
+                    </h4>
+                    <div className="relative group rounded-lg overflow-hidden border border-gray-200 aspect-video bg-gray-100 max-w-sm">
+                      <video src={festival.videoUrl} controls className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button
+                          type="button"
+                          onClick={deleteExistingVideo}
+                          className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
+                          title="Delete Video"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="p-8 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 flex flex-col items-center justify-center text-center">
+                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 mb-4">
+                    <UploadCloud className="w-8 h-8 text-[#c8a96e]" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                    Upload Hero Video
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-6 max-w-sm">
+                    A video that will play in the background of the festival hero section. Recommended short, lightweight video.
+                  </p>
+                  <Label
+                    htmlFor="video-upload"
+                    className="cursor-pointer bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2.5 rounded-lg font-medium transition-colors shadow-sm inline-flex items-center gap-2"
+                  >
+                    <UploadCloud className="w-4 h-4" />
+                    Select Video
+                    <input
+                      id="video-upload"
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      onChange={handleVideoChange}
+                    />
+                  </Label>
+                </div>
+
+                {videoPreview && (
+                  <div className="mt-6">
+                    <h4 className="font-medium mb-3 text-sm text-gray-500">
+                      New Selected Video
+                    </h4>
+                    <div className="relative group rounded-lg overflow-hidden border border-gray-200 aspect-video bg-gray-100 max-w-sm">
+                      <video src={videoPreview} controls className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button
+                          type="button"
+                          onClick={removeVideo}
+                          className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

@@ -110,6 +110,7 @@ model Festival {
   slug                String        @unique
   location            String
   bannerImages        String[]
+  videoUrl            String?
   duration            Int
   difficultyLevel     String
   bestTimeToVisit     String

@@ -168,6 +168,39 @@ export const syncStayTransport = async (festivalId, payloadStr, files) => {
   return festivalRepo.update(festivalId, { stayTransportImages: finalArray });
 };
 
+// ============ Video Upload ====================
+
+export const uploadVideo = async (festivalId, file) => {
+  const festival = await festivalRepo.findById(festivalId);
+  if (!festival) throw new Error("Festival not found");
+
+  const folder = `uploads/festivals/${festivalId}/video`;
+  
+  if (festival.videoUrl) {
+    await deleteFromCloudinary(festival.videoUrl);
+  }
+
+  const url = await uploadToCloudinary(file.buffer, {
+    folder,
+    publicId: "hero-video",
+    optimize: false
+  });
+
+  return festivalRepo.update(festivalId, { videoUrl: url });
+};
+
+export const deleteVideo = async (festivalId) => {
+  const festival = await festivalRepo.findById(festivalId);
+  if (!festival) throw new Error("Festival not found");
+
+  if (festival.videoUrl) {
+    await deleteFromCloudinary(festival.videoUrl);
+    return festivalRepo.update(festivalId, { videoUrl: null });
+  }
+
+  return festival;
+};
+
 // ============ V2 apis for User ====================
 
 export const getFeaturedFestivals = async () => {

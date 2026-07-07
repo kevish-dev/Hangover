@@ -115,6 +115,25 @@ export const syncStayTransport = async (req, res, next) => {
 
 // ============ V2 apis for User ====================
 
+export const uploadVideo = async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "No video uploaded" });
+    const festival = await festivalService.uploadVideo(req.params.id, req.file);
+    res.status(200).json({ message: "Video uploaded successfully", festival });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteVideo = async (req, res, next) => {
+  try {
+    const festival = await festivalService.deleteVideo(req.params.id);
+    res.status(200).json({ message: "Video deleted successfully", festival });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getFeaturedFestivals = async (req, res, next) => {
   try {
     const result = await festivalService.getFeaturedFestivals();

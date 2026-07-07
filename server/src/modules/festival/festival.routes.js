@@ -30,6 +30,13 @@ router.post(
 router.delete("/:id/banner-images", festivalController.deleteBanner);
 
 router.post(
+  "/:id/video",
+  uploadMiddleware.single("video"),
+  festivalController.uploadVideo
+);
+router.delete("/:id/video", festivalController.deleteVideo);
+
+router.post(
   "/:id/highlights",
   uploadMiddleware.array("images", 15),
   festivalController.syncHighlights

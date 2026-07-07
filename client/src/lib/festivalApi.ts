@@ -63,6 +63,7 @@ export interface ApiFestival {
   slug: string;
   location: string;
   bannerImages: string[];
+  videoUrl: string | null;
   duration: number;
   difficultyLevel: string;
   bestTimeToVisit: string;
