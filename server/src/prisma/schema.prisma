@@ -180,8 +180,8 @@ model Slot {
   id          String    @id @default(uuid())
   tripId      String?
   festivalId  String?
-  startDate   DateTime
-  endDate     DateTime
+  startDate   DateTime?
+  endDate     DateTime?
   capacity    Int
   filledSpots Int       @default(0)
   createdAt   DateTime  @default(now())
@@ -219,16 +219,16 @@ model Booking {
   updatedAt          DateTime          @updatedAt
   packageId          String?
   slotId             String
-  package            Package?          @relation(fields: [packageId], references: [id])
-  slot               Slot              @relation(fields: [slotId], references: [id])
+  package            Package?          @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  slot               Slot              @relation(fields: [slotId], references: [id], onDelete: Cascade)
   user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   payments           Payment[]
   paymentIntents     PaymentIntent[]
   reminders          PaymentReminder[]
   travelers          Traveler[]
-  trip               Trip?             @relation(fields: [tripId], references: [id])
+  trip               Trip?             @relation(fields: [tripId], references: [id], onDelete: Cascade)
   tripId             String?
-  festival           Festival?         @relation(fields: [festivalId], references: [id])
+  festival           Festival?         @relation(fields: [festivalId], references: [id], onDelete: Cascade)
   festivalId         String?
 
   @@index([packageId])
@@ -262,8 +262,8 @@ model Itinerary {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   festivalId  String?
-  festival    Festival?      @relation(fields: [festivalId], references: [id])
-  trip        Trip?          @relation(fields: [tripId], references: [id])
+  festival    Festival?      @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  trip        Trip?          @relation(fields: [tripId], references: [id], onDelete: Cascade)
   days        ItineraryDay[]
 
   @@index([tripId])
@@ -342,10 +342,10 @@ model Inquiry {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   festivalId   String?
-  festival     Festival? @relation(fields: [festivalId], references: [id])
+  festival     Festival? @relation(fields: [festivalId], references: [id], onDelete: Cascade)
   resolvedBy   User?     @relation("InquiryResolver", fields: [resolvedById], references: [id])
-  trip         Trip?     @relation(fields: [tripId], references: [id])
-  user         User?     @relation(fields: [userId], references: [id])
+  trip         Trip?     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user         User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([email])
   @@index([tripId])

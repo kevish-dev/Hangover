@@ -183,20 +183,47 @@ export default function AdminFestivalsPage() {
     },
   });
 
+  const confirmAction = (title: string, description: string, actionLabel: string, actionFn: () => Promise<void>) => {
+    toast(title, {
+      description,
+      position: "bottom-right",
+      action: { label: actionLabel, onClick: actionFn },
+      cancel: { label: "Cancel", onClick: () => {} },
+    });
+  };
+
   const handleDelete = (id: string) => {
-    if (window.confirm("Delete this festival?")) {
-      apiClient.delete(`/festivals/${id}`).then(() => {
-        toast.success("Festival deleted");
-        queryClient.invalidateQueries({ queryKey: ["admin", "festivals"] });
-      }).catch(() => toast.error("Failed to delete"));
-    }
+    confirmAction(
+      "Delete Festival?",
+      "Are you sure you want to delete this festival?",
+      "Delete",
+      async () => {
+        try {
+          await apiClient.delete(`/festivals/${id}`);
+          toast.success("Festival deleted");
+          queryClient.invalidateQueries({ queryKey: ["admin", "festivals"] });
+        } catch (error) {
+          toast.error("Failed to delete festival");
+        }
+      }
+    );
   };
 
   const handleTogglePublish = (fest: any) => {
-    apiClient.put(`/festivals/${fest.id}`, { isPublished: !fest.isPublished }).then(() => {
-      toast.success(fest.isPublished ? "Unpublished" : "Published");
-      queryClient.invalidateQueries({ queryKey: ["admin", "festivals"] });
-    }).catch(() => toast.error("Failed to update status"));
+    confirmAction(
+      fest.isPublished ? "Unpublish Festival?" : "Publish Festival?",
+      `Are you sure you want to ${fest.isPublished ? "unpublish" : "publish"} this festival?`,
+      "Confirm",
+      async () => {
+        try {
+          await apiClient.put(`/festivals/${fest.id}`, { isPublished: !fest.isPublished });
+          toast.success(fest.isPublished ? "Unpublished" : "Published");
+          queryClient.invalidateQueries({ queryKey: ["admin", "festivals"] });
+        } catch (error) {
+          toast.error("Failed to update status");
+        }
+      }
+    );
   };
 
   const openEditModal = async (fest: any) => {

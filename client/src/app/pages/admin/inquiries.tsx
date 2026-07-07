@@ -7,6 +7,7 @@ import { Input } from "../../components/ui/input";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Badge } from "../../components/ui/badge";
+import { formatTripType } from "../../../lib/tripApi";
 
 export default function AdminInquiriesPage() {
   const queryClient = useQueryClient();
@@ -125,11 +126,11 @@ export default function AdminInquiriesPage() {
                     </td>
                     <td className="px-6 py-4">
                       {inq.tripType ? (
-                        <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium uppercase">
-                          {inq.tripType.replace(/_/g, " ")}
-                        </span>
+                        <Badge variant="secondary" className="font-normal text-xs bg-gray-100 text-gray-700 hover:bg-gray-200">
+                          {formatTripType(inq.tripType)}
+                        </Badge>
                       ) : (
-                        <span className="text-gray-400 italic text-xs">Not specified</span>
+                        <span className="text-gray-400 text-xs italic">General</span>
                       )}
                     </td>
                     <td className="px-6 py-4 text-gray-500">
@@ -206,8 +207,8 @@ export default function AdminInquiriesPage() {
               <div>
                 <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Trip Interest</label>
                 {selectedInquiry.tripType ? (
-                  <span className="px-2.5 py-1 bg-gray-100 text-gray-800 rounded font-medium uppercase text-sm inline-block">
-                    {selectedInquiry.tripType.replace(/_/g, " ")}
+                  <span className="px-2.5 py-1 bg-gray-100 text-gray-800 rounded font-medium text-sm inline-block">
+                    {formatTripType(selectedInquiry.tripType)}
                   </span>
                 ) : (
                   <span className="text-gray-400 italic">Not specified</span>

@@ -30,6 +30,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ItineraryStep } from "./ItineraryStep";
+import { formatTripType } from "../../../lib/tripApi";
 
 // --- VALIDATION SCHEMA ---
 const tripSchema = z.object({
@@ -42,8 +43,8 @@ const tripSchema = z.object({
   slots: z.array(
     z.object({
       id: z.string().optional(),
-      startDate: z.string().min(1, "Start date is required"),
-      endDate: z.string().min(1, "End date is required"),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
       capacity: z.coerce.number().min(1, "Capacity must be at least 1"),
     })
   ).min(1, "At least one slot is required"),
@@ -591,8 +592,8 @@ export function TripFormModal({
         ...data,
         slots: data.slots.map(s => ({
             ...s,
-            startDate: new Date(s.startDate).toISOString(),
-            endDate: new Date(s.endDate).toISOString(),
+            startDate: s.startDate ? new Date(s.startDate).toISOString() : null,
+            endDate: s.endDate ? new Date(s.endDate).toISOString() : null,
         })),
         inclusions: data.inclusions
           .map((i) => i.value)
@@ -795,7 +796,7 @@ export function TripFormModal({
                   >
                     {TRIP_TYPES.map((t) => (
                       <option key={t} value={t}>
-                        {t.replace(/_/g, " ")}
+                        {formatTripType(t)}
                       </option>
                     ))}
                   </select>

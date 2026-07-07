@@ -19,26 +19,47 @@ export default function AdminDestinationsPage() {
     },
   });
 
-  const handleDelete = async (destinationId: string) => {
-    if (window.confirm("Are you sure you want to delete this destination? This action cannot be undone.")) {
-      try {
-        await apiClient.delete(`/destinations/${destinationId}`);
-        toast.success("Destination deleted successfully");
-        queryClient.invalidateQueries({ queryKey: ["admin", "destinations"] });
-      } catch (error) {
-        toast.error("Failed to delete destination");
-      }
-    }
+  const confirmAction = (title: string, description: string, actionLabel: string, actionFn: () => Promise<void>) => {
+    toast(title, {
+      description,
+      position: "bottom-right",
+      action: { label: actionLabel, onClick: actionFn },
+      cancel: { label: "Cancel", onClick: () => {} },
+    });
   };
 
-  const handleTogglePublish = async (destination: any) => {
-    try {
-      await apiClient.put(`/destinations/${destination.id}`, { isPublished: !destination.isPublished });
-      toast.success(destination.isPublished ? "Destination unpublished" : "Destination published");
-      queryClient.invalidateQueries({ queryKey: ["admin", "destinations"] });
-    } catch (error) {
-      toast.error("Failed to update status");
-    }
+  const handleDelete = (destinationId: string) => {
+    confirmAction(
+      "Delete Destination?",
+      "Are you sure you want to delete this destination? This action cannot be undone.",
+      "Delete",
+      async () => {
+        try {
+          await apiClient.delete(`/destinations/${destinationId}`);
+          toast.success("Destination deleted successfully");
+          queryClient.invalidateQueries({ queryKey: ["admin", "destinations"] });
+        } catch (error) {
+          toast.error("Failed to delete destination");
+        }
+      }
+    );
+  };
+
+  const handleTogglePublish = (destination: any) => {
+    confirmAction(
+      destination.isPublished ? "Unpublish Destination?" : "Publish Destination?",
+      `Are you sure you want to ${destination.isPublished ? "unpublish" : "publish"} this destination?`,
+      "Confirm",
+      async () => {
+        try {
+          await apiClient.put(`/destinations/${destination.id}`, { isPublished: !destination.isPublished });
+          toast.success(destination.isPublished ? "Destination unpublished" : "Destination published");
+          queryClient.invalidateQueries({ queryKey: ["admin", "destinations"] });
+        } catch (error) {
+          toast.error("Failed to update status");
+        }
+      }
+    );
   };
 
   const openCreateModal = () => {

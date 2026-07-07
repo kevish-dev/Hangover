@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../lib/axios";
 import { TripFormModal } from "../../components/admin/TripFormModal";
+import { formatTripType } from "../../../lib/tripApi";
 import {
   Map,
   MapPin,
@@ -304,7 +305,7 @@ export default function AdminTripsPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-bold text-gray-900 leading-tight truncate">{trip.title}</h3>
                     <span className="px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-600 uppercase tracking-wide shrink-0">
-                      {trip.tripType?.replace(/_/g, " ") || "UNKNOWN"}
+                      {trip.tripType ? formatTripType(trip.tripType) : "UNKNOWN"}
                     </span>
                     {!trip.isPublished && (
                       <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-700 uppercase tracking-wide shrink-0">Draft</span>

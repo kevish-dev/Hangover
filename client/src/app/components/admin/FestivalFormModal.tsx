@@ -42,8 +42,8 @@ const festivalSchema = z.object({
   slots: z.array(
     z.object({
       id: z.string().optional(),
-      startDate: z.string().min(1, "Start date is required"),
-      endDate: z.string().min(1, "End date is required"),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
       capacity: z.coerce.number().min(1, "Capacity must be at least 1"),
     })
   ).min(1, "At least one slot is required"),
@@ -594,8 +594,8 @@ export function FestivalFormModal({
         ...data,
         slots: data.slots.map((s: any) => ({
             ...s,
-            startDate: new Date(s.startDate).toISOString(),
-            endDate: new Date(s.endDate).toISOString(),
+            startDate: s.startDate ? new Date(s.startDate).toISOString() : null,
+            endDate: s.endDate ? new Date(s.endDate).toISOString() : null,
         })),
         inclusions: data.inclusions
           .map((i) => i.value)

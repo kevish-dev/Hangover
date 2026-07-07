@@ -42,7 +42,7 @@ export const createTrip = async (data) => {
   if (!data.stayTransportImages) {
     data.stayTransportImages = [];
   }
-  if (data.slots && data.slots.length > 0) {
+  if (data.slots && data.slots.length > 0 && data.slots[0].startDate && data.slots[0].endDate) {
     const start = new Date(data.slots[0].startDate);
     const end = new Date(data.slots[0].endDate);
     if (end <= start) {
@@ -55,7 +55,7 @@ export const createTrip = async (data) => {
 };
 
 export const updateTrip = async (id, data) => {
-  if (data.slots && data.slots.length > 0) {
+  if (data.slots && data.slots.length > 0 && data.slots[0].startDate && data.slots[0].endDate) {
     const start = new Date(data.slots[0].startDate);
     const end = new Date(data.slots[0].endDate);
     if (end > start) {
