@@ -556,7 +556,7 @@ export default function BookingPage() {
 
   // Payment choice
   const [paymentChoice, setPaymentChoice] = useState<"FULL" | "TOKEN">("FULL");
-  const [selectedPackageId, setSelectedPackageId] = useState<string>("");
+  const [selectedPackageId, setSelectedPackageId] = useState<string | null | undefined>(undefined);
 
   // Booking flow state
   const [bookingStep, setBookingStep] = useState<
@@ -608,8 +608,12 @@ export default function BookingPage() {
   }, [user, trip]);
 
   useEffect(() => {
-    if (trip?.packages?.length > 0 && !selectedPackageId) {
-      setSelectedPackageId(trip.packages[0].id);
+    if (selectedPackageId === undefined && trip) {
+      if (Number(trip.price) > 0) {
+        setSelectedPackageId(null);
+      } else if (trip.packages?.length > 0) {
+        setSelectedPackageId(trip.packages[0].id);
+      }
     }
   }, [trip, selectedPackageId]);
 
@@ -751,11 +755,6 @@ export default function BookingPage() {
         payload.packageId = selectedPackageId;
       }
       
-      if (isFestival) {
-        payload.festivalId = trip!.id;
-      } else {
-        payload.tripId = trip!.id;
-      }
       if (selectedSlotId) {
         payload.slotId = selectedSlotId;
       }
@@ -1757,6 +1756,29 @@ export default function BookingPage() {
                     Select a Package
                   </h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {Number(trip?.price) > 0 && (
+                      <div
+                        onClick={() => setSelectedPackageId(null)}
+                        style={{
+                          padding: "16px",
+                          borderRadius: "8px",
+                          border: selectedPackageId === null ? "1.5px solid #c8a96e" : "1px solid rgba(30,26,20,0.1)",
+                          background: selectedPackageId === null ? "rgba(200,169,110,0.05)" : "#fff",
+                          cursor: "pointer",
+                          transition: "all 0.2s ease",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center"
+                        }}
+                      >
+                        <div style={{ color: "#1e1a14", fontSize: "0.95rem", fontWeight: 500, fontFamily: "'Poppins', sans-serif" }}>
+                          Standard Package
+                        </div>
+                        <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#781216", fontFamily: "'Poppins', sans-serif" }}>
+                          {formatPrice(trip.price)}
+                        </div>
+                      </div>
+                    )}
                     {trip.packages.map((pkg: any) => {
                       const isSelected = selectedPackageId === pkg.id;
                       return (

@@ -199,7 +199,6 @@ model Booking {
   id                 String            @id @default(uuid())
   bookingReference   String            @unique
   userId             String
-  tripId             String?
   status             BookingStatus     @default(PENDING)
   paymentStatus      PaymentStatus     @default(PENDING)
   numberOfTravelers  Int               @default(1)
@@ -218,22 +217,22 @@ model Booking {
   specialRequests    String?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
-  festivalId         String?
   packageId          String?
-  slotId             String?
-  festival           Festival?         @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  slotId             String
   package            Package?          @relation(fields: [packageId], references: [id])
-  slot               Slot?             @relation(fields: [slotId], references: [id])
-  trip               Trip?             @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  slot               Slot              @relation(fields: [slotId], references: [id])
   user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   payments           Payment[]
   paymentIntents     PaymentIntent[]
   reminders          PaymentReminder[]
   travelers          Traveler[]
+  trip               Trip?             @relation(fields: [tripId], references: [id])
+  tripId             String?
+  festival           Festival?         @relation(fields: [festivalId], references: [id])
+  festivalId         String?
 
-  @@index([tripId])
-  @@index([festivalId])
   @@index([packageId])
+  @@index([slotId])
   @@index([userId])
   @@index([status])
   @@index([paymentStatus])

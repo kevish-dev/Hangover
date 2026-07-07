@@ -29,6 +29,7 @@ import { apiClient } from "../../../lib/axios";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { ItineraryStep } from "./ItineraryStep";
 
 // --- VALIDATION SCHEMA ---
 const tripSchema = z.object({
@@ -75,6 +76,29 @@ const tripSchema = z.object({
   ).optional(),
   isPublished: z.boolean().default(false),
   isFeatured: z.boolean().default(false),
+  itineraries: z.array(
+    z.object({
+      id: z.string().optional(),
+      title: z.string().min(1, "Title is required"),
+      description: z.string().optional(),
+      days: z.array(
+        z.object({
+          id: z.string().optional(),
+          dayNumber: z.coerce.number().min(1),
+          title: z.string().min(1, "Day title is required"),
+          description: z.string().optional(),
+          activities: z.array(
+            z.object({
+              id: z.string().optional(),
+              title: z.string().min(1, "Activity title is required"),
+              description: z.string().optional(),
+              time: z.string().optional(),
+            })
+          ).optional()
+        })
+      ).min(1, "At least one day is required")
+    })
+  ).optional(),
   }
 );
 
@@ -99,6 +123,7 @@ const STEPS = [
   "Logistics",
   "Content",
   "FAQs & Tags",
+  "Itinerary",
   "Stay & Transport",
   "Media",
 ];
@@ -223,6 +248,25 @@ export function TripFormModal({
                 tokenAmount: p.tokenAmount,
               }))
             : [],
+          itineraries: trip.itineraries?.length
+            ? trip.itineraries.map((it: any) => ({
+                id: it.id,
+                title: it.title,
+                description: it.description || "",
+                days: it.days?.map((d: any) => ({
+                  id: d.id,
+                  dayNumber: d.dayNumber,
+                  title: d.title,
+                  description: d.description || "",
+                  activities: d.activities?.map((a: any) => ({
+                    id: a.id,
+                    title: a.title,
+                    description: a.description || "",
+                    time: a.time || "",
+                  })) || []
+                })) || []
+              }))
+            : [],
           isPublished: trip.isPublished || false,
           isFeatured: trip.isFeatured || false,
         });
@@ -273,6 +317,7 @@ export function TripFormModal({
           tripTags: [],
           packages: [],
           faqs: [],
+          itineraries: [],
           isPublished: false,
           isFeatured: false,
         });
@@ -504,7 +549,8 @@ export function TripFormModal({
       fieldsToValidate = ["overview", "inclusions", "exclusions"];
     }
     if (step === 3) fieldsToValidate = ["faqs", "tripTags"];
-    if (step === 4) return true; // Stay & Transport has local state, basic validation can be skipped or added if needed
+    if (step === 4) fieldsToValidate = ["itineraries"];
+    if (step === 5) return true; // Stay & Transport has local state, basic validation can be skipped or added if needed
 
     const isValid = await form.trigger(fieldsToValidate);
 
@@ -520,7 +566,7 @@ export function TripFormModal({
       }
     }
 
-    if (step === 4) {
+    if (step === 5) {
       const invalid = stayItems.some(
         (i) => i.text.trim() === "" || (!i.preview && !i.url),
       );
@@ -568,6 +614,7 @@ export function TripFormModal({
           ?.map((t) => t.value)
           .filter((t) => t.trim() !== ""),
         packages: data.packages,
+        itineraries: data.itineraries,
         faqs: data.faqs?.filter(
           (f) => f.question.trim() !== "" && f.answer.trim() !== "",
         ),
@@ -1323,8 +1370,13 @@ export function TripFormModal({
               </div>
             </div>
 
-            {/* STEP 4: STAY & TRANSPORT */}
+            {/* STEP 4: ITINERARY */}
             <div className={step === 4 ? "block" : "hidden"}>
+              <ItineraryStep control={form.control} register={form.register} errors={form.formState.errors} />
+            </div>
+
+            {/* STEP 5: STAY & TRANSPORT */}
+            <div className={step === 5 ? "block" : "hidden"}>
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b pb-3">
                   <div>
@@ -1402,8 +1454,8 @@ export function TripFormModal({
               </div>
             </div>
 
-            {/* STEP 5: MEDIA (BANNER IMAGES) */}
-            <div className={step === 5 ? "block" : "hidden"}>
+            {/* STEP 6: MEDIA (BANNER IMAGES) */}
+            <div className={step === 6 ? "block" : "hidden"}>
               <div className="space-y-4">
                 {isEdit && trip?.bannerImages?.length > 0 && (
                   <div className="mb-6">

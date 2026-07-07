@@ -67,7 +67,7 @@ export const findById = async (whereObj) => {
 };
 
 export const create = async (data) => {
-  const { tags, faqs, packages, slots, ...rest } = data;
+  const { tags, faqs, packages, slots, itineraries, ...rest } = data;
   const payload = { ...rest };
   
   if (tags && Array.isArray(tags)) {
@@ -110,11 +110,35 @@ export const create = async (data) => {
     };
   }
 
+  if (itineraries && Array.isArray(itineraries)) {
+    payload.itineraries = {
+      create: itineraries.map((itinerary) => ({
+        title: itinerary.title,
+        description: itinerary.description || null,
+        days: {
+          create: (itinerary.days || []).map((day) => ({
+            dayNumber: day.dayNumber,
+            title: day.title,
+            description: day.description || null,
+            activities: {
+              create: (day.activities || []).map((activity, index) => ({
+                title: activity.title,
+                description: activity.description || null,
+                time: activity.time || null,
+                order: index,
+              })),
+            },
+          })),
+        },
+      })),
+    };
+  }
+
   return prisma.festival.create({ data: payload });
 };
 
 export const update = async (id, data) => {
-  const { tags, faqs, packages, slots, ...rest } = data;
+  const { tags, faqs, packages, slots, itineraries, ...rest } = data;
   const payload = { ...rest };
   
   if (tags && Array.isArray(tags)) {
@@ -185,6 +209,34 @@ export const update = async (id, data) => {
           filledSpots: 0
         }
       }))
+    };
+  }
+  if (itineraries && Array.isArray(itineraries)) {
+    // Delete existing itineraries first, Prisma cascade will delete days & activities
+    await prisma.itinerary.deleteMany({
+      where: { festivalId: id }
+    });
+
+    payload.itineraries = {
+      create: itineraries.map((itinerary) => ({
+        title: itinerary.title,
+        description: itinerary.description || null,
+        days: {
+          create: (itinerary.days || []).map((day) => ({
+            dayNumber: day.dayNumber,
+            title: day.title,
+            description: day.description || null,
+            activities: {
+              create: (day.activities || []).map((activity, index) => ({
+                title: activity.title,
+                description: activity.description || null,
+                time: activity.time || null,
+                order: index,
+              })),
+            },
+          })),
+        },
+      })),
     };
   }
 

@@ -30,42 +30,33 @@ export const createBooking = async (userId, data) => {
     );
   }
 
-  if (!data.tripId && !data.festivalId) {
-    throw new ValidationError("Must provide either tripId or festivalId");
-  }
-
   if (!data.slotId) {
-    throw new ValidationError("Must provide a slotId to book a specific date.");
+    throw new ValidationError("Must provide a slotId to book.");
   }
 
-  // 2. Fetch trip or festival
-  let item = null;
-  let isTrip = false;
-  
-  if (data.tripId) {
-    item = await prisma.trip.findUnique({ where: { id: data.tripId }, include: { packages: true } });
-    isTrip = true;
-  } else {
-    item = await prisma.festival.findUnique({ where: { id: data.festivalId }, include: { packages: true } });
+  const slot = await prisma.slot.findUnique({ 
+    where: { id: data.slotId },
+    include: { 
+      trip: { include: { packages: true } }, 
+      festival: { include: { packages: true } } 
+    } 
+  });
+  if (!slot) {
+    throw new NotFoundError("Booking slot not found");
   }
+
+  const isTrip = !!slot.tripId;
+  const item = isTrip ? slot.trip : slot.festival;
 
   if (!item) throw new NotFoundError("Booking item not found");
   if (!item.isActive)
     throw new ValidationError("This item is no longer available for booking.");
 
-  const slot = await prisma.slot.findUnique({ where: { id: data.slotId } });
-  if (!slot) {
-    throw new NotFoundError("Booking slot not found");
-  }
-  if (slot.tripId !== data.tripId && slot.festivalId !== data.festivalId) {
-    throw new ValidationError("Selected slot does not belong to this trip or festival.");
-  }
-
   // Check if user already has an active booking for this item
   const existingActive = await prisma.booking.findFirst({
     where: {
       userId,
-      ...(isTrip ? { tripId: data.tripId } : { festivalId: data.festivalId }),
+      slotId: data.slotId,
       status: { in: ["RESERVED", "CONFIRMED", "COMPLETED"] },
     },
   });
@@ -139,7 +130,7 @@ export const createBooking = async (userId, data) => {
   const existingPending = await prisma.booking.findFirst({
     where: {
       userId,
-      ...(isTrip ? { tripId: data.tripId } : { festivalId: data.festivalId }),
+      slotId: data.slotId,
       status: "PENDING",
     },
   });
@@ -155,8 +146,6 @@ export const createBooking = async (userId, data) => {
   // Generate booking reference and complete payload for a new booking
   bookingData.bookingReference = `HNG-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
   bookingData.userId = userId;
-  if (isTrip) bookingData.tripId = data.tripId;
-  else bookingData.festivalId = data.festivalId;
   bookingData.slotId = data.slotId;
   if (selectedPackage) bookingData.packageId = selectedPackage.id;
   bookingData.status = "PENDING";
@@ -195,15 +184,25 @@ export const getBookingById = async (id, userId, isAdmin = false) => {
   if (!booking) throw new NotFoundError("Booking not found");
   if (!isAdmin && booking.userId !== userId)
     throw new ForbiddenError("Forbidden");
-  return booking;
+  
+  return {
+    ...booking,
+    trip: booking.slot?.trip || null,
+    festival: booking.slot?.festival || null,
+  };
 };
 
 export const getUserBookings = async (userId, page = 1, limit = 10) => {
   const skip = (page - 1) * limit;
   const take = parseInt(limit, 10);
   const { bookings, total } = await repo.getUserBookings(userId, skip, take);
+  const mappedBookings = bookings.map(b => ({
+    ...b,
+    trip: b.slot?.trip || null,
+    festival: b.slot?.festival || null,
+  }));
   return {
-    data: bookings,
+    data: mappedBookings,
     meta: {
       total,
       page: parseInt(page, 10),
@@ -217,8 +216,13 @@ export const getAllBookings = async (page = 1, limit = 10) => {
   const skip = (page - 1) * limit;
   const take = parseInt(limit, 10);
   const { bookings, total } = await repo.getAllBookings(skip, take);
+  const mappedBookings = bookings.map(b => ({
+    ...b,
+    trip: b.slot?.trip || null,
+    festival: b.slot?.festival || null,
+  }));
   return {
-    data: bookings,
+    data: mappedBookings,
     meta: {
       total,
       page: parseInt(page, 10),
@@ -229,20 +233,20 @@ export const getAllBookings = async (page = 1, limit = 10) => {
 };
 
 export const getBookingsByTripId = async (tripId) => {
-  return repo.getBookingsByTripId(tripId);
+  const bookings = await repo.getBookingsByTripId(tripId);
+  return bookings.map(b => ({ ...b, trip: b.slot?.trip || null, festival: b.slot?.festival || null }));
 };
 
 export const getBookingsByFestivalId = async (festivalId) => {
-  return repo.getBookingsByFestivalId(festivalId);
+  const bookings = await repo.getBookingsByFestivalId(festivalId);
+  return bookings.map(b => ({ ...b, trip: b.slot?.trip || null, festival: b.slot?.festival || null }));
 };
 
 export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundAmount) => {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
     include: {
-      trip: true,
-      festival: true,
-      slot: true,
+      slot: { include: { trip: true, festival: true } },
       user: { include: { profile: true } },
       payments: {
         where: { status: "SUCCESS" }
@@ -323,6 +327,7 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
         });
       }
     }
+
 
     // Determine new paymentStatus for booking
     let newPaymentStatus = "CANCELLED";
