@@ -83,7 +83,7 @@ export interface ApiFestival {
   tags: ApiTag[];
   faqs: ApiFaq[];
   slots: ApiSlot[];
-  itineraries?: ApiItinerary[];
+  itinerary?: any;
   createdAt: string;
   updatedAt: string;
 }

@@ -808,9 +808,7 @@ function ItineraryAccordion({
 }: {
   days: {
     dayNumber: number;
-    title: string;
-    description: string | null;
-    activities: { title: string }[];
+    activities: string;
   }[];
 }) {
   const [open, setOpen] = useState<number | null>(0);
@@ -905,17 +903,6 @@ function ItineraryAccordion({
                 style={{ overflow: "hidden" }}
               >
                 <div style={{ padding: "0 20px 20px 68px" }}>
-                  <p
-                    style={{
-                      color: "rgba(30,26,20,0.62)",
-                      fontSize: "0.82rem",
-                      fontWeight: 300,
-                      lineHeight: 1.7,
-                      marginBottom: "12px",
-                    }}
-                  >
-                    {d.description || <NA text="No description available" />}
-                  </p>
                   <div
                     style={{
                       display: "flex",
@@ -923,10 +910,10 @@ function ItineraryAccordion({
                       gap: "6px",
                     }}
                   >
-                    {d.activities && d.activities.length > 0 ? (
-                      d.activities.map((a) => (
+                    {d.activities ? (
+                      d.activities.split('\n').map((activity, i) => (
                         <div
-                          key={a.title}
+                          key={i}
                           style={{
                             display: "flex",
                             alignItems: "flex-start",
@@ -951,7 +938,7 @@ function ItineraryAccordion({
                               lineHeight: 1.5,
                             }}
                           >
-                            {a.title}
+                            {activity.trim()}
                           </span>
                         </div>
                       ))
@@ -1187,16 +1174,9 @@ export default function TripDetail() {
   ) as { text: string; imageUrl: string }[];
 
   // Flatten itinerary days
-  const itineraryDays = (trip.itineraries || [])
-    .flatMap((it: any) =>
-      (it.days || []).map((d: any) => ({
-        dayNumber: d.dayNumber,
-        title: d.title,
-        description: d.description,
-        activities: (d.activities || []).sort((a: any, b: any) => a.order - b.order),
-      })),
-    )
-    .sort((a: any, b: any) => a.dayNumber - b.dayNumber);
+  const itineraryDays = Array.isArray(trip.itinerary) 
+    ? [...trip.itinerary].sort((a: any, b: any) => a.dayNumber - b.dayNumber)
+    : [];
 
   const waMessage = encodeURIComponent(
     `Hi! I'm interested in the "${trip.title}" trip. Can you share more details?`,

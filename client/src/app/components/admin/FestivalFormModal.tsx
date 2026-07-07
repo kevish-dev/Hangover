@@ -73,27 +73,10 @@ const festivalSchema = z.object({
     .optional(),
   isPublished: z.boolean().default(false),
   isFeatured: z.boolean().default(false),
-  itineraries: z.array(
+  itinerary: z.array(
     z.object({
-      id: z.string().optional(),
-      title: z.string().min(1, "Title is required"),
-      description: z.string().optional(),
-      days: z.array(
-        z.object({
-          id: z.string().optional(),
-          dayNumber: z.coerce.number().min(1),
-          title: z.string().min(1, "Day title is required"),
-          description: z.string().optional(),
-          activities: z.array(
-            z.object({
-              id: z.string().optional(),
-              title: z.string().min(1, "Activity title is required"),
-              description: z.string().optional(),
-              time: z.string().optional(),
-            })
-          ).optional()
-        })
-      ).min(1, "At least one day is required")
+      dayNumber: z.coerce.number().min(1, "Day number is required"),
+      activities: z.string().min(1, "Activities description is required")
     })
   ).optional(),
   }
@@ -224,25 +207,7 @@ export function FestivalFormModal({
                 tokenAmount: p.tokenAmount,
               }))
             : [],
-          itineraries: festival.itineraries?.length
-            ? festival.itineraries.map((it: any) => ({
-                id: it.id,
-                title: it.title,
-                description: it.description || "",
-                days: it.days?.map((d: any) => ({
-                  id: d.id,
-                  dayNumber: d.dayNumber,
-                  title: d.title,
-                  description: d.description || "",
-                  activities: d.activities?.map((a: any) => ({
-                    id: a.id,
-                    title: a.title,
-                    description: a.description || "",
-                    time: a.time || "",
-                  })) || []
-                })) || []
-              }))
-            : [],
+          itinerary: Array.isArray(festival.itinerary) ? festival.itinerary : [],
           faqs: festival.faqs?.length
             ? festival.faqs.map((f: any) => ({
                 question: f.question,
@@ -297,7 +262,7 @@ export function FestivalFormModal({
           packages: [],
           tags: [],
           faqs: [],
-          itineraries: [],
+          itinerary: [],
           isPublished: false,
           isFeatured: false,
         });
@@ -535,7 +500,7 @@ export function FestivalFormModal({
       fieldsToValidate = ["overview", "inclusions", "exclusions"];
     }
     if (step === 3) fieldsToValidate = ["faqs", "tags"];
-    if (step === 4) fieldsToValidate = ["itineraries"];
+    if (step === 4) fieldsToValidate = ["itinerary"];
     if (step === 5) return true; // Stay & Transport has local state, basic validation can be skipped or added if needed
 
     const isValid = await form.trigger(fieldsToValidate);
@@ -607,7 +572,7 @@ export function FestivalFormModal({
           ?.map((t) => t.value)
           .filter((t) => t.trim() !== ""),
         packages: data.packages,
-        itineraries: data.itineraries,
+        itinerary: data.itinerary,
         faqs: data.faqs?.filter(
           (f) => f.question.trim() !== "" && f.answer.trim() !== "",
         ),

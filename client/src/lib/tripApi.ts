@@ -78,7 +78,7 @@ export interface ApiTrip {
   destination: ApiDestination | null;
   tripTags: ApiTripTag[];
   faqs: ApiFaq[];
-  itineraries?: ApiItinerary[];
+  itinerary?: any;
   createdAt: string;
   updatedAt: string;
   slots?: any[];
