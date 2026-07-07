@@ -32,17 +32,31 @@ export default function AdminInquiriesPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this inquiry?")) {
-      try {
-        await apiClient.delete(`/inquiries/${id}`);
-        toast.success("Inquiry deleted");
-        setSelectedInquiry(null);
-        queryClient.invalidateQueries({ queryKey: ["admin", "inquiries"] });
-      } catch (error) {
-        toast.error("Failed to delete inquiry");
+  const confirmAction = (title: string, description: string, actionLabel: string, actionFn: () => Promise<void>) => {
+    toast(title, {
+      description,
+      position: "bottom-right",
+      action: { label: actionLabel, onClick: actionFn },
+      cancel: { label: "Cancel", onClick: () => {} },
+    });
+  };
+
+  const handleDelete = (id: string) => {
+    confirmAction(
+      "Delete Inquiry?",
+      "Are you sure you want to delete this inquiry?",
+      "Delete",
+      async () => {
+        try {
+          await apiClient.delete(`/inquiries/${id}`);
+          toast.success("Inquiry deleted");
+          setSelectedInquiry(null);
+          queryClient.invalidateQueries({ queryKey: ["admin", "inquiries"] });
+        } catch (error) {
+          toast.error("Failed to delete inquiry");
+        }
       }
-    }
+    );
   };
 
   if (isLoading) {
