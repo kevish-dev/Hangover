@@ -232,6 +232,10 @@ export const getBookingsByTripId = async (tripId) => {
   return repo.getBookingsByTripId(tripId);
 };
 
+export const getBookingsByFestivalId = async (festivalId) => {
+  return repo.getBookingsByFestivalId(festivalId);
+};
+
 export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundAmount) => {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },

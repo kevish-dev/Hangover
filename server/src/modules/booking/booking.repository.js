@@ -37,7 +37,7 @@ export const getUserBookings = async (userId, skip, take) => {
   const [bookings, total] = await Promise.all([
     prisma.booking.findMany({
       where: { userId },
-      include: { trip: true, festival: true, slot: true, travelers: true, payments: { include: { refunds: true } } },
+      include: { trip: true, festival: true, slot: true, package: true, travelers: true, payments: { include: { refunds: true } } },
       orderBy: { createdAt: "desc" },
       skip,
       take,
@@ -50,7 +50,7 @@ export const getUserBookings = async (userId, skip, take) => {
 export const getAllBookings = async (skip, take) => {
   const [bookings, total] = await Promise.all([
     prisma.booking.findMany({
-      include: { trip: true, festival: true, slot: true, travelers: true, user: { include: { profile: true } }, payments: { include: { refunds: true } } },
+      include: { trip: true, festival: true, slot: true, package: true, travelers: true, user: { include: { profile: true } }, payments: { include: { refunds: true } } },
       orderBy: { createdAt: "desc" },
       skip,
       take,
@@ -67,6 +67,7 @@ export const getBookingsByTripId = async (tripId) => {
       user: { include: { profile: true } },
       travelers: true,
       slot: true,
+      package: true,
       payments: { include: { refunds: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -80,6 +81,7 @@ export const getBookingsByFestivalId = async (festivalId) => {
       user: { include: { profile: true } },
       travelers: true,
       slot: true,
+      package: true,
       payments: { include: { refunds: true } },
     },
     orderBy: { createdAt: "desc" },

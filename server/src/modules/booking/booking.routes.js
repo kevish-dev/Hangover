@@ -1,6 +1,7 @@
 import { Router } from "express";
 import * as bookingController from "./booking.controller.js";
 import { requireAuth, requireAdmin } from "../../core/middlewares/auth.middleware.js";
+import { uploadMiddleware } from "../../core/services/upload.service.js";
 import "./booking.docs.js";
 
 const router = Router();
@@ -14,6 +15,7 @@ router.get("/festival/:festivalId", requireAdmin, bookingController.getBookingsB
 router.post("/:id/cancel-and-refund", requireAdmin, bookingController.cancelAndRefundBooking);
 
 // User routes
+router.post("/traveler/govt-id", uploadMiddleware.single("image"), bookingController.uploadTravelerGovtId);
 router.post("/", bookingController.createBooking);
 router.get("/me", bookingController.getMyBookings);
 router.get("/:id", bookingController.getBookingById);

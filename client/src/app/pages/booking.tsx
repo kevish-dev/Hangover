@@ -497,11 +497,12 @@ export default function BookingPage() {
   const navigate = useNavigate();
   const resumeBookingId = searchParams.get("resume"); // set when coming from "Complete Payment" CTA
   const isFestival = searchParams.get("type") === "festival";
-  const slotId = searchParams.get("slotId");
+  const urlSlotId = searchParams.get("slotId");
   const { user, isLoading: authLoading } = useAuth();
 
   const [trip, setTrip] = useState<any>(null); // polymorphic
   const [loading, setLoading] = useState(true);
+  const [selectedSlotId, setSelectedSlotId] = useState<string>(urlSlotId || "");
 
   // Form state
   const [solo, setSolo] = useState<"yes" | "no" | null>("yes");
@@ -612,6 +613,12 @@ export default function BookingPage() {
     }
   }, [trip, selectedPackageId]);
 
+  useEffect(() => {
+    if (trip?.slots?.length > 0 && !selectedSlotId) {
+      setSelectedSlotId(trip.slots[0].id);
+    }
+  }, [trip, selectedSlotId]);
+
   // Prevent scrolling when forced login is active
   useEffect(() => {
     if (!authLoading && !user) {
@@ -624,7 +631,7 @@ export default function BookingPage() {
     };
   }, [user, authLoading]);
 
-  const selectedSlot = trip?.slots?.find((s: any) => s.id === slotId);
+  const selectedSlot = trip?.slots?.find((s: any) => s.id === selectedSlotId);
   const spotsLeft = selectedSlot ? selectedSlot.capacity - (selectedSlot.filledSpots || 0) : 0;
   const canAddMoreTravelers = 1 + travelers.length < spotsLeft;
 
@@ -643,19 +650,29 @@ export default function BookingPage() {
     // Extract additional traveler data synchronously before any await
     const form = e.currentTarget as HTMLFormElement;
     const formData = new FormData(form);
-    const additionalTravelers = travelers.map((_, index) => {
+    const extractedTravelers = travelers.map((_, index) => {
       const tFirstName = formData.get(`traveler-${index}-firstName`) as string;
       const tLastName = formData.get(`traveler-${index}-lastName`) as string;
       return {
-        fullName: `${tFirstName || ""} ${tLastName || ""}`.trim(),
+        firstName: tFirstName,
+        lastName: tLastName,
         email: formData.get(`traveler-${index}-email`) as string,
         phone: formData.get(`traveler-${index}-phone`) as string,
-        dateOfBirth: formData.get(`traveler-${index}-dob`) as string,
+        dob: formData.get(`traveler-${index}-dob`) as string,
         gender: formData.get(`traveler-${index}-gender`) as string,
+        aadhaarFile: formData.get(`traveler-${index}-aadhaar`) as File | null,
       };
     });
 
     setBookingError(null);
+
+    if (!selectedSlotId) {
+      const msg = "Please select a slot before proceeding.";
+      setBookingError(msg);
+      toast.error(msg);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
 
     // 1. Auth guard — redirect to Google login if not logged in
     if (!user) {
@@ -702,6 +719,25 @@ export default function BookingPage() {
       };
       await apiClient.put("/users/me/profile", profileData);
 
+      // Upload additional travelers govt IDs
+      const additionalTravelers = await Promise.all(extractedTravelers.map(async (t) => {
+        let aadhaarUrl = null;
+        if (t.aadhaarFile && t.aadhaarFile.size > 0) {
+          const idForm = new FormData();
+          idForm.append("image", t.aadhaarFile);
+          const uploadRes = await apiClient.post("/bookings/traveler/govt-id", idForm);
+          aadhaarUrl = uploadRes.data.url;
+        }
+        return {
+          fullName: `${t.firstName || ""} ${t.lastName || ""}`.trim(),
+          email: t.email,
+          phone: t.phone,
+          dateOfBirth: t.dob,
+          gender: t.gender,
+          aadhaar: aadhaarUrl,
+        };
+      }));
+
       // 3. Create the booking
       const numberOfTravelers = 1 + travelers.length;
       
@@ -720,8 +756,8 @@ export default function BookingPage() {
       } else {
         payload.tripId = trip!.id;
       }
-      if (slotId) {
-        payload.slotId = slotId;
+      if (selectedSlotId) {
+        payload.slotId = selectedSlotId;
       }
       
       const bookingRes = await apiClient.post("/bookings", payload);
@@ -1655,8 +1691,108 @@ export default function BookingPage() {
           }}
           className="grid-cols-1 lg:grid-cols-[1fr_340px]"
         >
-          {/* ══ LEFT: Form ══ */}
-          <form
+          {/* ══ LEFT: Selection & Form ══ */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "2.5rem" }}>
+            {/* ══ Slots & Packages Selection ══ */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: trip?.packages?.length > 0 ? "1fr 1fr" : "1fr",
+              gap: "24px"
+            }}>
+              {/* Slots Column */}
+              <div>
+                <h3 style={{
+                  color: "#1e1a14",
+                  fontSize: "1.2rem",
+                  fontWeight: 400,
+                  marginBottom: "16px",
+                  fontFamily: "'Playfair Display', serif"
+                }}>
+                  Select a Slot
+                </h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {trip?.slots?.map((slot: any) => {
+                    const available = slot.capacity - (slot.filledSpots || 0);
+                    const isSoldOut = available <= 0;
+                    const isSelected = selectedSlotId === slot.id;
+                    return (
+                      <div
+                        key={slot.id}
+                        onClick={() => !isSoldOut && setSelectedSlotId(slot.id)}
+                        style={{
+                          padding: "16px",
+                          borderRadius: "8px",
+                          border: isSelected ? "1.5px solid #c8a96e" : "1px solid rgba(30,26,20,0.1)",
+                          background: isSelected ? "rgba(200,169,110,0.05)" : "#fff",
+                          cursor: isSoldOut ? "not-allowed" : "pointer",
+                          opacity: isSoldOut ? 0.6 : 1,
+                          transition: "all 0.2s ease",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center"
+                        }}
+                      >
+                        <div style={{ color: "#1e1a14", fontSize: "0.95rem", fontWeight: 500, fontFamily: "'Poppins', sans-serif" }}>
+                          {new Date(slot.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - {new Date(slot.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </div>
+                        <div style={{ fontSize: "0.75rem", color: isSoldOut ? "#ef4444" : "rgba(30,26,20,0.5)", fontFamily: "'Poppins', sans-serif" }}>
+                          {isSoldOut ? "Sold Out" : `${available} spots left`}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Packages Column */}
+              {trip?.packages?.length > 0 && (
+                <div>
+                  <h3 style={{
+                    color: "#1e1a14",
+                    fontSize: "1.2rem",
+                    fontWeight: 400,
+                    marginBottom: "16px",
+                    fontFamily: "'Playfair Display', serif"
+                  }}>
+                    Select a Package
+                  </h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {trip.packages.map((pkg: any) => {
+                      const isSelected = selectedPackageId === pkg.id;
+                      return (
+                        <div
+                          key={pkg.id}
+                          onClick={() => setSelectedPackageId(pkg.id)}
+                          style={{
+                            padding: "16px",
+                            borderRadius: "8px",
+                            border: isSelected ? "1.5px solid #c8a96e" : "1px solid rgba(30,26,20,0.1)",
+                            background: isSelected ? "rgba(200,169,110,0.05)" : "#fff",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center"
+                          }}
+                        >
+                          <div style={{ color: "#1e1a14", fontSize: "0.95rem", fontWeight: 500, fontFamily: "'Poppins', sans-serif" }}>
+                            {pkg.title}
+                          </div>
+                          <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#781216", fontFamily: "'Poppins', sans-serif" }}>
+                            {formatPrice(pkg.price)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <hr style={{ border: "none", borderTop: "1px solid rgba(30,26,20,0.1)", margin: "0" }} />
+
+            {/* ══ Form ══ */}
+            <form
             onSubmit={handleSubmit}
             onInvalid={(e) => {
               e.preventDefault();
@@ -2194,32 +2330,7 @@ export default function BookingPage() {
                 </div>
               </div>
 
-              {trip.packages?.length > 0 && (
-                <div style={{ marginBottom: "20px" }}>
-                  <label
-                    style={{
-                      display: "block",
-                      color: "#1e1a14",
-                      fontSize: "0.8rem",
-                      fontWeight: 500,
-                      marginBottom: "8px",
-                      fontFamily: "'Poppins', sans-serif",
-                    }}
-                  >
-                    Select Package
-                  </label>
-                  <Select
-                    value={selectedPackageId}
-                    onChange={(e) => setSelectedPackageId(e.target.value)}
-                  >
-                    {trip.packages.map((pkg: any) => (
-                      <option key={pkg.id} value={pkg.id}>
-                        {pkg.title} ({formatPrice(pkg.price)})
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              )}
+
 
               {/* Price breakdown */}
               <div
@@ -2522,6 +2633,7 @@ export default function BookingPage() {
               </p>
             </div>
           </form>
+          </div>
 
           {/* ══ RIGHT: Trip summary (sticky) ══ */}
           <div className="hidden lg:block" style={{ alignSelf: "stretch" }}>

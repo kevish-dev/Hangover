@@ -9,7 +9,7 @@ export const createPaymentIntent = async (data) => {
 export const getPaymentIntentByOrderId = async (razorpayOrderId) => {
   return prisma.paymentIntent.findUnique({
     where: { razorpayOrderId },
-    include: { booking: { include: { user: { include: { profile: true } }, trip: true, festival: true, slot: true } } },
+    include: { booking: { include: { user: { include: { profile: true } }, trip: true, festival: true, slot: true, package: true, travelers: true } } },
   });
 };
 

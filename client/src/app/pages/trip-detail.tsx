@@ -2336,36 +2336,7 @@ function TripDetailContent({
                   </p>
                 </div>
 
-                {trip.packages && trip.packages.length > 0 && (
-                  <div
-                    style={{
-                      marginBottom: "24px",
-                      padding: "16px",
-                      background: "rgba(30,26,20,0.02)",
-                      border: "1px solid rgba(30,26,20,0.06)",
-                      borderRadius: "10px",
-                    }}
-                  >
-                    <p
-                      style={{
-                        color: "#1e1a14",
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                        margin: "0 0 12px",
-                      }}
-                    >
-                      Available Packages
-                    </p>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                      {trip.packages.map((pkg: any) => (
-                        <div key={pkg.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <span style={{ fontSize: "0.7rem", color: "rgba(30,26,20,0.6)" }}>{pkg.title}</span>
-                          <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#781216" }}>{formatPrice(pkg.price)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+
 
                 {/* Key info */}
                 <div
@@ -2417,79 +2388,7 @@ function TripDetailContent({
                 </div>
 
                 {/* Slot Selection */}
-                {trip.slots && trip.slots.length > 0 && (
-                  <div style={{ marginBottom: "20px" }}>
-                    <label style={{
-                      display: "block",
-                      fontSize: "0.75rem",
-                      fontWeight: 600,
-                      color: "rgba(30,26,20,0.6)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      marginBottom: "8px"
-                    }}>
-                      Select a Slot
-                    </label>
-                    
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      {trip.slots.map((slot) => {
-                        const available = slot.capacity - (slot.filledSpots || 0);
-                        const isSoldOut = available <= 0;
-                        const isSelected = selectedSlotId === slot.id;
-                        
-                        return (
-                          <div
-                            key={slot.id}
-                            onClick={() => !isSoldOut && setSelectedSlotId(slot.id)}
-                            style={{
-                              padding: "10px 12px",
-                              borderRadius: "8px",
-                              border: isSelected ? "1.5px solid #c8a96e" : "1px solid rgba(30,26,20,0.1)",
-                              background: isSelected ? "rgba(200,169,110,0.05)" : "#fff",
-                              cursor: isSoldOut ? "not-allowed" : "pointer",
-                              opacity: isSoldOut ? 0.6 : 1,
-                              transition: "all 0.2s ease",
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center"
-                            }}
-                          >
-                            <div>
-                              <div style={{ 
-                                fontWeight: 600, 
-                                fontSize: "0.82rem", 
-                                color: "#1e1a14", 
-                                marginBottom: "2px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px"
-                              }}>
-                                <Calendar className="w-3.5 h-3.5 text-[#c8a96e]" />
-                                {new Date(slot.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - {new Date(slot.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                              </div>
-                              <div style={{ 
-                                fontSize: "0.7rem", 
-                                color: isSoldOut ? "#ef4444" : "#c8a96e", 
-                                fontWeight: 500,
-                                marginLeft: "20px"
-                              }}>
-                                {isSoldOut ? "Sold Out" : `${available} spots left`}
-                              </div>
-                            </div>
-                            <div style={{ 
-                              width: "14px", 
-                              height: "14px", 
-                              borderRadius: "50%", 
-                              border: isSelected ? "4px solid #c8a96e" : "1.5px solid rgba(30,26,20,0.2)",
-                              background: "#fff",
-                              flexShrink: 0
-                            }} />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+
 
                 {/* Book button */}
                 {hasBooked ? (
@@ -2541,13 +2440,7 @@ function TripDetailContent({
                   </Link>
                 ) : (
                   <Link
-                    to={selectedSlotId ? `/book/${trip.slug}${isFestival ? '?type=festival&slotId=' : '?slotId='}${selectedSlotId}` : "#"}
-                    onClick={(e) => {
-                      if (!selectedSlotId) {
-                        e.preventDefault();
-                        toast.error("Please select a date first");
-                      }
-                    }}
+                    to={`/book/${trip.slug}${isFestival ? '?type=festival' : ''}`}
                     style={{
                       display: "block",
                       width: "100%",

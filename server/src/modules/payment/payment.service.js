@@ -268,7 +268,19 @@ export const verifyPayment = async (userId, { razorpayOrderId, razorpayPaymentId
     const userEmail = booking.user?.email;
     const userName = booking.user?.profile?.fullName || "Traveler";
     const tripTitle = booking.trip?.title || booking.festival?.title || "your trip";
+    
     if (userEmail) {
+      const travelersDetails = booking.travelers && booking.travelers.length > 0 
+        ? booking.travelers.map(t => t.fullName).join(", ") 
+        : "";
+      const packageName = booking.package?.title || null;
+      let slotName = null;
+      if (booking.slot) {
+        const start = new Date(booking.slot.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+        const end = new Date(booking.slot.endDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+        slotName = `${start} - ${end}`;
+      }
+
       await email.sendBookingConfirmedEmail({
         to: userEmail,
         name: userName,
@@ -283,6 +295,9 @@ export const verifyPayment = async (userId, { razorpayOrderId, razorpayPaymentId
         receiptNumber: payment.receiptNumberInt,
         invoiceDate: payment.paidAt,
         travelersCount: booking.numberOfTravelers,
+        packageName,
+        slotName,
+        travelersDetails,
       });
     }
   } catch (_) {

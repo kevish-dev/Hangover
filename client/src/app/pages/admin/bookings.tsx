@@ -499,7 +499,13 @@ export default function AdminBookingsPage() {
                             <span className="col-span-2 text-gray-900">{traveler.phone || "N/A"}</span>
                             
                             <span className="text-gray-500">Aadhaar:</span>
-                            <span className="col-span-2 text-gray-900">{traveler.aadhaar || "N/A"}</span>
+                            <span className="col-span-2 text-gray-900">
+                              {traveler.aadhaar ? (
+                                <a href={traveler.aadhaar} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                                  View Document
+                                </a>
+                              ) : "N/A"}
+                            </span>
                           </div>
                         </div>
                       ))}
@@ -520,6 +526,16 @@ export default function AdminBookingsPage() {
                       <span className="text-gray-500">Item:</span>
                       <span className="col-span-2 font-medium text-gray-900">{selectedBooking.trip?.title || selectedBooking.festival?.title || "N/A"}</span>
                       
+                      <span className="text-gray-500">Package:</span>
+                      <span className="col-span-2 text-gray-900">{selectedBooking.package?.title || "No Package"}</span>
+                      
+                      <span className="text-gray-500">Slot:</span>
+                      <span className="col-span-2 text-gray-900">
+                        {selectedBooking.slot 
+                          ? `${format(new Date(selectedBooking.slot.startDate), "PP")} - ${format(new Date(selectedBooking.slot.endDate), "PP")}`
+                          : "No Slot Selected"}
+                      </span>
+
                       <span className="text-gray-500">Travelers:</span>
                       <span className="col-span-2 text-gray-900">{selectedBooking.numberOfTravelers} Person(s)</span>
                       
