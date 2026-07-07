@@ -1101,6 +1101,15 @@ export function FestivalFormModal({
                       </Button>
                     </div>
                   ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 w-fit"
+                    onClick={() => addInclusion({ value: "" })}
+                  >
+                    <Plus className="w-4 h-4 mr-1" /> Add
+                  </Button>
                   {form.formState.errors.inclusions && (
                     <p className="text-sm text-red-500">
                       {form.formState.errors.inclusions.root?.message ||
@@ -1133,6 +1142,15 @@ export function FestivalFormModal({
                       </Button>
                     </div>
                   ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 w-fit"
+                    onClick={() => addExclusion({ value: "" })}
+                  >
+                    <Plus className="w-4 h-4 mr-1" /> Add
+                  </Button>
                   {form.formState.errors.exclusions && (
                     <p className="text-sm text-red-500">
                       {form.formState.errors.exclusions.root?.message ||
@@ -1241,6 +1259,13 @@ export function FestivalFormModal({
                       </div>
                     ))
                   )}
+                  <Button
+                    type="button"
+                    onClick={() => addFaq({ question: "", answer: "" })}
+                    className="bg-gray-900 hover:bg-gray-800 text-white flex items-center gap-2 mt-2 w-fit"
+                  >
+                    <Plus className="w-4 h-4" /> Add FAQ
+                  </Button>
                 </div>
 
                 {/* FESTIVAL TAGS */}
@@ -1272,6 +1297,15 @@ export function FestivalFormModal({
                         </Button>
                       </div>
                     ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 w-fit"
+                      onClick={() => addTag({ value: "" })}
+                    >
+                      <Plus className="w-4 h-4 mr-1" /> Add Tag
+                    </Button>
                   </div>
                 </div>
               </div>
