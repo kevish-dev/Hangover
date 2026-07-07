@@ -23,6 +23,7 @@ import {
   ArrowLeft,
   ArrowUp,
   ArrowDown,
+  Trash,
 } from "lucide-react";
 import { apiClient } from "../../../lib/axios";
 import { useQueryClient } from "@tanstack/react-query";
@@ -34,8 +35,6 @@ const festivalSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
   location: z.string().min(2, "Location is required"),
   duration: z.coerce.number().min(1, "Duration must be at least 1 day"),
-  stageDays: z.coerce.number().min(1, "Stage days must be at least 1"),
-  numberOfArtists: z.coerce.number().min(1, "Artists must be at least 1"),
   difficultyLevel: z.string().min(1, "Difficulty is required"),
   bestTimeToVisit: z.string().min(1, "Best time is required"),
   price: z.coerce.number().min(0, "Price must be positive"),
@@ -151,8 +150,6 @@ export function FestivalFormModal({
       title: "",
       location: "",
       duration: 1,
-      stageDays: 1,
-      numberOfArtists: 1,
       difficultyLevel: "Moderate",
       bestTimeToVisit: "",
       price: 0,
@@ -179,8 +176,6 @@ export function FestivalFormModal({
           title: festival.title || "",
           location: festival.location || "",
           duration: festival.duration || 1,
-          stageDays: festival.stageDays || 1,
-          numberOfArtists: festival.numberOfArtists || 1,
           difficultyLevel: festival.difficultyLevel || "",
           bestTimeToVisit: festival.bestTimeToVisit || "",
           price: festival.price || 0,
@@ -253,8 +248,6 @@ export function FestivalFormModal({
           title: "",
           location: "",
           duration: 1,
-          stageDays: 1,
-          numberOfArtists: 1,
           difficultyLevel: "Moderate",
           bestTimeToVisit: "",
           price: 0,
@@ -465,8 +458,6 @@ export function FestivalFormModal({
         "title",
         "location",
         "duration",
-        "stageDays",
-        "numberOfArtists",
         "difficultyLevel",
         "bestTimeToVisit",
         "price",
@@ -758,24 +749,6 @@ export function FestivalFormModal({
                   {form.formState.errors.duration && (
                     <p className="text-sm text-red-500">
                       {form.formState.errors.duration.message}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Stage Days</Label>
-                  <Input type="number" {...form.register("stageDays")} />
-                  {form.formState.errors.stageDays && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.stageDays.message}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Number of Artists</Label>
-                  <Input type="number" {...form.register("numberOfArtists")} />
-                  {form.formState.errors.numberOfArtists && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.numberOfArtists.message}
                     </p>
                   )}
                 </div>
@@ -1429,7 +1402,7 @@ export function FestivalFormModal({
                   </div>
                 )}
                 <div className="p-8 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 flex flex-col items-center justify-center text-center">
-                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 mb-4">
+                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 mb-4">
                     <UploadCloud className="w-8 h-8 text-[#c8a96e]" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-1">

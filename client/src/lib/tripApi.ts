@@ -81,6 +81,8 @@ export interface ApiTrip {
   itineraries?: ApiItinerary[];
   createdAt: string;
   updatedAt: string;
+  slots?: any[];
+  packages?: any[];
 }
 
 export interface ApiTripsResponse {

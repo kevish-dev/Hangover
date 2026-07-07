@@ -49,7 +49,7 @@ function PaymentStatusBadge({ status }: { status: string }) {
   };
   return (
     <span className={`px-2 py-0.5 rounded text-xs font-semibold tracking-wide ${map[status] ?? "bg-gray-100 text-gray-600"}`}>
-      {status.replace("_", " ")}
+      {status?.replace("_", " ") || "UNKNOWN"}
     </span>
   );
 }
@@ -304,7 +304,7 @@ export default function AdminTripsPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-bold text-gray-900 leading-tight truncate">{trip.title}</h3>
                     <span className="px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-600 uppercase tracking-wide shrink-0">
-                      {trip.tripType.replace(/_/g, " ")}
+                      {trip.tripType?.replace(/_/g, " ") || "UNKNOWN"}
                     </span>
                     {!trip.isPublished && (
                       <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-700 uppercase tracking-wide shrink-0">Draft</span>

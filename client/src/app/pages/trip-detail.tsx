@@ -40,6 +40,7 @@ import { fetchFestivalBySlug } from "../../lib/festivalApi";
 import { SiteFooter } from "../components/site-footer";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiClient } from "../../lib/axios";
+import { toast } from "sonner";
 
 // ── "Not Available" inline label ──────────────────────────────────
 function NA({ text = "Not Available" }: { text?: string }) {
@@ -1174,22 +1175,22 @@ export default function TripDetail() {
   const durationStr = formatDuration(trip.duration);
   const altitudeStr = formatAltitude(trip?.maxAltitude || null);
   const spots = spotsLeft(trip.capacity, trip.filledSpots);
-  const tags = trip.tripTags?.map((t) => t.tag) || [];
+  const tags = trip.tripTags?.map((t: any) => t.tag) || [];
   const stayItems = (
     Array.isArray(trip.stayTransportImages) ? trip.stayTransportImages : []
   ) as { text: string; imageUrl: string }[];
 
   // Flatten itinerary days
   const itineraryDays = (trip.itineraries || [])
-    .flatMap((it) =>
-      (it.days || []).map((d) => ({
+    .flatMap((it: any) =>
+      (it.days || []).map((d: any) => ({
         dayNumber: d.dayNumber,
         title: d.title,
         description: d.description,
-        activities: (d.activities || []).sort((a, b) => a.order - b.order),
+        activities: (d.activities || []).sort((a: any, b: any) => a.order - b.order),
       })),
     )
-    .sort((a, b) => a.dayNumber - b.dayNumber);
+    .sort((a: any, b: any) => a.dayNumber - b.dayNumber);
 
   const waMessage = encodeURIComponent(
     `Hi! I'm interested in the "${trip.title}" trip. Can you share more details?`,
@@ -1214,6 +1215,7 @@ export default function TripDetail() {
       reservedBookingId={reservedBookingId}
       selectedSlotId={selectedSlotId}
       setSelectedSlotId={setSelectedSlotId}
+      isFestival={isFestival}
     />
   );
 }
@@ -2414,7 +2416,7 @@ function TripDetailContent({
                       letterSpacing: "0.05em",
                       marginBottom: "8px"
                     }}>
-                      Select a Date
+                      Select a Slot
                     </label>
                     <select
                       value={selectedSlotId || ""}

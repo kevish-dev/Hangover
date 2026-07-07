@@ -171,13 +171,6 @@ export const syncStayTransport = async (festivalId, payloadStr, files) => {
 // ============ V2 apis for User ====================
 
 export const getFeaturedFestivals = async () => {
-  let data = await festivalRepo.getFeaturedFestivals();
-  data = data.map(festival => {
-    return {
-      ...festival,
-      bannerImages: festival.bannerImages[0]
-    }
-  })
-
-  return {data}
+  const data = await festivalRepo.getFeaturedFestivals();
+  return { data };
 }

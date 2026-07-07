@@ -1437,7 +1437,7 @@ export function TripFormModal({
                   </div>
                 )}
                 <div className="p-8 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 flex flex-col items-center justify-center text-center">
-                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 mb-4">
+                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 mb-4">
                     <UploadCloud className="w-8 h-8 text-[#c8a96e]" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-1">

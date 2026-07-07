@@ -49,6 +49,14 @@ export interface ApiStayTransportItem {
   imageUrl: string;
 }
 
+export interface ApiSlot {
+  id: string;
+  startDate: string;
+  endDate: string;
+  capacity: number;
+  filledSpots: number;
+}
+
 export interface ApiFestival {
   id: string;
   title: string;
@@ -66,12 +74,6 @@ export interface ApiFestival {
   stayTransportImages: ApiStayTransportItem[] | null;
   price: string; // Decimal comes as string from Prisma
   tokenAmount: string;
-  capacity: number;
-  filledSpots: number;
-  startDate: string;
-  endDate: string;
-  stageDays: number;
-  numberOfArtists: number;
   isActive: boolean;
   isPublished: boolean;
   isFeatured: boolean;
@@ -79,6 +81,7 @@ export interface ApiFestival {
   destination: ApiDestination | null;
   tags: ApiTag[];
   faqs: ApiFaq[];
+  slots: ApiSlot[];
   itineraries?: ApiItinerary[];
   createdAt: string;
   updatedAt: string;
@@ -91,6 +94,13 @@ export interface ApiFestivalsResponse {
     page: number;
     limit: number;
     totalPages: number;
+  };
+}
+
+export interface ApiFeaturedFestivalsResponse {
+  message: string;
+  result: {
+    data: ApiFestival[];
   };
 }
 
@@ -109,7 +119,10 @@ export async function fetchFestivalBySlug(slug: string): Promise<ApiFestival> {
   return res.data;
 }
 
-
+export async function fetchFeaturedFestivals(): Promise<ApiFestival[]> {
+  const res = await apiClient.get<ApiFeaturedFestivalsResponse>("/festivals/featured");
+  return res.data.result.data;
+}
 
 // ── Formatting helpers ────────────────────────────────────────────
 

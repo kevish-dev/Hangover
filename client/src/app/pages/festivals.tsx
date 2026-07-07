@@ -1,88 +1,13 @@
 // @ts-ignore
 import logoSrc from "../../imports/final-logo_png_transparent.png";
-// @ts-ignore
-import heroVideo from "../../imports/compressed-hero.mp4";
 
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import { fetchAllFestivals, formatPrice, ApiFestival } from "../../lib/festivalApi";
 import { motion } from "motion/react";
-import { MapPin, Calendar, Clock, Users, ArrowRight, ChevronRight } from "lucide-react";
+import { MapPin, ArrowRight, ChevronRight, Calendar } from "lucide-react";
 import { SiteFooter } from "../components/site-footer";
 
-// ── Data ──────────────────────────────────────────────────────────
-
-const FEATURED = {
-  name: "Ziro Music Festival",
-  year: "2025",
-  dates: "25 – 28 Sep 2025",
-  location: "Ziro Valley, Arunachal Pradesh",
-  tagline: "Where indie music meets the mountains, and strangers become a tribe.",
-  description: "Four days in one of India's most beautiful valleys — surrounded by Apatani rice terraces, pine forests, and 40+ artists performing under open skies. Ziro Music Festival isn't just a concert. It's a full-bodied experience of Northeast India at its most alive.",
-  extraText: "Our 6-day curated trip puts you inside the festival — not just as an audience member but as part of the community. You'll stay in the valley, wake up to rice terraces, share meals with Apatani families, and spend three full days watching artists perform in settings no stage designer could improve on.",
-  price: "₹18,500",
-  spotsLeft: 8,
-  duration: "6 Days",
-  image: "https://images.unsplash.com/photo-1756370256926-e48ca54c5efe?w=1920&h=1080&fit=crop&auto=format&q=92",
-  tripSlug: "ziro-valley-music-festival",
-  stats: [
-    { num: "40+", label: "Artists",    detail: "Indie, folk and tribal — curated, never commercial" },
-    { num: "3",   label: "Stage Days", detail: "Full festival passes included in the trip price" },
-    { num: "6",   label: "Day Trip",   detail: "Valley camping, village walk and homestay dinner" },
-    { num: "12",  label: "People Max", detail: "Small group — you'll actually know everyone" },
-  ],
-};
-
-const OTHER_FESTIVALS = [
-  {
-    id: 1,
-    name: "Hornbill Festival",
-    location: "Nagaland",
-    dates: "1 – 10 Dec 2025",
-    price: "₹16,000",
-    status: "Bookings Open",
-    image: "https://images.unsplash.com/photo-1508519829430-40f7d3d161b4?w=900&h=560&fit=crop&auto=format&q=90",
-    slug: "hornbill-festival-experience",
-    tagline: "17 Naga tribes, one valley, the greatest cultural show on earth.",
-    type: "Cultural Festivals",
-  },
-  {
-    id: 2,
-    name: "Rann Utsav",
-    location: "Kutch, Gujarat",
-    dates: "Nov 2025 – Feb 2026",
-    price: "₹11,500",
-    status: "Bookings Open",
-    image: "https://images.unsplash.com/photo-1486314030120-d5ab85fe58cd?w=900&h=560&fit=crop&auto=format&q=90",
-    slug: "rann-of-kutch-desert-odyssey",
-    tagline: "Full moon, white salt desert, and a sky that has no ceiling.",
-    type: "Desert Expeditions",
-  },
-  {
-    id: 3,
-    name: "Hampi Utsav",
-    location: "Karnataka",
-    dates: "3 – 5 Jan 2026",
-    price: "₹8,500",
-    status: "Opening Soon",
-    image: "https://images.unsplash.com/photo-1773680690692-8e94e1794f9f?w=900&h=560&fit=crop&auto=format&q=90",
-    slug: "hampi-heritage-walk",
-    tagline: "Ancient ruins lit by a thousand lamps on the longest night.",
-    type: "Heritage Walks",
-  },
-  {
-    id: 4,
-    name: "Tawang Winter Carnival",
-    location: "Tawang, Arunachal Pradesh",
-    dates: "Jan 2026",
-    price: "₹18,000",
-    status: "Opening Soon",
-    image: "https://images.unsplash.com/photo-1665706896821-319040b81753?w=900&h=560&fit=crop&auto=format&q=90",
-    slug: "tawang-winter-wonderland",
-    tagline: "Monastic ceremonies, snow-capped peaks and a carnival above the clouds.",
-    type: "Mountain Treks",
-  },
-];
 
 // ── Transparent Hangover badge — no bg, no border ─────────────────
 function HangoverBadge({ large = false }: { large?: boolean }) {
@@ -119,25 +44,29 @@ function HangoverBadge({ large = false }: { large?: boolean }) {
 function FestivalCard({ festival, index }: { festival: any; index: number }) {
   const [hovered, setHovered] = useState(false);
   
-  // Determine if it's an ApiFestival or static
-  const isApi = !!festival.slug;
-  const slug = isApi ? festival.slug : festival.slug;
-  const name = isApi ? festival.title : festival.name;
-  const location = isApi ? festival.location : festival.location;
-  const price = isApi ? formatPrice(festival.price) : festival.price;
-  const image = isApi ? (festival.bannerImages?.[0] || OTHER_FESTIVALS[0].image) : festival.image;
-  const tagline = isApi ? (festival.overview?.substring(0, 60) + "...") : festival.tagline;
-  const type = isApi ? (festival.tags?.[0]?.tag || "Festival") : festival.type;
-  
+  const slug = festival.slug;
+  const name = festival.title ?? festival.name;
+  const location = festival.location;
+  const price = festival.price ? formatPrice(festival.price) : (festival.price ?? "TBA");
+  const image = festival.bannerImages?.[0] || festival.image || "";
+  const tagline = festival.overview ? festival.overview.substring(0, 60) + "..." : (festival.tagline ?? "");
+  const type = festival.tags?.[0]?.tag || festival.type || "Festival";
+
+  // Slot-based date and status
+  const firstSlot = festival.slots?.[0];
   let status = festival.status;
-  if (isApi) {
-    if (festival.filledSpots >= festival.capacity) status = "Sold Out";
-    else if (new Date(festival.startDate) < new Date()) status = "Closed";
+  if (firstSlot) {
+    const filled = firstSlot.filledSpots ?? 0;
+    const cap = firstSlot.capacity ?? 0;
+    if (filled >= cap) status = "Sold Out";
+    else if (new Date(firstSlot.startDate) < new Date()) status = "Closed";
     else status = "Bookings Open";
   }
   const isOpen = status === "Bookings Open";
 
-  const dates = isApi ? `${new Date(festival.startDate).getDate()} ${new Date(festival.startDate).toLocaleString('default', { month: 'short' })} - ${new Date(festival.endDate).getDate()} ${new Date(festival.endDate).toLocaleString('default', { month: 'short' })} ${new Date(festival.startDate).getFullYear()}` : festival.dates;
+  const dates = firstSlot
+    ? `${new Date(firstSlot.startDate).getDate()} ${new Date(firstSlot.startDate).toLocaleString('default', { month: 'short' })} - ${new Date(firstSlot.endDate).getDate()} ${new Date(firstSlot.endDate).toLocaleString('default', { month: 'short' })} ${new Date(firstSlot.startDate).getFullYear()}`
+    : (festival.dates ?? "Dates TBA");
 
   return (
     <motion.div
@@ -244,39 +173,48 @@ function FestivalCard({ festival, index }: { festival: any; index: number }) {
 
 // ── Page ──────────────────────────────────────────────────────────
 export default function FestivalsPage() {
-  const [festivals, setFestivals] = useState<ApiFestival[]>([]);
+  const [featuredFestival, setFeaturedFestival] = useState<ApiFestival | null>(null);
+  const [otherFestivals, setOtherFestivals] = useState<ApiFestival[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchAllFestivals()
-      .then(data => setFestivals(data.filter(f => f.isActive && f.isPublished)))
-      .catch(console.error);
+      .then((all) => {
+        const active = all.filter(f => f.isActive && f.isPublished);
+        const hero = active.find(f => f.isFeatured) ?? null;
+        setFeaturedFestival(hero);
+        setOtherFestivals(active.filter(f => f.id !== hero?.id));
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, []);
 
-  const dbFeatured = festivals.find(f => f.isFeatured);
-  const others = dbFeatured ? festivals.filter(f => f.id !== dbFeatured.id) : festivals;
+  // Derive hero display values from the featured festival
+  const dbFeatured = featuredFestival;
+  const firstSlot = dbFeatured?.slots?.[0];
+  const spotsLeft = firstSlot ? Math.max(0, firstSlot.capacity - firstSlot.filledSpots) : 0;
 
   const featured = dbFeatured ? {
     name: dbFeatured.title,
-    year: new Date(dbFeatured.startDate).getFullYear().toString(),
-    dates: `${new Date(dbFeatured.startDate).getDate()} ${new Date(dbFeatured.startDate).toLocaleString('default', { month: 'short' })} - ${new Date(dbFeatured.endDate).getDate()} ${new Date(dbFeatured.endDate).toLocaleString('default', { month: 'short' })} ${new Date(dbFeatured.startDate).getFullYear()}`,
+    year: firstSlot ? new Date(firstSlot.startDate).getFullYear().toString() : new Date().getFullYear().toString(),
+    dates: firstSlot
+      ? `${new Date(firstSlot.startDate).getDate()} ${new Date(firstSlot.startDate).toLocaleString('default', { month: 'short' })} – ${new Date(firstSlot.endDate).getDate()} ${new Date(firstSlot.endDate).toLocaleString('default', { month: 'short' })} ${new Date(firstSlot.startDate).getFullYear()}`
+      : "Dates TBA",
     location: dbFeatured.location,
     tagline: dbFeatured.overview?.substring(0, 100) + "...",
-    description: dbFeatured.overview || FEATURED.description,
-    extraText: FEATURED.extraText, // Fallback for extra text
+    description: dbFeatured.overview || "",
     price: formatPrice(dbFeatured.price),
-    spotsLeft: Math.max(0, dbFeatured.capacity - dbFeatured.filledSpots),
+    spotsLeft,
     duration: `${dbFeatured.duration} Days`,
-    image: dbFeatured.bannerImages?.[0] || FEATURED.image,
+    image: dbFeatured.bannerImages?.[0] || "",
     tripSlug: dbFeatured.slug,
     stats: [
-      { num: `${dbFeatured.numberOfArtists || "10+"}`, label: "Artists", detail: "Curated lineup" },
-      { num: `${dbFeatured.stageDays || "3"}`, label: "Stage Days", detail: "Full festival passes included" },
-      { num: `${dbFeatured.duration || "6"}`, label: "Day Trip", detail: "Camping and homestay" },
-      { num: `${dbFeatured.capacity || "12"}`, label: "People Max", detail: "Small group experience" },
+      { num: `${dbFeatured.duration || "?"}`, label: "Day Trip", detail: "Camping and homestay included" },
+      { num: `${firstSlot?.capacity || "?"}`, label: "People Max", detail: "Small group, personal experience" },
     ]
-  } : FEATURED;
+  } : null;
 
-  const displayOthers = others.length > 0 ? others : OTHER_FESTIVALS;
+  const displayOthers = otherFestivals;
 
   return (
     <div style={{ background: "#f5f0e6", minHeight: "100vh", fontFamily: "'Poppins', sans-serif" }}>
@@ -284,97 +222,153 @@ export default function FestivalsPage() {
       {/* ════════════════════
           FEATURED HERO
       ════════════════════ */}
-      <section style={{ position: "relative", height: "100vh", minHeight: "640px", overflow: "hidden" }}>
-        {dbFeatured?.bannerImages?.[0] ? (
-          <img 
-            src={dbFeatured.bannerImages[0]} 
+      <section className="relative w-full h-screen overflow-hidden bg-[#0b0b0b]">
+        {/* Background */}
+        {featured?.image ? (
+          <motion.img
+            key={featured.image}
+            src={featured.image}
             alt={featured.name}
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+            initial={{ opacity: 0, scale: 1.04 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1.1, ease: [0.25, 0.1, 0.25, 1] }}
+            className="absolute inset-0 w-full h-full object-cover"
           />
         ) : (
-          <video
-            autoPlay
-            muted
-            loop
-            playsInline
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-          >
-            <source src={heroVideo as string} type="video/mp4" />
-          </video>
+          <motion.div
+            className="absolute inset-0"
+            style={{ background: "linear-gradient(135deg, #0b0b0b 0%, #1a1510 30%, #201a12 50%, #1a1510 70%, #0b0b0b 100%)" }}
+            animate={{ opacity: loading ? [0.6, 1, 0.6] : 1 }}
+            transition={{ duration: 2.2, repeat: loading ? Infinity : 0, ease: "easeInOut" }}
+          />
         )}
 
-        {/* Rich crimson-to-dark diagonal — ties into brand color */}
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(125deg, rgba(55,7,9,0.96) 0%, rgba(44,5,8,0.84) 32%, rgba(20,14,10,0.52) 62%, rgba(11,11,11,0.06) 100%)" }} />
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(11,11,11,0.62) 0%, transparent 42%)", pointerEvents: "none" }} />
+        <style>{`@keyframes skPulse { 0%,100% { opacity:0.3; } 50% { opacity:0.6; } }`}</style>
 
-        {/* Content */}
-        <div style={{ position: "absolute", inset: 0, maxWidth: "1280px", margin: "0 auto", padding: "0 clamp(1.5rem,5vw,6rem)", display: "flex", alignItems: "center" }}>
-          <motion.div initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.85, ease: [0.25, 0.46, 0.45, 0.94] }}
-            style={{ maxWidth: "640px", paddingTop: "72px" }}>
+        {/* Overlay — dark left fading right, same as home hero */}
+        <div
+          className="absolute inset-0 z-10"
+          style={{
+            background:
+              "linear-gradient(to right, rgba(11,11,11,0.92) 0%, rgba(11,11,11,0.60) 50%, rgba(11,11,11,0.20) 100%), linear-gradient(to top, rgba(11,11,11,0.70) 0%, transparent 45%)",
+          }}
+        />
 
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
-              <div style={{ width: "24px", height: "1.5px", background: "#C8A96E" }} />
-              <span style={{ color: "#C8A96E", fontSize: "0.65rem", fontWeight: 500, letterSpacing: "0.3em", textTransform: "uppercase" }}>
-                Featured Festival {featured.year}
-              </span>
-            </div>
-
-            <h1 style={{ color: "#f9f4ec", fontSize: "clamp(2.6rem,7vw,5.5rem)", fontWeight: 300, letterSpacing: "-0.03em", lineHeight: 1.06, margin: "0 0 14px" }}>
-              {featured.name}
-            </h1>
-
-            <p style={{ color: "rgba(242,237,228,0.65)", fontSize: "clamp(0.88rem,1.5vw,1.05rem)", fontWeight: 300, fontStyle: "italic", lineHeight: 1.75, margin: "0 0 28px", maxWidth: "500px" }}>
-              "{featured.tagline}"
-            </p>
-
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "18px", marginBottom: "30px" }}>
-              {[
-                { icon: Calendar, text: featured.dates },
-                { icon: MapPin,   text: featured.location },
-                { icon: Clock,    text: featured.duration },
-                { icon: Users,    text: `${featured.spotsLeft} spots left` },
-              ].map(({ icon: Icon, text }) => (
-                <div key={text} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <Icon size={12} color="rgba(200,169,110,0.8)" strokeWidth={1.5} />
-                  <span style={{ color: "rgba(242,237,228,0.65)", fontSize: "0.76rem", fontWeight: 300 }}>{text}</span>
+        {/* Content — same padding as home hero */}
+        <div className="absolute inset-0 z-30 flex items-center">
+          <div className="px-6 md:px-10 lg:px-12 max-w-2xl w-full">
+            {loading ? (
+              <>
+                <motion.div className="h-3 w-24 rounded-full mb-6" style={{ background: "rgba(200,169,110,0.15)" }} animate={{ opacity: [0.3, 0.7, 0.3] }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }} />
+                <motion.div className="rounded mb-4" style={{ background: "rgba(242,237,228,0.08)", height: "clamp(3.5rem,8vw,7rem)", width: "80%" }} animate={{ opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut", delay: 0.15 }} />
+                <div className="w-12 h-px mb-6" style={{ background: "rgba(200,169,110,0.2)" }} />
+                <div className="space-y-2 mb-8">
+                  {[0.9, 0.75, 0.6].map((w, i) => (
+                    <motion.div key={i} className="h-3 rounded-full" style={{ background: "rgba(242,237,228,0.06)", width: `${w * 100}%` }} animate={{ opacity: [0.2, 0.5, 0.2] }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut", delay: 0.1 * i }} />
+                  ))}
                 </div>
-              ))}
-            </div>
+                <div className="flex items-center gap-8 mb-8">
+                  <motion.div className="h-10 w-20 rounded" style={{ background: "rgba(242,237,228,0.06)" }} animate={{ opacity: [0.2, 0.5, 0.2] }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut", delay: 0.3 }} />
+                  <div className="w-px h-8" style={{ background: "rgba(242,237,228,0.1)" }} />
+                  <motion.div className="h-10 w-24 rounded" style={{ background: "rgba(242,237,228,0.06)" }} animate={{ opacity: [0.2, 0.5, 0.2] }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut", delay: 0.4 }} />
+                </div>
+                <div className="flex gap-3">
+                  <motion.div className="h-11 w-36 rounded" style={{ background: "rgba(200,169,110,0.12)" }} animate={{ opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut", delay: 0.5 }} />
+                  <motion.div className="h-11 w-32 rounded" style={{ background: "rgba(242,237,228,0.06)" }} animate={{ opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut", delay: 0.6 }} />
+                </div>
+              </>
+            ) : featured ? (
+              <motion.div initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.75, ease: [0.25, 0.1, 0.25, 1] }}>
+                {/* Location chip */}
+                <div className="flex items-center gap-2 mb-6" style={{ fontFamily: "'Poppins', sans-serif" }}>
+                  <MapPin size={12} color="#c8a96e" />
+                  <span style={{ color: "#c8a96e", fontSize: "0.72rem", fontWeight: 400, letterSpacing: "0.2em", textTransform: "uppercase" }}>
+                    {featured.location}
+                  </span>
+                </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
-              <div>
-                <p style={{ color: "rgba(242,237,228,0.32)", fontSize: "0.57rem", letterSpacing: "0.16em", textTransform: "uppercase", margin: "0 0 3px" }}>Starting from</p>
-                <p style={{ color: "#f9f4ec", fontSize: "clamp(1.4rem,3vw,2rem)", fontWeight: 600, letterSpacing: "-0.04em", margin: 0, lineHeight: 1 }}>{featured.price}</p>
-              </div>
-              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                <Link to={`/book/${featured.tripSlug}?type=festival`} style={{ background: "#C8A96E", color: "#1a1612", padding: "12px 26px", fontFamily: "'Poppins', sans-serif", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "7px", transition: "background 0.25s ease" }}
-                  onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.background = "#dfc080")}
-                  onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.background = "#C8A96E")}>
-                  Book Your Spot <ArrowRight size={13} />
-                </Link>
-                <Link to={`/festivals/${featured.tripSlug}`} style={{ background: "rgba(242,237,228,0.07)", color: "rgba(242,237,228,0.75)", border: "1px solid rgba(242,237,228,0.16)", padding: "12px 22px", fontFamily: "'Poppins', sans-serif", fontSize: "0.76rem", fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none", display: "inline-flex", alignItems: "center", backdropFilter: "blur(6px)", transition: "border-color 0.2s, color 0.2s" }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(200,169,110,0.4)"; (e.currentTarget as HTMLAnchorElement).style.color = "#C8A96E"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(242,237,228,0.16)"; (e.currentTarget as HTMLAnchorElement).style.color = "rgba(242,237,228,0.75)"; }}>
-                  Explore the Trip
-                </Link>
-              </div>
-            </div>
-          </motion.div>
+                {/* Festival name */}
+                <h1 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 300, fontSize: "clamp(3.5rem,8vw,7rem)", letterSpacing: "-0.02em", lineHeight: 1.05, color: "#f2ede4", margin: "0 0 16px" }}>
+                  {featured.name}
+                </h1>
+
+                {/* Gold separator */}
+                <div style={{ width: "48px", height: "1px", background: "#c8a96e", marginBottom: "24px" }} />
+
+                {/* Tagline */}
+                <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 300, fontSize: "0.88rem", lineHeight: 1.75, color: "rgba(242,237,228,0.80)", maxWidth: "440px", margin: "0 0 32px" }}>
+                  {featured.tagline}
+                </p>
+
+                {/* Meta row */}
+                <div className="flex items-center gap-8 mb-8">
+                  <div>
+                    <div style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 400, fontSize: "0.65rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(242,237,228,0.65)", marginBottom: "4px" }}>Dates</div>
+                    <div style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: "0.88rem", color: "#f2ede4" }}>{featured.dates}</div>
+                  </div>
+                  <div style={{ width: "1px", height: "32px", background: "rgba(242,237,228,0.3)" }} />
+                  <div>
+                    <div style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 400, fontSize: "0.65rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(242,237,228,0.65)", marginBottom: "4px" }}>Starting</div>
+                    <div style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: "0.88rem", color: "#c8a96e" }}>{featured.price}</div>
+                  </div>
+                  <div style={{ width: "1px", height: "32px", background: "rgba(242,237,228,0.3)" }} />
+                  <div>
+                    <div style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 400, fontSize: "0.65rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(242,237,228,0.65)", marginBottom: "4px" }}>Spots Left</div>
+                    <div style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: "0.88rem", color: "#f2ede4" }}>{featured.spotsLeft}</div>
+                  </div>
+                </div>
+
+                {/* CTAs */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Link
+                    to={`/book/${featured.tripSlug}?type=festival`}
+                    style={{ background: "#C8A96E", color: "#0b0b0b", padding: "12px 28px", fontFamily: "'Poppins', sans-serif", fontSize: "0.78rem", fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "8px", transition: "background 0.25s ease" }}
+                    onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.background = "#dfc08a")}
+                    onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.background = "#C8A96E")}
+                  >
+                    Book Your Spot <ArrowRight size={14} />
+                  </Link>
+                  <Link
+                    to={`/festivals/${featured.tripSlug}`}
+                    style={{ background: "rgba(242,237,228,0.07)", color: "rgba(242,237,228,0.75)", border: "1px solid rgba(242,237,228,0.16)", padding: "12px 22px", fontFamily: "'Poppins', sans-serif", fontSize: "0.78rem", fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none", display: "inline-flex", alignItems: "center", backdropFilter: "blur(6px)", transition: "border-color 0.2s, color 0.2s" }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(200,169,110,0.4)"; (e.currentTarget as HTMLAnchorElement).style.color = "#C8A96E"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(242,237,228,0.16)"; (e.currentTarget as HTMLAnchorElement).style.color = "rgba(242,237,228,0.75)"; }}
+                  >
+                    Explore the Trip
+                  </Link>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }}>
+                <p style={{ color: "rgba(242,237,228,0.45)", fontSize: "1rem", fontWeight: 300, fontStyle: "italic", fontFamily: "'Poppins', sans-serif" }}>
+                  No featured festival at this time. Check back soon.
+                </p>
+              </motion.div>
+            )}
+          </div>
         </div>
 
-        {/* Hangover badge — bottom-right of hero, large */}
-        <div style={{ position: "absolute", bottom: "clamp(24px,4vh,40px)", right: "clamp(1.5rem,5vw,6rem)", zIndex: 10 }}>
-          <HangoverBadge large />
+        {/* Scroll hint — same as home hero */}
+        <div className="absolute bottom-10 right-10 z-30 flex flex-col items-center gap-2">
+          <div className="w-px h-10 relative overflow-hidden" style={{ background: "rgba(242,237,228,0.15)" }}>
+            <motion.div
+              className="absolute top-0 left-0 w-full bg-[#c8a96e]"
+              animate={{ height: ["0%", "100%"], top: ["0%", "100%"] }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: "linear" }}
+              style={{ height: "30%" }}
+            />
+          </div>
+          <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 400, fontSize: "0.58rem", color: "rgba(242,237,228,0.65)", textTransform: "uppercase", letterSpacing: "0.15em", writingMode: "vertical-rl" }}>
+            Scroll
+          </span>
         </div>
-
-        {/* Scroll pulse */}
-        <motion.div animate={{ y: [0, 7, 0] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          style={{ position: "absolute", bottom: "30px", left: "50%", transform: "translateX(-50%)", width: "1px", height: "44px", background: "linear-gradient(to bottom, rgba(200,169,110,0.65), transparent)" }} />
       </section>
+
 
       {/* ════════════════════
           MORE ABOUT
       ════════════════════ */}
+      {featured && (
       <section id="more-about" style={{ background: "#f5f0e6", borderTop: "1px solid rgba(0,0,0,0.06)", padding: "clamp(4rem,8vw,7rem) clamp(1.5rem,5vw,6rem)" }}>
         <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
 
@@ -398,9 +392,6 @@ export default function FestivalsPage() {
               <p style={{ color: "rgba(30,26,20,0.68)", fontSize: "clamp(0.88rem,1.3vw,0.98rem)", fontWeight: 300, lineHeight: 1.9, marginBottom: "22px" }}>
                 {featured.description}
               </p>
-              <p style={{ color: "rgba(30,26,20,0.68)", fontSize: "clamp(0.88rem,1.3vw,0.98rem)", fontWeight: 300, lineHeight: 1.9, marginBottom: "28px" }}>
-                {featured.extraText}
-              </p>
 
               {/* Pull quote */}
               <div style={{ borderLeft: "2px solid #C8A96E", paddingLeft: "20px", marginBottom: "28px" }}>
@@ -419,7 +410,7 @@ export default function FestivalsPage() {
               </Link>
             </motion.div>
 
-            {/* Right: stat cards + valley photo */}
+            {/* Right: stat cards + banner image */}
             <motion.div initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.55, delay: 0.16 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
                 {featured.stats.map((s, i) => (
@@ -433,14 +424,17 @@ export default function FestivalsPage() {
                   </motion.div>
                 ))}
               </div>
-              <div style={{ borderRadius: "10px", overflow: "hidden", aspectRatio: "16/9" }}>
-                <img src="https://images.unsplash.com/photo-1568644577260-0568ed0217e0?w=900&h=520&fit=crop&auto=format&q=90"
-                  alt="Ziro Valley" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-              </div>
+              {dbFeatured?.bannerImages?.[1] && (
+                <div style={{ borderRadius: "10px", overflow: "hidden", aspectRatio: "16/9" }}>
+                  <img src={dbFeatured.bannerImages[1]}
+                    alt={featured.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                </div>
+              )}
             </motion.div>
           </div>
         </div>
       </section>
+      )}
 
       {/* ════════════════════
           OTHER FESTIVALS

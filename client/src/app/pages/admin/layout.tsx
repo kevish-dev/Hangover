@@ -47,7 +47,7 @@ export default function AdminLayout() {
   return (
     <SidebarProvider>
       <Sidebar variant="inset" collapsible="icon" className="border-r border-gray-200">
-        <SidebarHeader className="border-b border-gray-200 py-4 px-4 flex flex-row items-center justify-between">
+        <SidebarHeader className="border-b border-gray-200 flex flex-row items-center justify-between">
           <div className="flex items-center gap-2 overflow-hidden">
              <div className="size-8 rounded-md bg-[#781216] flex items-center justify-center shrink-0">
                <span className="text-white font-bold text-lg leading-none">H</span>
