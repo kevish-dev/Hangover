@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link, useSearchParams } from "react-router";
+import { useParams, Link, useSearchParams, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowLeft,
@@ -211,6 +211,7 @@ function FilePickerField({
         <input
           type="file"
           accept="image/*,.pdf"
+          required={required && !existingUrl && !file}
           style={{ display: "none" }}
           onChange={(e) => onChange(e.target.files?.[0] ?? null)}
         />
@@ -265,6 +266,7 @@ function UncontrolledFilePicker({
           type="file"
           name={name}
           accept="image/*,.pdf"
+          required={required && !file}
           style={{ display: "none" }}
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
         />
@@ -480,6 +482,7 @@ function TravelerForm({
             label="Upload Aadhaar Card"
             name={`traveler-${index}-aadhaar`}
             hint="Clear photo or scan — max 5 MB"
+            required={true}
           />
         </div>
       </div>
@@ -491,6 +494,7 @@ function TravelerForm({
 export default function BookingPage() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const resumeBookingId = searchParams.get("resume"); // set when coming from "Complete Payment" CTA
   const isFestival = searchParams.get("type") === "festival";
   const slotId = searchParams.get("slotId");
@@ -620,7 +624,8 @@ export default function BookingPage() {
     };
   }, [user, authLoading]);
 
-  const spotsLeft = trip ? trip.capacity - trip.filledSpots : 0;
+  const selectedSlot = trip?.slots?.find((s: any) => s.id === slotId);
+  const spotsLeft = selectedSlot ? selectedSlot.capacity - (selectedSlot.filledSpots || 0) : 0;
   const canAddMoreTravelers = 1 + travelers.length < spotsLeft;
 
   const addTraveler = () => {
@@ -724,8 +729,6 @@ export default function BookingPage() {
         id: bookingId,
         bookingReference,
         initialPaymentType,
-        tokenAmount,
-        totalAmount,
       } = bookingRes.data;
 
       // 4. Initiate Razorpay payment — TOKEN or FULL based on backend decision
@@ -977,16 +980,21 @@ export default function BookingPage() {
           >
             Trip not found.
           </p>
-          <Link
-            to="/trips"
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
             style={{
               color: "#781216",
               textDecoration: "none",
               fontSize: "0.82rem",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: 0
             }}
           >
-            ← Back to trips
-          </Link>
+            ← Go Back
+          </button>
         </div>
       </div>
     );
@@ -1575,8 +1583,9 @@ export default function BookingPage() {
             zIndex: 1,
           }}
         >
-          <Link
-            to={`/trips/${slug}`}
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -1587,17 +1596,21 @@ export default function BookingPage() {
               textDecoration: "none",
               marginBottom: "14px",
               transition: "color 0.2s",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              padding: 0
             }}
             onMouseEnter={(e) =>
-              ((e.currentTarget as HTMLAnchorElement).style.color = "#f2ede4")
+              ((e.currentTarget as HTMLButtonElement).style.color = "#f2ede4")
             }
             onMouseLeave={(e) =>
-              ((e.currentTarget as HTMLAnchorElement).style.color =
+              ((e.currentTarget as HTMLButtonElement).style.color =
                 "rgba(242,237,228,0.55)")
             }
           >
             <ArrowLeft size={13} /> Back to {tripName}
-          </Link>
+          </button>
           <p
             style={{
               color: "#C8A96E",

@@ -15,6 +15,8 @@ interface LoginDialogProps {
 
 export function LoginDialog({ children }: LoginDialogProps) {
   const handleGoogleLogin = () => {
+    // Clear any stale booking intent if the user logs in explicitly via the generic dialog
+    localStorage.removeItem("booking_redirect_intent");
     // Redirect to backend OAuth initiation endpoint
     window.location.href = `${API_URL}/auth/google`;
   };

@@ -249,7 +249,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
           }}
         >
           {[
-            { icon: Calendar, text: `Travel ${formatTravelMonth(item?.startDate)}` },
+            { icon: Calendar, text: `Travel ${formatTravelMonth(booking.slot?.startDate)}` },
             { icon: Users, text: `${booking.numberOfTravelers} Traveler${booking.numberOfTravelers > 1 ? "s" : ""}` },
             ...(item?.duration ? [{ icon: Clock, text: formatDuration(item.duration) }] : []),
           ].map(({ icon: Icon, text }, i) => (

@@ -48,6 +48,7 @@ export interface ApiBooking {
   updatedAt: string;
   trip?: ApiTrip;
   festival?: any; // Add festival type when available
+  slot?: any; // Add slot type
   payments: ApiPayment[];
 }
 
@@ -73,24 +74,23 @@ export async function fetchMyBookings(): Promise<ApiBooking[]> {
 // ── Helpers ───────────────────────────────────────────────────────
 
 export function isUpcomingBooking(b: ApiBooking): boolean {
-  const item = b.trip || b.festival;
-  if (!item) return false;
-  const tripStart = new Date(item.startDate);
+  if (b.status === "CANCELLED" || b.status === "COMPLETED") return false;
+  if (!b.slot) return false;
+  const tripStart = new Date(b.slot.startDate);
   const now = new Date();
   const activeStatuses: BookingStatus[] = ["PENDING", "RESERVED", "CONFIRMED"];
   return activeStatuses.includes(b.status) && tripStart > now;
 }
 
 export function isPastBooking(b: ApiBooking): boolean {
-  const item = b.trip || b.festival;
-  if (!item) return false;
-  const tripStart = new Date(item.startDate);
+  if (!b.slot) return false;
+  const tripStart = new Date(b.slot.startDate);
   const now = new Date();
   
   return (
     b.status === "COMPLETED" ||
     b.status === "CANCELLED" ||
-    (b.status !== "CANCELLED" && tripStart <= now)
+    tripStart <= now
   );
 }
 

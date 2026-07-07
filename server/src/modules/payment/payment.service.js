@@ -267,15 +267,15 @@ export const verifyPayment = async (userId, { razorpayOrderId, razorpayPaymentId
   try {
     const userEmail = booking.user?.email;
     const userName = booking.user?.profile?.fullName || "Traveler";
-    const tripTitle = booking.trip?.title || "your trip";
+    const tripTitle = booking.trip?.title || booking.festival?.title || "your trip";
     if (userEmail) {
       await email.sendBookingConfirmedEmail({
         to: userEmail,
         name: userName,
         bookingRef: booking.bookingReference,
         tripTitle,
-        tripStartDate: booking.trip?.startDate,
-        tripEndDate: booking.trip?.endDate,
+        tripStartDate: booking.slot?.startDate,
+        tripEndDate: booking.slot?.endDate,
         amountPaid: intent.amount,
         totalAmount: booking.totalAmount,
         amountDue: intent.type === "FULL" || intent.type === "BALANCE" ? 0 : Number(booking.totalAmount) - Number(booking.tokenAmount),
@@ -351,7 +351,7 @@ export const recordFailedPayment = async (userId, { razorpayOrderId, razorpayPay
   // Fire failure email — non-blocking so SMTP issues don't affect the response
   const userEmail = booking.user?.email;
   const userName = booking.user?.profile?.fullName || booking.user?.email?.split("@")[0] || "Traveller";
-  const tripTitle = booking.trip?.title || "your trip";
+  const tripTitle = booking.trip?.title || booking.festival?.title || "your trip";
   if (userEmail) {
     email.sendPaymentFailedEmail({
       to: userEmail,
@@ -437,9 +437,9 @@ export const handleWebhook = async (rawBody, signature) => {
                 to: userEmail,
                 name: booking.user?.profile?.fullName || "Traveler",
                 bookingRef: booking.bookingReference,
-                tripTitle: booking.trip?.title || "your trip",
-                tripStartDate: booking.trip?.startDate,
-                tripEndDate: booking.trip?.endDate,
+                tripTitle: booking.trip?.title || booking.festival?.title || "your trip",
+                tripStartDate: booking.slot?.startDate,
+                tripEndDate: booking.slot?.endDate,
                 amountPaid: intent.amount,
                 totalAmount: booking.totalAmount,
                 amountDue: intent.type === "FULL" || intent.type === "BALANCE" ? 0 : Number(booking.totalAmount) - Number(booking.tokenAmount),

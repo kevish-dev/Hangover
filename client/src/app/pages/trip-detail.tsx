@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams, Link, useLocation } from "react-router";
+import { useParams, Link, useLocation, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import {
   MapPin,
@@ -1076,6 +1076,7 @@ function DetailLoadingSkeleton() {
 
 export default function TripDetail() {
   const { slug } = useParams();
+  const navigate = useNavigate();
   const location = useLocation();
   const isFestival = location.pathname.startsWith("/festivals");
   const { user } = useAuth();
@@ -1151,17 +1152,22 @@ export default function TripDetail() {
           >
             {error || "Trip not found"}
           </p>
-          <Link
-            to={isFestival ? "/festivals" : "/trips"}
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
             style={{
               color: "#781216",
               fontSize: "0.82rem",
               fontWeight: 500,
               textDecoration: "none",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: 0
             }}
           >
-            ← Back to {isFestival ? "festivals" : "trips"}
-          </Link>
+            ← Go Back
+          </button>
         </div>
       </div>
     );
@@ -1499,6 +1505,7 @@ function TripDetailContent({
   isFestival?: boolean;
 }) {
   const [heroIndex, setHeroIndex] = useState(0);
+  const navigate = useNavigate();
   const [lightbox, setLightbox] = useState<number | null>(null);
 
   const safeAllImages =
@@ -1771,8 +1778,9 @@ function TripDetailContent({
         />
 
         {/* Back button */}
-        <Link
-          to="/trips"
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
           style={{
             position: "absolute",
             top: "90px",
@@ -1786,10 +1794,14 @@ function TripDetailContent({
             letterSpacing: "0.08em",
             textDecoration: "none",
             fontFamily: "'Poppins', sans-serif",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: 0
           }}
         >
-          <ArrowLeft size={14} /> All Trips
-        </Link>
+          <ArrowLeft size={14} /> Go Back
+        </button>
 
         {/* Prev / Next arrows */}
         {safeAllImages.length > 1 && (
@@ -2406,20 +2418,20 @@ function TripDetailContent({
 
                 {/* Slot Selection */}
                 {trip.slots && trip.slots.length > 0 && (
-                  <div style={{ marginBottom: "24px" }}>
+                  <div style={{ marginBottom: "20px" }}>
                     <label style={{
                       display: "block",
-                      fontSize: "0.8rem",
+                      fontSize: "0.75rem",
                       fontWeight: 600,
                       color: "rgba(30,26,20,0.6)",
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
-                      marginBottom: "12px"
+                      marginBottom: "8px"
                     }}>
                       Select a Slot
                     </label>
                     
-                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                       {trip.slots.map((slot) => {
                         const available = slot.capacity - (slot.filledSpots || 0);
                         const isSoldOut = available <= 0;
@@ -2430,9 +2442,9 @@ function TripDetailContent({
                             key={slot.id}
                             onClick={() => !isSoldOut && setSelectedSlotId(slot.id)}
                             style={{
-                              padding: "14px 16px",
-                              borderRadius: "12px",
-                              border: isSelected ? "2px solid #c8a96e" : "1px solid rgba(30,26,20,0.1)",
+                              padding: "10px 12px",
+                              borderRadius: "8px",
+                              border: isSelected ? "1.5px solid #c8a96e" : "1px solid rgba(30,26,20,0.1)",
                               background: isSelected ? "rgba(200,169,110,0.05)" : "#fff",
                               cursor: isSoldOut ? "not-allowed" : "pointer",
                               opacity: isSoldOut ? 0.6 : 1,
@@ -2445,30 +2457,30 @@ function TripDetailContent({
                             <div>
                               <div style={{ 
                                 fontWeight: 600, 
-                                fontSize: "0.95rem", 
+                                fontSize: "0.82rem", 
                                 color: "#1e1a14", 
-                                marginBottom: "4px",
+                                marginBottom: "2px",
                                 display: "flex",
                                 alignItems: "center",
-                                gap: "8px"
+                                gap: "6px"
                               }}>
-                                <Calendar className="w-4 h-4 text-[#c8a96e]" />
+                                <Calendar className="w-3.5 h-3.5 text-[#c8a96e]" />
                                 {new Date(slot.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - {new Date(slot.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                               </div>
                               <div style={{ 
-                                fontSize: "0.8rem", 
+                                fontSize: "0.7rem", 
                                 color: isSoldOut ? "#ef4444" : "#c8a96e", 
                                 fontWeight: 500,
-                                marginLeft: "24px"
+                                marginLeft: "20px"
                               }}>
                                 {isSoldOut ? "Sold Out" : `${available} spots left`}
                               </div>
                             </div>
                             <div style={{ 
-                              width: "20px", 
-                              height: "20px", 
+                              width: "14px", 
+                              height: "14px", 
                               borderRadius: "50%", 
-                              border: isSelected ? "6px solid #c8a96e" : "2px solid rgba(30,26,20,0.2)",
+                              border: isSelected ? "4px solid #c8a96e" : "1.5px solid rgba(30,26,20,0.2)",
                               background: "#fff",
                               flexShrink: 0
                             }} />
