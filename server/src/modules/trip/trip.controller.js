@@ -2,8 +2,8 @@ import * as tripService from "./trip.service.js";
 
 export const getTrips = async (req, res, next) => {
   try {
-    const { page, limit } = req.query;
-    const isAdmin = req.user?.role === "ADMIN";
+    const { page, limit, adminView } = req.query;
+    const isAdmin = req.user?.role === "ADMIN" && adminView === "true";
     const result = await tripService.getTrips(page, limit, isAdmin);
     res.status(200).json(result);
   } catch (error) {
@@ -13,7 +13,8 @@ export const getTrips = async (req, res, next) => {
 
 export const getTripById = async (req, res, next) => {
   try {
-    const isAdmin = req.user?.role === "ADMIN";
+    const { adminView } = req.query;
+    const isAdmin = req.user?.role === "ADMIN" && adminView === "true";
     const trip = await tripService.getTripById(req.params.id, isAdmin);
     res.status(200).json(trip);
   } catch (error) {

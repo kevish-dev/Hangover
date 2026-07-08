@@ -178,7 +178,7 @@ export default function AdminFestivalsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "festivals"],
     queryFn: async () => {
-      const res = await apiClient.get("/festivals");
+      const res = await apiClient.get("/festivals?adminView=true");
       return res.data;
     },
   });
@@ -228,7 +228,7 @@ export default function AdminFestivalsPage() {
 
   const openEditModal = async (fest: any) => {
     try {
-      const res = await apiClient.get(`/festivals/${fest.id}`);
+      const res = await apiClient.get(`/festivals/${fest.id}?adminView=true`);
       setEditingFestival(res.data);
       setIsModalOpen(true);
     } catch {

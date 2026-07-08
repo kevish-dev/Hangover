@@ -1,6 +1,6 @@
 import { prisma } from "../../prisma/client.js";
 
-export const findAll = async (skip, take, where = {}) => {
+export const findAll = async (skip, take, where = {}, isAdmin = false) => {
   const [trips, total] = await Promise.all([
     prisma.trip.findMany({
       where,
@@ -36,7 +36,7 @@ export const findAll = async (skip, take, where = {}) => {
   return { trips, total };
 };
 
-export const findById = async (whereObj) => {
+export const findById = async (whereObj, isAdmin = false) => {
   const filter = typeof whereObj === 'string' ? { id: whereObj } : whereObj;
   return prisma.trip.findFirst({
     where: filter,

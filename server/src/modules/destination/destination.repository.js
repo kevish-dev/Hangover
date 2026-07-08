@@ -1,6 +1,9 @@
 import { prisma } from "../../prisma/client.js";
 
-export const findAll = async (skip, take, where = {}) => {
+export const findAll = async (skip, take, where = {}, isAdmin = false) => {
+  const tripInclude = isAdmin ? true : { where: { isPublished: true } };
+  const festInclude = isAdmin ? true : { where: { isPublished: true } };
+  
   const [destinations, total] = await Promise.all([
     prisma.destination.findMany({
       where,
@@ -8,7 +11,8 @@ export const findAll = async (skip, take, where = {}) => {
       take,
       orderBy: { createdAt: "desc" },
       include: {
-        trips: true
+        trips: tripInclude,
+        festivals: festInclude
       }
     }),
     prisma.destination.count({ where }),
@@ -16,12 +20,16 @@ export const findAll = async (skip, take, where = {}) => {
   return { destinations, total };
 };
 
-export const findById = async (whereObj) => {
+export const findById = async (whereObj, isAdmin = false) => {
   const filter = typeof whereObj === 'string' ? { id: whereObj } : whereObj;
+  const tripInclude = isAdmin ? true : { where: { isPublished: true } };
+  const festInclude = isAdmin ? true : { where: { isPublished: true } };
+  
   return prisma.destination.findFirst({
     where: filter,
     include: {
-      trips: true,
+      trips: tripInclude,
+      festivals: festInclude,
     }
   });
 };

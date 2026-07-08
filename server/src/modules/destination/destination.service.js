@@ -5,7 +5,7 @@ export const getDestinations = async (page = 1, limit = 10, isAdmin = false) => 
   const take = parseInt(limit, 10);
   
   const where = isAdmin ? {} : { isPublished: true };
-  const { destinations, total } = await destinationRepo.findAll(skip, take, where);
+  const { destinations, total } = await destinationRepo.findAll(skip, take, where, isAdmin);
   
   return {
     data: destinations,
@@ -20,7 +20,7 @@ export const getDestinations = async (page = 1, limit = 10, isAdmin = false) => 
 
 export const getDestinationById = async (id, isAdmin = false) => {
   const where = isAdmin ? { id } : { id, isPublished: true };
-  const destination = await destinationRepo.findById(where);
+  const destination = await destinationRepo.findById(where, isAdmin);
   if (!destination) throw new Error("Destination not found");
   return destination;
 };
