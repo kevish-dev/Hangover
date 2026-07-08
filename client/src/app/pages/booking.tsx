@@ -1041,7 +1041,6 @@ export default function BookingPage() {
     trip.bannerImages?.[0] || trip.highlights?.[0]?.imageUrl || "";
   const tripDuration = formatDuration(trip.duration);
   const tripDestination = trip.location;
-  const tripDifficulty = trip.difficultyLevel;
 
   const activePackage = trip.packages?.find((p: any) => p.id === selectedPackageId);
   const basePrice = activePackage ? Number(activePackage.price) : Number(trip.price || 0);
@@ -2739,10 +2738,6 @@ export default function BookingPage() {
 
                   {[
                     { label: "Duration", val: tripDuration },
-                    {
-                      label: "Difficulty",
-                      val: tripDifficulty,
-                    },
                     {
                       label: "Dates",
                       val: trip.startDate && trip.endDate

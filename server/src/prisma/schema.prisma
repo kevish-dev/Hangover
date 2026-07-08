@@ -61,9 +61,7 @@ model Trip {
   location            String
   bannerImages        String[]
   duration            Int
-  difficultyLevel     String
   bestTimeToVisit     String
-  maxAltitude         Int
   overview            String
   galleryImages       String[]
   inclusions          String[]
@@ -112,9 +110,7 @@ model Festival {
   bannerImages        String[]
   videoUrl            String?
   duration            Int
-  difficultyLevel     String
   bestTimeToVisit     String
-  maxAltitude         Int
   overview            String
   highlights          Json          @default("[]")
   galleryImages       String[]

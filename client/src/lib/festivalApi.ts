@@ -65,9 +65,7 @@ export interface ApiFestival {
   bannerImages: string[];
   videoUrl: string | null;
   duration: number;
-  difficultyLevel: string;
   bestTimeToVisit: string;
-  maxAltitude: number | null;
   overview: string;
   highlights: ApiStayTransportItem[] | null;
   inclusions: string[];

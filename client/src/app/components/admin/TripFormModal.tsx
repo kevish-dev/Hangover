@@ -38,8 +38,6 @@ const tripSchema = z.object({
   location: z.string().min(2, "Location is required"),
   tripType: z.string().min(1, "Trip type is required"),
   bestTimeToVisit: z.string().min(1, "Best time is required"),
-  price: z.coerce.number().min(0, "Price must be positive"),
-  tokenAmount: z.coerce.number().min(0, "Booking amount must be positive"),
   slots: z.array(
     z.object({
       id: z.string().optional(),
@@ -69,11 +67,11 @@ const tripSchema = z.object({
     .optional(),
   packages: z.array(
     z.object({
-      title: z.string().min(1, "Title is required"),
-      price: z.coerce.number().min(0, "Price must be positive"),
-      tokenAmount: z.coerce.number().min(0, "Booking amount must be positive"),
+      title: z.string().min(1, "Package name is required"),
+      price: z.coerce.number().min(1, "Price must be greater than 0"),
+      tokenAmount: z.coerce.number().min(0, "Booking amount must be 0 or more"),
     })
-  ).optional(),
+  ).min(1, "At least one pricing package is required"),
   isPublished: z.boolean().default(false),
   isFeatured: z.boolean().default(false),
   itinerary: z.array(
@@ -176,14 +174,12 @@ export function TripFormModal({
       location: "",
       tripType: "MOUNTAIN_TREK",
       bestTimeToVisit: "",
-      price: 0,
-      tokenAmount: 0,
       slots: [{ startDate: "", endDate: "", capacity: 10 }],
       overview: "",
       inclusions: [],
       exclusions: [],
       tripTags: [],
-      packages: [],
+      packages: [{ title: "Standard", price: 0, tokenAmount: 0 }],
       faqs: [],
       isPublished: false,
       isFeatured: false,
@@ -200,8 +196,6 @@ export function TripFormModal({
           location: trip.location || "",
           tripType: trip.tripType || "MOUNTAIN_TREK",
           bestTimeToVisit: trip.bestTimeToVisit || "",
-          price: trip.price || 0,
-          tokenAmount: trip.tokenAmount || 0,
           slots: trip.slots && trip.slots.length > 0 ? trip.slots.map((s: any) => ({
             id: s.id,
             startDate: formatDateForInput(s.startDate),
@@ -229,10 +223,10 @@ export function TripFormModal({
           packages: trip.packages?.length
             ? trip.packages.map((p: any) => ({
                 title: p.title,
-                price: p.price,
-                tokenAmount: p.tokenAmount,
+                price: Number(p.price),
+                tokenAmount: Number(p.tokenAmount),
               }))
-            : [],
+            : [{ title: "Standard", price: 0, tokenAmount: 0 }],
           itinerary: Array.isArray(trip.itinerary) ? trip.itinerary.map((day: any) => ({
             ...day,
             activities: Array.isArray(day.activities)
@@ -280,14 +274,12 @@ export function TripFormModal({
           location: "",
           tripType: "MOUNTAIN_TREK",
           bestTimeToVisit: "",
-          price: 0,
-          tokenAmount: 0,
           slots: [{ startDate: "", endDate: "", capacity: 10 }],
           overview: "",
           inclusions: [],
           exclusions: [],
           tripTags: [],
-          packages: [],
+          packages: [{ title: "Standard", price: 0, tokenAmount: 0 }],
           faqs: [],
           itinerary: [],
           isPublished: false,
@@ -503,6 +495,43 @@ export function TripFormModal({
     }
   };
 
+  // Human-readable labels for trip form fields
+  const FIELD_LABELS: Record<string, string> = {
+    title: "Trip Title",
+    location: "Location",
+    tripType: "Trip Type",
+    bestTimeToVisit: "Best Time to Visit",
+    packages: "Pricing Packages",
+    slots: "Trip Slots",
+    overview: "Overview",
+    inclusions: "Inclusions",
+    exclusions: "Exclusions",
+    faqs: "FAQs",
+    tripTags: "Tags",
+    itinerary: "Itinerary",
+  };
+
+  const getStepErrors = (errors: any, fieldsToValidate: string[]): string[] => {
+    const missing: string[] = [];
+    for (const field of fieldsToValidate) {
+      const err = errors[field];
+      if (!err) continue;
+      const label = FIELD_LABELS[field] || field;
+      // Arrays (slots, inclusions, exclusions, etc.) can have a root message
+      if (err.message) {
+        missing.push(`${label}: ${err.message}`);
+      } else if (err.root?.message) {
+        missing.push(`${label}: ${err.root.message}`);
+      } else if (Array.isArray(err)) {
+        // Individual array-item errors — just flag the section
+        missing.push(label);
+      } else if (typeof err === "object") {
+        missing.push(label);
+      }
+    }
+    return missing;
+  };
+
   const validateStep = async () => {
     let fieldsToValidate: (keyof TripFormValues)[] = [];
     if (step === 0)
@@ -511,8 +540,7 @@ export function TripFormModal({
         "location",
         "tripType",
         "bestTimeToVisit",
-        "price",
-        "tokenAmount",
+        "packages",
       ];
     else if (step === 1) {
       fieldsToValidate = ["slots"];
@@ -553,23 +581,66 @@ export function TripFormModal({
   };
 
   const nextStep = async () => {
+    let fieldsToValidate: (keyof TripFormValues)[] = [];
+    if (step === 0)
+      fieldsToValidate = ["title", "location", "tripType", "bestTimeToVisit", "packages"];
+    else if (step === 1) fieldsToValidate = ["slots"];
+    else if (step === 2) fieldsToValidate = ["overview", "inclusions", "exclusions"];
+    else if (step === 3) fieldsToValidate = ["faqs", "tripTags"];
+    else if (step === 4) fieldsToValidate = ["itinerary"];
+
     if (await validateStep()) {
       setStep((s) => Math.min(STEPS.length - 1, s + 1));
     } else {
-      toast.error("Validation Error: Please fill in all required fields marked with * to continue.", {
-        position: "bottom-right",
-      });
+      const errors = form.formState.errors;
+      const missing = getStepErrors(errors, fieldsToValidate);
+      if (missing.length > 0) {
+        toast.error(
+          <div>
+            <p className="font-semibold mb-1">Please fix the following before continuing:</p>
+            <ul className="list-disc list-inside space-y-0.5 text-sm">
+              {missing.map((m, i) => <li key={i}>{m}</li>)}
+            </ul>
+          </div>,
+          { position: "bottom-right", duration: 5000 }
+        );
+      } else {
+        // Fallback for highlight / stay errors already shown inside validateStep
+        toast.error("Please fix all errors on this step before continuing.", { position: "bottom-right" });
+      }
     }
   };
   const prevStep = () => setStep((s) => Math.max(0, s - 1));
 
+  const onError = (errors: any) => {
+    const missing = getStepErrors(errors, Object.keys(errors));
+    if (missing.length > 0) {
+      toast.error(
+        <div>
+          <p className="font-semibold mb-1">Please fix the following before submitting:</p>
+          <ul className="list-disc list-inside space-y-0.5 text-sm">
+            {missing.map((m, i) => <li key={i}>{m}</li>)}
+          </ul>
+        </div>,
+        { position: "bottom-right", duration: 5000 }
+      );
+    } else {
+      toast.error("Please fill all required fields correctly.", { position: "bottom-right" });
+    }
+  };
   const onSubmit = async (data: TripFormValues) => {
     if (step !== STEPS.length - 1) return;
 
     setIsSubmitting(true);
     try {
+      // Derive price/tokenAmount from cheapest package for DB compatibility
+      const sortedPkgs = [...data.packages].sort((a, b) => Number(a.price) - Number(b.price));
+      const lowestPkg = sortedPkgs[0];
+
       const payload = {
         ...data,
+        price: Number(lowestPkg.price),
+        tokenAmount: Number(lowestPkg.tokenAmount),
         slots: data.slots.map(s => ({
             ...s,
             startDate: s.startDate ? new Date(s.startDate).toISOString() : null,
@@ -740,7 +811,7 @@ export function TripFormModal({
         <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
           <form
             id="trip-form"
-            onSubmit={form.handleSubmit(onSubmit as any)}
+            onSubmit={form.handleSubmit(onSubmit as any, onError)}
             onKeyDown={handleKeyDown}
             className="space-y-6"
           >
@@ -801,43 +872,18 @@ export function TripFormModal({
                     </p>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Label>Price (₹) <span className="text-red-500">*</span></Label>
-                  <Input type="number" {...form.register("price")} />
-                  {form.formState.errors.price && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.price.message}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Booking Amount (₹) <span className="text-red-500">*</span></Label>
-                  <Input type="number" {...form.register("tokenAmount")} />
-                  {form.formState.errors.tokenAmount && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.tokenAmount.message}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2 col-span-2">
-                </div>
 
-                {/* Packages Section */}
-                <div className="col-span-2 space-y-4 border p-4 rounded-md mt-4">
+                {/* Pricing Packages Section */}
+                <div className="col-span-2 space-y-3 border-2 border-[#c8a96e]/30 bg-amber-50/30 p-4 rounded-md">
                   <div className="flex justify-between items-center">
-                    <h3 className="font-semibold">Packages (Optional)</h3>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => appendPackage({ title: "", price: 0, tokenAmount: 0 })}
-                    >
-                      Add Package
-                    </Button>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Pricing Packages <span className="text-red-500">*</span></h3>
+                      <p className="text-xs text-gray-500 mt-0.5">Users choose a package when booking. At least one package is required.</p>
+                    </div>
                   </div>
-                  <p className="text-sm text-gray-500 mb-2">
-                    If added, users will choose a package during booking. Otherwise, the Base Price is used.
-                  </p>
+                  {form.formState.errors.packages?.root?.message && (
+                    <p className="text-sm text-red-500">{form.formState.errors.packages.root.message}</p>
+                  )}
                   {packageFields.map((field, index) => (
                     <div key={field.id} className="flex gap-4 items-start relative p-3 border rounded-md">
                       <div className="flex-1 space-y-2">
@@ -881,11 +927,22 @@ export function TripFormModal({
                         variant="ghost"
                         className="text-red-500 mt-7"
                         onClick={() => removePackage(index)}
+                        disabled={packageFields.length === 1}
+                        title={packageFields.length === 1 ? "At least one package is required" : "Remove package"}
                       >
                         <Trash className="w-4 h-4" />
                       </Button>
                     </div>
                   ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 w-full border-dashed"
+                    onClick={() => appendPackage({ title: "", price: 0, tokenAmount: 0 })}
+                  >
+                    <Plus className="w-4 h-4 mr-2" /> Add Package
+                  </Button>
                 </div>
                 <div className="space-y-2 col-span-2 flex flex-col sm:flex-row sm:items-center gap-4 mt-2">
                   <div className="flex items-center gap-2">

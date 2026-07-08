@@ -56,9 +56,7 @@ export interface ApiTrip {
   location: string;
   bannerImages: string[];
   duration: number;
-  difficultyLevel: string;
   bestTimeToVisit: string;
-  maxAltitude: number | null;
   overview: string;
   highlights: ApiStayTransportItem[] | null;
   inclusions: string[];

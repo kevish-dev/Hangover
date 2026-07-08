@@ -1157,7 +1157,6 @@ export default function TripDetail() {
   const typeLabel = trip.tripType ? formatTripType(trip.tripType) : "Festival";
   const priceStr = formatPrice(trip.price);
   const durationStr = formatDuration(trip.duration);
-  const altitudeStr = formatAltitude(trip?.maxAltitude || null);
   const spots = spotsLeft(trip.capacity, trip.filledSpots);
   const tags = trip.tripTags?.map((t: any) => t.tag) || [];
   const stayItems = (
@@ -1184,7 +1183,6 @@ export default function TripDetail() {
       typeLabel={typeLabel}
       priceStr={priceStr}
       durationStr={durationStr}
-      altitudeStr={altitudeStr}
       spots={spots}
       tags={tags}
       stayItems={stayItems}
@@ -1442,7 +1440,6 @@ function TripDetailContent({
   typeLabel,
   priceStr,
   durationStr,
-  altitudeStr,
   spots,
   tags,
   stayItems,
@@ -1460,7 +1457,6 @@ function TripDetailContent({
   typeLabel: string;
   priceStr: string;
   durationStr: string;
-  altitudeStr: string;
   spots: number;
   tags: string[];
   stayItems: { text: string; imageUrl: string }[];
@@ -1980,18 +1976,10 @@ function TripDetailContent({
                     : null,
                 },
                 {
-                  icon: Mountain,
-                  label: "Difficulty",
-                  value: trip.difficultyLevel || null,
-                },
-                {
                   icon: Calendar,
                   label: "Best Time",
                   value: trip.bestTimeToVisit || null,
                 },
-                ...((trip.maxAltitude || 0) > 0
-                  ? [{ icon: Zap, label: "Max Altitude", value: altitudeStr }]
-                  : []),
               ].map(({ icon: Icon, label, value }) => (
                 <div
                   key={label}
@@ -2324,8 +2312,6 @@ function TripDetailContent({
                 >
                   {[
                     { label: "Duration", val: durationStr },
-
-                    { label: "Difficulty", val: trip.difficultyLevel || null },
                     {
                       label: "Availability",
                       val: spots > 0 ? `${spots} spots left` : "Fully booked",

@@ -37,8 +37,6 @@ const festivalSchema = z.object({
   location: z.string().min(2, "Location is required"),
   duration: z.coerce.number().min(1, "Duration must be at least 1 day"),
   bestTimeToVisit: z.string().min(1, "Best time is required"),
-  price: z.coerce.number().min(0, "Price must be positive"),
-  tokenAmount: z.coerce.number().min(0, "Booking amount must be positive"),
   slots: z.array(
     z.object({
       id: z.string().optional(),
@@ -60,11 +58,11 @@ const festivalSchema = z.object({
   tags: z.array(z.object({ value: z.string().min(1) })).optional(),
   packages: z.array(
     z.object({
-      title: z.string().min(1, "Title is required"),
-      price: z.coerce.number().min(0, "Price must be positive"),
-      tokenAmount: z.coerce.number().min(0, "Booking amount must be positive"),
+      title: z.string().min(1, "Package name is required"),
+      price: z.coerce.number().min(1, "Price must be greater than 0"),
+      tokenAmount: z.coerce.number().min(0, "Booking amount must be 0 or more"),
     })
-  ).optional(),
+  ).min(1, "At least one pricing package is required"),
   faqs: z
     .array(
       z.object({
@@ -164,14 +162,12 @@ export function FestivalFormModal({
       location: "",
       duration: 1,
       bestTimeToVisit: "",
-      price: 0,
-      tokenAmount: 0,
       slots: [{ startDate: "", endDate: "", capacity: 10 }],
       overview: "",
       inclusions: [],
       exclusions: [],
       tags: [],
-      packages: [],
+      packages: [{ title: "Standard", price: 0, tokenAmount: 0 }],
       faqs: [],
       isPublished: false,
       isFeatured: false,
@@ -188,8 +184,6 @@ export function FestivalFormModal({
           location: festival.location || "",
           duration: festival.duration || 1,
           bestTimeToVisit: festival.bestTimeToVisit || "",
-          price: festival.price || 0,
-          tokenAmount: festival.tokenAmount || 0,
           slots: festival.slots && festival.slots.length > 0 ? festival.slots.map((s: any) => ({
             id: s.id,
             startDate: formatDateForInput(s.startDate),
@@ -211,10 +205,10 @@ export function FestivalFormModal({
           packages: festival.packages?.length
             ? festival.packages.map((p: any) => ({
                 title: p.title,
-                price: p.price,
-                tokenAmount: p.tokenAmount,
+                price: Number(p.price),
+                tokenAmount: Number(p.tokenAmount),
               }))
-            : [],
+            : [{ title: "Standard", price: 0, tokenAmount: 0 }],
           itinerary: Array.isArray(festival.itinerary) ? festival.itinerary.map((day: any) => ({
             ...day,
             activities: Array.isArray(day.activities)
@@ -268,13 +262,11 @@ export function FestivalFormModal({
           location: "",
           duration: 1,
           bestTimeToVisit: "",
-          price: 0,
-          tokenAmount: 0,
           slots: [{ startDate: "", endDate: "", capacity: 10 }],
           overview: "",
           inclusions: [],
           exclusions: [],
-          packages: [],
+          packages: [{ title: "Standard", price: 0, tokenAmount: 0 }],
           tags: [],
           faqs: [],
           itinerary: [],
@@ -498,6 +490,41 @@ export function FestivalFormModal({
     }
   };
 
+  // Human-readable labels for festival form fields
+  const FIELD_LABELS: Record<string, string> = {
+    title: "Festival Title",
+    location: "Location",
+    duration: "Duration (days)",
+    bestTimeToVisit: "Best Time to Visit",
+    packages: "Pricing Packages",
+    slots: "Festival Slots",
+    overview: "Overview",
+    inclusions: "Inclusions",
+    exclusions: "Exclusions",
+    faqs: "FAQs",
+    tags: "Tags",
+    itinerary: "Itinerary",
+  };
+
+  const getStepErrors = (errors: any, fieldsToValidate: string[]): string[] => {
+    const missing: string[] = [];
+    for (const field of fieldsToValidate) {
+      const err = errors[field];
+      if (!err) continue;
+      const label = FIELD_LABELS[field] || field;
+      if (err.message) {
+        missing.push(`${label}: ${err.message}`);
+      } else if (err.root?.message) {
+        missing.push(`${label}: ${err.root.message}`);
+      } else if (Array.isArray(err)) {
+        missing.push(label);
+      } else if (typeof err === "object") {
+        missing.push(label);
+      }
+    }
+    return missing;
+  };
+
   const validateStep = async () => {
     let fieldsToValidate: (keyof FestivalFormValues)[] = [];
     if (step === 0)
@@ -506,8 +533,7 @@ export function FestivalFormModal({
         "location",
         "duration",
         "bestTimeToVisit",
-        "price",
-        "tokenAmount",
+        "packages",
       ];
     else if (step === 1) {
       fieldsToValidate = ["slots"];
@@ -548,6 +574,14 @@ export function FestivalFormModal({
   };
 
   const nextStep = async () => {
+    let fieldsToValidate: (keyof FestivalFormValues)[] = [];
+    if (step === 0)
+      fieldsToValidate = ["title", "location", "duration", "bestTimeToVisit", "packages"];
+    else if (step === 1) fieldsToValidate = ["slots"];
+    else if (step === 2) fieldsToValidate = ["overview", "inclusions", "exclusions"];
+    else if (step === 3) fieldsToValidate = ["faqs", "tags"];
+    else if (step === 4) fieldsToValidate = ["itinerary"];
+
     if (await validateStep()) {
       setStep((s) => {
         const next = Math.min(STEPS.length - 1, s + 1);
@@ -558,20 +592,54 @@ export function FestivalFormModal({
         return next;
       });
     } else {
-      toast.error("Validation Error: Please fill in all required fields marked with * to continue.", {
-        position: "bottom-right",
-      });
+      const errors = form.formState.errors;
+      const missing = getStepErrors(errors, fieldsToValidate);
+      if (missing.length > 0) {
+        toast.error(
+          <div>
+            <p className="font-semibold mb-1">Please fix the following before continuing:</p>
+            <ul className="list-disc list-inside space-y-0.5 text-sm">
+              {missing.map((m, i) => <li key={i}>{m}</li>)}
+            </ul>
+          </div>,
+          { position: "bottom-right", duration: 5000 }
+        );
+      } else {
+        toast.error("Please fix all errors on this step before continuing.", { position: "bottom-right" });
+      }
     }
   };
   const prevStep = () => setStep((s) => Math.max(0, s - 1));
 
+  const onError = (errors: any) => {
+    const missing = getStepErrors(errors, Object.keys(errors));
+    if (missing.length > 0) {
+      toast.error(
+        <div>
+          <p className="font-semibold mb-1">Please fix the following before submitting:</p>
+          <ul className="list-disc list-inside space-y-0.5 text-sm">
+            {missing.map((m, i) => <li key={i}>{m}</li>)}
+          </ul>
+        </div>,
+        { position: "bottom-right", duration: 5000 }
+      );
+    } else {
+      toast.error("Please fill all required fields correctly.", { position: "bottom-right" });
+    }
+  };
   const onSubmit = async (data: FestivalFormValues) => {
     if (step !== STEPS.length - 1) return;
 
     setIsSubmitting(true);
     try {
+      // Derive price/tokenAmount from cheapest package for DB compatibility
+      const sortedPkgs = [...data.packages].sort((a, b) => Number(a.price) - Number(b.price));
+      const lowestPkg = sortedPkgs[0];
+
       const payload = {
         ...data,
+        price: Number(lowestPkg.price),
+        tokenAmount: Number(lowestPkg.tokenAmount),
         slots: data.slots.map((s: any) => ({
             ...s,
             startDate: s.startDate ? new Date(s.startDate).toISOString() : null,
@@ -752,7 +820,7 @@ export function FestivalFormModal({
         <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
           <form
             id="festival-form"
-            onSubmit={form.handleSubmit(onSubmit)}
+            onSubmit={form.handleSubmit(onSubmit as any, onError)}
             onKeyDown={handleKeyDown}
             className="space-y-6"
           >
@@ -796,43 +864,17 @@ export function FestivalFormModal({
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Price (₹) <span className="text-red-500">*</span></Label>
-                  <Input type="number" {...form.register("price")} />
-                  {form.formState.errors.price && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.price.message}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Booking Amount (₹) <span className="text-red-500">*</span></Label>
-                  <Input type="number" {...form.register("tokenAmount")} />
-                  {form.formState.errors.tokenAmount && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.tokenAmount.message}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2 col-span-2">
-                </div>
-
-                {/* Packages Section */}
-                <div className="col-span-2 space-y-4 border p-4 rounded-md mt-4">
+                {/* Pricing Packages Section */}
+                <div className="col-span-2 space-y-3 border-2 border-[#c8a96e]/30 bg-amber-50/30 p-4 rounded-md">
                   <div className="flex justify-between items-center">
-                    <h3 className="font-semibold">Packages (Optional)</h3>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => appendPackage({ title: "", price: 0, tokenAmount: 0 })}
-                    >
-                      Add Package
-                    </Button>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Pricing Packages <span className="text-red-500">*</span></h3>
+                      <p className="text-xs text-gray-500 mt-0.5">Users choose a package when booking. At least one package is required.</p>
+                    </div>
                   </div>
-                  <p className="text-sm text-gray-500 mb-2">
-                    If added, users will choose a package during booking. Otherwise, the Base Price is used.
-                  </p>
+                  {form.formState.errors.packages?.root?.message && (
+                    <p className="text-sm text-red-500">{form.formState.errors.packages.root.message}</p>
+                  )}
                   {packageFields.map((field, index) => (
                     <div key={field.id} className="flex gap-4 items-start relative p-3 border rounded-md">
                       <div className="flex-1 space-y-2">
@@ -876,11 +918,22 @@ export function FestivalFormModal({
                         variant="ghost"
                         className="text-red-500 mt-7"
                         onClick={() => removePackage(index)}
+                        disabled={packageFields.length === 1}
+                        title={packageFields.length === 1 ? "At least one package is required" : "Remove package"}
                       >
                         <Trash className="w-4 h-4" />
                       </Button>
                     </div>
                   ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 w-full border-dashed"
+                    onClick={() => appendPackage({ title: "", price: 0, tokenAmount: 0 })}
+                  >
+                    <Plus className="w-4 h-4 mr-2" /> Add Package
+                  </Button>
                 </div>
 
                 <div className="space-y-2 col-span-2 flex flex-col sm:flex-row sm:items-center gap-4 mt-2">

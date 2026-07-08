@@ -39,9 +39,8 @@ export const createFestival = async (data) => {
   if (!data.slug) {
     data.slug = generateSlug(data.title) + "-" + Date.now();
   }
-  if (!data.stayTransportImages) {
-    data.stayTransportImages = [];
-  }
+  if (!data.stayTransportImages) data.stayTransportImages = [];
+
   if (data.slots && data.slots.length > 0 && data.slots[0].startDate && data.slots[0].endDate) {
     const start = new Date(data.slots[0].startDate);
     const end = new Date(data.slots[0].endDate);
@@ -51,6 +50,12 @@ export const createFestival = async (data) => {
     const diffTime = Math.abs(end - start);
     data.duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }
+  if (!data.duration) data.duration = 1;
+
+  // price and tokenAmount are required Decimal columns — ensure they're set
+  if (data.price === undefined || data.price === null) data.price = 0;
+  if (data.tokenAmount === undefined || data.tokenAmount === null) data.tokenAmount = 0;
+
   return festivalRepo.create(data);
 };
 
