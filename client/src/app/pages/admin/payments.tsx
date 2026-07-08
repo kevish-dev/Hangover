@@ -43,7 +43,7 @@ export default function AdminPaymentsPage() {
               <tr>
                 <th className="px-6 py-4">Transaction ID</th>
                 <th className="px-6 py-4">Booking Ref</th>
-                <th className="px-6 py-4">Trip</th>
+                <th className="px-6 py-4">Item</th>
                 <th className="px-6 py-4">User</th>
                 <th className="px-6 py-4">Type</th>
                 <th className="px-6 py-4">Amount</th>
@@ -68,7 +68,7 @@ export default function AdminPaymentsPage() {
                       {payment.booking.bookingReference}
                     </td>
                     <td className="px-6 py-4 text-gray-700 max-w-[200px] truncate">
-                      {payment.booking.trip.title}
+                      {payment.booking.trip?.title || payment.booking.festival?.title}
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-gray-900 font-medium">{payment.booking.user.profile?.fullName || "N/A"}</div>

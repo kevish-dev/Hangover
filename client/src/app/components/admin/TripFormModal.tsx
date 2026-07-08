@@ -23,27 +23,31 @@ import {
   ArrowLeft,
   ArrowUp,
   ArrowDown,
+  Trash,
 } from "lucide-react";
 import { apiClient } from "../../../lib/axios";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { ItineraryStep } from "./ItineraryStep";
+import { formatTripType } from "../../../lib/tripApi";
 
 // --- VALIDATION SCHEMA ---
 const tripSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
   location: z.string().min(2, "Location is required"),
   tripType: z.string().min(1, "Trip type is required"),
-  difficultyLevel: z.string().min(1, "Difficulty is required"),
   bestTimeToVisit: z.string().min(1, "Best time is required"),
-  price: z.coerce.number().min(0, "Price must be positive"),
-  tokenAmount: z.coerce.number().min(0, "Booking amount must be positive"),
-  capacity: z.coerce.number().min(1, "Capacity must be at least 1"),
-
-  startDate: z.string().min(1, "Start date is required"),
-  endDate: z.string().min(1, "End date is required"),
-
-  maxAltitude: z.coerce.number().optional(),
+  slots: z.array(
+    z.object({
+      id: z.string().optional(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+      title: z.string().optional(),
+      priority: z.coerce.number().optional(),
+      capacity: z.coerce.number().min(1, "Capacity must be at least 1"),
+    })
+  ).min(1, "At least one slot is required"),
 
   overview: z.string().min(10, "Overview must be detailed"),
   inclusions: z
@@ -61,18 +65,25 @@ const tripSchema = z.object({
       }),
     )
     .optional(),
+  packages: z.array(
+    z.object({
+      title: z.string().min(1, "Package name is required"),
+      price: z.coerce.number().min(1, "Price must be greater than 0"),
+      tokenAmount: z.coerce.number().min(0, "Booking amount must be 0 or more"),
+    })
+  ).min(1, "At least one pricing package is required"),
   isPublished: z.boolean().default(false),
   isFeatured: z.boolean().default(false),
-}).refine(
-  (data) => {
-    if (data.startDate && data.endDate) {
-      return new Date(data.endDate) > new Date(data.startDate);
-    }
-    return true;
-  },
-  {
-    message: "End date must be after start date",
-    path: ["endDate"],
+  itinerary: z.array(
+    z.object({
+      dayNumber: z.coerce.number().min(1, "Day number is required"),
+      activities: z.array(
+        z.object({
+          value: z.string().min(1, "Activity is required")
+        })
+      ).min(1, "At least one activity is required")
+    })
+  ).optional(),
   }
 );
 
@@ -97,6 +108,7 @@ const STEPS = [
   "Logistics",
   "Content",
   "FAQs & Tags",
+  "Itinerary",
   "Stay & Transport",
   "Media",
 ];
@@ -161,18 +173,13 @@ export function TripFormModal({
       title: "",
       location: "",
       tripType: "MOUNTAIN_TREK",
-      difficultyLevel: "Moderate",
       bestTimeToVisit: "",
-      price: 0,
-      tokenAmount: 0,
-      capacity: 10,
-      startDate: "",
-      endDate: "",
-      maxAltitude: 0,
+      slots: [{ startDate: "", endDate: "", capacity: 10 }],
       overview: "",
       inclusions: [],
       exclusions: [],
       tripTags: [],
+      packages: [{ title: "Standard", price: 0, tokenAmount: 0 }],
       faqs: [],
       isPublished: false,
       isFeatured: false,
@@ -188,15 +195,15 @@ export function TripFormModal({
           title: trip.title || "",
           location: trip.location || "",
           tripType: trip.tripType || "MOUNTAIN_TREK",
-          difficultyLevel: trip.difficultyLevel || "",
           bestTimeToVisit: trip.bestTimeToVisit || "",
-          price: trip.price || 0,
-          tokenAmount: trip.tokenAmount || 0,
-          capacity: trip.capacity || 10,
-          startDate: formatDateForInput(trip.startDate),
-          endDate: formatDateForInput(trip.endDate),
-
-          maxAltitude: trip.maxAltitude || 0,
+          slots: trip.slots && trip.slots.length > 0 ? trip.slots.map((s: any) => ({
+            id: s.id,
+            startDate: formatDateForInput(s.startDate),
+            endDate: formatDateForInput(s.endDate),
+            title: s.title || "",
+            priority: s.priority || 0,
+            capacity: s.capacity
+          })) : [{ startDate: "", endDate: "", capacity: 10, title: "", priority: 0 }],
           overview: trip.overview || "",
           inclusions: trip.inclusions?.length
             ? trip.inclusions.map((i: string) => ({ value: i }))
@@ -213,6 +220,21 @@ export function TripFormModal({
                 answer: f.answer,
               }))
             : [],
+          packages: trip.packages?.length
+            ? trip.packages.map((p: any) => ({
+                title: p.title,
+                price: Number(p.price),
+                tokenAmount: Number(p.tokenAmount),
+              }))
+            : [{ title: "Standard", price: 0, tokenAmount: 0 }],
+          itinerary: Array.isArray(trip.itinerary) ? trip.itinerary.map((day: any) => ({
+            ...day,
+            activities: Array.isArray(day.activities)
+              ? day.activities.map((a: string) => ({ value: a }))
+              : typeof day.activities === 'string'
+              ? day.activities.split('\n').filter(Boolean).map((a: string) => ({ value: a }))
+              : [{ value: "" }]
+          })) : [],
           isPublished: trip.isPublished || false,
           isFeatured: trip.isFeatured || false,
         });
@@ -251,19 +273,15 @@ export function TripFormModal({
           title: "",
           location: "",
           tripType: "MOUNTAIN_TREK",
-          difficultyLevel: "Moderate",
           bestTimeToVisit: "",
-          price: 0,
-          tokenAmount: 0,
-          capacity: 10,
-          startDate: "",
-          endDate: "",
-          maxAltitude: 0,
+          slots: [{ startDate: "", endDate: "", capacity: 10 }],
           overview: "",
           inclusions: [],
           exclusions: [],
           tripTags: [],
+          packages: [{ title: "Standard", price: 0, tokenAmount: 0 }],
           faqs: [],
+          itinerary: [],
           isPublished: false,
           isFeatured: false,
         });
@@ -299,6 +317,22 @@ export function TripFormModal({
   } = useFieldArray({
     control: form.control,
     name: "tripTags",
+  });
+  const {
+    fields: packageFields,
+    append: appendPackage,
+    remove: removePackage,
+  } = useFieldArray({
+    name: "packages",
+    control: form.control,
+  });
+  const {
+    fields: slotFields,
+    append: appendSlot,
+    remove: removeSlot,
+  } = useFieldArray({
+    name: "slots",
+    control: form.control,
   });
   const {
     fields: faqFields,
@@ -461,6 +495,43 @@ export function TripFormModal({
     }
   };
 
+  // Human-readable labels for trip form fields
+  const FIELD_LABELS: Record<string, string> = {
+    title: "Trip Title",
+    location: "Location",
+    tripType: "Trip Type",
+    bestTimeToVisit: "Best Time to Visit",
+    packages: "Pricing Packages",
+    slots: "Trip Slots",
+    overview: "Overview",
+    inclusions: "Inclusions",
+    exclusions: "Exclusions",
+    faqs: "FAQs",
+    tripTags: "Tags",
+    itinerary: "Itinerary",
+  };
+
+  const getStepErrors = (errors: any, fieldsToValidate: string[]): string[] => {
+    const missing: string[] = [];
+    for (const field of fieldsToValidate) {
+      const err = errors[field];
+      if (!err) continue;
+      const label = FIELD_LABELS[field] || field;
+      // Arrays (slots, inclusions, exclusions, etc.) can have a root message
+      if (err.message) {
+        missing.push(`${label}: ${err.message}`);
+      } else if (err.root?.message) {
+        missing.push(`${label}: ${err.root.message}`);
+      } else if (Array.isArray(err)) {
+        // Individual array-item errors — just flag the section
+        missing.push(label);
+      } else if (typeof err === "object") {
+        missing.push(label);
+      }
+    }
+    return missing;
+  };
+
   const validateStep = async () => {
     let fieldsToValidate: (keyof TripFormValues)[] = [];
     if (step === 0)
@@ -468,18 +539,17 @@ export function TripFormModal({
         "title",
         "location",
         "tripType",
-        "difficultyLevel",
         "bestTimeToVisit",
-        "price",
-        "tokenAmount",
-        "capacity",
+        "packages",
       ];
-    if (step === 1)
-      fieldsToValidate = ["startDate", "endDate", "maxAltitude"];
-    if (step === 2)
+    else if (step === 1) {
+      fieldsToValidate = ["slots"];
+    } else if (step === 2) {
       fieldsToValidate = ["overview", "inclusions", "exclusions"];
+    }
     if (step === 3) fieldsToValidate = ["faqs", "tripTags"];
-    if (step === 4) return true; // Stay & Transport has local state, basic validation can be skipped or added if needed
+    if (step === 4) fieldsToValidate = ["itinerary"];
+    if (step === 5) return true; // Stay & Transport has local state, basic validation can be skipped or added if needed
 
     const isValid = await form.trigger(fieldsToValidate);
 
@@ -495,7 +565,7 @@ export function TripFormModal({
       }
     }
 
-    if (step === 4) {
+    if (step === 5) {
       const invalid = stayItems.some(
         (i) => i.text.trim() === "" || (!i.preview && !i.url),
       );
@@ -511,25 +581,71 @@ export function TripFormModal({
   };
 
   const nextStep = async () => {
+    let fieldsToValidate: (keyof TripFormValues)[] = [];
+    if (step === 0)
+      fieldsToValidate = ["title", "location", "tripType", "bestTimeToVisit", "packages"];
+    else if (step === 1) fieldsToValidate = ["slots"];
+    else if (step === 2) fieldsToValidate = ["overview", "inclusions", "exclusions"];
+    else if (step === 3) fieldsToValidate = ["faqs", "tripTags"];
+    else if (step === 4) fieldsToValidate = ["itinerary"];
+
     if (await validateStep()) {
       setStep((s) => Math.min(STEPS.length - 1, s + 1));
     } else {
-      toast.error("Please fill in all required fields correctly to continue.", {
-        position: "bottom-right",
-      });
+      const errors = form.formState.errors;
+      const missing = getStepErrors(errors, fieldsToValidate);
+      if (missing.length > 0) {
+        toast.error(
+          <div>
+            <p className="font-semibold mb-1">Please fix the following before continuing:</p>
+            <ul className="list-disc list-inside space-y-0.5 text-sm">
+              {missing.map((m, i) => <li key={i}>{m}</li>)}
+            </ul>
+          </div>,
+          { position: "bottom-right", duration: 5000 }
+        );
+      } else {
+        // Fallback for highlight / stay errors already shown inside validateStep
+        toast.error("Please fix all errors on this step before continuing.", { position: "bottom-right" });
+      }
     }
   };
   const prevStep = () => setStep((s) => Math.max(0, s - 1));
 
+  const onError = (errors: any) => {
+    const missing = getStepErrors(errors, Object.keys(errors));
+    if (missing.length > 0) {
+      toast.error(
+        <div>
+          <p className="font-semibold mb-1">Please fix the following before submitting:</p>
+          <ul className="list-disc list-inside space-y-0.5 text-sm">
+            {missing.map((m, i) => <li key={i}>{m}</li>)}
+          </ul>
+        </div>,
+        { position: "bottom-right", duration: 5000 }
+      );
+    } else {
+      toast.error("Please fill all required fields correctly.", { position: "bottom-right" });
+    }
+  };
   const onSubmit = async (data: TripFormValues) => {
     if (step !== STEPS.length - 1) return;
 
     setIsSubmitting(true);
     try {
+      // Derive price/tokenAmount from cheapest package for DB compatibility
+      const sortedPkgs = [...data.packages].sort((a, b) => Number(a.price) - Number(b.price));
+      const lowestPkg = sortedPkgs[0];
+
       const payload = {
         ...data,
-        startDate: new Date(data.startDate).toISOString(),
-        endDate: new Date(data.endDate).toISOString(),
+        price: Number(lowestPkg.price),
+        tokenAmount: Number(lowestPkg.tokenAmount),
+        slots: data.slots.map(s => ({
+            ...s,
+            startDate: s.startDate ? new Date(s.startDate).toISOString() : null,
+            endDate: s.endDate ? new Date(s.endDate).toISOString() : null,
+        })),
         inclusions: data.inclusions
           .map((i) => i.value)
           .filter((i) => i.trim() !== ""),
@@ -539,6 +655,11 @@ export function TripFormModal({
         tripTags: data.tripTags
           ?.map((t) => t.value)
           .filter((t) => t.trim() !== ""),
+        packages: data.packages,
+        itinerary: data.itinerary?.map((day: any) => ({
+          ...day,
+          activities: day.activities.map((a: any) => a.value).filter(Boolean)
+        })),
         faqs: data.faqs?.filter(
           (f) => f.question.trim() !== "" && f.answer.trim() !== "",
         ),
@@ -690,7 +811,7 @@ export function TripFormModal({
         <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
           <form
             id="trip-form"
-            onSubmit={form.handleSubmit(onSubmit as any)}
+            onSubmit={form.handleSubmit(onSubmit as any, onError)}
             onKeyDown={handleKeyDown}
             className="space-y-6"
           >
@@ -698,7 +819,7 @@ export function TripFormModal({
             <div className={step === 0 ? "block" : "hidden"}>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 space-y-2">
-                  <Label>Trip Title</Label>
+                  <Label>Trip Title <span className="text-red-500">*</span></Label>
                   <Input
                     {...form.register("title")}
                     placeholder="e.g. Kedarkantha Winter Trek"
@@ -710,7 +831,7 @@ export function TripFormModal({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Location</Label>
+                  <Label>Location <span className="text-red-500">*</span></Label>
                   <Input
                     {...form.register("location")}
                     placeholder="e.g. Uttarakhand, India"
@@ -722,14 +843,14 @@ export function TripFormModal({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Trip Type</Label>
+                  <Label>Trip Type <span className="text-red-500">*</span></Label>
                   <select
                     {...form.register("tripType")}
                     className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   >
                     {TRIP_TYPES.map((t) => (
                       <option key={t} value={t}>
-                        {t.replace(/_/g, " ")}
+                        {formatTripType(t)}
                       </option>
                     ))}
                   </select>
@@ -740,27 +861,7 @@ export function TripFormModal({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Difficulty Level</Label>
-                  <select
-                    {...form.register("difficultyLevel")}
-                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  >
-                    <option value="" disabled>Select Difficulty</option>
-                    <option value="Easy">Easy</option>
-                    <option value="Easy to Moderate">Easy to Moderate</option>
-                    <option value="Moderate">Moderate</option>
-                    <option value="Moderate to Difficult">Moderate to Difficult</option>
-                    <option value="Difficult">Difficult</option>
-                    <option value="Expert">Expert</option>
-                  </select>
-                  {form.formState.errors.difficultyLevel && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.difficultyLevel.message}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Best Time to Visit</Label>
+                  <Label>Best Time to Visit <span className="text-red-500">*</span></Label>
                   <Input
                     {...form.register("bestTimeToVisit")}
                     placeholder="e.g. Dec to March"
@@ -771,32 +872,77 @@ export function TripFormModal({
                     </p>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Label>Price (₹)</Label>
-                  <Input type="number" {...form.register("price")} />
-                  {form.formState.errors.price && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.price.message}
-                    </p>
+
+                {/* Pricing Packages Section */}
+                <div className="col-span-2 space-y-3 border-2 border-[#c8a96e]/30 bg-amber-50/30 p-4 rounded-md">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Pricing Packages <span className="text-red-500">*</span></h3>
+                      <p className="text-xs text-gray-500 mt-0.5">Users choose a package when booking. At least one package is required.</p>
+                    </div>
+                  </div>
+                  {form.formState.errors.packages?.root?.message && (
+                    <p className="text-sm text-red-500">{form.formState.errors.packages.root.message}</p>
                   )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Booking Amount (₹)</Label>
-                  <Input type="number" {...form.register("tokenAmount")} />
-                  {form.formState.errors.tokenAmount && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.tokenAmount.message}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2 col-span-2">
-                  <Label>Total Capacity (Pax)</Label>
-                  <Input type="number" {...form.register("capacity")} />
-                  {form.formState.errors.capacity && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.capacity.message}
-                    </p>
-                  )}
+                  {packageFields.map((field, index) => (
+                    <div key={field.id} className="flex gap-4 items-start relative p-3 border rounded-md">
+                      <div className="flex-1 space-y-2">
+                        <Label>Title</Label>
+                        <Input
+                          placeholder="e.g. VIP Package"
+                          {...form.register(`packages.${index}.title` as const)}
+                        />
+                        {form.formState.errors.packages?.[index]?.title && (
+                          <p className="text-sm text-red-500">
+                            {form.formState.errors.packages[index]?.title?.message}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <Label>Price (₹) <span className="text-red-500">*</span></Label>
+                        <Input
+                          type="number"
+                          {...form.register(`packages.${index}.price` as const)}
+                        />
+                        {form.formState.errors.packages?.[index]?.price && (
+                          <p className="text-sm text-red-500">
+                            {form.formState.errors.packages[index]?.price?.message}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <Label>Booking Amount (₹) <span className="text-red-500">*</span></Label>
+                        <Input
+                          type="number"
+                          {...form.register(`packages.${index}.tokenAmount` as const)}
+                        />
+                        {form.formState.errors.packages?.[index]?.tokenAmount && (
+                          <p className="text-sm text-red-500">
+                            {form.formState.errors.packages[index]?.tokenAmount?.message}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="text-red-500 mt-7"
+                        onClick={() => removePackage(index)}
+                        disabled={packageFields.length === 1}
+                        title={packageFields.length === 1 ? "At least one package is required" : "Remove package"}
+                      >
+                        <Trash className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 w-full border-dashed"
+                    onClick={() => appendPackage({ title: "", price: 0, tokenAmount: 0 })}
+                  >
+                    <Plus className="w-4 h-4 mr-2" /> Add Package
+                  </Button>
                 </div>
                 <div className="space-y-2 col-span-2 flex flex-col sm:flex-row sm:items-center gap-4 mt-2">
                   <div className="flex items-center gap-2">
@@ -825,48 +971,108 @@ export function TripFormModal({
               </div>
             </div>
 
-            {/* STEP 1: LOGISTICS */}
+          {/* STEP 1: LOGISTICS (SLOTS & ALTITUDE) */}
             <div className={step === 1 ? "block" : "hidden"}>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Start Date</Label>
-                  <Input
-                    type="datetime-local"
-                    {...form.register("startDate")}
-                  />
-                  {form.formState.errors.startDate && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.startDate.message}
+              <div className="space-y-6">
+                <div>
+                  <div className="mb-2">
+                    <Label>Slots (Dates & Capacity) <span className="text-red-500">*</span></Label>
+                  </div>
+                  {form.formState.errors.slots?.root && (
+                    <p className="text-sm text-red-500 mb-2">
+                      {form.formState.errors.slots.root.message}
                     </p>
                   )}
-                </div>
-                <div className="space-y-2">
-                  <Label>End Date</Label>
-                  <Input type="datetime-local" {...form.register("endDate")} />
-                  {form.formState.errors.endDate && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.endDate.message}
-                    </p>
-                  )}
+                  <div className="space-y-4">
+                    {slotFields.map((field, index) => (
+                      <div key={field.id} className="flex items-start gap-4 p-4 border rounded-md relative group">
+                        <div className="flex-1 space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Start Date <span className="text-red-500">*</span></Label>
+                              <Input
+                                type="datetime-local"
+                                {...form.register(`slots.${index}.startDate`)}
+                              />
+                              {form.formState.errors.slots?.[index]?.startDate && (
+                                <p className="text-sm text-red-500">
+                                  {form.formState.errors.slots[index]?.startDate?.message}
+                                </p>
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              <Label>End Date <span className="text-red-500">*</span></Label>
+                              <Input
+                                type="datetime-local"
+                                {...form.register(`slots.${index}.endDate`)}
+                              />
+                              {form.formState.errors.slots?.[index]?.endDate && (
+                                <p className="text-sm text-red-500">
+                                  {form.formState.errors.slots[index]?.endDate?.message}
+                                </p>
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Title (e.g. Diwali Weekend)</Label>
+                              <Input
+                                placeholder="Optional"
+                                {...form.register(`slots.${index}.title`)}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Priority (1 is highest)</Label>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...form.register(`slots.${index}.priority`)}
+                              />
+                            </div>
+                            <div className="space-y-2 col-span-2">
+                              <Label>Capacity for this Slot <span className="text-red-500">*</span></Label>
+                              <Input
+                                type="number"
+                                {...form.register(`slots.${index}.capacity`)}
+                              />
+                              {form.formState.errors.slots?.[index]?.capacity && (
+                                <p className="text-sm text-red-500">
+                                  {form.formState.errors.slots[index]?.capacity?.message}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity absolute top-2 right-2"
+                          onClick={() => removeSlot(index)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => appendSlot({ startDate: "", endDate: "", capacity: 10, title: "", priority: 0 })}
+                      className="mt-2"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Slot
+                    </Button>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Max Altitude (ft)</Label>
-                  <Input type="number" {...form.register("maxAltitude")} />
-                  {form.formState.errors.maxAltitude && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.maxAltitude.message}
-                    </p>
-                  )}
                 </div>
-              </div>
             </div>
 
             {/* STEP 2: CONTENT */}
             <div className={step === 2 ? "block" : "hidden"}>
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <Label>Overview</Label>
+                  <Label>Overview <span className="text-red-500">*</span></Label>
                   <Textarea
                     {...form.register("overview")}
                     rows={4}
@@ -882,18 +1088,10 @@ export function TripFormModal({
 
                 {/* HIGHLIGHTS */}
                 <div className="space-y-4 pt-2">
-                  <div className="flex items-center justify-between">
+                  <div>
                     <Label className="text-base font-semibold">
                       Highlights
                     </Label>
-                    <Button
-                      type="button"
-                      onClick={addHighlightItem}
-                      className="bg-gray-900 hover:bg-gray-800 text-white flex items-center gap-2"
-                      size="sm"
-                    >
-                      <Plus className="w-4 h-4 mr-1" /> Add Highlight
-                    </Button>
                   </div>
                   {highlightItems.length === 0 ? (
                     <div className="py-6 text-center border-2 border-dashed border-gray-200 rounded-lg bg-gray-50 text-gray-500">
@@ -946,22 +1144,22 @@ export function TripFormModal({
                       </div>
                     ))
                   )}
+                  <Button
+                    type="button"
+                    onClick={addHighlightItem}
+                    className="bg-gray-900 hover:bg-gray-800 text-white flex items-center gap-2 mt-2 w-fit"
+                    size="sm"
+                  >
+                    <Plus className="w-4 h-4 mr-1" /> Add Highlight
+                  </Button>
                 </div>
 
                 {/* INCLUSIONS */}
                 <div className="space-y-3 p-4 border rounded-lg bg-green-50/30 border-green-100">
-                  <div className="flex items-center justify-between">
+                  <div>
                     <Label className="text-base font-semibold text-green-800">
-                      Inclusions
+                      Inclusions <span className="text-red-500">*</span>
                     </Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => addInclusion({ value: "" })}
-                    >
-                      <Plus className="w-4 h-4 mr-1" /> Add
-                    </Button>
                   </div>
                   {inclusionFields.map((field, index) => (
                     <div key={field.id} className="flex items-center gap-2">
@@ -980,6 +1178,15 @@ export function TripFormModal({
                       </Button>
                     </div>
                   ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 w-fit"
+                    onClick={() => addInclusion({ value: "" })}
+                  >
+                    <Plus className="w-4 h-4 mr-1" /> Add
+                  </Button>
                   {form.formState.errors.inclusions && (
                     <p className="text-sm text-red-500">
                       {form.formState.errors.inclusions.root?.message ||
@@ -990,18 +1197,10 @@ export function TripFormModal({
 
                 {/* EXCLUSIONS */}
                 <div className="space-y-3 p-4 border rounded-lg bg-red-50/30 border-red-100">
-                  <div className="flex items-center justify-between">
+                  <div>
                     <Label className="text-base font-semibold text-red-800">
-                      Exclusions
+                      Exclusions <span className="text-red-500">*</span>
                     </Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => addExclusion({ value: "" })}
-                    >
-                      <Plus className="w-4 h-4 mr-1" /> Add
-                    </Button>
                   </div>
                   {exclusionFields.map((field, index) => (
                     <div key={field.id} className="flex items-center gap-2">
@@ -1020,6 +1219,15 @@ export function TripFormModal({
                       </Button>
                     </div>
                   ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 w-fit"
+                    onClick={() => addExclusion({ value: "" })}
+                  >
+                    <Plus className="w-4 h-4 mr-1" /> Add
+                  </Button>
                   {form.formState.errors.exclusions && (
                     <p className="text-sm text-red-500">
                       {form.formState.errors.exclusions.root?.message ||
@@ -1033,7 +1241,7 @@ export function TripFormModal({
             {/* STEP 3: FAQs */}
             <div className={step === 3 ? "block" : "hidden"}>
               <div className="space-y-4">
-                <div className="flex items-center justify-between border-b pb-3">
+                <div className="border-b pb-3">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">
                       Frequently Asked Questions
@@ -1042,13 +1250,6 @@ export function TripFormModal({
                       Add common questions and answers for this trip.
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    onClick={() => addFaq({ question: "", answer: "" })}
-                    className="bg-gray-900 hover:bg-gray-800 text-white flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" /> Add FAQ
-                  </Button>
                 </div>
 
                 <div className="space-y-4">
@@ -1135,22 +1336,21 @@ export function TripFormModal({
                       </div>
                     ))
                   )}
+                  <Button
+                    type="button"
+                    onClick={() => addFaq({ question: "", answer: "" })}
+                    className="bg-gray-900 hover:bg-gray-800 text-white flex items-center gap-2 mt-2 w-fit"
+                  >
+                    <Plus className="w-4 h-4" /> Add FAQ
+                  </Button>
                 </div>
 
                 {/* TRIP TAGS */}
                 <div className="space-y-3 p-4 mt-6 border rounded-lg bg-blue-50/30 border-blue-100">
-                  <div className="flex items-center justify-between">
+                  <div>
                     <Label className="text-base font-semibold text-blue-800">
                       Trip Tags
                     </Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => addTripTag({ value: "" })}
-                    >
-                      <Plus className="w-4 h-4 mr-1" /> Add Tag
-                    </Button>
                   </div>
                   <p className="text-xs text-gray-500">
                     Add tags to categorize this trip (e.g. Adventure, Couples,
@@ -1175,15 +1375,29 @@ export function TripFormModal({
                         </Button>
                       </div>
                     ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 w-fit"
+                      onClick={() => addTripTag({ value: "" })}
+                    >
+                      <Plus className="w-4 h-4 mr-1" /> Add Tag
+                    </Button>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* STEP 4: STAY & TRANSPORT */}
+            {/* STEP 4: ITINERARY */}
             <div className={step === 4 ? "block" : "hidden"}>
+              <ItineraryStep control={form.control} register={form.register} errors={form.formState.errors} />
+            </div>
+
+            {/* STEP 5: STAY & TRANSPORT */}
+            <div className={step === 5 ? "block" : "hidden"}>
               <div className="space-y-4">
-                <div className="flex items-center justify-between border-b pb-3">
+                <div className="border-b pb-3">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">
                       Stay & Transport Options
@@ -1193,13 +1407,6 @@ export function TripFormModal({
                       transport.
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    onClick={addStayItem}
-                    className="bg-[#781216] hover:bg-[#5a0d10] text-white flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" /> Add Item
-                  </Button>
                 </div>
 
                 <div className="space-y-4 pt-2">
@@ -1255,12 +1462,19 @@ export function TripFormModal({
                       </div>
                     ))
                   )}
+                  <Button
+                    type="button"
+                    onClick={addStayItem}
+                    className="bg-[#781216] hover:bg-[#5a0d10] text-white flex items-center gap-2 mt-2 w-fit"
+                  >
+                    <Plus className="w-4 h-4" /> Add Item
+                  </Button>
                 </div>
               </div>
             </div>
 
-            {/* STEP 5: MEDIA (BANNER IMAGES) */}
-            <div className={step === 5 ? "block" : "hidden"}>
+            {/* STEP 6: MEDIA (BANNER IMAGES) */}
+            <div className={step === 6 ? "block" : "hidden"}>
               <div className="space-y-4">
                 {isEdit && trip?.bannerImages?.length > 0 && (
                   <div className="mb-6">
@@ -1294,7 +1508,7 @@ export function TripFormModal({
                   </div>
                 )}
                 <div className="p-8 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 flex flex-col items-center justify-center text-center">
-                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 mb-4">
+                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 mb-4">
                     <UploadCloud className="w-8 h-8 text-[#c8a96e]" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-1">

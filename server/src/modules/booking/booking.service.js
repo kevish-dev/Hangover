@@ -30,22 +30,38 @@ export const createBooking = async (userId, data) => {
     );
   }
 
-  // 2. Fetch trip
-  const trip = await prisma.trip.findUnique({ where: { id: data.tripId } });
-  if (!trip) throw new NotFoundError("Trip not found");
-  if (!trip.isActive)
-    throw new ValidationError("This trip is no longer available for booking.");
+  if (!data.slotId) {
+    throw new ValidationError("Must provide a slotId to book.");
+  }
 
-  // Check if user already has an active booking for this trip
+  const slot = await prisma.slot.findUnique({ 
+    where: { id: data.slotId },
+    include: { 
+      trip: { include: { packages: true } }, 
+      festival: { include: { packages: true } } 
+    } 
+  });
+  if (!slot) {
+    throw new NotFoundError("Booking slot not found");
+  }
+
+  const isTrip = !!slot.tripId;
+  const item = isTrip ? slot.trip : slot.festival;
+
+  if (!item) throw new NotFoundError("Booking item not found");
+  if (!item.isActive)
+    throw new ValidationError("This item is no longer available for booking.");
+
+  // Check if user already has an active booking for this item
   const existingActive = await prisma.booking.findFirst({
     where: {
       userId,
-      tripId: data.tripId,
+      slotId: data.slotId,
       status: { in: ["RESERVED", "CONFIRMED", "COMPLETED"] },
     },
   });
   if (existingActive) {
-    throw new ValidationError("You have already booked this trip.");
+    throw new ValidationError("You have already booked this item.");
   }
 
   // 3. Pricing calculation (per-person)
@@ -53,18 +69,29 @@ export const createBooking = async (userId, data) => {
 
   // Validate traveler count against group size limits
 
-  // Check capacity
-  const spotsLeft = trip.capacity - trip.filledSpots;
+  // Check capacity on the slot
+  const spotsLeft = slot.capacity - slot.filledSpots;
   if (numberOfTravelers > spotsLeft) {
     throw new ValidationError(
-      `Only ${spotsLeft} spot(s) remaining on this trip.`,
+      `Only ${spotsLeft} spot(s) remaining for the selected dates.`,
     );
   }
 
-  const baseTotalAmount = Number(trip.price) * numberOfTravelers;
+  let selectedPackage = null;
+  if (data.packageId) {
+    selectedPackage = item.packages?.find(p => p.id === data.packageId);
+    if (!selectedPackage) {
+      throw new ValidationError("Selected package not found for this item.");
+    }
+  }
+
+  const itemPrice = selectedPackage ? Number(selectedPackage.price) : Number(item.price);
+  const itemToken = selectedPackage ? Number(selectedPackage.tokenAmount) : Number(item.tokenAmount);
+
+  const baseTotalAmount = itemPrice * numberOfTravelers;
   const totalAmount = baseTotalAmount + (baseTotalAmount * 0.05);
 
-  const baseTokenAmount = Number(trip.tokenAmount) * numberOfTravelers;
+  const baseTokenAmount = itemToken * numberOfTravelers;
   const tokenAmount = baseTokenAmount + (baseTokenAmount * 0.05);
 
   let initialPaymentType = data.initialPaymentType || "TOKEN";
@@ -74,8 +101,8 @@ export const createBooking = async (userId, data) => {
   const amountDue =
     initialPaymentType === "FULL" ? 0 : totalAmount - tokenAmount;
 
-  // 4. Calculate balance due date: 10 days before trip start
-  const balanceDueDate = new Date(trip.startDate);
+  // 4. Calculate balance due date: 10 days before start
+  const balanceDueDate = new Date(slot.startDate);
   balanceDueDate.setDate(balanceDueDate.getDate() - 10);
 
   // 5. Build booking payload
@@ -103,7 +130,7 @@ export const createBooking = async (userId, data) => {
   const existingPending = await prisma.booking.findFirst({
     where: {
       userId,
-      tripId: data.tripId,
+      slotId: data.slotId,
       status: "PENDING",
     },
   });
@@ -119,7 +146,8 @@ export const createBooking = async (userId, data) => {
   // Generate booking reference and complete payload for a new booking
   bookingData.bookingReference = `HNG-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
   bookingData.userId = userId;
-  bookingData.tripId = data.tripId;
+  bookingData.slotId = data.slotId;
+  if (selectedPackage) bookingData.packageId = selectedPackage.id;
   bookingData.status = "PENDING";
   bookingData.paymentStatus = "PENDING";
 
@@ -156,15 +184,25 @@ export const getBookingById = async (id, userId, isAdmin = false) => {
   if (!booking) throw new NotFoundError("Booking not found");
   if (!isAdmin && booking.userId !== userId)
     throw new ForbiddenError("Forbidden");
-  return booking;
+  
+  return {
+    ...booking,
+    trip: booking.slot?.trip || null,
+    festival: booking.slot?.festival || null,
+  };
 };
 
 export const getUserBookings = async (userId, page = 1, limit = 10) => {
   const skip = (page - 1) * limit;
   const take = parseInt(limit, 10);
   const { bookings, total } = await repo.getUserBookings(userId, skip, take);
+  const mappedBookings = bookings.map(b => ({
+    ...b,
+    trip: b.slot?.trip || null,
+    festival: b.slot?.festival || null,
+  }));
   return {
-    data: bookings,
+    data: mappedBookings,
     meta: {
       total,
       page: parseInt(page, 10),
@@ -178,8 +216,13 @@ export const getAllBookings = async (page = 1, limit = 10) => {
   const skip = (page - 1) * limit;
   const take = parseInt(limit, 10);
   const { bookings, total } = await repo.getAllBookings(skip, take);
+  const mappedBookings = bookings.map(b => ({
+    ...b,
+    trip: b.slot?.trip || null,
+    festival: b.slot?.festival || null,
+  }));
   return {
-    data: bookings,
+    data: mappedBookings,
     meta: {
       total,
       page: parseInt(page, 10),
@@ -190,14 +233,20 @@ export const getAllBookings = async (page = 1, limit = 10) => {
 };
 
 export const getBookingsByTripId = async (tripId) => {
-  return repo.getBookingsByTripId(tripId);
+  const bookings = await repo.getBookingsByTripId(tripId);
+  return bookings.map(b => ({ ...b, trip: b.slot?.trip || null, festival: b.slot?.festival || null }));
+};
+
+export const getBookingsByFestivalId = async (festivalId) => {
+  const bookings = await repo.getBookingsByFestivalId(festivalId);
+  return bookings.map(b => ({ ...b, trip: b.slot?.trip || null, festival: b.slot?.festival || null }));
 };
 
 export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundAmount) => {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
     include: {
-      trip: true,
+      slot: { include: { trip: true, festival: true } },
       user: { include: { profile: true } },
       payments: {
         where: { status: "SUCCESS" }
@@ -279,6 +328,7 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
       }
     }
 
+
     // Determine new paymentStatus for booking
     let newPaymentStatus = "CANCELLED";
     if (totalPaid > 0) {
@@ -303,21 +353,24 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
       }
     });
 
-    // Free up trip spots
-    await tx.trip.update({
-      where: { id: booking.tripId },
-      data: {
-        filledSpots: Math.max(0, booking.trip.filledSpots - booking.numberOfTravelers)
-      }
-    });
+    // Free up spots
+    if (booking.slotId) {
+      await tx.slot.update({
+        where: { id: booking.slotId },
+        data: {
+          filledSpots: Math.max(0, (booking.slot.filledSpots || 0) - booking.numberOfTravelers)
+        }
+      });
+    }
   });
 
   // Send Email (Fire and forget)
   import("../../core/services/email.service.js").then((emailService) => {
     if (emailService.sendBookingCancelledRefundedEmail) {
+      const itemTitle = booking.trip ? booking.trip.title : booking.festival.title;
       emailService.sendBookingCancelledRefundedEmail(booking.user.email, {
         name: booking.user.profile?.fullName || "Traveler",
-        tripTitle: booking.trip.title,
+        tripTitle: itemTitle,
         bookingRef: booking.bookingReference,
         refundAmount: validRefundAmount
       }).catch(err => console.error("Failed to send cancellation email:", err));

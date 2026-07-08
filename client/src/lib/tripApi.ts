@@ -56,9 +56,7 @@ export interface ApiTrip {
   location: string;
   bannerImages: string[];
   duration: number;
-  difficultyLevel: string;
   bestTimeToVisit: string;
-  maxAltitude: number | null;
   overview: string;
   highlights: ApiStayTransportItem[] | null;
   inclusions: string[];
@@ -78,9 +76,11 @@ export interface ApiTrip {
   destination: ApiDestination | null;
   tripTags: ApiTripTag[];
   faqs: ApiFaq[];
-  itineraries?: ApiItinerary[];
+  itinerary?: any;
   createdAt: string;
   updatedAt: string;
+  slots?: any[];
+  packages?: any[];
 }
 
 export interface ApiTripsResponse {

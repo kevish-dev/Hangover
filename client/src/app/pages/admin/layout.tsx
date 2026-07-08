@@ -15,12 +15,13 @@ import {
   SidebarTrigger,
   SidebarInset,
 } from "../../components/ui/sidebar";
-import { LayoutDashboard, Map, MapPin, CalendarCheck, Users, Settings, LogOut, CreditCard, MessageSquare, Home } from "lucide-react";
+import { LayoutDashboard, Map, MapPin, CalendarCheck, Users, Settings, LogOut, CreditCard, MessageSquare, Home, Tent } from "lucide-react";
 
 const navItems = [
   { title: "Home", url: "/", icon: Home },
   { title: "Destinations", url: "/dashboard/destinations", icon: MapPin },
   { title: "Trips", url: "/dashboard/trips", icon: Map },
+  { title: "Festivals", url: "/dashboard/festivals", icon: Tent },
   { title: "Bookings", url: "/dashboard/bookings", icon: CalendarCheck },
   { title: "Payments", url: "/dashboard/payments", icon: CreditCard },
   { title: "Inquiries", url: "/dashboard/inquiries", icon: MessageSquare },
@@ -46,7 +47,7 @@ export default function AdminLayout() {
   return (
     <SidebarProvider>
       <Sidebar variant="inset" collapsible="icon" className="border-r border-gray-200">
-        <SidebarHeader className="border-b border-gray-200 py-4 px-4 flex flex-row items-center justify-between">
+        <SidebarHeader className="border-b border-gray-200 flex flex-row items-center justify-between">
           <div className="flex items-center gap-2 overflow-hidden">
              <div className="size-8 rounded-md bg-[#781216] flex items-center justify-center shrink-0">
                <span className="text-white font-bold text-lg leading-none">H</span>

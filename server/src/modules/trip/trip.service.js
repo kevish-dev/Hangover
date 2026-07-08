@@ -39,37 +39,32 @@ export const createTrip = async (data) => {
   if (!data.slug) {
     data.slug = generateSlug(data.title) + "-" + Date.now();
   }
-  if (!data.stayTransportImages) {
-    data.stayTransportImages = [];
-  }
-  if (data.startDate && data.endDate) {
-    const start = new Date(data.startDate);
-    const end = new Date(data.endDate);
+  if (!data.stayTransportImages) data.stayTransportImages = [];
+
+  if (data.slots && data.slots.length > 0 && data.slots[0].startDate && data.slots[0].endDate) {
+    const start = new Date(data.slots[0].startDate);
+    const end = new Date(data.slots[0].endDate);
     if (end <= start) {
       throw new Error("End date must be strictly after start date");
     }
     const diffTime = Math.abs(end - start);
     data.duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }
+  if (!data.duration) data.duration = 1;
+
+  // price and tokenAmount are required Decimal columns — ensure they're set
+  if (data.price === undefined || data.price === null) data.price = 0;
+  if (data.tokenAmount === undefined || data.tokenAmount === null) data.tokenAmount = 0;
+
   return tripRepo.create(data);
 };
 
 export const updateTrip = async (id, data) => {
-  if (data.startDate || data.endDate) {
-    let start = data.startDate;
-    let end = data.endDate;
-    if (!start || !end) {
-      const trip = await tripRepo.findById(id);
-      start = start || trip.startDate;
-      end = end || trip.endDate;
-    }
-    if (start && end) {
-      const s = new Date(start);
-      const e = new Date(end);
-      if (e <= s) {
-        throw new Error("End date must be strictly after start date");
-      }
-      const diffTime = Math.abs(e - s);
+  if (data.slots && data.slots.length > 0 && data.slots[0].startDate && data.slots[0].endDate) {
+    const start = new Date(data.slots[0].startDate);
+    const end = new Date(data.slots[0].endDate);
+    if (end > start) {
+      const diffTime = Math.abs(end - start);
       data.duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     }
   }

@@ -58,9 +58,7 @@ registry.registerPath({
               title: z.string(),
               location: z.string(),
               duration: z.number().optional(),
-              difficultyLevel: z.string(),
               bestTimeToVisit: z.string(),
-              maxAltitude: z.number().optional(),
               overview: z.string(),
               price: z.number(),
               tokenAmount: z.number(),
@@ -77,6 +75,15 @@ registry.registerPath({
                     answer: z.string(),
                     order: z.number().optional(),
                   }),
+                )
+                .optional(),
+              packages: z
+                .array(
+                  z.object({
+                    title: z.string(),
+                    price: z.number(),
+                    tokenAmount: z.number(),
+                  })
                 )
                 .optional(),
             })
@@ -124,6 +131,15 @@ registry.registerPath({
                     answer: z.string(),
                     order: z.number().optional(),
                   }),
+                )
+                .optional(),
+              packages: z
+                .array(
+                  z.object({
+                    title: z.string(),
+                    price: z.number(),
+                    tokenAmount: z.number(),
+                  })
                 )
                 .optional(),
             })

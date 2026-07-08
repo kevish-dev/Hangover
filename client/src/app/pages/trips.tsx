@@ -41,13 +41,12 @@ type Filters = {
   categories: string[];
   durations: string[];
   months: string[];
-  difficulties: string[];
   priceRange: string | null;
 };
 
 const EMPTY_FILTERS: Filters = {
   destinations: [], categories: [], durations: [],
-  months: [], difficulties: [], priceRange: null,
+  months: [], priceRange: null,
 };
 
 // ── Helper: extract month abbreviations from bestTimeToVisit ──────
@@ -314,7 +313,6 @@ function FilterSidebar({
   availableDestinations, 
   availableCategories,
   availableDurations,
-  availableDifficulties,
   availablePriceRanges
 }: {
   filters: Filters;
@@ -322,7 +320,6 @@ function FilterSidebar({
   availableDestinations: string[];
   availableCategories: string[];
   availableDurations: string[];
-  availableDifficulties: string[];
   availablePriceRanges: { label: string, min: number, max: number }[];
 }) {
   const toggle = (key: keyof Omit<Filters, "priceRange">, val: string) => {
@@ -404,16 +401,6 @@ function FilterSidebar({
         />
       </FilterGroup>
 
-      {/* Difficulty */}
-      {availableDifficulties.length > 0 && (
-        <FilterGroup title="Difficulty" defaultOpen={false}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "7px" }}>
-            {availableDifficulties.map((d) => (
-              <CheckPill key={d} label={d} active={filters.difficulties.includes(d)} onToggle={() => toggle("difficulties", d)} />
-            ))}
-          </div>
-        </FilterGroup>
-      )}
     </div>
   );
 }
@@ -784,12 +771,6 @@ export default function TripsPage() {
     return sorted.map(d => formatDuration(d));
   }, [trips]);
 
-  const availableDifficulties = useMemo(() => {
-    const diffSet = new Set<string>();
-    trips.forEach(t => { if (t.difficultyLevel) diffSet.add(t.difficultyLevel); });
-    return Array.from(diffSet).sort();
-  }, [trips]);
-
   const availablePriceRanges = useMemo(() => {
     return PRICE_RANGES.filter(r => trips.some(t => {
       const price = priceToNumber(t.price);
@@ -835,9 +816,6 @@ export default function TripsPage() {
         const tripMonths = parseMonths(t.bestTimeToVisit);
         if (!filters.months.some((m) => tripMonths.includes(m))) return false;
       }
-
-      // Difficulty
-      if (filters.difficulties.length > 0 && !filters.difficulties.includes(t.difficultyLevel)) return false;
 
       return true;
     });
@@ -932,7 +910,7 @@ export default function TripsPage() {
 
           {/* Sidebar — desktop */}
           <div className="hidden lg:block" style={{ width: "240px", flexShrink: 0, position: "sticky", top: "155px", background: "#ffffff", border: "1px solid rgba(30,26,20,0.07)", borderRadius: "12px", padding: "20px 20px 8px" }}>
-            <FilterSidebar filters={filters} setFilters={setFilters} availableDestinations={availableDestinations} availableCategories={availableCategories} availableDurations={availableDurations} availableDifficulties={availableDifficulties} availablePriceRanges={availablePriceRanges} />
+            <FilterSidebar filters={filters} setFilters={setFilters} availableDestinations={availableDestinations} availableCategories={availableCategories} availableDurations={availableDurations} availablePriceRanges={availablePriceRanges} />
           </div>
 
           {/* Mobile filter drawer */}
@@ -952,7 +930,7 @@ export default function TripsPage() {
                     <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, color: "#1e1a14", fontSize: "0.9rem" }}>Filters</span>
                     <button onClick={() => setMobileFiltersOpen(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#1e1a14" /></button>
                   </div>
-                  <FilterSidebar filters={filters} setFilters={setFilters} availableDestinations={availableDestinations} availableCategories={availableCategories} availableDurations={availableDurations} availableDifficulties={availableDifficulties} availablePriceRanges={availablePriceRanges} />
+                  <FilterSidebar filters={filters} setFilters={setFilters} availableDestinations={availableDestinations} availableCategories={availableCategories} availableDurations={availableDurations} availablePriceRanges={availablePriceRanges} />
                 </motion.div>
               </>
             )}

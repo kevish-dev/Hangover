@@ -46,7 +46,9 @@ export interface ApiBooking {
   specialRequests: string | null;
   createdAt: string;
   updatedAt: string;
-  trip: ApiTrip;
+  trip?: ApiTrip;
+  festival?: any; // Add festival type when available
+  slot?: any; // Add slot type
   payments: ApiPayment[];
 }
 
@@ -72,19 +74,28 @@ export async function fetchMyBookings(): Promise<ApiBooking[]> {
 // ── Helpers ───────────────────────────────────────────────────────
 
 export function isUpcomingBooking(b: ApiBooking): boolean {
-  // CANCELLED bookings (including fully-refunded ones) always go to Past
   if (b.status === "CANCELLED" || b.status === "COMPLETED") return false;
-  const tripStart = new Date(b.trip.startDate);
-  const now = new Date();
   const activeStatuses: BookingStatus[] = ["PENDING", "RESERVED", "CONFIRMED"];
-  return activeStatuses.includes(b.status) && tripStart > now;
+  if (!activeStatuses.includes(b.status)) return false;
+  
+  if (!b.slot?.startDate) return true; // Show active bookings without slots as upcoming
+  const tripStart = new Date(b.slot.startDate);
+  const now = new Date();
+  return tripStart > now;
 }
 
 export function isPastBooking(b: ApiBooking): boolean {
-  return !isUpcomingBooking(b);
+  if (b.status === "COMPLETED" || b.status === "CANCELLED") return true;
+  if (!b.slot?.startDate) return false; // If no slot and not completed/cancelled, it's upcoming
+  
+  const tripStart = new Date(b.slot.startDate);
+  const now = new Date();
+  
+  return tripStart <= now;
 }
 
-export function formatBookingDate(iso: string): string {
+export function formatBookingDate(iso?: string): string {
+  if (!iso) return "N/A";
   return new Date(iso).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
@@ -92,7 +103,8 @@ export function formatBookingDate(iso: string): string {
   });
 }
 
-export function formatTravelMonth(iso: string): string {
+export function formatTravelMonth(iso?: string): string {
+  if (!iso) return "TBD";
   return new Date(iso).toLocaleDateString("en-IN", {
     month: "short",
     year: "numeric",

@@ -67,9 +67,10 @@ function StatusBadge({ status }: { status: string }) {
 
 function BookingCard({ booking }: { booking: ApiBooking }) {
   const [hovered, setHovered] = useState(false);
-  const trip = booking.trip;
-  const heroImage = trip.bannerImages?.[0] || "";
-  const state = trip.destination?.state || trip.location || "";
+  const item = booking.trip || booking.festival;
+  const isFestival = !!booking.festival;
+  const heroImage = item?.bannerImages?.[0] || "";
+  const state = item?.destination?.state || item?.location || "";
   const paid = parseFloat(booking.amountPaid || "0");
   const due = parseFloat(booking.amountDue || "0");
   const isFullyRefunded = booking.paymentStatus === "REFUNDED";
@@ -129,7 +130,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
         {heroImage ? (
           <img
             src={heroImage}
-            alt={trip.title}
+            alt={item?.title}
             style={{
               width: "100%",
               height: "100%",
@@ -224,7 +225,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
               lineHeight: 1.3,
             }}
           >
-            {trip.title}
+            {item?.title}
           </h3>
           <p
             style={{
@@ -248,9 +249,9 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
           }}
         >
           {[
-            { icon: Calendar, text: `Travel ${formatTravelMonth(trip.startDate)}` },
+            { icon: Calendar, text: `Travel ${formatTravelMonth(booking.slot?.startDate)}` },
             { icon: Users, text: `${booking.numberOfTravelers} Traveler${booking.numberOfTravelers > 1 ? "s" : ""}` },
-            { icon: Clock, text: formatDuration(trip.duration) },
+            ...(item?.duration ? [{ icon: Clock, text: formatDuration(item.duration) }] : []),
           ].map(({ icon: Icon, text }, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
               <Icon size={11} color="rgba(30,26,20,0.35)" strokeWidth={1.5} />
@@ -340,7 +341,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
             {/* Book Again — only shown for fully refunded trips */}
             {isFullyRefunded && (
               <Link
-                to={`/book/${trip.slug}`}
+                to={`/book/${item?.slug}${isFestival ? "?type=festival" : ""}`}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -363,7 +364,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
               </Link>
             )}
             <Link
-              to={`/trips/${trip.slug}`}
+              to={isFestival ? `/festivals/${item?.slug}` : `/trips/${item?.slug}`}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -376,7 +377,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
                 whiteSpace: "nowrap",
               }}
             >
-              View Trip <ChevronRight size={12} />
+              View {isFestival ? "Festival" : "Trip"} <ChevronRight size={12} />
             </Link>
           </div>
         </div>

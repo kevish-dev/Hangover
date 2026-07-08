@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link, useSearchParams } from "react-router";
+import { useParams, Link, useSearchParams, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowLeft,
@@ -20,6 +20,7 @@ import {
   formatDuration,
   type ApiTrip,
 } from "../../lib/tripApi";
+import { fetchFestivalBySlug } from "../../lib/festivalApi";
 import { apiClient, API_URL } from "../../lib/axios";
 import { useAuth } from "../../contexts/AuthContext";
 import { SiteFooter } from "../components/site-footer";
@@ -210,6 +211,7 @@ function FilePickerField({
         <input
           type="file"
           accept="image/*,.pdf"
+          required={required && !existingUrl && !file}
           style={{ display: "none" }}
           onChange={(e) => onChange(e.target.files?.[0] ?? null)}
         />
@@ -264,6 +266,7 @@ function UncontrolledFilePicker({
           type="file"
           name={name}
           accept="image/*,.pdf"
+          required={required && !file}
           style={{ display: "none" }}
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
         />
@@ -479,6 +482,7 @@ function TravelerForm({
             label="Upload Aadhaar Card"
             name={`traveler-${index}-aadhaar`}
             hint="Clear photo or scan — max 5 MB"
+            required={true}
           />
         </div>
       </div>
@@ -490,11 +494,15 @@ function TravelerForm({
 export default function BookingPage() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const resumeBookingId = searchParams.get("resume"); // set when coming from "Complete Payment" CTA
+  const isFestival = searchParams.get("type") === "festival";
+  const urlSlotId = searchParams.get("slotId");
   const { user, isLoading: authLoading } = useAuth();
 
-  const [trip, setTrip] = useState<ApiTrip | null>(null);
+  const [trip, setTrip] = useState<any>(null); // polymorphic
   const [loading, setLoading] = useState(true);
+  const [selectedSlotId, setSelectedSlotId] = useState<string>(urlSlotId || "");
 
   // Form state
   const [solo, setSolo] = useState<"yes" | "no" | null>("yes");
@@ -548,6 +556,7 @@ export default function BookingPage() {
 
   // Payment choice
   const [paymentChoice, setPaymentChoice] = useState<"FULL" | "TOKEN">("FULL");
+  const [selectedPackageId, setSelectedPackageId] = useState<string | null | undefined>(undefined);
 
   // Booking flow state
   const [bookingStep, setBookingStep] = useState<
@@ -572,7 +581,8 @@ export default function BookingPage() {
   useEffect(() => {
     if (!slug) return;
     setLoading(true);
-    fetchTripBySlug(slug)
+    const fetcher = isFestival ? fetchFestivalBySlug : fetchTripBySlug;
+    fetcher(slug)
       .then((data) => setTrip(data))
       .catch(() => setTrip(null))
       .finally(() => setLoading(false));
@@ -585,10 +595,10 @@ export default function BookingPage() {
         .then((res) => {
           const bookings = res.data?.data || [];
           const confirmed = bookings.find(
-            (b: any) => b.tripId === trip.id && (b.status === "CONFIRMED" || b.status === "COMPLETED"),
+            (b: any) => (isFestival ? b.festivalId === trip.id : b.tripId === trip.id) && (b.status === "CONFIRMED" || b.status === "COMPLETED"),
           );
           const reserved = bookings.find(
-            (b: any) => b.tripId === trip.id && b.status === "RESERVED",
+            (b: any) => (isFestival ? b.festivalId === trip.id : b.tripId === trip.id) && b.status === "RESERVED",
           );
           setHasBooked(!!confirmed);
           setReservedBooking(reserved || null);
@@ -596,6 +606,22 @@ export default function BookingPage() {
         .catch(console.error);
     }
   }, [user, trip]);
+
+  useEffect(() => {
+    if (selectedPackageId === undefined && trip) {
+      if (Number(trip.price) > 0) {
+        setSelectedPackageId(null);
+      } else if (trip.packages?.length > 0) {
+        setSelectedPackageId(trip.packages[0].id);
+      }
+    }
+  }, [trip, selectedPackageId]);
+
+  useEffect(() => {
+    if (trip?.slots?.length > 0 && !selectedSlotId) {
+      setSelectedSlotId(trip.slots[0].id);
+    }
+  }, [trip, selectedSlotId]);
 
   // Prevent scrolling when forced login is active
   useEffect(() => {
@@ -609,7 +635,8 @@ export default function BookingPage() {
     };
   }, [user, authLoading]);
 
-  const spotsLeft = trip ? trip.capacity - trip.filledSpots : 0;
+  const selectedSlot = trip?.slots?.find((s: any) => s.id === selectedSlotId);
+  const spotsLeft = selectedSlot ? selectedSlot.capacity - (selectedSlot.filledSpots || 0) : 0;
   const canAddMoreTravelers = 1 + travelers.length < spotsLeft;
 
   const addTraveler = () => {
@@ -627,19 +654,29 @@ export default function BookingPage() {
     // Extract additional traveler data synchronously before any await
     const form = e.currentTarget as HTMLFormElement;
     const formData = new FormData(form);
-    const additionalTravelers = travelers.map((_, index) => {
+    const extractedTravelers = travelers.map((_, index) => {
       const tFirstName = formData.get(`traveler-${index}-firstName`) as string;
       const tLastName = formData.get(`traveler-${index}-lastName`) as string;
       return {
-        fullName: `${tFirstName || ""} ${tLastName || ""}`.trim(),
+        firstName: tFirstName,
+        lastName: tLastName,
         email: formData.get(`traveler-${index}-email`) as string,
         phone: formData.get(`traveler-${index}-phone`) as string,
-        dateOfBirth: formData.get(`traveler-${index}-dob`) as string,
+        dob: formData.get(`traveler-${index}-dob`) as string,
         gender: formData.get(`traveler-${index}-gender`) as string,
+        aadhaarFile: formData.get(`traveler-${index}-aadhaar`) as File | null,
       };
     });
 
     setBookingError(null);
+
+    if (!selectedSlotId) {
+      const msg = "Please select a slot before proceeding.";
+      setBookingError(msg);
+      toast.error(msg);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
 
     // 1. Auth guard — redirect to Google login if not logged in
     if (!user) {
@@ -686,21 +723,47 @@ export default function BookingPage() {
       };
       await apiClient.put("/users/me/profile", profileData);
 
+      // Upload additional travelers govt IDs
+      const additionalTravelers = await Promise.all(extractedTravelers.map(async (t) => {
+        let aadhaarUrl = null;
+        if (t.aadhaarFile && t.aadhaarFile.size > 0) {
+          const idForm = new FormData();
+          idForm.append("image", t.aadhaarFile);
+          const uploadRes = await apiClient.post("/bookings/traveler/govt-id", idForm);
+          aadhaarUrl = uploadRes.data.url;
+        }
+        return {
+          fullName: `${t.firstName || ""} ${t.lastName || ""}`.trim(),
+          email: t.email,
+          phone: t.phone,
+          dateOfBirth: t.dob,
+          gender: t.gender,
+          aadhaar: aadhaarUrl,
+        };
+      }));
+
       // 3. Create the booking
       const numberOfTravelers = 1 + travelers.length;
-      const bookingRes = await apiClient.post("/bookings", {
-        tripId: trip!.id,
+      
+      const payload: any = {
         numberOfTravelers,
         specialRequests: specialRequests || undefined,
         initialPaymentType: isTokenZero ? "FULL" : paymentChoice,
         additionalTravelers,
-      });
+      };
+      if (selectedPackageId) {
+        payload.packageId = selectedPackageId;
+      }
+      
+      if (selectedSlotId) {
+        payload.slotId = selectedSlotId;
+      }
+      
+      const bookingRes = await apiClient.post("/bookings", payload);
       const {
         id: bookingId,
         bookingReference,
         initialPaymentType,
-        tokenAmount,
-        totalAmount,
       } = bookingRes.data;
 
       // 4. Initiate Razorpay payment — TOKEN or FULL based on backend decision
@@ -952,16 +1015,21 @@ export default function BookingPage() {
           >
             Trip not found.
           </p>
-          <Link
-            to="/trips"
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
             style={{
               color: "#781216",
               textDecoration: "none",
               fontSize: "0.82rem",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: 0
             }}
           >
-            ← Back to trips
-          </Link>
+            ← Go Back
+          </button>
         </div>
       </div>
     );
@@ -971,17 +1039,21 @@ export default function BookingPage() {
   const tripName = trip.title;
   const tripImage =
     trip.bannerImages?.[0] || trip.highlights?.[0]?.imageUrl || "";
-  const tripPrice = formatPrice(trip.price);
   const tripDuration = formatDuration(trip.duration);
   const tripDestination = trip.location;
-  const tripDifficulty = trip.difficultyLevel;
+
+  const activePackage = trip.packages?.find((p: any) => p.id === selectedPackageId);
+  const basePrice = activePackage ? Number(activePackage.price) : Number(trip.price || 0);
+  const baseToken = activePackage ? Number(activePackage.tokenAmount) : Number(trip.tokenAmount || 0);
+
+  const tripPrice = formatPrice(basePrice);
 
   const numTravelers = 1 + travelers.length;
-  const baseTotalAmount = Number(trip.price) * numTravelers;
+  const baseTotalAmount = basePrice * numTravelers;
   const totalGst = baseTotalAmount * 0.05;
   const totalAmountDue = baseTotalAmount + totalGst;
 
-  const baseTokenTotal = Number(trip.tokenAmount) * numTravelers;
+  const baseTokenTotal = baseToken * numTravelers;
   const tokenGst = baseTokenTotal * 0.05;
   const tokenAmountDue = baseTokenTotal + tokenGst;
   const isTokenZero = tokenAmountDue === 0;
@@ -1223,7 +1295,7 @@ export default function BookingPage() {
             </strong>
           </p>
           <Link
-            to={`/trips/${slug}`}
+            to={`/profile`}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -1238,7 +1310,7 @@ export default function BookingPage() {
               paddingBottom: "3px",
             }}
           >
-            ← Back to Trip Details
+            Go to Profile Dashboard →
           </Link>
         </motion.div>
       </div>
@@ -1415,7 +1487,7 @@ export default function BookingPage() {
           </button>
           <br />
           <Link
-            to={`/trips/${slug}`}
+            to={`/profile`}
             style={{
               color: "#781216",
               fontSize: "0.78rem",
@@ -1427,7 +1499,7 @@ export default function BookingPage() {
               paddingBottom: "3px",
             }}
           >
-            ← Back to Trip Details
+            Go to Profile Dashboard →
           </Link>
         </motion.div>
       </div>
@@ -1485,7 +1557,7 @@ export default function BookingPage() {
             You have already booked this trip. Your spot is confirmed.
           </p>
           <Link
-            to={`/trips/${slug}`}
+            to={`/profile`}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -1500,7 +1572,7 @@ export default function BookingPage() {
               paddingBottom: "3px",
             }}
           >
-            ← Back to Trip Details
+            Go to Profile Dashboard →
           </Link>
         </motion.div>
       </div>
@@ -1545,8 +1617,9 @@ export default function BookingPage() {
             zIndex: 1,
           }}
         >
-          <Link
-            to={`/trips/${slug}`}
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -1557,17 +1630,21 @@ export default function BookingPage() {
               textDecoration: "none",
               marginBottom: "14px",
               transition: "color 0.2s",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              padding: 0
             }}
             onMouseEnter={(e) =>
-              ((e.currentTarget as HTMLAnchorElement).style.color = "#f2ede4")
+              ((e.currentTarget as HTMLButtonElement).style.color = "#f2ede4")
             }
             onMouseLeave={(e) =>
-              ((e.currentTarget as HTMLAnchorElement).style.color =
+              ((e.currentTarget as HTMLButtonElement).style.color =
                 "rgba(242,237,228,0.55)")
             }
           >
             <ArrowLeft size={13} /> Back to {tripName}
-          </Link>
+          </button>
           <p
             style={{
               color: "#C8A96E",
@@ -1612,8 +1689,137 @@ export default function BookingPage() {
           }}
           className="grid-cols-1 lg:grid-cols-[1fr_340px]"
         >
-          {/* ══ LEFT: Form ══ */}
-          <form
+          {/* ══ LEFT: Selection & Form ══ */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "2.5rem" }}>
+            {/* ══ Slots & Packages Selection ══ */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: trip?.packages?.length > 0 ? "1fr 1fr" : "1fr",
+              gap: "24px"
+            }}>
+              {/* Slots Column */}
+              <div>
+                <h3 style={{
+                  color: "#1e1a14",
+                  fontSize: "1.2rem",
+                  fontWeight: 400,
+                  marginBottom: "16px",
+                  fontFamily: "'Playfair Display', serif"
+                }}>
+                  Select a Slot
+                </h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {[...(trip?.slots || [])].sort((a: any, b: any) => {
+                    const pA = a.priority || Infinity;
+                    const pB = b.priority || Infinity;
+                    if (pA !== pB) return pA - pB;
+                    return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+                  }).map((slot: any) => {
+                    const available = slot.capacity - (slot.filledSpots || 0);
+                    const isSoldOut = available <= 0;
+                    const isSelected = selectedSlotId === slot.id;
+                    return (
+                      <div
+                        key={slot.id}
+                        onClick={() => !isSoldOut && setSelectedSlotId(slot.id)}
+                        style={{
+                          padding: "16px",
+                          borderRadius: "8px",
+                          border: isSelected ? "1.5px solid #c8a96e" : "1px solid rgba(30,26,20,0.1)",
+                          background: isSelected ? "rgba(200,169,110,0.05)" : "#fff",
+                          cursor: isSoldOut ? "not-allowed" : "pointer",
+                          opacity: isSoldOut ? 0.6 : 1,
+                          transition: "all 0.2s ease",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center"
+                        }}
+                      >
+                        <div style={{ color: "#1e1a14", fontSize: "0.95rem", fontWeight: 500, fontFamily: "'Poppins', sans-serif" }}>
+                          {new Date(slot.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - {new Date(slot.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          {slot.title && <span style={{ marginLeft: "6px", fontWeight: 400, fontSize: "0.85rem", color: "rgba(30,26,20,0.7)" }}>({slot.title})</span>}
+                        </div>
+                        <div style={{ fontSize: "0.75rem", color: isSoldOut ? "#ef4444" : "rgba(30,26,20,0.5)", fontFamily: "'Poppins', sans-serif" }}>
+                          {isSoldOut ? "Sold Out" : `${available} spots left`}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Packages Column */}
+              {trip?.packages?.length > 0 && (
+                <div>
+                  <h3 style={{
+                    color: "#1e1a14",
+                    fontSize: "1.2rem",
+                    fontWeight: 400,
+                    marginBottom: "16px",
+                    fontFamily: "'Playfair Display', serif"
+                  }}>
+                    Select a Package
+                  </h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {Number(trip?.price) > 0 && (
+                      <div
+                        onClick={() => setSelectedPackageId(null)}
+                        style={{
+                          padding: "16px",
+                          borderRadius: "8px",
+                          border: selectedPackageId === null ? "1.5px solid #c8a96e" : "1px solid rgba(30,26,20,0.1)",
+                          background: selectedPackageId === null ? "rgba(200,169,110,0.05)" : "#fff",
+                          cursor: "pointer",
+                          transition: "all 0.2s ease",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center"
+                        }}
+                      >
+                        <div style={{ color: "#1e1a14", fontSize: "0.95rem", fontWeight: 500, fontFamily: "'Poppins', sans-serif" }}>
+                          Standard Package
+                        </div>
+                        <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#781216", fontFamily: "'Poppins', sans-serif" }}>
+                          {formatPrice(trip.price)}
+                        </div>
+                      </div>
+                    )}
+                    {trip.packages.map((pkg: any) => {
+                      const isSelected = selectedPackageId === pkg.id;
+                      return (
+                        <div
+                          key={pkg.id}
+                          onClick={() => setSelectedPackageId(pkg.id)}
+                          style={{
+                            padding: "16px",
+                            borderRadius: "8px",
+                            border: isSelected ? "1.5px solid #c8a96e" : "1px solid rgba(30,26,20,0.1)",
+                            background: isSelected ? "rgba(200,169,110,0.05)" : "#fff",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center"
+                          }}
+                        >
+                          <div style={{ color: "#1e1a14", fontSize: "0.95rem", fontWeight: 500, fontFamily: "'Poppins', sans-serif" }}>
+                            {pkg.title}
+                          </div>
+                          <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#781216", fontFamily: "'Poppins', sans-serif" }}>
+                            {formatPrice(pkg.price)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <hr style={{ border: "none", borderTop: "1px solid rgba(30,26,20,0.1)", margin: "0" }} />
+
+            {/* ══ Form ══ */}
+            <form
             onSubmit={handleSubmit}
             onInvalid={(e) => {
               e.preventDefault();
@@ -2151,6 +2357,8 @@ export default function BookingPage() {
                 </div>
               </div>
 
+
+
               {/* Price breakdown */}
               <div
                 style={{
@@ -2162,8 +2370,8 @@ export default function BookingPage() {
               >
                 {[
                   {
-                    label: "Trip Price (per person)",
-                    val: tripPrice,
+                    label: "Price (per person)",
+                    val: formatPrice(basePrice),
                   },
                   {
                     label: `Travelers`,
@@ -2452,6 +2660,7 @@ export default function BookingPage() {
               </p>
             </div>
           </form>
+          </div>
 
           {/* ══ RIGHT: Trip summary (sticky) ══ */}
           <div className="hidden lg:block" style={{ alignSelf: "stretch" }}>
@@ -2529,10 +2738,6 @@ export default function BookingPage() {
 
                   {[
                     { label: "Duration", val: tripDuration },
-                    {
-                      label: "Difficulty",
-                      val: tripDifficulty,
-                    },
                     {
                       label: "Dates",
                       val: trip.startDate && trip.endDate

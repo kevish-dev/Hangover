@@ -1,5 +1,3 @@
-// @ts-ignore — Vite resolves mp4 imports as asset URLs
-import video3Src from "../../imports/Lewis_Hamilton_Signing_Camera_Lens_F1_2014_Abu_Dhabi_GP.mp4";
 
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
@@ -101,15 +99,15 @@ const VIDEOS = [
     range: [0.33, 0.68] as [number, number],
     zIndex: 2,
   },
-  {
-    src: video3Src as string,
-    label: "Hornbill Festival",
-    location: "Nagaland",
-    date: "Dec 2025",
-    quote: "Ancient tribes, living culture.",
-    range: [0.63, 1.0] as [number, number],
-    zIndex: 3,
-  },
+  // {
+  //   src: video3Src as string,
+  //   label: "Hornbill Festival",
+  //   location: "Nagaland",
+  //   date: "Dec 2025",
+  //   quote: "Ancient tribes, living culture.",
+  //   range: [0.63, 1.0] as [number, number],
+  //   zIndex: 3,
+  // },
 ];
 
 // ── Main export ───────────────────────────────────────────────────────────────

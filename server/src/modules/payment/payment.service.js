@@ -25,8 +25,8 @@ const assertBookingOwner = (booking, userId, isAdmin = false) => {
  * Whichever fires first wins; the second call is a guaranteed no-op.
  *
  * Availability rule:
- *   - TOKEN payment  -> filledSpots++ (spot is immediately reserved)
- *   - FULL  payment  -> filledSpots++ (spot is immediately confirmed)
+ *   - TOKEN payment  -> filledSpots++ on slot (spot is immediately reserved)
+ *   - FULL  payment  -> filledSpots++ on slot (spot is immediately confirmed)
  *   - BALANCE payment -> NO increment (spot was already counted at TOKEN time)
  */
 const _processSuccessfulPayment = async (intent, rzpPaymentId, rzpSignature, rzpMethod) => {
@@ -94,10 +94,12 @@ const _processSuccessfulPayment = async (intent, rzpPaymentId, rzpSignature, rzp
     // 4. Decrement availability:
     //    TOKEN -> spot reserved now; FULL -> spot confirmed now; BALANCE -> already counted at TOKEN time.
     if (intent.type === "TOKEN" || intent.type === "FULL") {
-      await tx.trip.update({
-        where: { id: booking.tripId },
-        data: { filledSpots: { increment: booking.numberOfTravelers } },
-      });
+      if (booking.slotId) {
+        await tx.slot.update({
+          where: { id: booking.slotId },
+          data: { filledSpots: { increment: booking.numberOfTravelers } },
+        });
+      }
     }
 
     return pmt;
@@ -265,15 +267,27 @@ export const verifyPayment = async (userId, { razorpayOrderId, razorpayPaymentId
   try {
     const userEmail = booking.user?.email;
     const userName = booking.user?.profile?.fullName || "Traveler";
-    const tripTitle = booking.trip?.title || "your trip";
+    const tripTitle = booking.trip?.title || booking.festival?.title || "your trip";
+    
     if (userEmail) {
+      const travelersDetails = booking.travelers && booking.travelers.length > 0 
+        ? booking.travelers.map(t => t.fullName).join(", ") 
+        : "";
+      const packageName = booking.package?.title || null;
+      let slotName = null;
+      if (booking.slot) {
+        const start = new Date(booking.slot.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+        const end = new Date(booking.slot.endDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+        slotName = `${start} - ${end}`;
+      }
+
       await email.sendBookingConfirmedEmail({
         to: userEmail,
         name: userName,
         bookingRef: booking.bookingReference,
         tripTitle,
-        tripStartDate: booking.trip?.startDate,
-        tripEndDate: booking.trip?.endDate,
+        tripStartDate: booking.slot?.startDate,
+        tripEndDate: booking.slot?.endDate,
         amountPaid: intent.amount,
         totalAmount: booking.totalAmount,
         amountDue: intent.type === "FULL" || intent.type === "BALANCE" ? 0 : Number(booking.totalAmount) - Number(booking.tokenAmount),
@@ -281,6 +295,9 @@ export const verifyPayment = async (userId, { razorpayOrderId, razorpayPaymentId
         receiptNumber: payment.receiptNumberInt,
         invoiceDate: payment.paidAt,
         travelersCount: booking.numberOfTravelers,
+        packageName,
+        slotName,
+        travelersDetails,
       });
     }
   } catch (_) {
@@ -349,7 +366,7 @@ export const recordFailedPayment = async (userId, { razorpayOrderId, razorpayPay
   // Fire failure email — non-blocking so SMTP issues don't affect the response
   const userEmail = booking.user?.email;
   const userName = booking.user?.profile?.fullName || booking.user?.email?.split("@")[0] || "Traveller";
-  const tripTitle = booking.trip?.title || "your trip";
+  const tripTitle = booking.trip?.title || booking.festival?.title || "your trip";
   if (userEmail) {
     email.sendPaymentFailedEmail({
       to: userEmail,
@@ -435,9 +452,9 @@ export const handleWebhook = async (rawBody, signature) => {
                 to: userEmail,
                 name: booking.user?.profile?.fullName || "Traveler",
                 bookingRef: booking.bookingReference,
-                tripTitle: booking.trip?.title || "your trip",
-                tripStartDate: booking.trip?.startDate,
-                tripEndDate: booking.trip?.endDate,
+                tripTitle: booking.trip?.title || booking.festival?.title || "your trip",
+                tripStartDate: booking.slot?.startDate,
+                tripEndDate: booking.slot?.endDate,
                 amountPaid: intent.amount,
                 totalAmount: booking.totalAmount,
                 amountDue: intent.type === "FULL" || intent.type === "BALANCE" ? 0 : Number(booking.totalAmount) - Number(booking.tokenAmount),
@@ -649,13 +666,15 @@ export const issueRefund = async (paymentId, amount, reason, adminId) => {
     //    filledSpots is decremented for CONFIRMED (FULL/BALANCE paid) AND RESERVED (TOKEN paid)
     //    bookings, because both states hold a spot per the availability rule.
     if (isBookingFullyRefunded && (booking.status === "CONFIRMED" || booking.status === "RESERVED")) {
-      const currentTrip = await tx.trip.findUnique({ where: { id: booking.tripId }, select: { filledSpots: true } });
-      const safeDecrement = Math.min(booking.numberOfTravelers, currentTrip?.filledSpots ?? 0);
-      if (safeDecrement > 0) {
-        await tx.trip.update({
-          where: { id: booking.tripId },
-          data: { filledSpots: { decrement: safeDecrement } },
-        });
+      if (booking.slotId) {
+        const currentSlot = await tx.slot.findUnique({ where: { id: booking.slotId }, select: { filledSpots: true } });
+        const safeDecrement = Math.min(booking.numberOfTravelers, currentSlot?.filledSpots ?? 0);
+        if (safeDecrement > 0) {
+          await tx.slot.update({
+            where: { id: booking.slotId },
+            data: { filledSpots: { decrement: safeDecrement } },
+          });
+        }
       }
     }
 

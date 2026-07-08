@@ -9,7 +9,7 @@ export const createPaymentIntent = async (data) => {
 export const getPaymentIntentByOrderId = async (razorpayOrderId) => {
   return prisma.paymentIntent.findUnique({
     where: { razorpayOrderId },
-    include: { booking: { include: { user: { include: { profile: true } }, trip: true } } },
+    include: { booking: { include: { user: { include: { profile: true } }, trip: true, festival: true, slot: true, package: true, travelers: true } } },
   });
 };
 
@@ -26,7 +26,7 @@ export const createPayment = async (data) => {
 export const getPaymentById = async (id) => {
   return prisma.payment.findUnique({
     where: { id },
-    include: { booking: { include: { trip: true, user: { include: { profile: true } } } }, refunds: true },
+    include: { booking: { include: { trip: true, festival: true, slot: true, user: { include: { profile: true } } } }, refunds: true },
   });
 };
 

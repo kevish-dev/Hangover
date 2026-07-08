@@ -6,7 +6,7 @@ const FROM = env.SMTP_FROM;
 /**
  * Send booking confirmation email
  */
-export const sendBookingConfirmedEmail = async ({ to, name, bookingRef, tripTitle, tripStartDate, tripEndDate, amountPaid, totalAmount, amountDue, paymentType, receiptNumber, invoiceDate, travelersCount }) => {
+export const sendBookingConfirmedEmail = async ({ to, name, bookingRef, tripTitle, tripStartDate, tripEndDate, amountPaid, totalAmount, amountDue, paymentType, receiptNumber, invoiceDate, travelersCount, packageName, slotName, travelersDetails }) => {
   const dateStr = new Date(invoiceDate).toLocaleDateString("en-IN", {
     day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
   });
@@ -42,8 +42,11 @@ export const sendBookingConfirmedEmail = async ({ to, name, bookingRef, tripTitl
           <table style="width:100%;font-size:14px;line-height:1.8;">
             <tr><td style="color:#666;width:40%;">Booking Reference:</td><td style="font-weight:bold;color:#222;">${bookingRef}</td></tr>
             <tr><td style="color:#666;">Trip Name:</td><td style="font-weight:bold;color:#222;">${tripTitle}</td></tr>
+            ${packageName ? `<tr><td style="color:#666;">Package:</td><td style="font-weight:bold;color:#222;">${packageName}</td></tr>` : ''}
+            ${slotName ? `<tr><td style="color:#666;">Slot:</td><td style="font-weight:bold;color:#222;">${slotName}</td></tr>` : ''}
             ${tripStartDate && tripEndDate ? `<tr><td style="color:#666;">Trip Dates:</td><td style="font-weight:bold;color:#222;">${new Date(tripStartDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} - ${new Date(tripEndDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td></tr>` : ''}
             <tr><td style="color:#666;">Number of Travelers:</td><td style="font-weight:bold;color:#222;">${travelersCount}</td></tr>
+            ${travelersDetails ? `<tr><td style="color:#666;">Travelers:</td><td style="font-weight:bold;color:#222;">${travelersDetails}</td></tr>` : ''}
           </table>
         </div>
 

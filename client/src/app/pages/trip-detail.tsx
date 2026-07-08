@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams, Link } from "react-router";
+import { useParams, Link, useLocation, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import {
   MapPin,
@@ -36,9 +36,11 @@ import {
   type ApiTrip,
   type ApiFaq,
 } from "../../lib/tripApi";
+import { fetchFestivalBySlug } from "../../lib/festivalApi";
 import { SiteFooter } from "../components/site-footer";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiClient } from "../../lib/axios";
+import { toast } from "sonner";
 
 // ── "Not Available" inline label ──────────────────────────────────
 function NA({ text = "Not Available" }: { text?: string }) {
@@ -67,6 +69,7 @@ function RelatedTrips({
   const [related, setRelated] = useState<ApiTrip[]>([]);
 
   useEffect(() => {
+    if (!currentType) return;
     fetchAllTrips()
       .then((all) => {
         const sameType = all.filter(
@@ -186,7 +189,7 @@ function RelatedTrips({
 function RelatedCard({ trip }: { trip: ApiTrip }) {
   const [hovered, setHovered] = useState(false);
   const heroImage = trip.bannerImages?.[0] || "";
-  const typeLabel = formatTripType(trip.tripType);
+  const typeLabel = trip.tripType ? formatTripType(trip.tripType) : "Trip";
 
   return (
     <Link
@@ -805,9 +808,7 @@ function ItineraryAccordion({
 }: {
   days: {
     dayNumber: number;
-    title: string;
-    description: string | null;
-    activities: { title: string }[];
+    activities?: string | string[];
   }[];
 }) {
   const [open, setOpen] = useState<number | null>(0);
@@ -872,17 +873,6 @@ function ItineraryAccordion({
               >
                 Day {d.dayNumber}
               </p>
-              <p
-                style={{
-                  color: "#1e1a14",
-                  fontSize: "0.9rem",
-                  fontWeight: 500,
-                  margin: 0,
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                {d.title || <NA />}
-              </p>
             </div>
             <motion.div
               animate={{ rotate: open === d.dayNumber - 1 ? 180 : 0 }}
@@ -902,17 +892,6 @@ function ItineraryAccordion({
                 style={{ overflow: "hidden" }}
               >
                 <div style={{ padding: "0 20px 20px 68px" }}>
-                  <p
-                    style={{
-                      color: "rgba(30,26,20,0.62)",
-                      fontSize: "0.82rem",
-                      fontWeight: 300,
-                      lineHeight: 1.7,
-                      marginBottom: "12px",
-                    }}
-                  >
-                    {d.description || <NA text="No description available" />}
-                  </p>
                   <div
                     style={{
                       display: "flex",
@@ -920,26 +899,28 @@ function ItineraryAccordion({
                       gap: "6px",
                     }}
                   >
-                    {d.activities && d.activities.length > 0 ? (
-                      d.activities.map((a) => (
+                    {d.activities ? (
+                      (Array.isArray(d.activities) ? d.activities : typeof d.activities === 'string' ? d.activities.split('\n') : [])
+                        .filter(Boolean)
+                        .map((activity, i) => (
                         <div
-                          key={a.title}
+                          key={i}
                           style={{
                             display: "flex",
                             alignItems: "flex-start",
                             gap: "8px",
                           }}
                         >
-                          <div
+                          <span
                             style={{
-                              width: "5px",
-                              height: "5px",
-                              borderRadius: "50%",
-                              background: "#C8A96E",
-                              flexShrink: 0,
-                              marginTop: "6px",
+                              color: "#C8A96E",
+                              fontSize: "0.78rem",
+                              fontWeight: 500,
+                              minWidth: "14px",
                             }}
-                          />
+                          >
+                            {i + 1}.
+                          </span>
                           <span
                             style={{
                               color: "rgba(30,26,20,0.7)",
@@ -948,7 +929,7 @@ function ItineraryAccordion({
                               lineHeight: 1.5,
                             }}
                           >
-                            {a.title}
+                            {activity.trim()}
                           </span>
                         </div>
                       ))
@@ -1073,22 +1054,27 @@ function DetailLoadingSkeleton() {
 
 export default function TripDetail() {
   const { slug } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isFestival = location.pathname.startsWith("/festivals");
   const { user } = useAuth();
-  const [trip, setTrip] = useState<ApiTrip | null>(null);
+  const [trip, setTrip] = useState<any>(null); // polymorphic: ApiTrip | ApiFestival
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasBooked, setHasBooked] = useState(false);
   const [reservedBookingId, setReservedBookingId] = useState<string | null>(null);
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) return;
     setLoading(true);
     setError(null);
-    fetchTripBySlug(slug)
+    const fetcher = isFestival ? fetchFestivalBySlug : fetchTripBySlug;
+    fetcher(slug)
       .then((data) => setTrip(data))
       .catch((err) =>
         setError(
-          err?.response?.data?.message || err?.message || "Trip not found",
+          err?.response?.data?.message || err?.message || (isFestival ? "Festival not found" : "Trip not found"),
         ),
       )
       .finally(() => setLoading(false));
@@ -1101,10 +1087,10 @@ export default function TripDetail() {
         .then((res) => {
           const bookings = res.data?.data || [];
           const confirmed = bookings.find(
-            (b: any) => b.tripId === trip.id && (b.status === "CONFIRMED" || b.status === "COMPLETED")
+            (b: any) => (isFestival ? b.festivalId === trip.id : b.tripId === trip.id) && (b.status === "CONFIRMED" || b.status === "COMPLETED")
           );
           const reserved = bookings.find(
-            (b: any) => b.tripId === trip.id && b.status === "RESERVED"
+            (b: any) => (isFestival ? b.festivalId === trip.id : b.tripId === trip.id) && b.status === "RESERVED"
           );
           setHasBooked(!!confirmed);
           setReservedBookingId(reserved?.id || null);
@@ -1144,16 +1130,22 @@ export default function TripDetail() {
           >
             {error || "Trip not found"}
           </p>
-          <Link
-            to="/trips"
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
             style={{
               color: "#781216",
               fontSize: "0.82rem",
+              fontWeight: 500,
               textDecoration: "none",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: 0
             }}
           >
-            ← Back to all trips
-          </Link>
+            ← Go Back
+          </button>
         </div>
       </div>
     );
@@ -1162,27 +1154,21 @@ export default function TripDetail() {
   // Derived values
   const heroImage = trip.bannerImages?.[0] || "";
   const allImages = trip.bannerImages || [];
-  const typeLabel = formatTripType(trip.tripType);
+  const typeLabel = trip.tripType ? formatTripType(trip.tripType) : "Festival";
   const priceStr = formatPrice(trip.price);
   const durationStr = formatDuration(trip.duration);
-  const altitudeStr = formatAltitude(trip?.maxAltitude || null);
   const spots = spotsLeft(trip.capacity, trip.filledSpots);
-  const tags = trip.tripTags?.map((t) => t.tag) || [];
+  const tags = trip.tripTags?.map((t: any) => t.tag) || [];
   const stayItems = (
     Array.isArray(trip.stayTransportImages) ? trip.stayTransportImages : []
   ) as { text: string; imageUrl: string }[];
 
   // Flatten itinerary days
-  const itineraryDays = (trip.itineraries || [])
-    .flatMap((it) =>
-      (it.days || []).map((d) => ({
-        dayNumber: d.dayNumber,
-        title: d.title,
-        description: d.description,
-        activities: (d.activities || []).sort((a, b) => a.order - b.order),
-      })),
-    )
-    .sort((a, b) => a.dayNumber - b.dayNumber);
+  const itineraryDays = Array.isArray(trip.itinerary) 
+    ? [...trip.itinerary]
+        .map((d: any) => ({ ...d, dayNumber: d.dayNumber || d.day }))
+        .sort((a: any, b: any) => a.dayNumber - b.dayNumber)
+    : [];
 
   const waMessage = encodeURIComponent(
     `Hi! I'm interested in the "${trip.title}" trip. Can you share more details?`,
@@ -1197,7 +1183,6 @@ export default function TripDetail() {
       typeLabel={typeLabel}
       priceStr={priceStr}
       durationStr={durationStr}
-      altitudeStr={altitudeStr}
       spots={spots}
       tags={tags}
       stayItems={stayItems}
@@ -1205,6 +1190,9 @@ export default function TripDetail() {
       waLink={waLink}
       hasBooked={hasBooked}
       reservedBookingId={reservedBookingId}
+      selectedSlotId={selectedSlotId}
+      setSelectedSlotId={setSelectedSlotId}
+      isFestival={isFestival}
     />
   );
 }
@@ -1452,7 +1440,6 @@ function TripDetailContent({
   typeLabel,
   priceStr,
   durationStr,
-  altitudeStr,
   spots,
   tags,
   stayItems,
@@ -1460,6 +1447,9 @@ function TripDetailContent({
   waLink,
   hasBooked,
   reservedBookingId,
+  isFestival,
+  selectedSlotId,
+  setSelectedSlotId,
 }: {
   trip: ApiTrip;
   heroImage: string;
@@ -1467,7 +1457,6 @@ function TripDetailContent({
   typeLabel: string;
   priceStr: string;
   durationStr: string;
-  altitudeStr: string;
   spots: number;
   tags: string[];
   stayItems: { text: string; imageUrl: string }[];
@@ -1480,8 +1469,12 @@ function TripDetailContent({
   waLink: string;
   hasBooked: boolean;
   reservedBookingId: string | null;
+  selectedSlotId: string | null;
+  setSelectedSlotId: (id: string | null) => void;
+  isFestival?: boolean;
 }) {
   const [heroIndex, setHeroIndex] = useState(0);
+  const navigate = useNavigate();
   const [lightbox, setLightbox] = useState<number | null>(null);
 
   const safeAllImages =
@@ -1754,8 +1747,9 @@ function TripDetailContent({
         />
 
         {/* Back button */}
-        <Link
-          to="/trips"
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
           style={{
             position: "absolute",
             top: "90px",
@@ -1769,10 +1763,14 @@ function TripDetailContent({
             letterSpacing: "0.08em",
             textDecoration: "none",
             fontFamily: "'Poppins', sans-serif",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: 0
           }}
         >
-          <ArrowLeft size={14} /> All Trips
-        </Link>
+          <ArrowLeft size={14} /> Go Back
+        </button>
 
         {/* Prev / Next arrows */}
         {safeAllImages.length > 1 && (
@@ -1971,23 +1969,17 @@ function TripDetailContent({
                 {
                   icon: Calendar,
                   label: "Dates",
-                  value: trip.startDate && trip.endDate
-                    ? `${new Date(trip.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} - ${new Date(trip.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                  value: trip.slots && trip.slots.length > 0
+                    ? trip.slots.length === 1 
+                      ? `${new Date(trip.slots[0].startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` 
+                      : `${trip.slots.length} Slots Available`
                     : null,
-                },
-                {
-                  icon: Mountain,
-                  label: "Difficulty",
-                  value: trip.difficultyLevel || null,
                 },
                 {
                   icon: Calendar,
                   label: "Best Time",
                   value: trip.bestTimeToVisit || null,
                 },
-                ...((trip.maxAltitude || 0) > 0
-                  ? [{ icon: Zap, label: "Max Altitude", value: altitudeStr }]
-                  : []),
               ].map(({ icon: Icon, label, value }) => (
                 <div
                   key={label}
@@ -2305,6 +2297,8 @@ function TripDetailContent({
                   </p>
                 </div>
 
+
+
                 {/* Key info */}
                 <div
                   style={{
@@ -2318,8 +2312,6 @@ function TripDetailContent({
                 >
                   {[
                     { label: "Duration", val: durationStr },
-
-                    { label: "Difficulty", val: trip.difficultyLevel || null },
                     {
                       label: "Availability",
                       val: spots > 0 ? `${spots} spots left` : "Fully booked",
@@ -2354,6 +2346,9 @@ function TripDetailContent({
                   ))}
                 </div>
 
+                {/* Slot Selection */}
+
+
                 {/* Book button */}
                 {hasBooked ? (
                   <div
@@ -2380,7 +2375,7 @@ function TripDetailContent({
                   </div>
                 ) : reservedBookingId ? (
                   <Link
-                    to={`/book/${trip.slug}?resume=${reservedBookingId}`}
+                    to={`/book/${trip.slug}?resume=${reservedBookingId}${isFestival ? '&type=festival' : ''}`}
                     style={{
                       display: "block",
                       width: "100%",
@@ -2404,7 +2399,7 @@ function TripDetailContent({
                   </Link>
                 ) : (
                   <Link
-                    to={`/book/${trip.slug}`}
+                    to={`/book/${trip.slug}${isFestival ? '?type=festival' : ''}`}
                     style={{
                       display: "block",
                       width: "100%",
@@ -2566,7 +2561,7 @@ function TripDetailContent({
       </div>
 
       {/* ── Related Trips ── */}
-      <RelatedTrips currentId={trip.id} currentType={trip.tripType} />
+      {!isFestival && <RelatedTrips currentId={trip.id} currentType={trip.tripType} />}
 
       {/* ── WhatsApp FAB — always visible ── */}
       <a
