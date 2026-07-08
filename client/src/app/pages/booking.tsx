@@ -1710,7 +1710,12 @@ export default function BookingPage() {
                   Select a Slot
                 </h3>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  {trip?.slots?.map((slot: any) => {
+                  {[...(trip?.slots || [])].sort((a: any, b: any) => {
+                    const pA = a.priority || Infinity;
+                    const pB = b.priority || Infinity;
+                    if (pA !== pB) return pA - pB;
+                    return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+                  }).map((slot: any) => {
                     const available = slot.capacity - (slot.filledSpots || 0);
                     const isSoldOut = available <= 0;
                     const isSelected = selectedSlotId === slot.id;
@@ -1733,6 +1738,7 @@ export default function BookingPage() {
                       >
                         <div style={{ color: "#1e1a14", fontSize: "0.95rem", fontWeight: 500, fontFamily: "'Poppins', sans-serif" }}>
                           {new Date(slot.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - {new Date(slot.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          {slot.title && <span style={{ marginLeft: "6px", fontWeight: 400, fontSize: "0.85rem", color: "rgba(30,26,20,0.7)" }}>({slot.title})</span>}
                         </div>
                         <div style={{ fontSize: "0.75rem", color: isSoldOut ? "#ef4444" : "rgba(30,26,20,0.5)", fontFamily: "'Poppins', sans-serif" }}>
                           {isSoldOut ? "Sold Out" : `${available} spots left`}

@@ -92,6 +92,8 @@ export const create = async (data) => {
       create: slots.map(slot => ({
         startDate: new Date(slot.startDate),
         endDate: new Date(slot.endDate),
+        title: slot.title || null,
+        priority: slot.priority ? parseInt(slot.priority, 10) : 0,
         capacity: parseInt(slot.capacity, 10),
         filledSpots: 0
       }))
@@ -165,11 +167,15 @@ export const update = async (id, data) => {
         update: {
           startDate: new Date(slot.startDate),
           endDate: new Date(slot.endDate),
+          title: slot.title || null,
+          priority: slot.priority ? parseInt(slot.priority, 10) : 0,
           capacity: parseInt(slot.capacity, 10)
         },
         create: {
           startDate: new Date(slot.startDate),
           endDate: new Date(slot.endDate),
+          title: slot.title || null,
+          priority: slot.priority ? parseInt(slot.priority, 10) : 0,
           capacity: parseInt(slot.capacity, 10),
           filledSpots: 0
         }

@@ -16,6 +16,7 @@ import inquiryRoutes from "./src/modules/inquiry/inquiry.routes.js";
 import paymentRoutes from "./src/modules/payment/payment.routes.js";
 import destinationRoutes from "./src/modules/destination/destination.routes.js";
 import { errorHandler } from "./src/core/errors/errorHandler.js";
+import { prisma } from "./src/prisma/client.js";
 const app = express();
 
 // Raw body parser for Razorpay webhook (must be before express.json)
@@ -65,8 +66,20 @@ app.use(
 
 app.use(errorHandler);
 
-app.listen(env.PORT, () => {
-  console.log(`Server running on ${env.PORT}`);
-});
+const startServer = async () => {
+  try {
+    await prisma.$connect();
+    console.log("Connected to database successfully");
+    
+    app.listen(env.PORT, () => {
+      console.log(`Server running on ${env.PORT}`);
+    });
+  } catch (error) {
+    console.error("Failed to connect to database:", error);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 // Check cd

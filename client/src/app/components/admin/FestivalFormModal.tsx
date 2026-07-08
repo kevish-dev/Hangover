@@ -44,6 +44,8 @@ const festivalSchema = z.object({
       id: z.string().optional(),
       startDate: z.string().optional(),
       endDate: z.string().optional(),
+      title: z.string().optional(),
+      priority: z.coerce.number().optional(),
       capacity: z.coerce.number().min(1, "Capacity must be at least 1"),
     })
   ).min(1, "At least one slot is required"),
@@ -76,7 +78,11 @@ const festivalSchema = z.object({
   itinerary: z.array(
     z.object({
       dayNumber: z.coerce.number().min(1, "Day number is required"),
-      activities: z.string().min(1, "Activities description is required")
+      activities: z.array(
+        z.object({
+          value: z.string().min(1, "Activity is required")
+        })
+      ).min(1, "At least one activity is required")
     })
   ).optional(),
   }
@@ -188,8 +194,10 @@ export function FestivalFormModal({
             id: s.id,
             startDate: formatDateForInput(s.startDate),
             endDate: formatDateForInput(s.endDate),
+            title: s.title || "",
+            priority: s.priority || 0,
             capacity: s.capacity
-          })) : [{ startDate: "", endDate: "", capacity: 10 }],
+          })) : [{ startDate: "", endDate: "", capacity: 10, title: "", priority: 0 }],
           overview: festival.overview || "",
           inclusions: festival.inclusions?.length
             ? festival.inclusions.map((i: string) => ({ value: i }))
@@ -207,7 +215,14 @@ export function FestivalFormModal({
                 tokenAmount: p.tokenAmount,
               }))
             : [],
-          itinerary: Array.isArray(festival.itinerary) ? festival.itinerary : [],
+          itinerary: Array.isArray(festival.itinerary) ? festival.itinerary.map((day: any) => ({
+            ...day,
+            activities: Array.isArray(day.activities)
+              ? day.activities.map((a: string) => ({ value: a }))
+              : typeof day.activities === 'string'
+              ? day.activities.split('\n').filter(Boolean).map((a: string) => ({ value: a }))
+              : [{ value: "" }]
+          })) : [],
           faqs: festival.faqs?.length
             ? festival.faqs.map((f: any) => ({
                 question: f.question,
@@ -572,7 +587,10 @@ export function FestivalFormModal({
           ?.map((t) => t.value)
           .filter((t) => t.trim() !== ""),
         packages: data.packages,
-        itinerary: data.itinerary,
+        itinerary: data.itinerary?.map((day: any) => ({
+          ...day,
+          activities: day.activities.map((a: any) => a.value).filter(Boolean)
+        })),
         faqs: data.faqs?.filter(
           (f) => f.question.trim() !== "" && f.answer.trim() !== "",
         ),
@@ -925,6 +943,21 @@ export function FestivalFormModal({
                                 </p>
                               )}
                             </div>
+                            <div className="space-y-2">
+                              <Label>Title (e.g. Diwali Weekend)</Label>
+                              <Input
+                                placeholder="Optional"
+                                {...form.register(`slots.${index}.title`)}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Priority (1 is highest)</Label>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...form.register(`slots.${index}.priority`)}
+                              />
+                            </div>
                             <div className="space-y-2 col-span-2">
                               <Label>Capacity for this Slot <span className="text-red-500">*</span></Label>
                               <Input
@@ -950,6 +983,16 @@ export function FestivalFormModal({
                         </Button>
                       </div>
                     ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => appendSlot({ startDate: "", endDate: "", capacity: 10, title: "", priority: 0 })}
+                      className="mt-2"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Slot
+                    </Button>
                   </div>
                 </div>
 

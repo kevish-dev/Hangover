@@ -808,7 +808,7 @@ function ItineraryAccordion({
 }: {
   days: {
     dayNumber: number;
-    activities: string;
+    activities?: string | string[];
   }[];
 }) {
   const [open, setOpen] = useState<number | null>(0);
@@ -873,17 +873,6 @@ function ItineraryAccordion({
               >
                 Day {d.dayNumber}
               </p>
-              <p
-                style={{
-                  color: "#1e1a14",
-                  fontSize: "0.9rem",
-                  fontWeight: 500,
-                  margin: 0,
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                {d.title || <NA />}
-              </p>
             </div>
             <motion.div
               animate={{ rotate: open === d.dayNumber - 1 ? 180 : 0 }}
@@ -911,7 +900,9 @@ function ItineraryAccordion({
                     }}
                   >
                     {d.activities ? (
-                      d.activities.split('\n').map((activity, i) => (
+                      (Array.isArray(d.activities) ? d.activities : typeof d.activities === 'string' ? d.activities.split('\n') : [])
+                        .filter(Boolean)
+                        .map((activity, i) => (
                         <div
                           key={i}
                           style={{
@@ -920,16 +911,16 @@ function ItineraryAccordion({
                             gap: "8px",
                           }}
                         >
-                          <div
+                          <span
                             style={{
-                              width: "5px",
-                              height: "5px",
-                              borderRadius: "50%",
-                              background: "#C8A96E",
-                              flexShrink: 0,
-                              marginTop: "6px",
+                              color: "#C8A96E",
+                              fontSize: "0.78rem",
+                              fontWeight: 500,
+                              minWidth: "14px",
                             }}
-                          />
+                          >
+                            {i + 1}.
+                          </span>
                           <span
                             style={{
                               color: "rgba(30,26,20,0.7)",
@@ -1175,7 +1166,9 @@ export default function TripDetail() {
 
   // Flatten itinerary days
   const itineraryDays = Array.isArray(trip.itinerary) 
-    ? [...trip.itinerary].sort((a: any, b: any) => a.dayNumber - b.dayNumber)
+    ? [...trip.itinerary]
+        .map((d: any) => ({ ...d, dayNumber: d.dayNumber || d.day }))
+        .sort((a: any, b: any) => a.dayNumber - b.dayNumber)
     : [];
 
   const waMessage = encodeURIComponent(

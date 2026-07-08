@@ -12,6 +12,52 @@ interface ItineraryStepProps {
   errors: FieldErrors<any>;
 }
 
+function DayActivities({ nestIndex, control, register, errors }: { nestIndex: number, control: Control<any>, register: UseFormRegister<any>, errors: FieldErrors<any> }) {
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: `itinerary.${nestIndex}.activities`
+  });
+
+  return (
+    <div className="space-y-3 mt-1">
+      {fields.map((item, k) => (
+        <div key={item.id} className="flex items-start gap-2">
+          <div className="w-6 shrink-0 text-center text-sm font-medium text-gray-400 mt-2">{k + 1}.</div>
+          <div className="flex-1">
+            <Input
+              {...register(`itinerary.${nestIndex}.activities.${k}.value`)}
+              placeholder="e.g. Arrive at Dibrugarh and drive to Roing..."
+            />
+            {errors?.itinerary?.[nestIndex]?.activities?.[k]?.value && (
+              <p className="text-xs text-red-500 mt-1">
+                {errors.itinerary[nestIndex].activities[k].value.message as string}
+              </p>
+            )}
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => remove(k)}
+            className="text-red-500 hover:bg-red-50 hover:text-red-600 px-2 h-10"
+            disabled={fields.length === 1}
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => append({ value: "" })}
+        className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 mt-1 flex items-center gap-1"
+      >
+        <Plus className="w-4 h-4" /> Add Activity
+      </Button>
+    </div>
+  );
+}
+
 export function ItineraryStep({ control, register, errors }: ItineraryStepProps) {
   const { fields, append, remove } = useFieldArray({
     control,
@@ -24,12 +70,12 @@ export function ItineraryStep({ control, register, errors }: ItineraryStepProps)
         <div>
           <h3 className="text-lg font-semibold text-gray-900">Day-by-Day Itinerary</h3>
           <p className="text-sm text-gray-500">
-            Define the daily activities. You can use bullet points for the activities.
+            Define the daily activities.
           </p>
         </div>
         <Button
           type="button"
-          onClick={() => append({ dayNumber: fields.length + 1, activities: "" })}
+          onClick={() => append({ dayNumber: fields.length + 1, activities: [{ value: "" }] })}
           className="bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"
         >
           <Plus className="w-4 h-4" /> Add Day
@@ -61,17 +107,7 @@ export function ItineraryStep({ control, register, errors }: ItineraryStepProps)
               </div>
               <div className="flex-1">
                 <Label className="text-sm font-semibold">Activities</Label>
-                <Textarea
-                  {...register(`itinerary.${index}.activities`)}
-                  placeholder="e.g. Arrive at Dibrugarh and drive to Roing. Explore the local market..."
-                  rows={3}
-                  className="mt-1 resize-y"
-                />
-                {errors.itinerary?.[index]?.activities && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {errors.itinerary[index].activities.message as string}
-                  </p>
-                )}
+                <DayActivities nestIndex={index} control={control} register={register} errors={errors} />
               </div>
               <Button
                 type="button"
@@ -83,6 +119,14 @@ export function ItineraryStep({ control, register, errors }: ItineraryStepProps)
               </Button>
             </div>
           ))}
+          <Button
+            type="button"
+            onClick={() => append({ dayNumber: fields.length + 1, activities: [{ value: "" }] })}
+            variant="outline"
+            className="w-full mt-2 border-dashed border-2 py-6 text-gray-500 hover:text-gray-900 flex justify-center items-center gap-2"
+          >
+            <Plus className="w-4 h-4" /> Add Day
+          </Button>
         </div>
       )}
     </div>
