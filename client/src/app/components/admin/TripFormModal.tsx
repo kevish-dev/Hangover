@@ -824,8 +824,16 @@ export function TripFormModal({
 
                 {/* Packages Section */}
                 <div className="col-span-2 space-y-4 border p-4 rounded-md mt-4">
-                  <div>
+                  <div className="flex justify-between items-center">
                     <h3 className="font-semibold">Packages (Optional)</h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => appendPackage({ title: "", price: 0, tokenAmount: 0 })}
+                    >
+                      Add Package
+                    </Button>
                   </div>
                   <p className="text-sm text-gray-500 mb-2">
                     If added, users will choose a package during booking. Otherwise, the Base Price is used.
