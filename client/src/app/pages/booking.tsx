@@ -1761,29 +1761,7 @@ export default function BookingPage() {
                     Select a Package
                   </h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                    {Number(trip?.price) > 0 && (
-                      <div
-                        onClick={() => setSelectedPackageId(null)}
-                        style={{
-                          padding: "16px",
-                          borderRadius: "8px",
-                          border: selectedPackageId === null ? "1.5px solid #c8a96e" : "1px solid rgba(30,26,20,0.1)",
-                          background: selectedPackageId === null ? "rgba(200,169,110,0.05)" : "#fff",
-                          cursor: "pointer",
-                          transition: "all 0.2s ease",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center"
-                        }}
-                      >
-                        <div style={{ color: "#1e1a14", fontSize: "0.95rem", fontWeight: 500, fontFamily: "'Poppins', sans-serif" }}>
-                          Standard Package
-                        </div>
-                        <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#781216", fontFamily: "'Poppins', sans-serif" }}>
-                          {formatPrice(trip.price)}
-                        </div>
-                      </div>
-                    )}
+
                     {trip.packages.map((pkg: any) => {
                       const isSelected = selectedPackageId === pkg.id;
                       return (

@@ -13,7 +13,7 @@ export const getAllTripTags = async () => {
 export const getTripTagById = async (id) => {
   return prisma.tripTag.findUnique({
     where: { id },
-    include: { trips: true }
+    include: { trips: { where: { isPublished: true } } }
   });
 };
 

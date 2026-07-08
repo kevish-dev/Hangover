@@ -12,7 +12,7 @@ export const getTrips = async (page = 1, limit = 10, isAdmin = false) => {
   
   const where = isAdmin ? {} : { isPublished: true };
 
-  const { trips, total } = await tripRepo.findAll(skip, take, where);
+  const { trips, total } = await tripRepo.findAll(skip, take, where, isAdmin);
 
   return {
     data: trips,
@@ -30,7 +30,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export const getTripById = async (id, isAdmin = false) => {
   const idField = UUID_RE.test(id) ? 'id' : 'slug';
   const where = isAdmin ? { [idField]: id } : { [idField]: id, isPublished: true };
-  const trip = await tripRepo.findById(where);
+  const trip = await tripRepo.findById(where, isAdmin);
   if (!trip) throw new Error("Trip not found");
   return trip;
 };

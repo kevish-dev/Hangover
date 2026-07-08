@@ -12,7 +12,7 @@ export const getFestivals = async (page = 1, limit = 10, isAdmin = false) => {
   
   const where = isAdmin ? {} : { isPublished: true };
 
-  const { festivals, total } = await festivalRepo.findAll(skip, take, where);
+  const { festivals, total } = await festivalRepo.findAll(skip, take, where, isAdmin);
 
   return {
     data: festivals,
@@ -30,7 +30,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export const getFestivalById = async (id, isAdmin = false) => {
   const idField = UUID_RE.test(id) ? 'id' : 'slug';
   const where = isAdmin ? { [idField]: id } : { [idField]: id, isPublished: true };
-  const festival = await festivalRepo.findById(where);
+  const festival = await festivalRepo.findById(where, isAdmin);
   if (!festival) throw new Error("Festival not found");
   return festival;
 };

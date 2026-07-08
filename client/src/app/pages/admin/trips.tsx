@@ -169,7 +169,7 @@ export default function AdminTripsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "trips"],
     queryFn: async () => {
-      const res = await apiClient.get("/trips");
+      const res = await apiClient.get("/trips?adminView=true");
       return res.data;
     },
   });
@@ -237,7 +237,7 @@ export default function AdminTripsPage() {
     setProcessingId(trip.id);
     setProcessingAction("edit" as any);
     try {
-      const res = await apiClient.get(`/trips/${trip.id}`);
+      const res = await apiClient.get(`/trips/${trip.id}?adminView=true`);
       setEditingTrip(res.data);
       setIsModalOpen(true);
     } catch (error) {

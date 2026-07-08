@@ -34,7 +34,7 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
   const { data: tripsData } = useQuery({
     queryKey: ["admin", "trips"],
     queryFn: async () => {
-      const res = await apiClient.get("/trips?limit=100");
+      const res = await apiClient.get("/trips?limit=100&adminView=true");
       return res.data;
     },
     enabled: open, // Only fetch trips when modal is open

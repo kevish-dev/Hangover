@@ -3,8 +3,8 @@ import { AppError } from "../../core/errors/errors.js";
 
 export const getDestinations = async (req, res, next) => {
   try {
-    const { page, limit } = req.query;
-    const isAdmin = req.user?.role === "ADMIN";
+    const { page, limit, adminView } = req.query;
+    const isAdmin = req.user?.role === "ADMIN" && adminView === "true";
     const destinations = await destinationService.getDestinations(page, limit, isAdmin);
     res.json(destinations);
   } catch (error) {
@@ -14,7 +14,8 @@ export const getDestinations = async (req, res, next) => {
 
 export const getDestinationById = async (req, res, next) => {
   try {
-    const isAdmin = req.user?.role === "ADMIN";
+    const { adminView } = req.query;
+    const isAdmin = req.user?.role === "ADMIN" && adminView === "true";
     const destination = await destinationService.getDestinationById(
       req.params.id,
       isAdmin,

@@ -14,7 +14,7 @@ export default function AdminDestinationsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "destinations"],
     queryFn: async () => {
-      const res = await apiClient.get("/destinations");
+      const res = await apiClient.get("/destinations?adminView=true");
       return res.data;
     },
   });
