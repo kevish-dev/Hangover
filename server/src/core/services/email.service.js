@@ -185,3 +185,24 @@ export const sendBookingCancelledRefundedEmail = async (to, { name, bookingRef, 
     `,
   });
 };
+
+/**
+ * Send review request email after trip completion
+ */
+export const sendReviewRequestEmail = async ({ to, name, tripTitle, reviewLink }) => {
+  await transport.sendMail({
+    from: FROM,
+    to,
+    subject: `How was your trip? Review ${tripTitle}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9f9f9;border-radius:8px;">
+        <h2 style="color:#1a1a2e;">We hope you had a great time!</h2>
+        <p>Hi ${name},</p>
+        <p>Your trip <strong>${tripTitle}</strong> has recently concluded, and we'd love to hear about your experience.</p>
+        <p>Please take a moment to leave a review and let us know how we did.</p>
+        <a href="${reviewLink}" style="display:inline-block;margin-top:16px;padding:12px 24px;background:#781216;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Leave a Review</a>
+        <p style="margin-top:24px;color:#999;font-size:12px;">Hangover Trips</p>
+      </div>
+    `,
+  });
+};

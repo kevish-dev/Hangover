@@ -16,7 +16,8 @@ import AdminBookingsPage from "./pages/admin/bookings";
 import ProfilePage from "./pages/profile";
 import AdminInquiriesPage from "./pages/admin/inquiries";
 import AdminFestivalsPage from "./pages/admin/festivals";
-
+import ReviewSubmitPage from "./pages/review-submit";
+import AdminReviewsPage from "./pages/admin/reviews";
 
 export const router = createBrowserRouter([
   {
@@ -30,6 +31,7 @@ export const router = createBrowserRouter([
       { path: "festivals/:slug", Component: TripDetail },
       { path: "book/:slug", Component: BookingPage },
       { path: "bookings/:bookingId/pay-balance", Component: PayBalancePage },
+      { path: "bookings/:bookingId/review", Component: ReviewSubmitPage },
       { path: "about", Component: AboutPage },
       { path: "profile", Component: ProfilePage },
     ],
@@ -45,6 +47,7 @@ export const router = createBrowserRouter([
       { path: "bookings", Component: AdminBookingsPage },
       { path: "payments", Component: AdminPaymentsPage },
       { path: "inquiries", Component: AdminInquiriesPage },
+      { path: "reviews", Component: AdminReviewsPage },
     ],
   },
   {

@@ -20,6 +20,7 @@ model User {
   resolvedInquiries Inquiry[]    @relation("InquiryResolver")
   inquiries         Inquiry[]
   profile           UserProfile?
+  reviews           Review[]
 
   @@index([email])
   @@index([role])
@@ -85,6 +86,7 @@ model Trip {
   slots               Slot[]
   destination         Destination? @relation(fields: [destinationId], references: [id])
   tripTags            TripTag[]    @relation("TripToTripTag")
+  reviews             Review[]
 
   @@index([tripType])
   @@index([isActive])
@@ -133,6 +135,7 @@ model Festival {
   packages            Package[]
   slots               Slot[]
   tags                FestivalTag[] @relation("FestivalToFestivalTag")
+  reviews             Review[]
 
   @@index([isActive])
   @@index([isFeatured])
@@ -228,6 +231,7 @@ model Booking {
   tripId             String?
   festival           Festival?         @relation(fields: [festivalId], references: [id], onDelete: Cascade)
   festivalId         String?
+  review             Review?
 
   @@index([packageId])
   @@index([slotId])
@@ -509,3 +513,27 @@ enum RefundStatus {
   SUCCESS
   FAILED
 }
+
+model Review {
+  id          String    @id @default(uuid())
+  rating      Int
+  comment     String?
+  userId      String
+  tripId      String?
+  festivalId  String?
+  bookingId   String    @unique
+  isPublished Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trip        Trip?     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  festival    Festival? @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tripId])
+  @@index([festivalId])
+  @@index([isPublished])
+}
+

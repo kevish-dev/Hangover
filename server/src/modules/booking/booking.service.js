@@ -57,6 +57,7 @@ export const createBooking = async (userId, data) => {
     where: {
       userId,
       slotId: data.slotId,
+      ...(data.packageId ? { packageId: data.packageId } : {}),
       status: { in: ["RESERVED", "CONFIRMED", "COMPLETED"] },
     },
   });
@@ -131,6 +132,7 @@ export const createBooking = async (userId, data) => {
     where: {
       userId,
       slotId: data.slotId,
+      ...(data.packageId ? { packageId: data.packageId } : {}),
       status: "PENDING",
     },
   });
@@ -378,4 +380,63 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
   }).catch(err => console.error("Failed to import email service:", err));
 
   return { success: true, message: `Booking cancelled${validRefundAmount > 0 ? ` and ₹${validRefundAmount} refunded` : ""} successfully.` };
+};
+
+export const finalizeCompletedTripsAndSendEmails = async () => {
+  // Find all CONFIRMED bookings where the slot end date has passed
+  const bookingsToComplete = await prisma.booking.findMany({
+    where: {
+      status: "CONFIRMED",
+      slot: {
+        endDate: {
+          lt: new Date()
+        }
+      }
+    },
+    include: {
+      user: { include: { profile: true } },
+      slot: { include: { trip: true, festival: true } }
+    }
+  });
+
+  if (bookingsToComplete.length === 0) {
+    return { count: 0, message: "No completed trips found." };
+  }
+
+  const { sendReviewRequestEmail } = await import("../../core/services/email.service.js");
+  const env = (await import("../../core/env/env.js")).default;
+  const frontendUrl = env.FRONTEND_URL || "http://localhost:3000";
+
+  let updatedCount = 0;
+
+  for (const booking of bookingsToComplete) {
+    // 1. Mark as completed
+    await prisma.booking.update({
+      where: { id: booking.id },
+      data: {
+        status: "COMPLETED",
+        completedAt: new Date()
+      }
+    });
+
+    updatedCount++;
+
+    // 2. Send Review Email
+    const itemTitle = booking.slot.trip ? booking.slot.trip.title : booking.slot.festival?.title;
+    if (itemTitle && booking.user?.email) {
+      const reviewLink = `${frontendUrl}/bookings/${booking.id}/review`;
+      try {
+        await sendReviewRequestEmail({
+          to: booking.user.email,
+          name: booking.user.profile?.fullName || "Traveler",
+          tripTitle: itemTitle,
+          reviewLink
+        });
+      } catch (err) {
+        console.error(`Failed to send review email to ${booking.user.email} for booking ${booking.id}`, err);
+      }
+    }
+  }
+
+  return { count: updatedCount, message: `Successfully finalized ${updatedCount} trip(s) and sent review emails.` };
 };

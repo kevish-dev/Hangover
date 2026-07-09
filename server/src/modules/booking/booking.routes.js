@@ -10,6 +10,7 @@ router.use(requireAuth);
 
 // Admin must come before /:id to avoid route shadowing
 router.get("/", requireAdmin, bookingController.getAllBookings);
+router.post("/finalize-completed", requireAdmin, bookingController.finalizeCompletedTrips);
 router.get("/trip/:tripId", requireAdmin, bookingController.getBookingsByTrip);
 router.get("/festival/:festivalId", requireAdmin, bookingController.getBookingsByFestival);
 router.post("/:id/cancel-and-refund", requireAdmin, bookingController.cancelAndRefundBooking);
