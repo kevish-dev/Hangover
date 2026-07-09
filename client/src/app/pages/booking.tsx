@@ -609,10 +609,10 @@ export default function BookingPage() {
 
   useEffect(() => {
     if (selectedPackageId === undefined && trip) {
-      if (Number(trip.price) > 0) {
-        setSelectedPackageId(null);
-      } else if (trip.packages?.length > 0) {
+      if (trip.packages?.length > 0) {
         setSelectedPackageId(trip.packages[0].id);
+      } else {
+        setSelectedPackageId(null);
       }
     }
   }, [trip, selectedPackageId]);
@@ -1701,14 +1701,14 @@ export default function BookingPage() {
               <div>
                 <h3 style={{
                   color: "#1e1a14",
-                  fontSize: "1.2rem",
+                  fontSize: "1rem",
                   fontWeight: 400,
-                  marginBottom: "16px",
+                  marginBottom: "12px",
                   fontFamily: "'Playfair Display', serif"
                 }}>
                   Select a Slot
                 </h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                   {[...(trip?.slots || [])].sort((a: any, b: any) => {
                     const pA = a.priority || Infinity;
                     const pB = b.priority || Infinity;
@@ -1723,8 +1723,8 @@ export default function BookingPage() {
                         key={slot.id}
                         onClick={() => !isSoldOut && setSelectedSlotId(slot.id)}
                         style={{
-                          padding: "16px",
-                          borderRadius: "8px",
+                          padding: "10px 12px",
+                          borderRadius: "6px",
                           border: isSelected ? "1.5px solid #c8a96e" : "1px solid rgba(30,26,20,0.1)",
                           background: isSelected ? "rgba(200,169,110,0.05)" : "#fff",
                           cursor: isSoldOut ? "not-allowed" : "pointer",
@@ -1735,11 +1735,11 @@ export default function BookingPage() {
                           alignItems: "center"
                         }}
                       >
-                        <div style={{ color: "#1e1a14", fontSize: "0.95rem", fontWeight: 500, fontFamily: "'Poppins', sans-serif" }}>
+                        <div style={{ color: "#1e1a14", fontSize: "0.85rem", fontWeight: 500, fontFamily: "'Poppins', sans-serif" }}>
                           {new Date(slot.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - {new Date(slot.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                          {slot.title && <span style={{ marginLeft: "6px", fontWeight: 400, fontSize: "0.85rem", color: "rgba(30,26,20,0.7)" }}>({slot.title})</span>}
+                          {slot.title && <span style={{ marginLeft: "6px", fontWeight: 400, fontSize: "0.75rem", color: "rgba(30,26,20,0.7)" }}>({slot.title})</span>}
                         </div>
-                        <div style={{ fontSize: "0.75rem", color: isSoldOut ? "#ef4444" : "rgba(30,26,20,0.5)", fontFamily: "'Poppins', sans-serif" }}>
+                        <div style={{ fontSize: "0.7rem", color: isSoldOut ? "#ef4444" : "rgba(30,26,20,0.5)", fontFamily: "'Poppins', sans-serif" }}>
                           {isSoldOut ? "Sold Out" : `${available} spots left`}
                         </div>
                       </div>
@@ -1753,14 +1753,14 @@ export default function BookingPage() {
                 <div>
                   <h3 style={{
                     color: "#1e1a14",
-                    fontSize: "1.2rem",
+                    fontSize: "0.9rem",
                     fontWeight: 400,
-                    marginBottom: "16px",
+                    marginBottom: "12px",
                     fontFamily: "'Playfair Display', serif"
                   }}>
                     Select a Package
                   </h3>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
 
                     {trip.packages.map((pkg: any) => {
                       const isSelected = selectedPackageId === pkg.id;
@@ -1769,8 +1769,8 @@ export default function BookingPage() {
                           key={pkg.id}
                           onClick={() => setSelectedPackageId(pkg.id)}
                           style={{
-                            padding: "16px",
-                            borderRadius: "8px",
+                            padding: "8px 10px",
+                            borderRadius: "6px",
                             border: isSelected ? "1.5px solid #c8a96e" : "1px solid rgba(30,26,20,0.1)",
                             background: isSelected ? "rgba(200,169,110,0.05)" : "#fff",
                             cursor: "pointer",
@@ -2718,10 +2718,11 @@ export default function BookingPage() {
                     { label: "Duration", val: tripDuration },
                     {
                       label: "Dates",
-                      val: trip.startDate && trip.endDate
-                        ? `${new Date(trip.startDate).toLocaleDateString("en-IN", { month: "short", day: "numeric" })} – ${new Date(trip.endDate).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}`
+                      val: selectedSlot?.startDate && selectedSlot?.endDate
+                        ? `${new Date(selectedSlot.startDate).toLocaleDateString("en-IN", { month: "short", day: "numeric" })} – ${new Date(selectedSlot.endDate).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}`
                         : "Not Available",
                     },
+                    ...(activePackage ? [{ label: "Package", val: activePackage.title }] : []),
                   ].map(({ label, val }) => (
                     <div
                       key={label}

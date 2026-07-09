@@ -1,5 +1,5 @@
 // @ts-ignore
-import logoSrc from "../../imports/final-logo_png_transparent.png";
+import logoSrc from "/images/final-logo_png_transparent.png";
 
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router";
@@ -110,7 +110,7 @@ function HangoverBadge({ large = false }: { large?: boolean }) {
 function FilterGroup({
   title,
   children,
-  defaultOpen = true,
+  defaultOpen = false,
 }: {
   title: string;
   children: React.ReactNode;

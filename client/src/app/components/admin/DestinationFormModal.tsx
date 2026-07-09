@@ -28,6 +28,7 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
     state: "",
     subheading: "",
     tripIds: [] as string[],
+    festivalIds: [] as string[],
     isPublished: false,
   });
 
@@ -40,7 +41,17 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
     enabled: open, // Only fetch trips when modal is open
   });
 
+  const { data: festivalsData } = useQuery({
+    queryKey: ["admin", "festivals"],
+    queryFn: async () => {
+      const res = await apiClient.get("/festivals?limit=100&adminView=true");
+      return res.data;
+    },
+    enabled: open,
+  });
+
   const availableTrips = tripsData?.data || [];
+  const availableFestivals = festivalsData?.data || [];
 
   useEffect(() => {
     if (destination) {
@@ -49,6 +60,7 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
         state: destination.state || "",
         subheading: destination.subheading || "",
         tripIds: destination.trips?.map((t: any) => t.id) || [],
+        festivalIds: destination.festivals?.map((f: any) => f.id) || [],
         isPublished: destination.isPublished || false,
       });
     } else {
@@ -57,6 +69,7 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
         state: "",
         subheading: "",
         tripIds: [],
+        festivalIds: [],
         isPublished: false,
       });
     }
@@ -74,6 +87,17 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
         return { ...prev, tripIds: prev.tripIds.filter(id => id !== tripId) };
       } else {
         return { ...prev, tripIds: [...prev.tripIds, tripId] };
+      }
+    });
+  };
+
+  const handleFestivalToggle = (festivalId: string) => {
+    setFormData(prev => {
+      const isSelected = prev.festivalIds.includes(festivalId);
+      if (isSelected) {
+        return { ...prev, festivalIds: prev.festivalIds.filter(id => id !== festivalId) };
+      } else {
+        return { ...prev, festivalIds: [...prev.festivalIds, festivalId] };
       }
     });
   };
@@ -159,6 +183,30 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
                       <div className="flex flex-col">
                         <span className="text-sm font-medium text-gray-900">{trip.title}</span>
                         <span className="text-xs text-gray-500">{trip.location}</span>
+                      </div>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Map Festivals to this Destination</label>
+              <div className="border border-gray-200 rounded-md p-3 max-h-48 overflow-y-auto bg-gray-50/50 space-y-2">
+                {availableFestivals.length === 0 ? (
+                  <p className="text-sm text-gray-500 py-2">No festivals available to map.</p>
+                ) : (
+                  availableFestivals.map((festival: any) => (
+                    <label key={festival.id} className="flex items-center space-x-3 p-2 hover:bg-white rounded cursor-pointer transition-colors border border-transparent hover:border-gray-200">
+                      <input 
+                        type="checkbox" 
+                        checked={formData.festivalIds.includes(festival.id)}
+                        onChange={() => handleFestivalToggle(festival.id)}
+                        className="w-4 h-4 text-[#c8a96e] rounded border-gray-300 focus:ring-[#c8a96e]"
+                      />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-gray-900">{festival.title}</span>
+                        <span className="text-xs text-gray-500">{festival.location}</span>
                       </div>
                     </label>
                   ))

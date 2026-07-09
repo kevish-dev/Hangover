@@ -1,5 +1,5 @@
 // @ts-ignore — Vite resolves PNG imports as asset URLs
-import logoSrc from "../../imports/final-logo_png_transparent.png";
+import logoSrc from "/images/final-logo_png_transparent.png";
 
 import { useState } from "react";
 import { motion } from "motion/react";

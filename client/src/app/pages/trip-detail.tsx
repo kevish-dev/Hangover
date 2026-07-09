@@ -807,151 +807,134 @@ function ItineraryAccordion({
   days,
 }: {
   days: {
-    dayNumber: number;
+    day?: string;
+    dayNumber?: number;
+    title?: string;
     activities?: string | string[];
   }[];
 }) {
-  const [open, setOpen] = useState<number | null>(0);
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-      {days.map((d) => (
-        <div
-          key={d.dayNumber}
-          style={{
-            border: "1px solid rgba(30,26,20,0.08)",
-            borderRadius: "10px",
-            overflow: "hidden",
-            background: open === d.dayNumber - 1 ? "#ffffff" : "#faf8f4",
-            transition: "background 0.2s ease",
-          }}
-        >
-          <button
-            onClick={() =>
-              setOpen(open === d.dayNumber - 1 ? null : d.dayNumber - 1)
-            }
-            style={{
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              gap: "16px",
-              padding: "16px 20px",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              textAlign: "left",
-              fontFamily: "'Poppins', sans-serif",
-            }}
-          >
-            <span
-              style={{
-                width: "32px",
-                height: "32px",
-                borderRadius: "50%",
-                background:
-                  open === d.dayNumber - 1 ? "#781216" : "rgba(120,18,22,0.08)",
-                color: open === d.dayNumber - 1 ? "#fff" : "#781216",
-                fontSize: "0.7rem",
-                fontWeight: 600,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-                transition: "all 0.25s ease",
-              }}
-            >
-              {d.dayNumber}
-            </span>
-            <div style={{ flex: 1 }}>
-              <p
-                style={{
-                  color: "rgba(30,26,20,0.45)",
-                  fontSize: "0.6rem",
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                  margin: "0 0 2px",
-                }}
-              >
-                Day {d.dayNumber}
-              </p>
-            </div>
-            <motion.div
-              animate={{ rotate: open === d.dayNumber - 1 ? 180 : 0 }}
-              transition={{ duration: 0.25 }}
-            >
-              <ChevronDown size={16} color="rgba(30,26,20,0.4)" />
-            </motion.div>
-          </button>
+  const [openIndex, setOpenIndex] = useState<number | null>(0); // First item open by default
 
-          <AnimatePresence>
-            {open === d.dayNumber - 1 && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.3, ease: "easeInOut" }}
-                style={{ overflow: "hidden" }}
-              >
-                <div style={{ padding: "0 20px 20px 68px" }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "6px",
-                    }}
-                  >
-                    {d.activities ? (
-                      (Array.isArray(d.activities) ? d.activities : typeof d.activities === 'string' ? d.activities.split('\n') : [])
-                        .filter(Boolean)
-                        .map((activity, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            display: "flex",
-                            alignItems: "flex-start",
-                            gap: "8px",
-                          }}
-                        >
-                          <span
-                            style={{
-                              color: "#C8A96E",
-                              fontSize: "0.78rem",
-                              fontWeight: 500,
-                              minWidth: "14px",
-                            }}
-                          >
-                            {i + 1}.
-                          </span>
-                          <span
-                            style={{
-                              color: "rgba(30,26,20,0.7)",
-                              fontSize: "0.78rem",
-                              fontWeight: 300,
-                              lineHeight: 1.5,
-                            }}
-                          >
-                            {activity.trim()}
-                          </span>
-                        </div>
-                      ))
-                    ) : (
-                      <span
-                        style={{
-                          color: "#c0392b",
-                          fontSize: "0.78rem",
-                          fontWeight: 500,
-                          fontStyle: "italic",
-                        }}
-                      >
-                        No activities listed
-                      </span>
-                    )}
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "12px", fontFamily: "'Poppins', sans-serif" }}>
+      {days.map((d, index) => {
+        const rawDay = d.day || d.dayNumber || (index + 1);
+        const numericDay = String(rawDay).replace(/day/i, '').trim();
+        const titleText = d.title || "";
+        
+        let acts: string[] = [];
+        if (Array.isArray(d.activities)) {
+          acts = d.activities;
+        } else if (typeof d.activities === 'string') {
+          acts = d.activities.split('\n');
+        }
+
+        acts = acts.filter(a => a.trim().length > 0);
+        const isOpen = openIndex === index;
+
+        return (
+          <div 
+            key={index}
+            style={{
+              background: "#ffffff",
+              borderRadius: "12px",
+              padding: "14px 18px",
+              cursor: "pointer",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+              transition: "box-shadow 0.2s ease"
+            }}
+            onClick={() => setOpenIndex(isOpen ? null : index)}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px" }}>
+              <div style={{ display: "flex", gap: "16px", alignItems: "flex-start" }}>
+                {/* Number Badge */}
+                <div style={{
+                  width: "30px", height: "30px", borderRadius: "50%",
+                  background: isOpen ? "#781216" : "#f2e8e3",
+                  color: isOpen ? "#ffffff" : "#781216",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "0.8rem", fontWeight: 700, flexShrink: 0,
+                  transition: "all 0.2s ease"
+                }}>
+                  {numericDay}
+                </div>
+                {/* Text */}
+                <div style={{ paddingTop: "2px" }}>
+                  <div style={{ 
+                    fontSize: "0.55rem", fontWeight: 600, color: "rgba(30,26,20,0.4)", 
+                    letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "4px" 
+                  }}>
+                    DAY {numericDay}
+                  </div>
+                  <div style={{ 
+                    fontSize: "0.95rem", fontWeight: 600, color: "#1e1a14",
+                    letterSpacing: "-0.01em"
+                  }}>
+                    {titleText || `Day ${numericDay} Itinerary`}
                   </div>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      ))}
+              </div>
+              <div style={{ paddingTop: "8px", color: "rgba(30,26,20,0.3)" }}>
+                <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                  <ChevronDown size={16} />
+                </motion.div>
+              </div>
+            </div>
+
+            <AnimatePresence>
+              {isOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  style={{ overflow: "hidden" }}
+                >
+                  <div style={{ 
+                    paddingTop: "12px", paddingLeft: "46px",
+                    color: "rgba(30,26,20,0.65)", fontSize: "0.8rem", lineHeight: 1.5 
+                  }}>
+                    {acts.length > 0 ? (
+                      <ul style={{ listStyleType: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
+                        {acts.map((act, i) => {
+                          // Render the first item as a paragraph without a bullet if it seems like a long description, 
+                          // or if we just want to follow the screenshot exactly (which has one paragraph, then bullets).
+                          // To keep it simple and robust, let's check if the first item doesn't look like a bullet and is reasonably long.
+                          // But we can also just render it as a bullet if we aren't sure. 
+                          // Let's just make it a bullet for consistency, as per previous instructions.
+                          // Or we can just render the first one without a bullet if it's the first item!
+                          // Let's do that for the exact match with screenshot.
+                          const isDescription = i === 0 && act.length > 40 && acts.length > 1;
+                          
+                          if (isDescription) {
+                            return (
+                              <li key={i} style={{ marginBottom: "6px" }}>
+                                {act.trim()}
+                              </li>
+                            );
+                          }
+                          
+                          return (
+                            <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                              <div style={{ 
+                                width: "5px", height: "5px", borderRadius: "50%", 
+                                background: "#C8A96E", marginTop: "6px", flexShrink: 0 
+                              }} />
+                              <span>{act.trim()}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <span style={{ fontStyle: "italic", color: "rgba(30,26,20,0.4)" }}>No activities listed</span>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })}
     </div>
   );
 }

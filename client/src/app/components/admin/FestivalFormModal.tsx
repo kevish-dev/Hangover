@@ -50,11 +50,11 @@ const festivalSchema = z.object({
 
   overview: z.string().min(10, "Overview must be detailed"),
   inclusions: z
-    .array(z.object({ value: z.string().min(1) }))
-    .min(1, "At least one inclusion"),
+    .array(z.object({ value: z.string().min(1, "Inclusion is required") }))
+    .min(1, "At least one inclusion is required"),
   exclusions: z
-    .array(z.object({ value: z.string().min(1) }))
-    .min(1, "At least one exclusion"),
+    .array(z.object({ value: z.string().min(1, "Exclusion is required") }))
+    .min(1, "At least one exclusion is required"),
   tags: z.array(z.object({ value: z.string().min(1) })).optional(),
   packages: z.array(
     z.object({
@@ -75,12 +75,9 @@ const festivalSchema = z.object({
   isFeatured: z.boolean().default(false),
   itinerary: z.array(
     z.object({
-      dayNumber: z.coerce.number().min(1, "Day number is required"),
-      activities: z.array(
-        z.object({
-          value: z.string().min(1, "Activity is required")
-        })
-      ).min(1, "At least one activity is required")
+      day: z.string().min(1, "Day is required"),
+      title: z.string().min(1, "Title is required"),
+      activities: z.string().min(1, "Activities are required")
     })
   ).optional(),
   }
@@ -162,7 +159,7 @@ export function FestivalFormModal({
       location: "",
       duration: 1,
       bestTimeToVisit: "",
-      slots: [{ startDate: "", endDate: "", capacity: 10 }],
+      slots: [{ startDate: "", endDate: "", capacity: 12 }],
       overview: "",
       inclusions: [],
       exclusions: [],
@@ -191,14 +188,18 @@ export function FestivalFormModal({
             title: s.title || "",
             priority: s.priority || 0,
             capacity: s.capacity
-          })) : [{ startDate: "", endDate: "", capacity: 10, title: "", priority: 0 }],
+          })) : [{ startDate: "", endDate: "", capacity: 12, title: "", priority: 0 }],
           overview: festival.overview || "",
-          inclusions: festival.inclusions?.length
-            ? festival.inclusions.map((i: string) => ({ value: i }))
-            : [{ value: "" }],
-          exclusions: festival.exclusions?.length
-            ? festival.exclusions.map((e: string) => ({ value: e }))
-            : [{ value: "" }],
+          inclusions: Array.isArray(festival.inclusions) && festival.inclusions.length > 0
+            ? festival.inclusions.map((i: any) => ({ value: typeof i === 'string' ? i : (i.value || "") }))
+            : typeof festival.inclusions === 'string' && festival.inclusions.trim().startsWith('[')
+              ? JSON.parse(festival.inclusions).map((i: any) => ({ value: typeof i === 'string' ? i : (i.value || "") }))
+              : [{ value: "" }],
+          exclusions: Array.isArray(festival.exclusions) && festival.exclusions.length > 0
+            ? festival.exclusions.map((e: any) => ({ value: typeof e === 'string' ? e : (e.value || "") }))
+            : typeof festival.exclusions === 'string' && festival.exclusions.trim().startsWith('[')
+              ? JSON.parse(festival.exclusions).map((e: any) => ({ value: typeof e === 'string' ? e : (e.value || "") }))
+              : [{ value: "" }],
           tags: festival.tags?.length
             ? festival.tags.map((t: any) => ({ value: t.tag }))
             : [{ value: "" }],
@@ -210,12 +211,13 @@ export function FestivalFormModal({
               }))
             : [{ title: "Standard", price: 0, tokenAmount: 0 }],
           itinerary: Array.isArray(festival.itinerary) ? festival.itinerary.map((day: any) => ({
-            ...day,
-            activities: Array.isArray(day.activities)
-              ? day.activities.map((a: string) => ({ value: a }))
-              : typeof day.activities === 'string'
-              ? day.activities.split('\n').filter(Boolean).map((a: string) => ({ value: a }))
-              : [{ value: "" }]
+            day: day.day || `Day ${day.dayNumber || 1}`,
+            title: day.title || "",
+            activities: typeof day.activities === 'string'
+              ? day.activities
+              : Array.isArray(day.activities)
+                ? day.activities.join('\n')
+                : ""
           })) : [],
           faqs: festival.faqs?.length
             ? festival.faqs.map((f: any) => ({
@@ -262,7 +264,7 @@ export function FestivalFormModal({
           location: "",
           duration: 1,
           bestTimeToVisit: "",
-          slots: [{ startDate: "", endDate: "", capacity: 10 }],
+          slots: [{ startDate: "", endDate: "", capacity: 12 }],
           overview: "",
           inclusions: [],
           exclusions: [],
@@ -655,10 +657,7 @@ export function FestivalFormModal({
           ?.map((t) => t.value)
           .filter((t) => t.trim() !== ""),
         packages: data.packages,
-        itinerary: data.itinerary?.map((day: any) => ({
-          ...day,
-          activities: day.activities.map((a: any) => a.value).filter(Boolean)
-        })),
+        itinerary: data.itinerary,
         faqs: data.faqs?.filter(
           (f) => f.question.trim() !== "" && f.answer.trim() !== "",
         ),
@@ -1048,7 +1047,7 @@ export function FestivalFormModal({
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => appendSlot({ startDate: "", endDate: "", capacity: 10, title: "", priority: 0 })}
+                      onClick={() => appendSlot({ startDate: "", endDate: "", capacity: 12, title: "", priority: 0 })}
                       className="mt-2"
                     >
                       <Plus className="w-4 h-4 mr-2" />

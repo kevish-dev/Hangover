@@ -12,52 +12,6 @@ interface ItineraryStepProps {
   errors: FieldErrors<any>;
 }
 
-function DayActivities({ nestIndex, control, register, errors }: { nestIndex: number, control: Control<any>, register: UseFormRegister<any>, errors: FieldErrors<any> }) {
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: `itinerary.${nestIndex}.activities`
-  });
-
-  return (
-    <div className="space-y-3 mt-1">
-      {fields.map((item, k) => (
-        <div key={item.id} className="flex items-start gap-2">
-          <div className="w-6 shrink-0 text-center text-sm font-medium text-gray-400 mt-2">{k + 1}.</div>
-          <div className="flex-1">
-            <Input
-              {...register(`itinerary.${nestIndex}.activities.${k}.value`)}
-              placeholder="e.g. Arrive at Dibrugarh and drive to Roing..."
-            />
-            {errors?.itinerary?.[nestIndex]?.activities?.[k]?.value && (
-              <p className="text-xs text-red-500 mt-1">
-                {errors.itinerary[nestIndex].activities[k].value.message as string}
-              </p>
-            )}
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => remove(k)}
-            className="text-red-500 hover:bg-red-50 hover:text-red-600 px-2 h-10"
-            disabled={fields.length === 1}
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
-      ))}
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={() => append({ value: "" })}
-        className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 mt-1 flex items-center gap-1"
-      >
-        <Plus className="w-4 h-4" /> Add Activity
-      </Button>
-    </div>
-  );
-}
-
 export function ItineraryStep({ control, register, errors }: ItineraryStepProps) {
   const { fields, append, remove } = useFieldArray({
     control,
@@ -75,7 +29,7 @@ export function ItineraryStep({ control, register, errors }: ItineraryStepProps)
         </div>
         <Button
           type="button"
-          onClick={() => append({ dayNumber: fields.length + 1, activities: [{ value: "" }] })}
+          onClick={() => append({ day: `Day ${fields.length + 1}`, title: "", activities: "" })}
           className="bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"
         >
           <Plus className="w-4 h-4" /> Add Day
@@ -91,37 +45,64 @@ export function ItineraryStep({ control, register, errors }: ItineraryStepProps)
       ) : (
         <div className="space-y-4">
           {fields.map((day, index) => (
-            <div key={day.id} className="p-5 border rounded-xl bg-white shadow-sm flex gap-4 items-start">
-              <div className="w-24 shrink-0">
-                <Label className="text-sm font-semibold">Day #</Label>
-                <Input
-                  type="number"
-                  {...register(`itinerary.${index}.dayNumber`)}
-                  className="mt-1"
-                />
-                {errors.itinerary?.[index]?.dayNumber && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {errors.itinerary[index].dayNumber.message as string}
-                  </p>
-                )}
-              </div>
-              <div className="flex-1">
-                <Label className="text-sm font-semibold">Activities</Label>
-                <DayActivities nestIndex={index} control={control} register={register} errors={errors} />
-              </div>
+            <div key={day.id} className="p-5 border rounded-xl bg-white shadow-sm flex flex-col gap-4 relative">
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => remove(index)}
-                className="mt-6 text-red-500 hover:bg-red-50 hover:text-red-600 px-3"
+                className="absolute top-4 right-4 text-red-500 hover:bg-red-50 hover:text-red-600 px-3"
               >
                 <Trash2 className="w-5 h-5" />
               </Button>
+              
+              <div className="grid grid-cols-2 gap-4 mr-12">
+                <div>
+                  <Label className="text-sm font-semibold">Day (e.g. Day 1)</Label>
+                  <Input
+                    type="text"
+                    {...register(`itinerary.${index}.day`)}
+                    className="mt-1"
+                    placeholder="Day 1"
+                  />
+                  {(errors.itinerary as any)?.[index]?.day && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {(errors.itinerary as any)[index].day.message as string}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold">Title</Label>
+                  <Input
+                    type="text"
+                    {...register(`itinerary.${index}.title`)}
+                    className="mt-1"
+                    placeholder="Welcome to the Northeast"
+                  />
+                  {(errors.itinerary as any)?.[index]?.title && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {(errors.itinerary as any)[index].title.message as string}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-semibold">Activities</Label>
+                <Textarea
+                  {...register(`itinerary.${index}.activities`)}
+                  className="mt-1 min-h-[100px]"
+                  placeholder="Arrival & pickup from Guwahati Airport...&#10;Scenic 8-hr drive..."
+                />
+                {(errors.itinerary as any)?.[index]?.activities && (
+                  <p className="text-xs text-red-500 mt-1">
+                    {(errors.itinerary as any)[index].activities.message as string}
+                  </p>
+                )}
+              </div>
             </div>
           ))}
           <Button
             type="button"
-            onClick={() => append({ dayNumber: fields.length + 1, activities: [{ value: "" }] })}
+            onClick={() => append({ day: `Day ${fields.length + 1}`, title: "", activities: "" })}
             variant="outline"
             className="w-full mt-2 border-dashed border-2 py-6 text-gray-500 hover:text-gray-900 flex justify-center items-center gap-2"
           >

@@ -30,11 +30,10 @@ export interface ApiActivity {
 }
 
 export interface ApiItineraryDay {
-  id: string;
-  dayNumber: number;
+  id?: string;
+  day: string;
   title: string;
-  description: string | null;
-  activities: ApiActivity[];
+  activities: string;
 }
 
 export interface ApiItinerary {
