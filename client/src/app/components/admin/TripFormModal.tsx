@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import imageCompression from "browser-image-compression";
 import {
   Dialog,
   DialogContent,
@@ -681,9 +682,18 @@ export function TripFormModal({
         const stayPayload: any[] = [];
         let fileIndex = 0;
 
-        stayItems.forEach((item) => {
+        for (const item of stayItems) {
           if (item.type === "NEW" && item.file) {
-            stayFormData.append("images", item.file);
+            try {
+              const compressedFile = await imageCompression(item.file, { 
+                maxSizeMB: 10, 
+                initialQuality: 0.9,
+                useWebWorker: true
+              });
+              stayFormData.append("images", compressedFile);
+            } catch (err) {
+              stayFormData.append("images", item.file);
+            }
             stayPayload.push({ text: item.text, type: "NEW", fileIndex });
             fileIndex++;
           } else if (item.type === "EXISTING") {
@@ -693,19 +703,15 @@ export function TripFormModal({
               url: item.url,
             });
           }
-        });
+        }
         stayFormData.append("payload", JSON.stringify(stayPayload));
 
-        await apiClient.post(`/trips/${tripId}/stay-transport`, stayFormData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await apiClient.post(`/trips/${tripId}/stay-transport`, stayFormData);
         toast.success("Stay & Transport updated!");
       } else if (isEdit) {
         const stayFormData = new FormData();
         stayFormData.append("payload", JSON.stringify([]));
-        await apiClient.post(`/trips/${tripId}/stay-transport`, stayFormData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await apiClient.post(`/trips/${tripId}/stay-transport`, stayFormData);
       }
 
       // Sync Highlights
@@ -714,9 +720,18 @@ export function TripFormModal({
         const highlightPayload: any[] = [];
         let highlightFileIndex = 0;
 
-        highlightItems.forEach((item) => {
+        for (const item of highlightItems) {
           if (item.type === "NEW" && item.file) {
-            highlightFormData.append("images", item.file);
+            try {
+              const compressedFile = await imageCompression(item.file, { 
+                maxSizeMB: 10, 
+                initialQuality: 0.9,
+                useWebWorker: true
+              });
+              highlightFormData.append("images", compressedFile);
+            } catch (err) {
+              highlightFormData.append("images", item.file);
+            }
             highlightPayload.push({ text: item.text, type: "NEW", fileIndex: highlightFileIndex });
             highlightFileIndex++;
           } else if (item.type === "EXISTING") {
@@ -726,28 +741,33 @@ export function TripFormModal({
               url: item.url,
             });
           }
-        });
+        }
         highlightFormData.append("payload", JSON.stringify(highlightPayload));
 
-        await apiClient.post(`/trips/${tripId}/highlights`, highlightFormData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await apiClient.post(`/trips/${tripId}/highlights`, highlightFormData);
         toast.success("Highlights updated!");
       } else if (isEdit) {
         const highlightFormData = new FormData();
         highlightFormData.append("payload", JSON.stringify([]));
-        await apiClient.post(`/trips/${tripId}/highlights`, highlightFormData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await apiClient.post(`/trips/${tripId}/highlights`, highlightFormData);
       }
 
       // Sync Banners
       if (images.length > 0) {
         const formData = new FormData();
-        images.forEach((img) => formData.append("banners", img));
-        await apiClient.post(`/trips/${tripId}/banner-images`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        for (const img of images) {
+          try {
+            const compressedFile = await imageCompression(img, { 
+              maxSizeMB: 10, 
+              initialQuality: 0.9,
+              useWebWorker: true
+            });
+            formData.append("banners", compressedFile);
+          } catch (err) {
+            formData.append("banners", img);
+          }
+        }
+        await apiClient.post(`/trips/${tripId}/banner-images`, formData);
         toast.success("Banner images uploaded!");
       }
 
