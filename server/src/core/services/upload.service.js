@@ -18,7 +18,10 @@ if (env.CLOUDINARY_URL) {
 
 // Memory storage for multer so we can process with sharp before uploading
 const storage = multer.memoryStorage();
-export const uploadMiddleware = multer({ storage });
+export const uploadMiddleware = multer({ 
+  storage,
+  limits: { fileSize: 100 * 1024 * 1024 }, // 50MB
+});
 
 /**
  * Uploads a buffer to Cloudinary
