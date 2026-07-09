@@ -14,6 +14,9 @@ import {
   isNotAvailable,
   type ApiTrip,
 } from "../../lib/tripApi";
+import { fetchAllFestivals } from "../../lib/festivalApi";
+
+export type ExtendedTrip = ApiTrip & { isFestival?: boolean };
 
 // ── "Not Available" inline label ──────────────────────────────────
 function NA({ text = "Not Available" }: { text?: string }) {
@@ -445,6 +448,11 @@ function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
         <div style={{ position: "absolute", top: "12px", left: "12px", background: "#781216", color: "#fff", borderRadius: "4px", padding: "3px 10px", fontSize: "0.58rem", fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase" }}>
           {typeLabel}
         </div>
+        {(trip as any).isFestival && (
+          <div style={{ position: "absolute", top: "12px", left: "12px", background: "#c8a96e", color: "#fff", borderRadius: "4px", padding: "3px 10px", fontSize: "0.58rem", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", boxShadow: "0 2px 4px rgba(0,0,0,0.2)" }}>
+            Hangover Featured
+          </div>
+        )}
         {spots <= 8 && spots > 0 && (
           <div style={{ position: "absolute", top: "12px", right: "12px", background: "rgba(11,11,11,0.7)", backdropFilter: "blur(6px)", color: "#C8A96E", borderRadius: "4px", padding: "3px 10px", fontSize: "0.58rem", fontWeight: 500 }}>
             {spots} spots left
@@ -482,8 +490,8 @@ function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
               {isNotAvailable(priceStr) ? <NA /> : priceStr}
             </span>
           </div>
-          <Link to={`/trips/${trip.slug}`} style={{ background: hovered ? "#C8A96E" : "transparent", border: `1.5px solid ${hovered ? "#C8A96E" : "rgba(30,26,20,0.15)"}`, color: hovered ? "#1e1a14" : "rgba(30,26,20,0.6)", borderRadius: "4px", padding: "7px 16px", fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Poppins', sans-serif", transition: "all 0.25s ease", display: "flex", alignItems: "center", gap: "5px", textDecoration: "none" }}>
-            View Trip <ArrowRight size={11} />
+          <Link to={(trip as any).isFestival ? `/festivals/${trip.slug}` : `/trips/${trip.slug}`} style={{ background: hovered ? "#C8A96E" : "transparent", border: `1.5px solid ${hovered ? "#C8A96E" : "rgba(30,26,20,0.15)"}`, color: hovered ? "#1e1a14" : "rgba(30,26,20,0.6)", borderRadius: "4px", padding: "7px 16px", fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Poppins', sans-serif", transition: "all 0.25s ease", display: "flex", alignItems: "center", gap: "5px", textDecoration: "none" }}>
+            View {(trip as any).isFestival ? "Festival" : "Trip"} <ArrowRight size={11} />
           </Link>
         </div>
       </div>
@@ -669,7 +677,7 @@ function DestinationSections({ trips }: { trips: ApiTrip[] }) {
             region={region}
             tagline={tagline}
             trips={groupTrips}
-            defaultOpen={idx === 0}
+            defaultOpen={true}
           />
         );
       })}
@@ -720,7 +728,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
 
 // ── Main page ─────────────────────────────────────────────────────
 export default function TripsPage() {
-  const [trips, setTrips] = useState<ApiTrip[]>([]);
+  const [trips, setTrips] = useState<ExtendedTrip[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -733,8 +741,17 @@ export default function TripsPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchAllTrips();
-      setTrips(data);
+      const [tripsData, festivalsData] = await Promise.all([
+        fetchAllTrips(),
+        fetchAllFestivals()
+      ]);
+      const festivalsAsTrips = festivalsData.map((f: any) => ({
+        ...f,
+        isFestival: true,
+        tripType: f.tags && f.tags.length > 0 ? f.tags[0].tag : "FESTIVAL",
+        tripTags: f.tags ? f.tags.map((t: any) => ({ tag: t.tag })) : []
+      }));
+      setTrips([...tripsData, ...festivalsAsTrips]);
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || "Something went wrong");
     } finally {

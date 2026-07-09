@@ -1,5 +1,5 @@
 // @ts-ignore
-import logoSrc from "../../imports/final-logo_png_transparent.png";
+import logoSrc from "/images/final-logo_png_transparent.png";
 
 import { useState, useEffect, forwardRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router";

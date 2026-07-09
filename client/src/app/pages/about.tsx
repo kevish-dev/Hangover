@@ -120,25 +120,25 @@ function JourneyIllustration() {
 // ── Founders data ──────────────────────────────────────────────────
 const FOUNDERS = [
   {
-    name: "Aarav Thakur",
+    name: "Donyi Camder Tok",
     role: "Co-Founder & Trip Architect",
-    avatar: "https://randomuser.me/api/portraits/men/32.jpg",
+    avatar: "/images/Donyi Camder Tok.jpg",
     quote: "I was tired of being a tourist in my own country. I wanted to travel in a way that actually changed something.",
     milestone: "Conceived the idea of community-led travel in a Ziro dhaba, 2023.",
     emoji: "🏕",
   },
   {
-    name: "Nisha Borah",
+    name: "Kaustav Banerjee",
     role: "Co-Founder & Community Lead",
-    avatar: "https://randomuser.me/api/portraits/women/44.jpg",
+    avatar: "/images/Kaustav Banerjee.jpg",
     quote: "The first trip had 8 strangers and zero certainty. That uncertainty was the whole point.",
     milestone: "Led the first Ziro trip and hasn't stopped since.",
     emoji: "🎵",
   },
   {
-    name: "Raunak Gogoi",
+    name: "Sandeep Kumar Singh",
     role: "Co-Founder & Route Designer",
-    avatar: "https://randomuser.me/api/portraits/men/56.jpg",
+    avatar: "/images/Sandeep Kumar Singh.jpg",
     quote: "Every route I design starts with one question — what would make someone cry with gratitude?",
     milestone: "Opened Mechuka and Tawang routes that nobody else was running.",
     emoji: "🗺",

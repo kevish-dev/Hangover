@@ -35,19 +35,25 @@ export const findById = async (whereObj, isAdmin = false) => {
 };
 
 export const create = async (data) => {
-  const { tripIds, ...rest } = data;
+  const { tripIds, festivalIds, ...rest } = data;
   const payload = { ...rest };
   if (tripIds && tripIds.length > 0) {
     payload.trips = { connect: tripIds.map(id => ({ id })) };
+  }
+  if (festivalIds && festivalIds.length > 0) {
+    payload.festivals = { connect: festivalIds.map(id => ({ id })) };
   }
   return prisma.destination.create({ data: payload });
 };
 
 export const update = async (id, data) => {
-  const { tripIds, ...rest } = data;
+  const { tripIds, festivalIds, ...rest } = data;
   const payload = { ...rest };
   if (tripIds) {
     payload.trips = { set: tripIds.map(id => ({ id })) };
+  }
+  if (festivalIds) {
+    payload.festivals = { set: festivalIds.map(id => ({ id })) };
   }
   return prisma.destination.update({
     where: { id },

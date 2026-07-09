@@ -53,7 +53,7 @@ function ActionMenu({ booking, onRemind, onCancelAndRefund }: { booking: any, on
   const isCancellable = booking.status !== "CANCELLED" && booking.status !== "COMPLETED";
   const totalPaid = Number(booking.amountPaid) || 0;
 
-  if (booking.paymentStatus !== "PARTIALLY_PAID" && !hasSuccessfulPayments && !isCancellable) {
+  if (booking.status === "PENDING" || (booking.paymentStatus !== "PARTIALLY_PAID" && !hasSuccessfulPayments && !isCancellable)) {
     return <div className="text-gray-400 text-xs italic">No actions</div>;
   }
 

@@ -51,11 +51,11 @@ const tripSchema = z.object({
 
   overview: z.string().min(10, "Overview must be detailed"),
   inclusions: z
-    .array(z.object({ value: z.string().min(1) }))
-    .min(1, "At least one inclusion"),
+    .array(z.object({ value: z.string().min(1, "Inclusion is required") }))
+    .min(1, "At least one inclusion is required"),
   exclusions: z
-    .array(z.object({ value: z.string().min(1) }))
-    .min(1, "At least one exclusion"),
+    .array(z.object({ value: z.string().min(1, "Exclusion is required") }))
+    .min(1, "At least one exclusion is required"),
   tripTags: z.array(z.object({ value: z.string().min(1) })).optional(),
   faqs: z
     .array(
@@ -76,12 +76,9 @@ const tripSchema = z.object({
   isFeatured: z.boolean().default(false),
   itinerary: z.array(
     z.object({
-      dayNumber: z.coerce.number().min(1, "Day number is required"),
-      activities: z.array(
-        z.object({
-          value: z.string().min(1, "Activity is required")
-        })
-      ).min(1, "At least one activity is required")
+      day: z.string().min(1, "Day is required"),
+      title: z.string().min(1, "Title is required"),
+      activities: z.string().min(1, "Activities are required")
     })
   ).optional(),
   }
@@ -174,7 +171,7 @@ export function TripFormModal({
       location: "",
       tripType: "MOUNTAIN_TREK",
       bestTimeToVisit: "",
-      slots: [{ startDate: "", endDate: "", capacity: 10 }],
+      slots: [{ startDate: "", endDate: "", capacity: 12 }],
       overview: "",
       inclusions: [],
       exclusions: [],
@@ -203,14 +200,18 @@ export function TripFormModal({
             title: s.title || "",
             priority: s.priority || 0,
             capacity: s.capacity
-          })) : [{ startDate: "", endDate: "", capacity: 10, title: "", priority: 0 }],
+          })) : [{ startDate: "", endDate: "", capacity: 12, title: "", priority: 0 }],
           overview: trip.overview || "",
-          inclusions: trip.inclusions?.length
-            ? trip.inclusions.map((i: string) => ({ value: i }))
-            : [{ value: "" }],
-          exclusions: trip.exclusions?.length
-            ? trip.exclusions.map((e: string) => ({ value: e }))
-            : [{ value: "" }],
+          inclusions: Array.isArray(trip.inclusions) && trip.inclusions.length > 0
+            ? trip.inclusions.map((i: any) => ({ value: typeof i === 'string' ? i : (i.value || "") }))
+            : typeof trip.inclusions === 'string' && trip.inclusions.trim().startsWith('[')
+              ? JSON.parse(trip.inclusions).map((i: any) => ({ value: typeof i === 'string' ? i : (i.value || "") }))
+              : [{ value: "" }],
+          exclusions: Array.isArray(trip.exclusions) && trip.exclusions.length > 0
+            ? trip.exclusions.map((e: any) => ({ value: typeof e === 'string' ? e : (e.value || "") }))
+            : typeof trip.exclusions === 'string' && trip.exclusions.trim().startsWith('[')
+              ? JSON.parse(trip.exclusions).map((e: any) => ({ value: typeof e === 'string' ? e : (e.value || "") }))
+              : [{ value: "" }],
           tripTags: trip.tripTags?.length
             ? trip.tripTags.map((t: any) => ({ value: t.tag }))
             : [{ value: "" }],
@@ -228,12 +229,13 @@ export function TripFormModal({
               }))
             : [{ title: "Standard", price: 0, tokenAmount: 0 }],
           itinerary: Array.isArray(trip.itinerary) ? trip.itinerary.map((day: any) => ({
-            ...day,
-            activities: Array.isArray(day.activities)
-              ? day.activities.map((a: string) => ({ value: a }))
-              : typeof day.activities === 'string'
-              ? day.activities.split('\n').filter(Boolean).map((a: string) => ({ value: a }))
-              : [{ value: "" }]
+            day: day.day || `Day ${day.dayNumber || 1}`,
+            title: day.title || "",
+            activities: typeof day.activities === 'string' 
+              ? day.activities 
+              : Array.isArray(day.activities) 
+                ? day.activities.join('\n') 
+                : ""
           })) : [],
           isPublished: trip.isPublished || false,
           isFeatured: trip.isFeatured || false,
@@ -274,7 +276,7 @@ export function TripFormModal({
           location: "",
           tripType: "MOUNTAIN_TREK",
           bestTimeToVisit: "",
-          slots: [{ startDate: "", endDate: "", capacity: 10 }],
+          slots: [{ startDate: "", endDate: "", capacity: 12 }],
           overview: "",
           inclusions: [],
           exclusions: [],
@@ -656,10 +658,7 @@ export function TripFormModal({
           ?.map((t) => t.value)
           .filter((t) => t.trim() !== ""),
         packages: data.packages,
-        itinerary: data.itinerary?.map((day: any) => ({
-          ...day,
-          activities: day.activities.map((a: any) => a.value).filter(Boolean)
-        })),
+        itinerary: data.itinerary,
         faqs: data.faqs?.filter(
           (f) => f.question.trim() !== "" && f.answer.trim() !== "",
         ),
@@ -1056,7 +1055,7 @@ export function TripFormModal({
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => appendSlot({ startDate: "", endDate: "", capacity: 10, title: "", priority: 0 })}
+                      onClick={() => appendSlot({ startDate: "", endDate: "", capacity: 12, title: "", priority: 0 })}
                       className="mt-2"
                     >
                       <Plus className="w-4 h-4 mr-2" />
