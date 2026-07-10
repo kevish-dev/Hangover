@@ -1,5 +1,5 @@
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { MapPin, Calendar, ArrowRight } from "lucide-react";
 import {
@@ -290,6 +290,33 @@ function VideoLayer({
   video: VideoMeta;
   scrollYProgress: MotionValue<number>;
 }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [shouldLoad, setShouldLoad] = useState(false);
+
+  useEffect(() => {
+    const node = videoRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setShouldLoad(entry.isIntersecting),
+      { rootMargin: "150px 0px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const node = videoRef.current;
+    if (!node) return;
+    if (shouldLoad) {
+      node.load();
+      node.play().catch(() => undefined);
+    }
+    else {
+      node.pause();
+      node.removeAttribute("src");
+      node.load();
+    }
+  }, [shouldLoad]);
   const progress = useTransform(
     scrollYProgress,
     video.range,
@@ -328,10 +355,11 @@ function VideoLayer({
         }}
       >
         <motion.video
-          autoPlay
+          ref={videoRef}
           muted
           loop
           playsInline
+          preload="none"
           style={{
             width: "100%",
             height: "100%",
@@ -340,7 +368,7 @@ function VideoLayer({
             scale,
           }}
         >
-          <source src={video.src} type="video/mp4" />
+          {shouldLoad && <source src={video.src} type="video/mp4" />}
         </motion.video>
 
         <div

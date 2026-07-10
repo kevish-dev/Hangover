@@ -1,7 +1,7 @@
 import { Router } from "express";
 import * as tripController from "./trip.controller.js";
 import { requireAuth, requireAdmin, optionalAuth } from "../../core/middlewares/auth.middleware.js";
-import { uploadMiddleware } from "../../core/services/upload.service.js";
+import { imageUploadMiddleware } from "../../core/services/upload.service.js";
 import faqRoutes from "../faq/faq.routes.js";
 
 import "./trip.docs.js"; // Register OpenAPI specs
@@ -25,20 +25,21 @@ router.put("/:id", tripController.updateTrip);
 router.delete("/:id", tripController.deleteTrip);
 router.post(
   "/:id/banner-images",
-  uploadMiddleware.array("banners", 10), // Allow up to 10 banners at once
+  imageUploadMiddleware.array("banners", 10),
   tripController.uploadBanners
 );
 router.delete("/:id/banner-images", tripController.deleteBanner);
+router.delete("/:id/gallery-images", tripController.deleteGalleryImage);
 
 router.post(
   "/:id/highlights",
-  uploadMiddleware.array("images", 15),
+  imageUploadMiddleware.array("images", 15),
   tripController.syncHighlights
 );
 
 router.post(
   "/:id/stay-transport",
-  uploadMiddleware.array("images", 15),
+  imageUploadMiddleware.array("images", 15),
   tripController.syncStayTransport
 );
 

@@ -72,6 +72,14 @@ export const updateTrip = async (id, data) => {
 };
 
 export const deleteTrip = async (id) => {
+  const trip = await getTripById(id, true);
+  const contentUrls = [
+    ...(trip.bannerImages || []),
+    ...(trip.galleryImages || []),
+    ...(Array.isArray(trip.highlights) ? trip.highlights.map((item) => item?.imageUrl) : []),
+    ...(Array.isArray(trip.stayTransportImages) ? trip.stayTransportImages.map((item) => item?.imageUrl) : []),
+  ].filter(Boolean);
+  await Promise.allSettled(contentUrls.map((url) => deleteFromCloudinary(url)));
   await deleteTripAssets(id);
   return tripRepo.remove(id);
 };
@@ -90,6 +98,14 @@ export const deleteBannerImage = async (tripId, imageUrl) => {
   // Update Database
   const newBanners = existingBanners.filter(url => url !== imageUrl);
   return tripRepo.update(tripId, { bannerImages: newBanners });
+};
+
+export const deleteGalleryImage = async (tripId, imageUrl) => {
+  const trip = await getTripById(tripId, true);
+  const galleryImages = trip.galleryImages || [];
+  if (!galleryImages.includes(imageUrl)) throw new Error("Image not found in trip");
+  await deleteFromCloudinary(imageUrl);
+  return tripRepo.update(tripId, { galleryImages: galleryImages.filter((url) => url !== imageUrl) });
 };
 
 export const uploadBannerImages = async (tripId, imageBuffers) => {
@@ -141,7 +157,13 @@ export const syncHighlights = async (tripId, payloadStr, files) => {
   const results = await Promise.all(uploadPromises);
   const finalArray = results.filter(item => item !== null);
 
-  return tripRepo.update(tripId, { highlights: finalArray });
+  const retainedUrls = new Set(finalArray.map((item) => item.imageUrl));
+  const removedUrls = (Array.isArray(trip.highlights) ? trip.highlights : [])
+    .map((item) => item?.imageUrl)
+    .filter((url) => url && !retainedUrls.has(url));
+  const updated = await tripRepo.update(tripId, { highlights: finalArray });
+  await Promise.allSettled(removedUrls.map((url) => deleteFromCloudinary(url)));
+  return updated;
 };
 
 export const syncStayTransport = async (tripId, payloadStr, files) => {
@@ -170,7 +192,13 @@ export const syncStayTransport = async (tripId, payloadStr, files) => {
   const results = await Promise.all(uploadPromises);
   const finalArray = results.filter(item => item !== null);
 
-  return tripRepo.update(tripId, { stayTransportImages: finalArray });
+  const retainedUrls = new Set(finalArray.map((item) => item.imageUrl));
+  const removedUrls = (Array.isArray(trip.stayTransportImages) ? trip.stayTransportImages : [])
+    .map((item) => item?.imageUrl)
+    .filter((url) => url && !retainedUrls.has(url));
+  const updated = await tripRepo.update(tripId, { stayTransportImages: finalArray });
+  await Promise.allSettled(removedUrls.map((url) => deleteFromCloudinary(url)));
+  return updated;
 };
 
 // ============ V2 apis for User ====================

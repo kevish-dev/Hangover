@@ -4,6 +4,7 @@ import { ArrowRight, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useNavigate } from "react-router";
 import axios from "axios";
+import { mediaImageUrl } from "../../lib/media";
 
 interface FeaturedTrip {
   id: string;
@@ -253,8 +254,10 @@ export function HeroCarousel() {
           className="absolute inset-0"
         >
           <img
-            src={slide.bannerImages}
+            src={mediaImageUrl(slide.bannerImages, { width: 1920, fit: "fit" })}
             alt={slide.title}
+            fetchPriority="high"
+            decoding="async"
             className="w-full h-full object-cover"
           />
         </motion.div>

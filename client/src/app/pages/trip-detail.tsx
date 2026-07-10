@@ -41,6 +41,7 @@ import { SiteFooter } from "../components/site-footer";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiClient } from "../../lib/axios";
 import { toast } from "sonner";
+import { mediaImageUrl } from "../../lib/media";
 
 // ── "Not Available" inline label ──────────────────────────────────
 function NA({ text = "Not Available" }: { text?: string }) {
@@ -609,8 +610,10 @@ function AccommodationSection({
                     }}
                   >
                     <img
-                      src={p.imageUrl}
+                      src={mediaImageUrl(p.imageUrl, { width: 960, height: 720 })}
                       alt={p.text}
+                      loading="lazy"
+                      decoding="async"
                       style={{
                         width: "100%",
                         height: "100%",
@@ -1205,8 +1208,10 @@ function HighlightAccordionPanel({
       }}
     >
       <img
-        src={highlight.imageUrl}
+        src={mediaImageUrl(highlight.imageUrl, { width: 960, height: 640 })}
         alt={`Highlight ${index + 1}`}
+        loading="lazy"
+        decoding="async"
         style={{
           position: "absolute",
           inset: 0,
@@ -1302,8 +1307,10 @@ function HighlightMobilePanel({
       }}
     >
       <img
-        src={highlight.imageUrl}
+        src={mediaImageUrl(highlight.imageUrl, { width: 720, height: 440 })}
         alt={`Highlight ${index + 1}`}
+        loading="lazy"
+        decoding="async"
         style={{
           position: "absolute",
           inset: 0,
@@ -1589,7 +1596,7 @@ function TripDetailContent({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.96 }}
                 transition={{ duration: 0.22 }}
-                src={safeAllImages[lightbox]}
+                src={mediaImageUrl(safeAllImages[lightbox], { width: 2560, fit: "limit", quality: "auto:good" })}
                 alt={trip.title}
                 onClick={(e) => e.stopPropagation()}
                 style={{
@@ -1659,8 +1666,10 @@ function TripDetailContent({
                   }}
                 >
                   <img
-                    src={img}
+                    src={mediaImageUrl(img, { width: 160, height: 120 })}
                     alt=""
+                    loading="lazy"
+                    decoding="async"
                     style={{
                       width: "100%",
                       height: "100%",
@@ -1688,8 +1697,10 @@ function TripDetailContent({
           <AnimatePresence mode="sync" initial={false}>
             <motion.img
               key={heroIndex}
-              src={safeAllImages[heroIndex]}
+              src={mediaImageUrl(safeAllImages[heroIndex], { width: 1920, fit: "fit" })}
               alt={trip.title}
+              fetchPriority="high"
+              decoding="async"
               initial={{ opacity: 0, scale: 1.04 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}

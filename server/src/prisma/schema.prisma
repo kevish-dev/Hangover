@@ -20,6 +20,7 @@ model User {
   resolvedInquiries Inquiry[]    @relation("InquiryResolver")
   inquiries         Inquiry[]
   profile           UserProfile?
+  mediaUploads      MediaAsset[] @relation("MediaAssetUploader")
 
   @@index([email])
   @@index([role])
@@ -49,6 +50,8 @@ model UserProfile {
   createdAt                DateTime    @default(now())
   updatedAt                DateTime    @updatedAt
   govtIdImageUrl           String?
+  govtIdAssetId            String?     @unique
+  govtIdAsset              MediaAsset? @relation("ProfileGovernmentId", fields: [govtIdAssetId], references: [id], onDelete: SetNull)
   user                     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([govtIdNumber])
@@ -245,11 +248,35 @@ model Traveler {
   dateOfBirth DateTime?
   phone       String?
   aadhaar     String?
+  aadhaarAssetId String?     @unique
+  aadhaarAsset   MediaAsset? @relation("TravelerGovernmentId", fields: [aadhaarAssetId], references: [id], onDelete: SetNull)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@index([bookingId])
+}
+
+model MediaAsset {
+  id            String            @id @default(uuid())
+  publicId      String            @unique
+  resourceType  MediaResourceType
+  deliveryType  MediaDeliveryType @default(PUBLIC)
+  format        String?
+  version       String?
+  bytes         Int?
+  width         Int?
+  height        Int?
+  folder        String?
+  uploadedById  String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  uploadedBy    User?             @relation("MediaAssetUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  profileGovtId UserProfile?      @relation("ProfileGovernmentId")
+  travelerGovtId Traveler?        @relation("TravelerGovernmentId")
+
+  @@index([uploadedById])
+  @@index([deliveryType])
 }
 
 
@@ -429,6 +456,17 @@ enum Gender {
 enum GovtIdType {
   AADHAAR
   PASSPORT
+}
+
+enum MediaResourceType {
+  IMAGE
+  VIDEO
+  RAW
+}
+
+enum MediaDeliveryType {
+  PUBLIC
+  AUTHENTICATED
 }
 
 enum VerificationStatus {

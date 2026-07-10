@@ -3,102 +3,196 @@ import multer from "multer";
 import sharp from "sharp";
 import env from "../env/env.js";
 
-// Cloudinary configures itself automatically if CLOUDINARY_URL is present in the environment.
-// However, we explicitly configure it here just in case.
-if (env.CLOUDINARY_URL) {
-  // It automatically picks up CLOUDINARY_URL from process.env, but we can also be explicit
-} else if (env.CLOUDINARY_API_KEY && env.CLOUDINARY_API_SECRET) {
-  // Fallback if URL is missing but key/secret are provided
-  cloudinary.config({
-    api_key: env.CLOUDINARY_API_KEY,
-    api_secret: env.CLOUDINARY_API_SECRET,
-    // cloud_name would be needed here, which is why CLOUDINARY_URL is preferred
-  });
-}
+const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
+const DOCUMENT_TYPES = new Set([...IMAGE_TYPES, "application/pdf"]);
+const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
 
-// Memory storage for multer so we can process with sharp before uploading
-const storage = multer.memoryStorage();
-export const uploadMiddleware = multer({ 
-  storage,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 50MB
+const toHttpError = (message) => {
+  const error = new Error(message);
+  error.statusCode = 400;
+  error.code = "INVALID_MEDIA";
+  return error;
+};
+
+const createUploadMiddleware = ({ allowedTypes, fileSize, files }) =>
+  multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize, files, fields: 20, parts: files + 20 },
+    fileFilter: (_req, file, callback) => {
+      if (!allowedTypes.has(file.mimetype)) {
+        return callback(toHttpError("Unsupported media type."));
+      }
+      callback(null, true);
+    },
+  });
+
+// Public content uses images only. Limits are intentionally per request, not just UI hints.
+export const imageUploadMiddleware = createUploadMiddleware({
+  allowedTypes: IMAGE_TYPES,
+  fileSize: 12 * 1024 * 1024,
+  files: 15,
 });
 
+// IDs may be a clear image or PDF, but are stored as authenticated assets.
+export const documentUploadMiddleware = createUploadMiddleware({
+  allowedTypes: DOCUMENT_TYPES,
+  fileSize: 8 * 1024 * 1024,
+  files: 1,
+});
+
+export const videoUploadMiddleware = createUploadMiddleware({
+  allowedTypes: VIDEO_TYPES,
+  fileSize: 80 * 1024 * 1024,
+  files: 1,
+});
+
+// Backward-compatible default for existing image routes.
+export const uploadMiddleware = imageUploadMiddleware;
+
+const cloudinaryResourceType = (resourceType) => resourceType?.toLowerCase?.() || "image";
+
 /**
- * Uploads a buffer to Cloudinary
- * @param {Buffer} buffer - The image buffer
- * @param {Object} options - Configuration options
- * @param {string} options.folder - The folder path in Cloudinary
- * @param {string} [options.publicId] - Specific public ID to use (useful for overwriting)
- * @param {boolean} [options.optimize=true] - Whether to use Sharp to optimize and convert to WebP
- * @returns {Promise<string>} - The secure URL of the uploaded image
+ * Upload public visual content. Originals are normalized once, then Cloudinary
+ * delivers responsive derivatives at read time.
  */
-export const uploadToCloudinary = async (buffer, options = {}) => {
-  const { folder, publicId, optimize = true } = options;
-
-  let imageBuffer = buffer;
-
-  // If optimization is enabled, resize and convert to webp
-  if (optimize) {
-    imageBuffer = await sharp(buffer)
-      .resize(1200, 1200, {
-        fit: "inside",
-        withoutEnlargement: true,
-      })
-      .webp({ quality: 80 })
-      .toBuffer();
-  }
+export const uploadPublicImage = async (buffer, options = {}) => {
+  const { folder, publicId } = options;
+  const normalized = await sharp(buffer, { limitInputPixels: 40_000_000 })
+    .rotate()
+    .resize(2560, 1920, { fit: "inside", withoutEnlargement: true })
+    .webp({ quality: 84, smartSubsample: true })
+    .toBuffer();
 
   return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
+    cloudinary.uploader.upload_stream(
       {
         folder,
         public_id: publicId,
-        overwrite: !!publicId, // If a publicId is provided, allow it to overwrite existing
-        resource_type: "auto",
+        overwrite: Boolean(publicId),
+        resource_type: "image",
+        format: "webp",
       },
-      (error, result) => {
-        if (error) return reject(error);
-        resolve(result.secure_url);
-      }
-    );
-
-    // Write the buffer to the stream and end it
-    uploadStream.end(imageBuffer);
+      (error, result) => (error ? reject(error) : resolve(result)),
+    ).end(normalized);
   });
 };
 
-/**
- * Extracts public ID from a Cloudinary URL
- * @param {string} url - Cloudinary secure URL
- * @returns {string|null}
- */
-const extractPublicId = (url) => {
-  const matches = url.match(/\/upload\/(?:v\d+\/)?(.+?)\.[a-zA-Z0-9]+$/);
-  if (matches) return matches[1];
-  return null;
+/** Upload a sensitive ID as an authenticated Cloudinary asset. */
+export const uploadSensitiveDocument = async (file, options = {}) => {
+  const { folder, publicId } = options;
+  const isPdf = file.mimetype === "application/pdf";
+  const resourceType = isPdf ? "raw" : "image";
+  const resolvedPublicId = isPdf && !publicId.endsWith(".pdf") ? `${publicId}.pdf` : publicId;
+  const payload = isPdf
+    ? file.buffer
+    : await sharp(file.buffer, { limitInputPixels: 20_000_000 })
+        .rotate()
+        .resize(1800, 1800, { fit: "inside", withoutEnlargement: true })
+        .webp({ quality: 88, smartSubsample: true })
+        .toBuffer();
+
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader.upload_stream(
+      {
+        folder,
+        public_id: resolvedPublicId,
+        overwrite: Boolean(publicId),
+        resource_type: resourceType,
+        type: "authenticated",
+        ...(isPdf ? {} : { format: "webp" }),
+      },
+      (error, result) => (error ? reject(error) : resolve(result)),
+    ).end(payload);
+  });
 };
 
-/**
- * Deletes an image from Cloudinary
- * @param {string} url - The Cloudinary secure URL
- * @returns {Promise<any>}
- */
-export const deleteFromCloudinary = async (url) => {
+/** Upload a public video without image processing. Video delivery is transformed separately. */
+export const uploadPublicVideo = async (file, options = {}) => {
+  const { folder, publicId } = options;
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader.upload_stream(
+      {
+        folder,
+        public_id: publicId,
+        overwrite: Boolean(publicId),
+        resource_type: "video",
+        eager_async: true,
+        eager: [
+          { format: "jpg", transformation: [{ width: 1280, height: 720, crop: "fill", gravity: "auto" }] },
+          { format: "mp4", transformation: [{ width: 1280, crop: "limit" }, { video_codec: "auto" }] },
+        ],
+      },
+      (error, result) => (error ? reject(error) : resolve(result)),
+    ).end(file.buffer);
+  });
+};
+
+// Kept for existing service callers. New public-image callers should use uploadPublicImage.
+export const uploadToCloudinary = async (buffer, options = {}) => {
+  const result = await uploadPublicImage(buffer, options);
+  return result.secure_url;
+};
+
+export const createAuthenticatedDeliveryUrl = (asset) => {
+  if (!asset?.publicId) return null;
+  return cloudinary.url(asset.publicId, {
+    secure: true,
+    sign_url: true,
+    type: "authenticated",
+    resource_type: cloudinaryResourceType(asset.resourceType),
+    format: asset.format || undefined,
+    version: asset.version || undefined,
+    ...(env.CLOUDINARY_AUTH_TOKEN_KEY && {
+      auth_token: { key: env.CLOUDINARY_AUTH_TOKEN_KEY, duration: 300 },
+    }),
+  });
+};
+
+export const deleteMediaAsset = async (asset) => {
+  if (!asset?.publicId) return null;
+  return cloudinary.uploader.destroy(asset.publicId, {
+    resource_type: cloudinaryResourceType(asset.resourceType),
+    type: asset.deliveryType === "AUTHENTICATED" ? "authenticated" : "upload",
+    invalidate: true,
+  });
+};
+
+const extractPublicId = (url) => {
+  const matches = url?.match(/\/upload\/(?:v\d+\/)?(.+?)\.[a-zA-Z0-9]+$/);
+  return matches?.[1] || null;
+};
+
+// Legacy public URL cleanup. New uploads use MediaAsset metadata instead.
+export const deleteFromCloudinary = async (url, { resourceType = "image" } = {}) => {
   const publicId = extractPublicId(url);
   if (!publicId) return null;
-  return cloudinary.uploader.destroy(publicId);
+  return cloudinary.uploader.destroy(publicId, { resource_type: resourceType, invalidate: true });
 };
 
-/**
- * Deletes all assets in a specific trip folder
- * @param {string} tripId - The Trip ID
- * @returns {Promise<any>}
- */
 export const deleteTripAssets = async (tripId) => {
+  const prefix = `uploads/trips/${tripId}`;
   try {
-    return await cloudinary.api.delete_resources_by_prefix(`uploads/trips/${tripId}`);
+    await Promise.all([
+      cloudinary.api.delete_resources_by_prefix(prefix, { resource_type: "image" }),
+      cloudinary.api.delete_resources_by_prefix(prefix, { resource_type: "video" }),
+    ]);
   } catch (err) {
     console.error(`Failed to delete trip assets for ${tripId}:`, err);
-    return null;
   }
 };
+
+export const deleteFestivalAssets = async (festivalId) => {
+  const prefix = `uploads/festivals/${festivalId}`;
+  try {
+    await Promise.all([
+      cloudinary.api.delete_resources_by_prefix(prefix, { resource_type: "image" }),
+      cloudinary.api.delete_resources_by_prefix(prefix, { resource_type: "video" }),
+    ]);
+  } catch (err) {
+    console.error(`Failed to delete festival assets for ${festivalId}:`, err);
+  }
+};
+
+if (!env.CLOUDINARY_URL && env.CLOUDINARY_API_KEY && env.CLOUDINARY_API_SECRET) {
+  cloudinary.config({ api_key: env.CLOUDINARY_API_KEY, api_secret: env.CLOUDINARY_API_SECRET });
+}

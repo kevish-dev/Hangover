@@ -28,6 +28,7 @@ import {
 import { formatPrice, formatDuration, formatTripType } from "../../lib/tripApi";
 import { SiteFooter } from "../components/site-footer";
 import { ProfileSettings } from "../components/profile-settings";
+import { mediaImageUrl } from "../../lib/media";
 
 // ── Status badge styling ──────────────────────────────────────────
 
@@ -129,8 +130,10 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
       >
         {heroImage ? (
           <img
-            src={heroImage}
+            src={mediaImageUrl(heroImage, { width: 400, height: 320 })}
             alt={item?.title}
+            loading="lazy"
+            decoding="async"
             style={{
               width: "100%",
               height: "100%",
