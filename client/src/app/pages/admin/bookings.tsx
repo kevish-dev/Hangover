@@ -4,7 +4,7 @@ import { CalendarCheck, IndianRupee, Loader2, Bell, X, User, MapPin, Mail, Phone
 import { format } from "date-fns";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
-import { finalizeCompletedTrips } from "../../../lib/bookingApi";
+import { finalizeBooking } from "../../../lib/bookingApi";
 import { useMutation } from "@tanstack/react-query";
 
 function BookingStatusBadge({ status }: { status: string }) {
@@ -37,7 +37,7 @@ function PaymentStatusBadge({ status }: { status: string }) {
   );
 }
 
-function ActionMenu({ booking, onRemind, onCancelAndRefund }: { booking: any, onRemind: () => void, onCancelAndRefund: () => void }) {
+function ActionMenu({ booking, onRemind, onCancelAndRefund, onFinalize }: { booking: any, onRemind: () => void, onCancelAndRefund: () => void, onFinalize: () => void }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -55,7 +55,9 @@ function ActionMenu({ booking, onRemind, onCancelAndRefund }: { booking: any, on
   const isCancellable = booking.status !== "CANCELLED" && booking.status !== "COMPLETED";
   const totalPaid = Number(booking.amountPaid) || 0;
 
-  if (booking.status === "PENDING" || (booking.paymentStatus !== "PARTIALLY_PAID" && !hasSuccessfulPayments && !isCancellable)) {
+  const isFinalizable = booking.status === "CONFIRMED";
+
+  if (booking.status === "PENDING" || (booking.paymentStatus !== "PARTIALLY_PAID" && !hasSuccessfulPayments && !isCancellable && !isFinalizable)) {
     return <div className="text-gray-400 text-xs italic">No actions</div>;
   }
 
@@ -77,6 +79,16 @@ function ActionMenu({ booking, onRemind, onCancelAndRefund }: { booking: any, on
             >
               <Bell className="w-4 h-4 text-blue-600" />
               Remind Balance
+            </button>
+          )}
+
+          {isFinalizable && (
+            <button 
+              onClick={(e) => { e.stopPropagation(); setOpen(false); onFinalize(); }}
+              className="w-full text-left px-4 py-2.5 text-sm text-green-600 hover:bg-green-50 flex items-center gap-2 transition-colors border-b border-gray-50"
+            >
+              <CalendarCheck className="w-4 h-4 text-green-600" />
+              Finalize Trip
             </button>
           )}
 
@@ -189,13 +201,13 @@ export default function AdminBookingsPage() {
 
 
   const finalizeMutation = useMutation({
-    mutationFn: finalizeCompletedTrips,
+    mutationFn: finalizeBooking,
     onSuccess: (data) => {
       toast.success(data.message);
       queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || "Failed to finalize trips");
+      toast.error(error?.response?.data?.message || "Failed to finalize booking");
     }
   });
 
@@ -229,6 +241,12 @@ export default function AdminBookingsPage() {
       refetch();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to cancel booking.", { id: toastId });
+    }
+  };
+
+  const handleFinalize = (bookingId: string) => {
+    if (window.confirm("Are you sure you want to mark this trip as COMPLETED and send a review email to the user?")) {
+      finalizeMutation.mutate(bookingId);
     }
   };
 
@@ -301,20 +319,7 @@ export default function AdminBookingsPage() {
             />
           </div>
 
-          <button
-            onClick={() => {
-              if (window.confirm("Are you sure you want to mark all past confirmed trips as COMPLETED and send review emails?")) {
-                finalizeMutation.mutate();
-              }
-            }}
-            disabled={finalizeMutation.isPending}
-            className="px-4 py-2 bg-[#781216] text-white rounded-lg text-sm font-medium hover:bg-[#5a0d10] transition-colors flex items-center justify-center min-w-[160px]"
-          >
-            {finalizeMutation.isPending ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : null}
-            Finalize Completed Trips
-          </button>
+
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <select
               value={statusFilter}
@@ -412,6 +417,7 @@ export default function AdminBookingsPage() {
                         booking={b} 
                         onRemind={() => handleRemind(b.id)} 
                         onCancelAndRefund={() => setConfirmCancelId(b.id)}
+                        onFinalize={() => handleFinalize(b.id)}
                       />
                     </td>
                   </tr>

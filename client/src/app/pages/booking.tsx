@@ -550,9 +550,9 @@ export default function BookingPage() {
   // Govt ID upload state
   const [govtIdImage, setGovtIdImage] = useState<File | null>(null);
 
-  // Check if already booked or just reserved (partial payment)
   const [hasBooked, setHasBooked] = useState(false);
   const [reservedBooking, setReservedBooking] = useState<any>(null);
+  const [pendingBooking, setPendingBooking] = useState<any>(null);
 
   // Payment choice
   const [paymentChoice, setPaymentChoice] = useState<"FULL" | "TOKEN">("FULL");
@@ -600,8 +600,12 @@ export default function BookingPage() {
           const reserved = bookings.find(
             (b: any) => (isFestival ? b.festivalId === trip.id : b.tripId === trip.id) && b.status === "RESERVED",
           );
+          const pending = bookings.find(
+            (b: any) => (isFestival ? b.festivalId === trip.id : b.tripId === trip.id) && b.status === "PENDING",
+          );
           setHasBooked(!!confirmed);
           setReservedBooking(reserved || null);
+          setPendingBooking(pending || null);
         })
         .catch(console.error);
     }
@@ -1489,6 +1493,79 @@ export default function BookingPage() {
           <Link
             to={`/profile`}
             style={{
+              color: "#781216",
+              fontSize: "0.78rem",
+              fontWeight: 600,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              textDecoration: "none",
+              borderBottom: "1.5px solid rgba(120,18,22,0.25)",
+              paddingBottom: "3px",
+            }}
+          >
+            Go to Profile Dashboard →
+          </Link>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (pendingBooking) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f5f0e6",
+          fontFamily: "'Poppins', sans-serif",
+        }}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          style={{
+            textAlign: "center",
+            maxWidth: "480px",
+            padding: "3rem 2rem",
+          }}
+        >
+          <AlertCircle
+            size={52}
+            color="#b8943a"
+            strokeWidth={1.2}
+            style={{ margin: "0 auto 20px" }}
+          />
+          <h2
+            style={{
+              color: "#1e1a14",
+              fontSize: "1.6rem",
+              fontWeight: 300,
+              letterSpacing: "-0.02em",
+              margin: "0 0 8px",
+            }}
+          >
+            Pending Payment
+          </h2>
+          <p
+            style={{
+              color: "rgba(30,26,20,0.55)",
+              fontSize: "0.88rem",
+              fontWeight: 300,
+              lineHeight: 1.8,
+              margin: "0 0 28px",
+            }}
+          >
+            You already have a pending booking for this trip. Please complete the payment from your profile.
+          </p>
+          <Link
+            to={`/profile`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
               color: "#781216",
               fontSize: "0.78rem",
               fontWeight: 600,

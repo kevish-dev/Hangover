@@ -52,17 +52,26 @@ export const createBooking = async (userId, data) => {
   if (!item.isActive)
     throw new ValidationError("This item is no longer available for booking.");
 
-  // Check if user already has an active booking for this item
-  const existingActive = await prisma.booking.findFirst({
+  const siblingSlots = await prisma.slot.findMany({
+    where: isTrip ? { tripId: slot.tripId } : { festivalId: slot.festivalId },
+    select: { id: true }
+  });
+  const siblingSlotIds = siblingSlots.map(s => s.id);
+
+  const existingBooking = await prisma.booking.findFirst({
     where: {
       userId,
-      slotId: data.slotId,
-      ...(data.packageId ? { packageId: data.packageId } : {}),
-      status: { in: ["RESERVED", "CONFIRMED", "COMPLETED"] },
-    },
+      slotId: { in: siblingSlotIds },
+      status: { in: ["PENDING", "RESERVED", "CONFIRMED"] }
+    }
   });
-  if (existingActive) {
-    throw new ValidationError("You have already booked this item.");
+
+  if (existingBooking) {
+    if (existingBooking.status === "PENDING") {
+      throw new ValidationError("You already have a pending booking for this trip. Please complete the payment or ask support to cancel it.");
+    } else {
+      throw new ValidationError("You already have an active booking for this trip. You cannot book another slot or package until your trip is completed.");
+    }
   }
 
   // 3. Pricing calculation (per-person)
@@ -127,23 +136,6 @@ export const createBooking = async (userId, data) => {
       }))
     : [];
 
-  // Check if there is an existing PENDING booking to reuse
-  const existingPending = await prisma.booking.findFirst({
-    where: {
-      userId,
-      slotId: data.slotId,
-      ...(data.packageId ? { packageId: data.packageId } : {}),
-      status: "PENDING",
-    },
-  });
-
-  if (existingPending) {
-    bookingData.travelers = {
-      deleteMany: {}, // Clear any previous travelers if updating an existing pending booking
-      ...(travelersCreateData.length > 0 && { create: travelersCreateData })
-    };
-    return repo.updateBooking(existingPending.id, bookingData);
-  }
 
   // Generate booking reference and complete payload for a new booking
   bookingData.bookingReference = `HNG-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
@@ -382,61 +374,48 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
   return { success: true, message: `Booking cancelled${validRefundAmount > 0 ? ` and ₹${validRefundAmount} refunded` : ""} successfully.` };
 };
 
-export const finalizeCompletedTripsAndSendEmails = async () => {
-  // Find all CONFIRMED bookings where the slot end date has passed
-  const bookingsToComplete = await prisma.booking.findMany({
-    where: {
-      status: "CONFIRMED",
-      slot: {
-        endDate: {
-          lt: new Date()
-        }
-      }
-    },
+export const finalizeBooking = async (bookingId) => {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
     include: {
       user: { include: { profile: true } },
       slot: { include: { trip: true, festival: true } }
     }
   });
 
-  if (bookingsToComplete.length === 0) {
-    return { count: 0, message: "No completed trips found." };
+  if (!booking) throw new NotFoundError("Booking not found");
+  if (booking.status !== "CONFIRMED") {
+    throw new ValidationError("Only CONFIRMED bookings can be finalized.");
   }
 
   const { sendReviewRequestEmail } = await import("../../core/services/email.service.js");
   const env = (await import("../../core/env/env.js")).default;
-  const frontendUrl = env.FRONTEND_URL || "http://localhost:3000";
+  const frontendUrl = env.ORIGIN;
 
-  let updatedCount = 0;
+  // 1. Mark as completed
+  await prisma.booking.update({
+    where: { id: booking.id },
+    data: {
+      status: "COMPLETED",
+      completedAt: new Date()
+    }
+  });
 
-  for (const booking of bookingsToComplete) {
-    // 1. Mark as completed
-    await prisma.booking.update({
-      where: { id: booking.id },
-      data: {
-        status: "COMPLETED",
-        completedAt: new Date()
-      }
-    });
-
-    updatedCount++;
-
-    // 2. Send Review Email
-    const itemTitle = booking.slot.trip ? booking.slot.trip.title : booking.slot.festival?.title;
-    if (itemTitle && booking.user?.email) {
-      const reviewLink = `${frontendUrl}/bookings/${booking.id}/review`;
-      try {
-        await sendReviewRequestEmail({
-          to: booking.user.email,
-          name: booking.user.profile?.fullName || "Traveler",
-          tripTitle: itemTitle,
-          reviewLink
-        });
-      } catch (err) {
-        console.error(`Failed to send review email to ${booking.user.email} for booking ${booking.id}`, err);
-      }
+  // 2. Send Review Email
+  const itemTitle = booking.slot.trip ? booking.slot.trip.title : booking.slot.festival?.title;
+  if (itemTitle && booking.user?.email) {
+    const reviewLink = `${frontendUrl}/bookings/${booking.id}/review`;
+    try {
+      await sendReviewRequestEmail({
+        to: booking.user.email,
+        name: booking.user.profile?.fullName || "Traveler",
+        tripTitle: itemTitle,
+        reviewLink
+      });
+    } catch (err) {
+      console.error("Failed to send review email to", booking.user.email, err);
     }
   }
 
-  return { count: updatedCount, message: `Successfully finalized ${updatedCount} trip(s) and sent review emails.` };
+  return { success: true, message: "Booking finalized successfully." };
 };

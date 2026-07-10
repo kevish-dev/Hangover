@@ -89,9 +89,9 @@ export const uploadTravelerGovtId = async (req, res, next) => {
   }
 };
 
-export const finalizeCompletedTrips = async (req, res, next) => {
+export const finalizeBooking = async (req, res, next) => {
   try {
-    const result = await bookingService.finalizeCompletedTripsAndSendEmails();
+    const result = await bookingService.finalizeBooking(req.params.id);
     res.status(200).json(result);
   } catch (error) {
     next(error);
