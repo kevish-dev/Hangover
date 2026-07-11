@@ -8,6 +8,9 @@ import {
 } from "../../core/errors/errors.js";
 import crypto from "crypto";
 
+const toDecimal2 = (value) =>
+  Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+
 export const createBooking = async (userId, data) => {
   // 1. Verify user has a Government ID
   const user = await prisma.user.findUnique({
@@ -51,6 +54,9 @@ export const createBooking = async (userId, data) => {
   if (!item) throw new NotFoundError("Booking item not found");
   if (!item.isActive)
     throw new ValidationError("This item is no longer available for booking.");
+  if (!slot.startDate) {
+    throw new ValidationError("The selected slot does not have a start date and cannot be booked yet.");
+  }
 
   const siblingSlots = await prisma.slot.findMany({
     where: isTrip ? { tripId: slot.tripId } : { festivalId: slot.festivalId },
@@ -99,17 +105,17 @@ export const createBooking = async (userId, data) => {
   const itemToken = selectedPackage ? Number(selectedPackage.tokenAmount) : Number(item.tokenAmount);
 
   const baseTotalAmount = itemPrice * numberOfTravelers;
-  const totalAmount = baseTotalAmount + (baseTotalAmount * 0.05);
+  const totalAmount = toDecimal2(baseTotalAmount + (baseTotalAmount * 0.05));
 
   const baseTokenAmount = itemToken * numberOfTravelers;
-  const tokenAmount = baseTokenAmount + (baseTokenAmount * 0.05);
+  const tokenAmount = toDecimal2(baseTokenAmount + (baseTokenAmount * 0.05));
 
   let initialPaymentType = data.initialPaymentType || "TOKEN";
   if (tokenAmount === 0) {
     initialPaymentType = "FULL";
   }
   const amountDue =
-    initialPaymentType === "FULL" ? 0 : totalAmount - tokenAmount;
+    initialPaymentType === "FULL" ? 0 : toDecimal2(totalAmount - tokenAmount);
 
   // 4. Calculate balance due date: 10 days before start
   const balanceDueDate = new Date(slot.startDate);
@@ -141,6 +147,11 @@ export const createBooking = async (userId, data) => {
   bookingData.bookingReference = `HNG-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
   bookingData.userId = userId;
   bookingData.slotId = data.slotId;
+  if (isTrip) {
+    bookingData.tripId = slot.tripId;
+  } else {
+    bookingData.festivalId = slot.festivalId;
+  }
   if (selectedPackage) bookingData.packageId = selectedPackage.id;
   bookingData.status = "PENDING";
   bookingData.paymentStatus = "PENDING";

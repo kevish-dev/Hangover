@@ -1069,11 +1069,17 @@ export default function TripDetail() {
         .get(`/bookings/me?limit=100`)
         .then((res) => {
           const bookings = res.data?.data || [];
+          const belongsToCurrentItem = (booking: any) => {
+            const itemId = isFestival
+              ? booking.festivalId || booking.festival?.id || booking.slot?.festivalId
+              : booking.tripId || booking.trip?.id || booking.slot?.tripId;
+            return itemId === trip.id;
+          };
           const confirmed = bookings.find(
-            (b: any) => (isFestival ? b.festivalId === trip.id : b.tripId === trip.id) && (b.status === "CONFIRMED" || b.status === "COMPLETED")
+            (b: any) => belongsToCurrentItem(b) && b.status === "CONFIRMED"
           );
           const reserved = bookings.find(
-            (b: any) => (isFestival ? b.festivalId === trip.id : b.tripId === trip.id) && b.status === "RESERVED"
+            (b: any) => belongsToCurrentItem(b) && b.status === "RESERVED"
           );
           setHasBooked(!!confirmed);
           setReservedBookingId(reserved?.id || null);
@@ -2358,7 +2364,7 @@ function TripDetailContent({
                   </div>
                 ) : reservedBookingId ? (
                   <Link
-                    to={`/book/${trip.slug}?resume=${reservedBookingId}${isFestival ? '&type=festival' : ''}`}
+                    to={`/bookings/${reservedBookingId}/pay-balance`}
                     style={{
                       display: "block",
                       width: "100%",

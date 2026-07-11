@@ -184,13 +184,6 @@ export const initiateBalancePayment = async (userId, bookingId, isAdmin = false)
     throw new ValidationError("Balance payment can only be initiated for RESERVED / PARTIALLY_PAID bookings.");
   }
 
-  // Check cutoff — only block for non-admins
-  if (!isAdmin && booking.balanceDueDate && new Date() > new Date(booking.balanceDueDate)) {
-    throw new ValidationError(
-      "The balance payment deadline has passed. Please contact support."
-    );
-  }
-
   const amount = booking.amountDue;
   if (Number(amount) <= 0) {
     throw new ValidationError("No outstanding balance for this booking.");

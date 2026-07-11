@@ -228,13 +228,14 @@ export default function PayBalancePage() {
         bookingId: booking.id,
       });
       const { razorpayOrderId, razorpayKeyId, amount, currency } = initiateRes.data;
+      const itemTitle = booking.trip?.title || booking.festival?.title || "Trip";
 
       const options = {
         key: razorpayKeyId,
         amount,
         currency,
         name: "Hangover Trails",
-        description: `${booking.trip.title} — Balance Payment`,
+        description: `${itemTitle} — Balance Payment`,
         order_id: razorpayOrderId,
         prefill: {
           email: user.email,
@@ -263,7 +264,11 @@ export default function PayBalancePage() {
     }
   };
 
-  const isEligible = booking.status === "RESERVED" && booking.paymentStatus === "PARTIALLY_PAID";
+  const item = booking.trip || booking.festival;
+  const isEligible =
+    booking.status === "RESERVED" &&
+    booking.paymentStatus === "PARTIALLY_PAID" &&
+    Number(booking.amountDue) > 0;
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-16">
@@ -286,7 +291,7 @@ export default function PayBalancePage() {
                 <span className="block text-gray-500 mb-1">Destination</span>
                 <span className="font-medium text-gray-900 flex items-center gap-1">
                   <MapPin className="w-4 h-4 text-[#c8a96e]" />
-                  {booking.trip.title}
+                  {item?.title || "Trip"}
                 </span>
               </div>
               <div>

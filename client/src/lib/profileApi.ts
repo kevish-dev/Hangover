@@ -28,7 +28,10 @@ export interface ApiBooking {
   id: string;
   bookingReference: string;
   userId: string;
-  tripId: string;
+  tripId: string | null;
+  festivalId: string | null;
+  packageId: string | null;
+  slotId: string;
   status: BookingStatus;
   paymentStatus: PaymentStatus;
   numberOfTravelers: number;
@@ -48,6 +51,7 @@ export interface ApiBooking {
   updatedAt: string;
   trip?: ApiTrip;
   festival?: any; // Add festival type when available
+  package?: any; // Add package type
   slot?: any; // Add slot type
   payments: ApiPayment[];
 }
@@ -163,4 +167,3 @@ export async function uploadGovtId(govtIdType: string, image?: File | null): Pro
   });
   return res.data.profile;
 }
-

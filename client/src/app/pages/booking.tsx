@@ -594,14 +594,20 @@ export default function BookingPage() {
         .get(`/bookings/me?limit=100`)
         .then((res) => {
           const bookings = res.data?.data || [];
+          const belongsToCurrentItem = (booking: any) => {
+            const itemId = isFestival
+              ? booking.festivalId || booking.festival?.id || booking.slot?.festivalId
+              : booking.tripId || booking.trip?.id || booking.slot?.tripId;
+            return itemId === trip.id;
+          };
           const confirmed = bookings.find(
-            (b: any) => (isFestival ? b.festivalId === trip.id : b.tripId === trip.id) && (b.status === "CONFIRMED" || b.status === "COMPLETED"),
+            (b: any) => belongsToCurrentItem(b) && b.status === "CONFIRMED",
           );
           const reserved = bookings.find(
-            (b: any) => (isFestival ? b.festivalId === trip.id : b.tripId === trip.id) && b.status === "RESERVED",
+            (b: any) => belongsToCurrentItem(b) && b.status === "RESERVED",
           );
           const pending = bookings.find(
-            (b: any) => (isFestival ? b.festivalId === trip.id : b.tripId === trip.id) && b.status === "PENDING",
+            (b: any) => belongsToCurrentItem(b) && b.status === "PENDING",
           );
           setHasBooked(!!confirmed);
           setReservedBooking(reserved || null);
