@@ -27,6 +27,7 @@ import { SiteFooter } from "../components/site-footer";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { getMyProfile } from "../../lib/profileApi";
+import { mediaImageUrl } from "../../lib/media";
 
 // Razorpay is loaded as a static <script> in index.html
 declare const Razorpay: any;
@@ -152,6 +153,7 @@ function FilePickerField({
   file,
   onChange,
   existingUrl,
+  existingMimeType,
 }: {
   label: string;
   required?: boolean;
@@ -159,12 +161,14 @@ function FilePickerField({
   file: File | null;
   onChange: (f: File | null) => void;
   existingUrl?: string | null;
+  existingMimeType?: string | null;
 }) {
   const previewUrl = file ? URL.createObjectURL(file) : existingUrl;
+  const isPdf = file ? file.type === "application/pdf" : existingMimeType === "application/pdf";
 
   return (
     <Field label={label} required={required} hint={hint}>
-      {previewUrl && (
+      {previewUrl && !isPdf && (
         <div style={{ marginBottom: "12px" }}>
           <img
             src={previewUrl}
@@ -179,6 +183,11 @@ function FilePickerField({
             }}
           />
         </div>
+      )}
+      {previewUrl && isPdf && (
+        <a href={previewUrl} target="_blank" rel="noreferrer" style={{ color: "#781216", fontSize: "0.78rem" }}>
+          View uploaded PDF
+        </a>
       )}
       <label
         style={{
@@ -210,7 +219,7 @@ function FilePickerField({
         </span>
         <input
           type="file"
-          accept="image/*,.pdf"
+          accept="image/jpeg,image/png,image/webp,image/avif,application/pdf"
           required={required && !existingUrl && !file}
           style={{ display: "none" }}
           onChange={(e) => onChange(e.target.files?.[0] ?? null)}
@@ -265,7 +274,7 @@ function UncontrolledFilePicker({
         <input
           type="file"
           name={name}
-          accept="image/*,.pdf"
+          accept="image/jpeg,image/png,image/webp,image/avif,application/pdf"
           required={required && !file}
           style={{ display: "none" }}
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
@@ -481,7 +490,7 @@ function TravelerForm({
           <UncontrolledFilePicker
             label="Upload Aadhaar Card"
             name={`traveler-${index}-aadhaar`}
-            hint="Clear photo or scan — max 5 MB"
+            hint="Clear photo or scan — max 8 MB"
             required={true}
           />
         </div>
@@ -735,12 +744,12 @@ export default function BookingPage() {
 
       // Upload additional travelers govt IDs
       const additionalTravelers = await Promise.all(extractedTravelers.map(async (t) => {
-        let aadhaarUrl = null;
+        let aadhaarAssetId = null;
         if (t.aadhaarFile && t.aadhaarFile.size > 0) {
           const idForm = new FormData();
           idForm.append("image", t.aadhaarFile);
           const uploadRes = await apiClient.post("/bookings/traveler/govt-id", idForm);
-          aadhaarUrl = uploadRes.data.url;
+          aadhaarAssetId = uploadRes.data.assetId;
         }
         return {
           fullName: `${t.firstName || ""} ${t.lastName || ""}`.trim(),
@@ -748,7 +757,7 @@ export default function BookingPage() {
           phone: t.phone,
           dateOfBirth: t.dob,
           gender: t.gender,
-          aadhaar: aadhaarUrl,
+          aadhaarAssetId,
         };
       }));
 
@@ -1686,7 +1695,7 @@ export default function BookingPage() {
           style={{
             position: "absolute",
             inset: 0,
-            backgroundImage: `url(${tripImage})`,
+            backgroundImage: `url(${mediaImageUrl(tripImage, { width: 1280, height: 480, fit: "fill" })})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
             opacity: 0.08,
@@ -2089,10 +2098,11 @@ export default function BookingPage() {
                   <FilePickerField
                     label="Aadhaar / Govt ID"
                     required={!profile?.govtIdImageUrl}
-                    hint="Clear photo or scan — max 5 MB"
+                    hint="Clear photo or scan — max 8 MB"
                     file={govtIdImage}
                     onChange={setGovtIdImage}
                     existingUrl={profile?.govtIdImageUrl}
+                    existingMimeType={profile?.govtIdMimeType}
                   />
                 </div>
               </FormSection>
@@ -2752,8 +2762,10 @@ export default function BookingPage() {
                   }}
                 >
                   <img
-                    src={tripImage}
+                    src={mediaImageUrl(tripImage, { width: 640, height: 400 })}
                     alt={tripName}
+                    loading="lazy"
+                    decoding="async"
                     style={{
                       width: "100%",
                       height: "100%",

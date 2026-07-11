@@ -110,8 +110,13 @@ export function ProfileSettings() {
       
       // Clean up empty strings to null for backend
       const payload: Partial<UserProfile> = {};
-      Object.keys(profile).forEach((k) => {
-        const key = k as keyof UserProfile;
+      const editableFields: (keyof UserProfile)[] = [
+        "fullName", "phone", "alternatePhone", "dateOfBirth", "gender",
+        "addressLine1", "addressLine2", "city", "state", "postalCode", "country",
+        "emergencyContactName", "emergencyContactPhone", "emergencyContactRelation",
+        "bloodGroup", "medicalNotes", "govtIdType", "govtIdNumber",
+      ];
+      editableFields.forEach((key) => {
         const val = profile[key];
         payload[key] = (val === "") ? null : val as any;
       });
@@ -142,6 +147,7 @@ export function ProfileSettings() {
         ...prev,
         govtIdType: updated.govtIdType,
         govtIdImageUrl: updated.govtIdImageUrl,
+        govtIdMimeType: updated.govtIdMimeType,
       }));
       setImageFile(null);
       toast.success("Government ID uploaded successfully!");
@@ -377,9 +383,13 @@ export function ProfileSettings() {
             >
               {profile.govtIdImageUrl ? (
                 <>
-                  <div style={{ width: "100%", height: "200px", borderRadius: "8px", overflow: "hidden", marginBottom: "10px" }}>
-                    <img src={profile.govtIdImageUrl} alt="Government ID" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  </div>
+                  {profile.govtIdMimeType === "application/pdf" ? (
+                    <a href={profile.govtIdImageUrl} target="_blank" rel="noreferrer" className="text-sm text-[#781216] underline">View uploaded PDF</a>
+                  ) : (
+                    <div style={{ width: "100%", height: "200px", borderRadius: "8px", overflow: "hidden", marginBottom: "10px" }}>
+                      <img src={profile.govtIdImageUrl} alt="Government ID" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    </div>
+                  )}
                   <span style={{ fontSize: "0.75rem", color: "#228b22", fontWeight: 500 }}>✓ Uploaded</span>
                 </>
               ) : (
@@ -402,7 +412,7 @@ export function ProfileSettings() {
                 {imageFile ? imageFile.name : (profile.govtIdImageUrl ? "Replace Image" : "Select Image")}
                 <input
                   type="file"
-                  accept="image/jpeg, image/png, image/webp"
+                  accept="image/jpeg,image/png,image/webp,image/avif,application/pdf"
                   onChange={(e) => {
                     if (e.target.files && e.target.files[0]) setImageFile(e.target.files[0]);
                   }}

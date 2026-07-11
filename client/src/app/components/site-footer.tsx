@@ -116,7 +116,7 @@ export function SiteFooter() {
         <div style={{ position: "absolute", top: "-180px", right: "-180px", width: "520px", height: "520px", borderRadius: "50%", border: "1px solid rgba(184,148,58,0.08)", pointerEvents: "none" }} />
         <div style={{ position: "absolute", top: "-100px", right: "-100px", width: "340px", height: "340px", borderRadius: "50%", border: "1px solid rgba(184,148,58,0.05)", pointerEvents: "none" }} />
 
-        <div style={{ position: "relative", zIndex: 2, maxWidth: "1280px", margin: "0 auto", padding: "clamp(4rem,8vh,7rem) clamp(1.5rem,5vw,6rem)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "clamp(3rem,6vw,8rem)", alignItems: "center" }}
+        <div style={{ position: "relative", zIndex: 2, maxWidth: "1280px", margin: "0 auto", padding: "clamp(4rem,8vh,7rem) clamp(1.5rem,5vw,6rem)", display: "grid", gap: "clamp(3rem,6vw,8rem)", alignItems: "center" }}
           className="grid-cols-1 lg:grid-cols-2">
 
           {/* ── Left: headline + info ── */}
@@ -275,7 +275,7 @@ export function SiteFooter() {
                   </div>
 
                   {/* Name + Email row */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }} className="grid-cols-1 sm:grid-cols-2">
+                  <div style={{ display: "grid", gap: "12px" }} className="grid-cols-1 sm:grid-cols-2">
                     <div>
                       <label style={labelStyle}>Full Name *</label>
                       <input
@@ -305,7 +305,7 @@ export function SiteFooter() {
                   </div>
 
                   {/* Phone + Trip Type row */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }} className="grid-cols-1 sm:grid-cols-2">
+                  <div style={{ display: "grid", gap: "12px" }} className="grid-cols-1 sm:grid-cols-2">
                     <div>
                       <label style={labelStyle}>Phone</label>
                       <input
@@ -397,11 +397,11 @@ export function SiteFooter() {
         <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "clamp(3rem,6vw,5rem) clamp(1.5rem,5vw,6rem) 0" }}>
 
           {/* Top: brand + nav cols */}
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: "clamp(2rem,4vw,5rem)", marginBottom: "clamp(2.5rem,5vw,4rem)" }}
-            className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <div style={{ display: "grid", gap: "clamp(2rem,4vw,5rem)", marginBottom: "clamp(2.5rem,5vw,4rem)" }}
+            className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
 
             {/* Brand col */}
-            <div>
+            <div className="sm:col-span-2 lg:col-span-2">
               <img
                 src={logoSrc as string}
                 alt="Hangover Trails"

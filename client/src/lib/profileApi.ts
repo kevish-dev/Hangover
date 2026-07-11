@@ -139,6 +139,7 @@ export interface UserProfile {
   govtIdType: "AADHAAR" | "PASSPORT" | null;
   govtIdNumber: string | null;
   govtIdImageUrl: string | null;
+  govtIdMimeType?: string | null;
   createdAt: string;
   updatedAt: string;
 }

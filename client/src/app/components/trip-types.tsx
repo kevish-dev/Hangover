@@ -118,7 +118,7 @@ export function TripTypes() {
       <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
         <div
           style={{
-            borderRadius: "2.5rem",
+            borderRadius: "clamp(1rem, 5vw, 2.5rem)",
             overflow: "hidden",
             display: "flex",
             minHeight: "520px",
@@ -134,7 +134,7 @@ export function TripTypes() {
               display: "flex",
               alignItems: "center",
               justifyContent: "flex-start",
-              padding: "2rem 2.5rem",
+              padding: "clamp(1.5rem, 6vw, 2rem) clamp(1rem, 6vw, 2.5rem)",
               minHeight: "300px",
             }}
             className="w-full lg:w-[38%]"
@@ -208,7 +208,7 @@ export function TripTypes() {
             }}
           >
             {/* card stack */}
-            <div style={{ position: "relative", width: "340px", aspectRatio: "3/4" }}>
+            <div style={{ position: "relative", width: "min(100%, 340px)", aspectRatio: "3/4" }}>
               {TRIPS.map((trip, i) => {
                 const status = getStatus(i, current, TRIPS.length);
                 const isActive = status === "active";
@@ -221,7 +221,7 @@ export function TripTypes() {
                     key={trip.id}
                     initial={false}
                     animate={{
-                      x: isActive ? 0 : isPrev ? -110 : isNext ? 110 : 0,
+                      x: isActive ? 0 : isPrev ? -72 : isNext ? 72 : 0,
                       scale: isActive ? 1 : isPrev || isNext ? 0.86 : 0.7,
                       opacity: isActive ? 1 : isPrev || isNext ? 0.45 : 0,
                       rotate: isPrev ? -4 : isNext ? 4 : 0,

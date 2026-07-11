@@ -2,6 +2,13 @@ import { AppError, ValidationError } from "./errors.js";
 import { ZodError } from "zod";
 
 export const errorHandler = (err, req, res, next) => {
+  if (err?.name === "MulterError") {
+    return res.status(400).json({
+      success: false,
+      code: "INVALID_MEDIA",
+      message: err.code === "LIMIT_FILE_SIZE" ? "Uploaded file exceeds the allowed size." : "Invalid upload request.",
+    });
+  }
   if (err instanceof AppError) {
     const payload = {
       success: false,

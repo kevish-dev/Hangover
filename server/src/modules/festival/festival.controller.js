@@ -68,6 +68,24 @@ export const uploadBanners = async (req, res, next) => {
   }
 };
 
+export const createBannerUploadSignature = async (req, res, next) => {
+  try {
+    const result = await festivalService.createBannerUploadSignature(req.params.id);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const attachBannerImages = async (req, res, next) => {
+  try {
+    const festival = await festivalService.attachBannerImages(req.params.id, req.body?.imageUrls);
+    res.status(200).json({ message: "Banner images attached successfully", festival });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const deleteBanner = async (req, res, next) => {
   try {
     const { imageUrl } = req.body;

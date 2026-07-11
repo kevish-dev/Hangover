@@ -493,6 +493,9 @@ export default function AdminBookingsPage() {
                     <ImageIcon className="w-4 h-4 text-[#781216]" /> Government ID
                   </h3>
                   {selectedBooking.user?.profile?.govtIdImageUrl ? (
+                    selectedBooking.user.profile.govtIdMimeType === "application/pdf" ? (
+                      <a href={selectedBooking.user.profile.govtIdImageUrl} target="_blank" rel="noreferrer" className="block text-sm text-[#781216] underline">View Government ID PDF</a>
+                    ) : (
                     <a 
                       href={selectedBooking.user.profile.govtIdImageUrl} 
                       target="_blank" 
@@ -505,6 +508,7 @@ export default function AdminBookingsPage() {
                         className="w-full h-48 object-cover"
                       />
                     </a>
+                    )
                   ) : (
                     <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-500 text-center">
                       No Government ID provided.

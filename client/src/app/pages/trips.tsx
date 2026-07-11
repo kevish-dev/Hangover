@@ -15,6 +15,7 @@ import {
   type ApiTrip,
 } from "../../lib/tripApi";
 import { fetchAllFestivals } from "../../lib/festivalApi";
+import { mediaImageUrl } from "../../lib/media";
 
 export type ExtendedTrip = ApiTrip & { isFestival?: boolean };
 
@@ -438,7 +439,7 @@ function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
     >
       <div style={{ position: "relative", aspectRatio: "16/10", overflow: "hidden" }}>
         {heroImage ? (
-          <img src={heroImage} alt={trip.title} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.55s ease", transform: hovered ? "scale(1.05)" : "scale(1)" }} />
+          <img src={mediaImageUrl(heroImage, { width: 640, height: 400 })} alt={trip.title} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.55s ease", transform: hovered ? "scale(1.05)" : "scale(1)" }} />
         ) : (
           <div style={{ width: "100%", height: "100%", background: "#ede8dc", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <NA text="No Image" />

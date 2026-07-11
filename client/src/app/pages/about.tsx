@@ -121,26 +121,23 @@ function JourneyIllustration() {
 const FOUNDERS = [
   {
     name: "Donyi Camder Tok",
-    role: "Co-Founder & Trip Architect",
+    role: "Co-Founder & Head of Operations",
     avatar: "/images/Donyi Camder Tok.jpg",
-    quote: "I was tired of being a tourist in my own country. I wanted to travel in a way that actually changed something.",
-    milestone: "Conceived the idea of community-led travel in a Ziro dhaba, 2023.",
+    description: "Arunachal is home, and Donyi knows it like the back of his hand. The mastermind behind our on-ground operations, he turns every itinerary into a seamless adventure through his local expertise, trusted network, and knack for making things happen.",
     emoji: "🏕",
   },
   {
     name: "Kaustav Banerjee",
-    role: "Co-Founder & Community Lead",
+    role: "Co-Founder & Head of Technology",
     avatar: "/images/Kaustav Banerjee.jpg",
-    quote: "The first trip had 8 strangers and zero certainty. That uncertainty was the whole point.",
-    milestone: "Led the first Ziro trip and hasn't stopped since.",
+    description: "A traveller at heart with a knack for all things digital, Kaustav looks after Hangover Trails' digital presence—from the website to the technology that keeps things running smoothly behind the scenes. His focus is simple: making every interaction with Hangover Trails as seamless as the journeys themselves.",
     emoji: "🎵",
   },
   {
     name: "Sandeep Kumar Singh",
-    role: "Co-Founder & Route Designer",
+    role: "Co-Founder & Head of Marketing and Sales",
     avatar: "/images/Sandeep Kumar Singh.jpg",
-    quote: "Every route I design starts with one question — what would make someone cry with gratitude?",
-    milestone: "Opened Mechuka and Tawang routes that nobody else was running.",
+    description: "A passionate traveller and avid biker, Sandeep is always chasing the next road less travelled. When he's not out on a weekend ride, he's shaping Hangover Trails' digital presence—crafting stories, capturing experiences, and bringing our adventures to life, both online and on the ground.",
     emoji: "🗺",
   },
 ];
@@ -314,17 +311,12 @@ export default function AboutPage() {
                   <div style={{ position: "absolute", top: "10px", right: "10px", width: "20px", height: "20px", borderTop: "1.5px solid #C8A96E", borderRight: "1.5px solid #C8A96E", borderRadius: "0 4px 0 0" }} />
                 </div>
 
-                {/* Quote */}
+                {/* Description */}
                 <div style={{ borderLeft: "2px solid rgba(200,169,110,0.35)", paddingLeft: "16px", marginBottom: "14px", flex: 1 }}>
-                  <p style={{ color: "rgba(242,237,228,0.7)", fontSize: "0.83rem", fontWeight: 300, fontStyle: "italic", lineHeight: 1.75, margin: 0 }}>
-                    "{f.quote}"
+                  <p style={{ color: "rgba(242,237,228,0.7)", fontSize: "0.83rem", fontWeight: 300, lineHeight: 1.75, margin: 0 }}>
+                    {f.description}
                   </p>
                 </div>
-
-                {/* Milestone */}
-                <p style={{ color: "rgba(242,237,228,0.32)", fontSize: "0.68rem", fontWeight: 300, lineHeight: 1.6, margin: 0, letterSpacing: "0.01em" }}>
-                  {f.milestone}
-                </p>
               </motion.div>
             ))}
           </div>

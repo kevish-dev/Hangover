@@ -1,5 +1,5 @@
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { MapPin, Calendar, ArrowRight } from "lucide-react";
 import {
@@ -244,7 +244,7 @@ function StackedVideos() {
     <div
       ref={containerRef}
       style={{
-        height: "300vh",
+        height: "min(300vh, 2100px)",
         background: "#1a1612",
         position: "relative",
       }}
@@ -290,6 +290,33 @@ function VideoLayer({
   video: VideoMeta;
   scrollYProgress: MotionValue<number>;
 }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [shouldLoad, setShouldLoad] = useState(false);
+
+  useEffect(() => {
+    const node = videoRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setShouldLoad(entry.isIntersecting),
+      { rootMargin: "150px 0px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const node = videoRef.current;
+    if (!node) return;
+    if (shouldLoad) {
+      node.load();
+      node.play().catch(() => undefined);
+    }
+    else {
+      node.pause();
+      node.removeAttribute("src");
+      node.load();
+    }
+  }, [shouldLoad]);
   const progress = useTransform(
     scrollYProgress,
     video.range,
@@ -310,10 +337,9 @@ function VideoLayer({
 
   return (
     <div
+      className="aspect-[9/16] w-full max-h-[85vh] top-[7.5vh] md:max-h-none md:aspect-auto md:h-screen md:top-0 mx-auto"
       style={{
         position: "sticky",
-        top: 0,
-        height: "100vh",
         zIndex: video.zIndex,
         overflow: "hidden",
       }}
@@ -328,10 +354,11 @@ function VideoLayer({
         }}
       >
         <motion.video
-          autoPlay
+          ref={videoRef}
           muted
           loop
           playsInline
+          preload="none"
           style={{
             width: "100%",
             height: "100%",
@@ -340,7 +367,7 @@ function VideoLayer({
             scale,
           }}
         >
-          <source src={video.src} type="video/mp4" />
+          {shouldLoad && <source src={video.src} type="video/mp4" />}
         </motion.video>
 
         <div
@@ -354,6 +381,7 @@ function VideoLayer({
         />
 
         <div
+          className="flex-col sm:flex-row gap-3 sm:gap-4"
           style={{
             position: "absolute",
             bottom: "clamp(20px,4vh,48px)",
@@ -365,16 +393,17 @@ function VideoLayer({
             pointerEvents: "none",
           }}
         >
-          <div>
+          <div style={{ minWidth: 0 }}>
             <p
               style={{
                 color: "#b8943a",
                 fontSize: "0.6rem",
                 fontWeight: 500,
-                letterSpacing: "0.24em",
+                letterSpacing: "0.16em",
                 textTransform: "uppercase",
                 marginBottom: "5px",
                 fontFamily: "'Poppins', sans-serif",
+                lineHeight: 1.5,
               }}
             >
               {video.location} · {video.date}
@@ -387,6 +416,7 @@ function VideoLayer({
                 letterSpacing: "-0.01em",
                 fontStyle: "italic",
                 fontFamily: "'Poppins', sans-serif",
+                lineHeight: 1.35,
               }}
             >
               "{video.quote}"
@@ -398,6 +428,7 @@ function VideoLayer({
               border: "1px solid rgba(242,237,228,0.18)",
               padding: "8px 16px",
               backdropFilter: "blur(6px)",
+              maxWidth: "100%",
             }}
           >
             <span
@@ -408,6 +439,7 @@ function VideoLayer({
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
                 fontFamily: "'Poppins', sans-serif",
+                lineHeight: 1.4,
               }}
             >
               {video.label}
@@ -454,7 +486,9 @@ function GoldButton({
         cursor: "pointer",
         display: "inline-flex",
         alignItems: "center",
+        justifyContent: "center",
         gap: "8px",
+        width: "min(100%, 260px)",
         fontFamily: "'Poppins', sans-serif",
         transition: "background 0.25s ease",
       }}
@@ -490,6 +524,7 @@ function OutlineButton({
         letterSpacing: "0.1em",
         textTransform: "uppercase",
         cursor: "pointer",
+        width: "min(100%, 260px)",
         fontFamily: "'Poppins', sans-serif",
         transition: "border-color 0.25s ease, color 0.25s ease",
       }}
@@ -525,7 +560,9 @@ function FestivalChip({
         padding: "22px 28px",
         cursor: "pointer",
         textAlign: "left",
-        minWidth: "220px",
+        width: "100%",
+        minWidth: 0,
+        maxWidth: "420px",
         flex: "1 1 220px",
         transition:
           "border-color 0.25s ease, background 0.25s ease, transform 0.2s ease",

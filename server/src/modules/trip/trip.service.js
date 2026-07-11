@@ -1,5 +1,6 @@
 import * as tripRepo from "./trip.repository.js";
-import { uploadToCloudinary, deleteFromCloudinary, deleteTripAssets } from "../../core/services/upload.service.js";
+import { uploadToCloudinary, deleteFromCloudinary, deleteTripAssets, createDirectImageUploadSignature, isExpectedPublicImageUrl } from "../../core/services/upload.service.js";
+import { ValidationError } from "../../core/errors/errors.js";
 import { randomUUID } from "crypto";
 
 const generateSlug = (title) => {
@@ -72,6 +73,14 @@ export const updateTrip = async (id, data) => {
 };
 
 export const deleteTrip = async (id) => {
+  const trip = await getTripById(id, true);
+  const contentUrls = [
+    ...(trip.bannerImages || []),
+    ...(trip.galleryImages || []),
+    ...(Array.isArray(trip.highlights) ? trip.highlights.map((item) => item?.imageUrl) : []),
+    ...(Array.isArray(trip.stayTransportImages) ? trip.stayTransportImages.map((item) => item?.imageUrl) : []),
+  ].filter(Boolean);
+  await Promise.allSettled(contentUrls.map((url) => deleteFromCloudinary(url)));
   await deleteTripAssets(id);
   return tripRepo.remove(id);
 };
@@ -90,6 +99,14 @@ export const deleteBannerImage = async (tripId, imageUrl) => {
   // Update Database
   const newBanners = existingBanners.filter(url => url !== imageUrl);
   return tripRepo.update(tripId, { bannerImages: newBanners });
+};
+
+export const deleteGalleryImage = async (tripId, imageUrl) => {
+  const trip = await getTripById(tripId, true);
+  const galleryImages = trip.galleryImages || [];
+  if (!galleryImages.includes(imageUrl)) throw new Error("Image not found in trip");
+  await deleteFromCloudinary(imageUrl);
+  return tripRepo.update(tripId, { galleryImages: galleryImages.filter((url) => url !== imageUrl) });
 };
 
 export const uploadBannerImages = async (tripId, imageBuffers) => {
@@ -113,6 +130,23 @@ export const uploadBannerImages = async (tripId, imageBuffers) => {
   return tripRepo.update(tripId, {
     bannerImages: [...existingBanners, ...imageUrls]
   });
+};
+
+export const createBannerUploadSignature = async (tripId) => {
+  await getTripById(tripId, true);
+  return createDirectImageUploadSignature(`uploads/trips/${tripId}/bannerimages`);
+};
+
+export const attachBannerImages = async (tripId, imageUrls) => {
+  if (!Array.isArray(imageUrls) || imageUrls.length === 0 || imageUrls.length > 10) {
+    throw new ValidationError("Provide between 1 and 10 banner image URLs.");
+  }
+  const folder = `uploads/trips/${tripId}/bannerimages`;
+  if (!imageUrls.every((url) => typeof url === "string" && isExpectedPublicImageUrl(url, folder))) {
+    throw new ValidationError("One or more banner URLs are invalid.");
+  }
+  const trip = await getTripById(tripId, true);
+  return tripRepo.update(tripId, { bannerImages: [...(trip.bannerImages || []), ...imageUrls] });
 };
 
 export const syncHighlights = async (tripId, payloadStr, files) => {
@@ -141,7 +175,13 @@ export const syncHighlights = async (tripId, payloadStr, files) => {
   const results = await Promise.all(uploadPromises);
   const finalArray = results.filter(item => item !== null);
 
-  return tripRepo.update(tripId, { highlights: finalArray });
+  const retainedUrls = new Set(finalArray.map((item) => item.imageUrl));
+  const removedUrls = (Array.isArray(trip.highlights) ? trip.highlights : [])
+    .map((item) => item?.imageUrl)
+    .filter((url) => url && !retainedUrls.has(url));
+  const updated = await tripRepo.update(tripId, { highlights: finalArray });
+  await Promise.allSettled(removedUrls.map((url) => deleteFromCloudinary(url)));
+  return updated;
 };
 
 export const syncStayTransport = async (tripId, payloadStr, files) => {
@@ -170,7 +210,13 @@ export const syncStayTransport = async (tripId, payloadStr, files) => {
   const results = await Promise.all(uploadPromises);
   const finalArray = results.filter(item => item !== null);
 
-  return tripRepo.update(tripId, { stayTransportImages: finalArray });
+  const retainedUrls = new Set(finalArray.map((item) => item.imageUrl));
+  const removedUrls = (Array.isArray(trip.stayTransportImages) ? trip.stayTransportImages : [])
+    .map((item) => item?.imageUrl)
+    .filter((url) => url && !retainedUrls.has(url));
+  const updated = await tripRepo.update(tripId, { stayTransportImages: finalArray });
+  await Promise.allSettled(removedUrls.map((url) => deleteFromCloudinary(url)));
+  return updated;
 };
 
 // ============ V2 apis for User ====================

@@ -3,8 +3,8 @@ import * as userService from "./user.service.js";
 // --- Me Endpoints ---
 export const getMyProfile = async (req, res, next) => {
   try {
-    const user = await userService.getUserById(req.user.id);
-    res.status(200).json(user.profile || {});
+    const profile = await userService.getMyProfile(req.user.id);
+    res.status(200).json(profile);
   } catch (error) {
     next(error);
   }
@@ -22,20 +22,18 @@ export const updateMyProfile = async (req, res, next) => {
 export const uploadGovtId = async (req, res, next) => {
   try {
     const { govtIdType } = req.body;
-    if (!govtIdType) {
-      return res.status(400).json({ message: "govtIdType is required" });
+    if (!["AADHAAR", "PASSPORT"].includes(govtIdType)) {
+      return res.status(400).json({ message: "govtIdType must be AADHAAR or PASSPORT" });
     }
 
-    const imageBuffer = req.file?.buffer;
-
-    if (!imageBuffer) {
+    if (!req.file) {
       return res.status(400).json({ message: "Govt ID image is required" });
     }
 
     const profile = await userService.uploadGovtIdImage(
       req.user.id,
       govtIdType,
-      imageBuffer
+      req.file
     );
     
     res.status(200).json({ message: "Govt ID uploaded successfully", profile });

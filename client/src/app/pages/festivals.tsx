@@ -21,6 +21,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { SiteFooter } from "../components/site-footer";
+import { mediaImageUrl, mediaVideoPosterUrl, mediaVideoUrl } from "../../lib/media";
 
 // ── Price ranges ───────────────────────────────────────────────────
 const PRICE_RANGES = [
@@ -406,8 +407,10 @@ function FestivalCard({
       >
         {image ? (
           <img
-            src={image}
+            src={mediaImageUrl(image, { width: 640, height: 400 })}
             alt={name}
+            loading="lazy"
+            decoding="async"
             style={{
               width: "100%",
               height: "100%",
@@ -824,11 +827,13 @@ export default function FestivalsPage() {
         {featured?.videoUrl ? (
           <motion.video
             key={featured.videoUrl}
-            src={featured.videoUrl}
+            src={mediaVideoUrl(featured.videoUrl)}
             autoPlay
             muted
             loop
             playsInline
+            preload="metadata"
+            poster={mediaVideoPosterUrl(featured.videoUrl)}
             initial={{ opacity: 0, scale: 1.04 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1.1, ease: [0.25, 0.1, 0.25, 1] }}
@@ -837,8 +842,10 @@ export default function FestivalsPage() {
         ) : featured?.image ? (
           <motion.img
             key={featured.image}
-            src={featured.image}
+            src={mediaImageUrl(featured.image, { width: 1920, fit: "fit" })}
             alt={featured.name}
+            fetchPriority="high"
+            decoding="async"
             initial={{ opacity: 0, scale: 1.04 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1.1, ease: [0.25, 0.1, 0.25, 1] }}

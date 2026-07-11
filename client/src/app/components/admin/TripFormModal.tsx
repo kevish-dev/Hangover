@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ItineraryStep } from "./ItineraryStep";
 import { formatTripType } from "../../../lib/tripApi";
+import { uploadBannerImagesDirect } from "../../../lib/directImageUpload";
 
 // --- VALIDATION SCHEMA ---
 const tripSchema = z.object({
@@ -780,25 +781,11 @@ export function TripFormModal({
 
       // Sync Banners
       if (images.length > 0) {
-        const formData = new FormData();
-        const bannerPromises = images.map(async (img) => {
-          try {
-            return await imageCompression(img, { 
-              maxSizeMB: 10, 
-              initialQuality: 0.9,
-              useWebWorker: true
-            });
-          } catch (err) {
-            return img;
-          }
+        const uploadToast = toast.loading(`Uploading banners (0/${images.length})…`);
+        await uploadBannerImagesDirect("trips", tripId, images, (completed, total) => {
+          toast.loading(`Uploading banners (${completed}/${total})…`, { id: uploadToast });
         });
-
-        const compressedBanners = await Promise.all(bannerPromises);
-        compressedBanners.forEach((img) => formData.append("banners", img));
-        await apiClient.post(`/trips/${tripId}/banner-images`, formData, {
-          headers: { "Content-Type": "multipart/form-data" }
-        });
-        toast.success("Banner images uploaded!");
+        toast.success("Banner images uploaded!", { id: uploadToast });
       }
 
       queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });

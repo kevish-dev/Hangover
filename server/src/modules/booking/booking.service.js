@@ -7,6 +7,53 @@ import {
   ValidationError,
 } from "../../core/errors/errors.js";
 import crypto from "crypto";
+import { uploadSensitiveDocument, createAuthenticatedDeliveryUrl, deleteMediaAsset } from "../../core/services/upload.service.js";
+
+const withSecureDocumentUrls = (booking) => {
+  if (!booking) return booking;
+  const profile = booking.user?.profile;
+  const safeProfile = profile && {
+    ...profile,
+    govtIdImageUrl: profile.govtIdAsset
+      ? createAuthenticatedDeliveryUrl(profile.govtIdAsset)
+      : profile.govtIdImageUrl || null,
+    govtIdMimeType: profile.govtIdAsset
+      ? (profile.govtIdAsset.resourceType === "RAW" ? "application/pdf" : `image/${profile.govtIdAsset.format || "webp"}`)
+      : null,
+  };
+  return {
+    ...booking,
+    ...(booking.user && { user: { ...booking.user, profile: safeProfile } }),
+    travelers: booking.travelers?.map((traveler) => ({
+      ...traveler,
+      aadhaar: traveler.aadhaarAsset
+        ? createAuthenticatedDeliveryUrl(traveler.aadhaarAsset)
+        : traveler.aadhaar || null,
+      aadhaarMimeType: traveler.aadhaarAsset
+        ? (traveler.aadhaarAsset.resourceType === "RAW" ? "application/pdf" : `image/${traveler.aadhaarAsset.format || "webp"}`)
+        : null,
+    })),
+  };
+};
+
+export const uploadTravelerGovtId = async (userId, file) => {
+  const folder = `uploads/travelers/${userId}/govtid`;
+  const uploaded = await uploadSensitiveDocument(file, { folder, publicId: crypto.randomUUID() });
+  return prisma.mediaAsset.create({
+    data: {
+      publicId: uploaded.public_id,
+      resourceType: uploaded.resource_type.toUpperCase(),
+      deliveryType: "AUTHENTICATED",
+      format: uploaded.format || null,
+      version: uploaded.version ? String(uploaded.version) : null,
+      bytes: uploaded.bytes || null,
+      width: uploaded.width || null,
+      height: uploaded.height || null,
+      folder,
+      uploadedById: userId,
+    },
+  });
+};
 
 const toDecimal2 = (value) =>
   Math.round((Number(value) + Number.EPSILON) * 100) / 100;
@@ -25,7 +72,7 @@ export const createBooking = async (userId, data) => {
   }
 
   const hasGovtId =
-    user.profile.govtIdNumber || user.profile.govtIdImageUrl;
+    user.profile.govtIdNumber || user.profile.govtIdImageUrl || user.profile.govtIdAssetId;
 
   if (!hasGovtId) {
     throw new ForbiddenError(
@@ -133,15 +180,55 @@ export const createBooking = async (userId, data) => {
   };
 
   const travelersCreateData = (data.additionalTravelers && Array.isArray(data.additionalTravelers) && data.additionalTravelers.length > 0)
-    ? data.additionalTravelers.map(t => ({
+    ? await Promise.all(data.additionalTravelers.map(async (t) => {
+        if (t.aadhaarAssetId) {
+          const asset = await prisma.mediaAsset.findFirst({
+            where: {
+              id: t.aadhaarAssetId,
+              uploadedById: userId,
+              deliveryType: "AUTHENTICATED",
+              travelerGovtId: null,
+            },
+          });
+          if (!asset) throw new ValidationError("Invalid traveler government ID upload.");
+        }
+        return {
         fullName: t.fullName,
         gender: t.gender,
         dateOfBirth: t.dateOfBirth ? new Date(t.dateOfBirth) : null,
         phone: t.phone,
-        aadhaar: t.aadhaar,
+        aadhaar: t.aadhaarAssetId ? null : t.aadhaar || null,
+        aadhaarAssetId: t.aadhaarAssetId || null,
+      };
       }))
     : [];
 
+  // Check if there is an existing PENDING booking to reuse
+  const existingPending = await prisma.booking.findFirst({
+    where: {
+      userId,
+      slotId: data.slotId,
+      status: "PENDING",
+    },
+    include: { travelers: { select: { aadhaarAssetId: true } } },
+  });
+
+  if (existingPending) {
+    const replacedAssetIds = existingPending.travelers?.map((traveler) => traveler.aadhaarAssetId).filter(Boolean) || [];
+    bookingData.travelers = {
+      deleteMany: {}, // Clear any previous travelers if updating an existing pending booking
+      ...(travelersCreateData.length > 0 && { create: travelersCreateData })
+    };
+    const booking = await repo.updateBooking(existingPending.id, bookingData);
+    if (replacedAssetIds.length > 0) {
+      const replacedAssets = await prisma.mediaAsset.findMany({ where: { id: { in: replacedAssetIds } } });
+      await Promise.allSettled(replacedAssets.flatMap((asset) => [
+        deleteMediaAsset(asset),
+        prisma.mediaAsset.delete({ where: { id: asset.id } }),
+      ]));
+    }
+    return booking;
+  }
 
   // Generate booking reference and complete payload for a new booking
   bookingData.bookingReference = `HNG-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
@@ -190,18 +277,18 @@ export const getBookingById = async (id, userId, isAdmin = false) => {
   if (!isAdmin && booking.userId !== userId)
     throw new ForbiddenError("Forbidden");
   
-  return {
+  return withSecureDocumentUrls({
     ...booking,
     trip: booking.slot?.trip || null,
     festival: booking.slot?.festival || null,
-  };
+  });
 };
 
 export const getUserBookings = async (userId, page = 1, limit = 10) => {
   const skip = (page - 1) * limit;
   const take = parseInt(limit, 10);
   const { bookings, total } = await repo.getUserBookings(userId, skip, take);
-  const mappedBookings = bookings.map(b => ({
+  const mappedBookings = bookings.map(b => withSecureDocumentUrls({
     ...b,
     trip: b.slot?.trip || null,
     festival: b.slot?.festival || null,
@@ -221,7 +308,7 @@ export const getAllBookings = async (page = 1, limit = 10) => {
   const skip = (page - 1) * limit;
   const take = parseInt(limit, 10);
   const { bookings, total } = await repo.getAllBookings(skip, take);
-  const mappedBookings = bookings.map(b => ({
+  const mappedBookings = bookings.map(b => withSecureDocumentUrls({
     ...b,
     trip: b.slot?.trip || null,
     festival: b.slot?.festival || null,
@@ -239,12 +326,12 @@ export const getAllBookings = async (page = 1, limit = 10) => {
 
 export const getBookingsByTripId = async (tripId) => {
   const bookings = await repo.getBookingsByTripId(tripId);
-  return bookings.map(b => ({ ...b, trip: b.slot?.trip || null, festival: b.slot?.festival || null }));
+  return bookings.map(b => withSecureDocumentUrls({ ...b, trip: b.slot?.trip || null, festival: b.slot?.festival || null }));
 };
 
 export const getBookingsByFestivalId = async (festivalId) => {
   const bookings = await repo.getBookingsByFestivalId(festivalId);
-  return bookings.map(b => ({ ...b, trip: b.slot?.trip || null, festival: b.slot?.festival || null }));
+  return bookings.map(b => withSecureDocumentUrls({ ...b, trip: b.slot?.trip || null, festival: b.slot?.festival || null }));
 };
 
 export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundAmount) => {

@@ -1,5 +1,6 @@
 import * as festivalRepo from "./festival.repository.js";
-import { uploadToCloudinary, deleteFromCloudinary } from "../../core/services/upload.service.js";
+import { uploadToCloudinary, uploadPublicVideo, deleteFromCloudinary, deleteFestivalAssets, createDirectImageUploadSignature, isExpectedPublicImageUrl } from "../../core/services/upload.service.js";
+import { ValidationError } from "../../core/errors/errors.js";
 import { randomUUID } from "crypto";
 
 const generateSlug = (title) => {
@@ -72,7 +73,18 @@ export const updateFestival = async (id, data) => {
 };
 
 export const deleteFestival = async (id) => {
-  // Ideally, also delete assets from Cloudinary here.
+  const festival = await getFestivalById(id, true);
+  const imageUrls = [
+    ...(festival.bannerImages || []),
+    ...(festival.galleryImages || []),
+    ...(Array.isArray(festival.highlights) ? festival.highlights.map((item) => item?.imageUrl) : []),
+    ...(Array.isArray(festival.stayTransportImages) ? festival.stayTransportImages.map((item) => item?.imageUrl) : []),
+  ].filter(Boolean);
+  await Promise.allSettled([
+    ...imageUrls.map((url) => deleteFromCloudinary(url)),
+    ...(festival.videoUrl ? [deleteFromCloudinary(festival.videoUrl, { resourceType: "video" })] : []),
+  ]);
+  await deleteFestivalAssets(id);
   return festivalRepo.remove(id);
 };
 
@@ -115,6 +127,23 @@ export const uploadBannerImages = async (festivalId, imageBuffers) => {
   });
 };
 
+export const createBannerUploadSignature = async (festivalId) => {
+  await getFestivalById(festivalId, true);
+  return createDirectImageUploadSignature(`uploads/festivals/${festivalId}/bannerimages`);
+};
+
+export const attachBannerImages = async (festivalId, imageUrls) => {
+  if (!Array.isArray(imageUrls) || imageUrls.length === 0 || imageUrls.length > 10) {
+    throw new ValidationError("Provide between 1 and 10 banner image URLs.");
+  }
+  const folder = `uploads/festivals/${festivalId}/bannerimages`;
+  if (!imageUrls.every((url) => typeof url === "string" && isExpectedPublicImageUrl(url, folder))) {
+    throw new ValidationError("One or more banner URLs are invalid.");
+  }
+  const festival = await getFestivalById(festivalId, true);
+  return festivalRepo.update(festivalId, { bannerImages: [...(festival.bannerImages || []), ...imageUrls] });
+};
+
 export const syncHighlights = async (festivalId, payloadStr, files) => {
   const festival = await festivalRepo.findById(festivalId);
   if (!festival) throw new Error("Festival not found");
@@ -141,7 +170,13 @@ export const syncHighlights = async (festivalId, payloadStr, files) => {
   const results = await Promise.all(uploadPromises);
   const finalArray = results.filter(item => item !== null);
 
-  return festivalRepo.update(festivalId, { highlights: finalArray });
+  const retainedUrls = new Set(finalArray.map((item) => item.imageUrl));
+  const removedUrls = (Array.isArray(festival.highlights) ? festival.highlights : [])
+    .map((item) => item?.imageUrl)
+    .filter((url) => url && !retainedUrls.has(url));
+  const updated = await festivalRepo.update(festivalId, { highlights: finalArray });
+  await Promise.allSettled(removedUrls.map((url) => deleteFromCloudinary(url)));
+  return updated;
 };
 
 export const syncStayTransport = async (festivalId, payloadStr, files) => {
@@ -170,7 +205,13 @@ export const syncStayTransport = async (festivalId, payloadStr, files) => {
   const results = await Promise.all(uploadPromises);
   const finalArray = results.filter(item => item !== null);
 
-  return festivalRepo.update(festivalId, { stayTransportImages: finalArray });
+  const retainedUrls = new Set(finalArray.map((item) => item.imageUrl));
+  const removedUrls = (Array.isArray(festival.stayTransportImages) ? festival.stayTransportImages : [])
+    .map((item) => item?.imageUrl)
+    .filter((url) => url && !retainedUrls.has(url));
+  const updated = await festivalRepo.update(festivalId, { stayTransportImages: finalArray });
+  await Promise.allSettled(removedUrls.map((url) => deleteFromCloudinary(url)));
+  return updated;
 };
 
 // ============ Video Upload ====================
@@ -182,16 +223,15 @@ export const uploadVideo = async (festivalId, file) => {
   const folder = `uploads/festivals/${festivalId}/video`;
   
   if (festival.videoUrl) {
-    await deleteFromCloudinary(festival.videoUrl);
+    await deleteFromCloudinary(festival.videoUrl, { resourceType: "video" });
   }
 
-  const url = await uploadToCloudinary(file.buffer, {
+  const uploaded = await uploadPublicVideo(file, {
     folder,
     publicId: "hero-video",
-    optimize: false
   });
 
-  return festivalRepo.update(festivalId, { videoUrl: url });
+  return festivalRepo.update(festivalId, { videoUrl: uploaded.secure_url });
 };
 
 export const deleteVideo = async (festivalId) => {
@@ -199,7 +239,7 @@ export const deleteVideo = async (festivalId) => {
   if (!festival) throw new Error("Festival not found");
 
   if (festival.videoUrl) {
-    await deleteFromCloudinary(festival.videoUrl);
+    await deleteFromCloudinary(festival.videoUrl, { resourceType: "video" });
     return festivalRepo.update(festivalId, { videoUrl: null });
   }
 

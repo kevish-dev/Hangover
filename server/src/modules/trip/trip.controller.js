@@ -68,6 +68,24 @@ export const uploadBanners = async (req, res, next) => {
   }
 };
 
+export const createBannerUploadSignature = async (req, res, next) => {
+  try {
+    const result = await tripService.createBannerUploadSignature(req.params.id);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const attachBannerImages = async (req, res, next) => {
+  try {
+    const trip = await tripService.attachBannerImages(req.params.id, req.body?.imageUrls);
+    res.status(200).json({ message: "Banner images attached successfully", trip });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const deleteBanner = async (req, res, next) => {
   try {
     const { imageUrl } = req.body;
@@ -76,6 +94,20 @@ export const deleteBanner = async (req, res, next) => {
     }
     const trip = await tripService.deleteBannerImage(req.params.id, imageUrl);
     res.status(200).json({ message: "Banner image deleted successfully", trip });
+  } catch (error) {
+    if (error.message === "Image not found in trip") {
+      return res.status(404).json({ message: error.message });
+    }
+    next(error);
+  }
+};
+
+export const deleteGalleryImage = async (req, res, next) => {
+  try {
+    const { imageUrl } = req.body;
+    if (!imageUrl) return res.status(400).json({ message: "imageUrl is required" });
+    const trip = await tripService.deleteGalleryImage(req.params.id, imageUrl);
+    res.status(200).json({ message: "Gallery image deleted successfully", trip });
   } catch (error) {
     if (error.message === "Image not found in trip") {
       return res.status(404).json({ message: error.message });

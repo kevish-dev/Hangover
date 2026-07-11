@@ -4,6 +4,7 @@ import { ArrowRight, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useNavigate } from "react-router";
 import axios from "axios";
+import { mediaImageUrl } from "../../lib/media";
 
 interface FeaturedTrip {
   id: string;
@@ -103,7 +104,7 @@ export function HeroCarousel() {
   // ──── LOADING STATE ────
   if (isLoading) {
     return (
-      <section className="relative w-full h-screen overflow-hidden bg-[#0b0b0b]">
+      <section className="relative w-full min-h-[100svh] overflow-hidden bg-[#0b0b0b]">
         {/* Animated solid color pulse */}
         <motion.div
           className="absolute inset-0"
@@ -131,7 +132,7 @@ export function HeroCarousel() {
 
         {/* Skeleton content */}
         <div className="absolute inset-0 z-30 flex items-center">
-          <div className="px-10 md:px-16 lg:px-24 max-w-2xl w-full">
+          <div className="px-6 md:px-16 lg:px-24 max-w-2xl w-full">
             {/* Location chip skeleton */}
             <motion.div
               className="h-3 w-24 rounded-full mb-6"
@@ -189,7 +190,7 @@ export function HeroCarousel() {
             </div>
 
             {/* Meta skeleton */}
-            <div className="flex items-center gap-8 mb-8">
+            <div className="flex items-center gap-5 sm:gap-8 mb-8">
               <motion.div
                 className="h-10 w-20 rounded"
                 style={{ background: "rgba(242,237,228,0.06)" }}
@@ -241,7 +242,7 @@ export function HeroCarousel() {
   if (!slide) return null;
 
   return (
-    <section className="relative w-full h-screen overflow-hidden bg-[#0b0b0b]">
+    <section className="relative w-full min-h-[100svh] overflow-hidden bg-[#0b0b0b]">
       {/* Background image crossfade */}
       <AnimatePresence mode="sync" initial={false}>
         <motion.div
@@ -253,8 +254,10 @@ export function HeroCarousel() {
           className="absolute inset-0"
         >
           <img
-            src={slide.bannerImages}
+            src={mediaImageUrl(slide.bannerImages, { width: 1920, fit: "fit" })}
             alt={slide.title}
+            fetchPriority="high"
+            decoding="async"
             className="w-full h-full object-cover"
           />
         </motion.div>
@@ -265,7 +268,7 @@ export function HeroCarousel() {
         className="absolute inset-0 z-10"
         style={{
           background:
-            "linear-gradient(to right, rgba(11,11,11,0.92) 0%, rgba(11,11,11,0.60) 50%, rgba(11,11,11,0.20) 100%), linear-gradient(to top, rgba(11,11,11,0.70) 0%, transparent 45%)",
+            "linear-gradient(to right, rgba(11,11,11,0.92) 0%, rgba(11,11,11,0.60) 50%, rgba(11,11,11,0.20) 100%), linear-gradient(to top, rgba(11,11,11,0.78) 0%, transparent 48%)",
         }}
       />
 
@@ -275,8 +278,8 @@ export function HeroCarousel() {
       </div>
 
       {/* HERO CONTENT */}
-      <div className="absolute inset-0 z-30 flex items-center">
-        <div className="px-6 md:px-10 lg:px-12 max-w-2xl">
+      <div className="absolute inset-0 z-30 flex items-center pb-24 pt-24 md:py-0">
+        <div className="px-5 sm:px-6 md:px-10 lg:px-12 max-w-2xl w-full">
           <AnimatePresence mode="wait">
             <motion.div
               key={slide.id}
@@ -287,7 +290,7 @@ export function HeroCarousel() {
             >
               {/* Location chip */}
               <div
-                className="flex items-center gap-2 mb-6"
+                className="flex items-center gap-2 mb-4 md:mb-6"
                 style={{
                   fontFamily: "'Poppins', sans-serif",
                   fontWeight: 400,
@@ -295,8 +298,8 @@ export function HeroCarousel() {
               >
                 <MapPin size={12} className="text-[#c8a96e]" />
                 <span
-                  className="text-[#c8a96e] uppercase tracking-[0.2em]"
-                  style={{ fontSize: "0.72rem" }}
+                  className="text-[#c8a96e] uppercase tracking-[0.16em] md:tracking-[0.2em]"
+                  style={{ fontSize: "clamp(0.64rem, 2.5vw, 0.72rem)" }}
                 >
                   {slide.location}
                 </span>
@@ -308,8 +311,9 @@ export function HeroCarousel() {
                 style={{
                   fontFamily: "'Poppins', sans-serif",
                   fontWeight: 300,
-                  fontSize: "clamp(3.5rem, 8vw, 7rem)",
-                  letterSpacing: "-0.02em",
+                  fontSize: "clamp(2.45rem, 15vw, 7rem)",
+                  letterSpacing: 0,
+                  overflowWrap: "anywhere",
                 }}
               >
                 {slide.title}
@@ -321,8 +325,8 @@ export function HeroCarousel() {
               {/* Overview / Description */}
               {slide.overview && (
                 <p
-                  className="text-[#f2ede4]/80 mb-8 leading-relaxed max-w-md"
-                  style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 300, fontSize: "0.88rem" }}
+                  className="text-[#f2ede4]/80 mb-7 md:mb-8 leading-relaxed max-w-md"
+                  style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 300, fontSize: "clamp(0.8rem, 3vw, 0.88rem)" }}
                 >
                   {slide.overview.length > 160
                     ? slide.overview.slice(0, 160).trimEnd() + "…"
@@ -331,7 +335,7 @@ export function HeroCarousel() {
               )}
 
               {/* Meta — Duration + Starting price */}
-              <div className="flex items-center gap-8">
+              <div className="flex items-center gap-4 sm:gap-8">
                 <div>
                   <div
                     className="text-[#f2ede4]/65 uppercase tracking-widest mb-1"
@@ -388,11 +392,11 @@ export function HeroCarousel() {
                   background: "#C8A96E",
                   color: "#0b0b0b",
                   border: "none",
-                  padding: "12px 28px",
+                  padding: "12px clamp(20px, 6vw, 28px)",
                   fontFamily: "'Poppins', sans-serif",
                   fontWeight: 600,
-                  fontSize: "0.78rem",
-                  letterSpacing: "0.14em",
+                  fontSize: "0.76rem",
+                  letterSpacing: "0.1em",
                   textTransform: "uppercase",
                   cursor: "pointer",
                   display: "inline-flex",
@@ -419,7 +423,7 @@ export function HeroCarousel() {
 
       {/* NAV ARROWS (only show if more than 1 trip) */}
       {trips.length > 1 && (
-        <div className="absolute right-10 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-3">
+        <div className="absolute right-4 sm:right-6 md:right-10 bottom-9 md:bottom-auto md:top-1/2 md:-translate-y-1/2 z-30 flex flex-row md:flex-col gap-3">
           <button
             onClick={handlePrev}
             className="w-11 h-11 bg-[#f2ede4]/15 border border-[#f2ede4]/55 text-[#f2ede4] hover:bg-[#c8a96e] hover:border-[#c8a96e] hover:text-[#0b0b0b] active:scale-95 flex items-center justify-center transition-all duration-300"
@@ -439,7 +443,7 @@ export function HeroCarousel() {
 
       {/* SLIDE COUNTER + DOTS */}
       {trips.length > 1 && (
-        <div className="absolute bottom-10 left-10 md:left-16 lg:left-24 z-30 flex items-center gap-6">
+        <div className="absolute bottom-10 left-5 sm:left-6 md:left-16 lg:left-24 z-30 flex items-center gap-4 md:gap-6">
           <span
             className="text-[#f2ede4]/65 tabular-nums"
             style={{
@@ -472,7 +476,7 @@ export function HeroCarousel() {
       )}
 
       {/* Scroll hint */}
-      <div className="absolute bottom-10 right-10 z-30 flex flex-col items-center gap-2">
+      <div className="hidden md:flex absolute bottom-10 right-10 z-30 flex-col items-center gap-2">
         <div className="w-px h-10 bg-[#f2ede4]/15 relative overflow-hidden">
           <motion.div
             className="absolute top-0 left-0 w-full bg-[#c8a96e]"

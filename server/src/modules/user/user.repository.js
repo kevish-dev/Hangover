@@ -5,7 +5,7 @@ export const findAllUsers = async (skip, take) => {
     prisma.user.findMany({
       skip,
       take,
-      include: { profile: true },
+      include: { profile: { include: { govtIdAsset: true } } },
       orderBy: { createdAt: "desc" },
     }),
     prisma.user.count(),
@@ -16,7 +16,7 @@ export const findAllUsers = async (skip, take) => {
 export const findUserById = async (id) => {
   return prisma.user.findUnique({
     where: { id },
-    include: { profile: true },
+    include: { profile: { include: { govtIdAsset: true } } },
   });
 };
 
@@ -26,6 +26,7 @@ export const updateUserProfile = async (userId, data) => {
     where: { userId },
     update: data,
     create: { ...data, userId },
+    include: { govtIdAsset: true },
   });
 };
 

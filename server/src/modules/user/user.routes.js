@@ -1,7 +1,7 @@
 import { Router } from "express";
 import * as userController from "./user.controller.js";
 import { requireAuth, requireAdmin } from "../../core/middlewares/auth.middleware.js";
-import { uploadMiddleware } from "../../core/services/upload.service.js";
+import { documentUploadMiddleware } from "../../core/services/upload.service.js";
 import "./user.docs.js";
 
 const router = Router();
@@ -14,7 +14,7 @@ router.get("/me/profile", userController.getMyProfile);
 router.put("/me/profile", userController.updateMyProfile);
 router.post(
   "/me/govt-id",
-  uploadMiddleware.single("image"),
+  documentUploadMiddleware.single("image"),
   userController.uploadGovtId
 );
 
