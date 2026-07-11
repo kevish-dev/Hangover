@@ -1,5 +1,14 @@
 import { prisma } from "../../prisma/client.js";
 
+const bookingEmailInclude = {
+  user: { include: { profile: true } },
+  trip: true,
+  festival: true,
+  slot: { include: { trip: true, festival: true } },
+  package: true,
+  travelers: true,
+};
+
 // ─── Payment Intent ────────────────────────────────────────────────────────────
 
 export const createPaymentIntent = async (data) => {
@@ -9,7 +18,7 @@ export const createPaymentIntent = async (data) => {
 export const getPaymentIntentByOrderId = async (razorpayOrderId) => {
   return prisma.paymentIntent.findUnique({
     where: { razorpayOrderId },
-    include: { booking: { include: { user: { include: { profile: true } }, trip: true, festival: true, slot: true, package: true, travelers: true } } },
+    include: { booking: { include: bookingEmailInclude } },
   });
 };
 
@@ -26,7 +35,17 @@ export const createPayment = async (data) => {
 export const getPaymentById = async (id) => {
   return prisma.payment.findUnique({
     where: { id },
-    include: { booking: { include: { trip: true, festival: true, slot: true, user: { include: { profile: true } } } }, refunds: true },
+    include: {
+      booking: { include: bookingEmailInclude },
+      refunds: true,
+    },
+  });
+};
+
+export const getBookingForPaymentEmail = async (id) => {
+  return prisma.booking.findUnique({
+    where: { id },
+    include: bookingEmailInclude,
   });
 };
 

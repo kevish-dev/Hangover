@@ -17,6 +17,152 @@ const assertBookingOwner = (booking, userId, isAdmin = false) => {
   if (!isAdmin && booking.userId !== userId) throw new ForbiddenError("Forbidden");
 };
 
+const markPaymentCreation = (payment, wasCreated) => {
+  Object.defineProperty(payment, "wasCreated", {
+    value: wasCreated,
+    enumerable: false,
+  });
+  return payment;
+};
+
+const frontendUrl = (path) => `${env.ORIGIN.replace(/\/$/, "")}${path}`;
+
+const getBookingItem = (booking) =>
+  booking?.trip ||
+  booking?.festival ||
+  booking?.slot?.trip ||
+  booking?.slot?.festival ||
+  null;
+
+const formatEmailDate = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const getSlotName = (slot) => {
+  const title = slot?.title?.trim();
+  if (title) return title;
+
+  const start = formatEmailDate(slot?.startDate);
+  const end = formatEmailDate(slot?.endDate);
+  if (start && end) return `${start} - ${end}`;
+  return start || end || null;
+};
+
+const getBookingEmailDetails = (booking) => {
+  const item = getBookingItem(booking);
+  const travelerNames = [
+    booking?.user?.profile?.fullName,
+    ...(booking?.travelers || []).map((traveler) => traveler.fullName),
+  ]
+    .map((name) => (typeof name === "string" ? name.trim() : ""))
+    .filter(Boolean);
+
+  return {
+    bookingId: booking?.id,
+    tripTitle: item?.title || "your trip",
+    itemLocation: item?.location || null,
+    packageName: booking?.package?.title || null,
+    slotName: getSlotName(booking?.slot),
+    slotTitle: booking?.slot?.title || null,
+    tripStartDate: booking?.slot?.startDate || null,
+    tripEndDate: booking?.slot?.endDate || null,
+    travelersCount: booking?.numberOfTravelers || 1,
+    travelersDetails: travelerNames.join(", ") || null,
+    travelerNames,
+    bookingUrl: frontendUrl("/profile"),
+    balanceDueDate: booking?.balanceDueDate || null,
+  };
+};
+
+const getRetryPaymentLink = (booking, paymentType) => {
+  if (paymentType === "BALANCE") {
+    return frontendUrl(`/bookings/${booking.id}/pay-balance`);
+  }
+
+  return frontendUrl("/profile");
+};
+
+const paymentNotes = (payment) =>
+  payment?.notes && typeof payment.notes === "object" && !Array.isArray(payment.notes)
+    ? payment.notes
+    : {};
+
+const shouldSendPaymentReceipt = (payment) => {
+  const status = paymentNotes(payment).receiptEmailStatus;
+  if (payment?.wasCreated || status === "FAILED") return true;
+  if (status === "SENT" || !payment?.createdAt) return false;
+  return Date.now() - new Date(payment.createdAt).getTime() > 60_000;
+};
+
+const sendPaymentConfirmationEmail = async ({
+  booking,
+  intent,
+  payment,
+  fallbackPaymentId,
+  fallbackPaymentMethod,
+}) => {
+  const currentBooking =
+    (await repo.getBookingForPaymentEmail(booking.id)) || booking;
+  const details = getBookingEmailDetails(currentBooking);
+  const transactionAmount = payment?.amount ?? intent.amount;
+  const cumulativeAmountPaid = currentBooking.amountPaid;
+  const previousAmountPaid = toDecimal2(
+    Math.max(0, Number(cumulativeAmountPaid) - Number(transactionAmount)),
+  );
+  const paymentLink =
+    Number(currentBooking.amountDue) > 0
+      ? frontendUrl(`/bookings/${currentBooking.id}/pay-balance`)
+      : details.bookingUrl;
+
+  try {
+    await email.sendBookingConfirmedEmail({
+      to: currentBooking.user?.email,
+      name: currentBooking.user?.profile?.fullName || "Traveler",
+      bookingRef: currentBooking.bookingReference,
+      ...details,
+      totalAmount: currentBooking.totalAmount,
+      amountPaid: cumulativeAmountPaid,
+      transactionAmount,
+      cumulativeAmountPaid,
+      previousAmountPaid,
+      amountDue: currentBooking.amountDue,
+      paymentType: intent.type,
+      receiptNumber: payment?.receiptNumber || payment?.receiptNumberInt,
+      invoiceDate: payment?.paidAt || payment?.createdAt,
+      paidAt: payment?.paidAt || payment?.createdAt,
+      paymentMethod: payment?.paymentMethod || fallbackPaymentMethod || null,
+      paymentId: payment?.razorpayPaymentId || fallbackPaymentId || null,
+      orderId: payment?.razorpayOrderId || intent.razorpayOrderId,
+      paymentLink,
+    });
+    await repo.updatePayment(payment.id, {
+      notes: {
+        ...paymentNotes(payment),
+        paymentType: intent.type,
+        receiptEmailStatus: "SENT",
+        receiptEmailUpdatedAt: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    await repo.updatePayment(payment.id, {
+      notes: {
+        ...paymentNotes(payment),
+        paymentType: intent.type,
+        receiptEmailStatus: "FAILED",
+        receiptEmailUpdatedAt: new Date().toISOString(),
+      },
+    }).catch(() => undefined);
+    throw error;
+  }
+};
+
 // ─── Core: Process Successful Payment ────────────────────────────────────────
 
 /**
@@ -35,9 +181,11 @@ const _processSuccessfulPayment = async (intent, rzpPaymentId, rzpSignature, rzp
 
   // Idempotency — if already processed, return existing record
   const existing = await repo.getPaymentByIdempotencyKey(idempotencyKey);
-  if (existing) return existing;
+  if (existing) return markPaymentCreation(existing, false);
 
-  const payment = await prisma.$transaction(async (tx) => {
+  let payment;
+  try {
+    payment = await prisma.$transaction(async (tx) => {
     // 1. Create Payment record
     const pmt = await tx.payment.create({
       data: {
@@ -102,10 +250,19 @@ const _processSuccessfulPayment = async (intent, rzpPaymentId, rzpSignature, rzp
       }
     }
 
-    return pmt;
-  });
+      return pmt;
+    });
+  } catch (error) {
+    // Verify and webhook can arrive together. The unique idempotency key makes
+    // one transaction the winner; return that winner instead of surfacing a 500.
+    if (error?.code === "P2002") {
+      const winner = await repo.getPaymentByIdempotencyKey(idempotencyKey);
+      if (winner) return markPaymentCreation(winner, false);
+    }
+    throw error;
+  }
 
-  return payment;
+  return markPaymentCreation(payment, true);
 };
 
 // ─── Initiate Payment ─────────────────────────────────────────────────────────
@@ -259,42 +416,17 @@ export const verifyPayment = async (userId, { razorpayOrderId, razorpayPaymentId
   // 5. Send confirmation email (non-fatal)
   try {
     const userEmail = booking.user?.email;
-    const userName = booking.user?.profile?.fullName || "Traveler";
-    const tripTitle = booking.trip?.title || booking.festival?.title || "your trip";
-    
-    if (userEmail) {
-      const travelersDetails = booking.travelers && booking.travelers.length > 0 
-        ? booking.travelers.map(t => t.fullName).join(", ") 
-        : "";
-      const packageName = booking.package?.title || null;
-      let slotName = null;
-      if (booking.slot) {
-        const start = new Date(booking.slot.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-        const end = new Date(booking.slot.endDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-        slotName = `${start} - ${end}`;
-      }
-
-      await email.sendBookingConfirmedEmail({
-        to: userEmail,
-        name: userName,
-        bookingRef: booking.bookingReference,
-        tripTitle,
-        tripStartDate: booking.slot?.startDate,
-        tripEndDate: booking.slot?.endDate,
-        amountPaid: intent.amount,
-        totalAmount: booking.totalAmount,
-        amountDue: intent.type === "FULL" || intent.type === "BALANCE" ? 0 : Number(booking.totalAmount) - Number(booking.tokenAmount),
-        paymentType: intent.type,
-        receiptNumber: payment.receiptNumberInt,
-        invoiceDate: payment.paidAt,
-        travelersCount: booking.numberOfTravelers,
-        packageName,
-        slotName,
-        travelersDetails,
+    if (userEmail && shouldSendPaymentReceipt(payment)) {
+      await sendPaymentConfirmationEmail({
+        booking,
+        intent,
+        payment,
+        fallbackPaymentId: razorpayPaymentId,
+        fallbackPaymentMethod: rzpPayment.method || null,
       });
     }
-  } catch (_) {
-    // Non-fatal — don't block the response if email fails
+  } catch (error) {
+    console.error(`[Email] Payment receipt failed for booking ${booking.id}, payment ${payment.id}:`, error);
   }
 
   return payment;
@@ -359,14 +491,32 @@ export const recordFailedPayment = async (userId, { razorpayOrderId, razorpayPay
   // Fire failure email — non-blocking so SMTP issues don't affect the response
   const userEmail = booking.user?.email;
   const userName = booking.user?.profile?.fullName || booking.user?.email?.split("@")[0] || "Traveller";
-  const tripTitle = booking.trip?.title || booking.festival?.title || "your trip";
   if (userEmail) {
+    const details = getBookingEmailDetails(booking);
+    const failureReason = reason || payment.failureReason || "Payment failed";
+    const retryLink = getRetryPaymentLink(booking, intent.type);
+    const outstandingAmount = intent.type === "BALANCE"
+      ? Number(booking.amountDue)
+      : toDecimal2(Math.max(0, Number(booking.totalAmount) - Number(booking.amountPaid)));
     email.sendPaymentFailedEmail({
       to: userEmail,
       name: userName,
       bookingRef: booking.bookingReference,
-      tripTitle,
-      amount: Number(intent.amount).toLocaleString("en-IN"),
+      ...details,
+      amount: Number(intent.amount),
+      totalAmount: booking.totalAmount,
+      amountPaid: booking.amountPaid,
+      amountDue: outstandingAmount,
+      dueDate: booking.balanceDueDate,
+      paymentType: intent.type,
+      reason: failureReason,
+      failureReason,
+      code: code || payment.failureCode || null,
+      retryLink,
+      paymentLink: retryLink,
+      attemptedAt: payment.createdAt,
+      paymentId: razorpayPaymentId || payment.razorpayPaymentId || null,
+      orderId: razorpayOrderId,
     }).catch((err) => console.error("[Email] Failed to send payment failure email:", err));
   }
 
@@ -383,14 +533,20 @@ export const recordFailedPayment = async (userId, { razorpayOrderId, razorpayPay
  * The payment.captured handler is self-sufficient — it will fully confirm
  * a booking even if the frontend /verify call never arrived (e.g. browser closed).
  */
-export const handleWebhook = async (rawBody, signature) => {
+export const handleWebhook = async (rawBody, signature, webhookEventId) => {
   // 1. Verify webhook signature
   const isValid = razorpay.verifyWebhookSignature(rawBody, signature);
   if (!isValid) throw new AppError("Invalid webhook signature", 400, "INVALID_WEBHOOK_SIGNATURE");
 
   const payload = JSON.parse(rawBody);
-  const eventId = payload.id || payload.event;
   const eventType = payload.event;
+  const entityId =
+    payload.payload?.payment?.entity?.id ||
+    payload.payload?.refund?.entity?.id ||
+    payload.payload?.order?.entity?.id;
+  const payloadDigest = crypto.createHash("sha256").update(rawBody).digest("hex");
+  const headerEventId = Array.isArray(webhookEventId) ? webhookEventId[0] : webhookEventId;
+  const eventId = headerEventId || payload.id || `${eventType}:${entityId || payloadDigest}`;
 
   // 2. Idempotency — skip if already processed
   const existing = await repo.getWebhookByEventId(eventId);
@@ -434,30 +590,23 @@ export const handleWebhook = async (rawBody, signature) => {
           rzpPayment.method || null
         );
 
-        // Send confirmation email (non-fatal) — only if payment was just now created
-        // (avoid duplicate emails if frontend /verify already sent one)
-        if (payment && payment.createdAt && (Date.now() - new Date(payment.createdAt).getTime()) < 30000) {
+        // Send one receipt from whichever confirmation path created the payment first.
+        if (shouldSendPaymentReceipt(payment)) {
           try {
             const { booking } = intent;
             const userEmail = booking.user?.email;
             if (userEmail) {
-              await email.sendBookingConfirmedEmail({
-                to: userEmail,
-                name: booking.user?.profile?.fullName || "Traveler",
-                bookingRef: booking.bookingReference,
-                tripTitle: booking.trip?.title || booking.festival?.title || "your trip",
-                tripStartDate: booking.slot?.startDate,
-                tripEndDate: booking.slot?.endDate,
-                amountPaid: intent.amount,
-                totalAmount: booking.totalAmount,
-                amountDue: intent.type === "FULL" || intent.type === "BALANCE" ? 0 : Number(booking.totalAmount) - Number(booking.tokenAmount),
-                paymentType: intent.type,
-                receiptNumber: payment.receiptNumberInt,
-                invoiceDate: payment.paidAt,
-                travelersCount: booking.numberOfTravelers,
+              await sendPaymentConfirmationEmail({
+                booking,
+                intent,
+                payment,
+                fallbackPaymentId: rzpPayment.id,
+                fallbackPaymentMethod: rzpPayment.method || null,
               });
             }
-          } catch (_) {}
+          } catch (error) {
+            console.error(`[Email] Webhook receipt failed for payment ${payment.id}:`, error);
+          }
         }
         break;
       }
@@ -676,17 +825,48 @@ export const issueRefund = async (paymentId, amount, reason, adminId) => {
 
   // Send refund email
   try {
-    const { booking } = payment;
-    if (booking?.user?.email) {
+    const currentBooking =
+      (await repo.getBookingForPaymentEmail(payment.bookingId)) || payment.booking;
+    if (currentBooking?.user?.email) {
+      const details = getBookingEmailDetails(currentBooking);
+      const remainingAmount = toDecimal2(
+        Math.max(0, maxRefundable - refundAmount),
+      );
+      const emailRefundReason = reason || "Refund requested by administrator";
+      const refundReference =
+        refundRecord.razorpayRefundId || rzpRefund.id || refundRecord.id;
+      const isPaymentFullyRefunded = remainingAmount === 0;
+
       await email.sendRefundInitiatedEmail({
-        to: booking.user.email,
-        name: booking.user.profile?.fullName || "Traveler",
-        bookingRef: booking.bookingReference,
-        tripTitle: booking.trip?.title || "your trip",
+        to: currentBooking.user.email,
+        name: currentBooking.user.profile?.fullName || "Traveler",
+        bookingRef: currentBooking.bookingReference,
+        ...details,
         refundAmount,
+        refundReason: emailRefundReason,
+        reason: emailRefundReason,
+        refundId: refundReference,
+        refundReference,
+        refundDate: refundRecord.createdAt,
+        initiatedAt: refundRecord.createdAt,
+        paymentMethod: payment.paymentMethod || null,
+        paymentId: payment.razorpayPaymentId || null,
+        orderId: payment.razorpayOrderId,
+        isFullRefund: isPaymentFullyRefunded,
+        refundType: isPaymentFullyRefunded ? "FULL" : "PARTIAL",
+        originalPaymentAmount: payment.amount,
+        refundableAmountRemaining: remainingAmount,
+        bookingAmountPaidAfterRefund: currentBooking.amountPaid,
+        totalAmount: currentBooking.totalAmount,
+        amountPaid: currentBooking.amountPaid,
+        amountDue: currentBooking.amountDue,
+        receiptNumber: payment.receiptNumber || payment.receiptNumberInt,
+        paidAt: payment.paidAt,
       });
     }
-  } catch (_) {}
+  } catch (error) {
+    console.error(`[Email] Refund notification failed for payment ${payment.id}:`, error);
+  }
 
   return refundRecord;
 };
@@ -694,7 +874,7 @@ export const issueRefund = async (paymentId, amount, reason, adminId) => {
 // ─── Admin: Send Balance Reminder ─────────────────────────────────────────────
 
 export const sendBalanceReminder = async (bookingId, adminId) => {
-  const booking = await bookingRepo.getBookingById(bookingId);
+  const booking = await repo.getBookingForPaymentEmail(bookingId);
   if (!booking) throw new NotFoundError("Booking not found");
 
   if (booking.paymentStatus !== "PARTIALLY_PAID") {
@@ -703,8 +883,9 @@ export const sendBalanceReminder = async (bookingId, adminId) => {
 
   const userEmail = booking.user?.email;
   const userName = booking.user?.profile?.fullName || "Traveler";
-  const tripTitle = booking.trip?.title || "your trip";
-  const paymentLink = `${env.ORIGIN}/bookings/${bookingId}/pay-balance`;
+  const details = getBookingEmailDetails(booking);
+  const tripTitle = details.tripTitle;
+  const paymentLink = frontendUrl(`/bookings/${bookingId}/pay-balance`);
 
   // Create reminder record
   const reminder = await repo.createReminder({
@@ -721,7 +902,9 @@ export const sendBalanceReminder = async (bookingId, adminId) => {
       to: userEmail,
       name: userName,
       bookingRef: booking.bookingReference,
-      tripTitle,
+      ...details,
+      totalAmount: booking.totalAmount,
+      amountPaid: booking.amountPaid,
       balanceAmount: booking.amountDue,
       dueDate: booking.balanceDueDate,
       paymentLink,

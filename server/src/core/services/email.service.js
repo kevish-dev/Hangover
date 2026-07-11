@@ -2,207 +2,965 @@ import transport from "../smtp/client.js";
 import env from "../env/env.js";
 
 const FROM = env.SMTP_FROM;
+const APP_URL = env.ORIGIN.replace(/\/+$/, "");
+const APP_ORIGIN = new URL(APP_URL).origin;
 
-/**
- * Send booking confirmation email
- */
-export const sendBookingConfirmedEmail = async ({ to, name, bookingRef, tripTitle, tripStartDate, tripEndDate, amountPaid, totalAmount, amountDue, paymentType, receiptNumber, invoiceDate, travelersCount, packageName, slotName, travelersDetails }) => {
-  const dateStr = new Date(invoiceDate).toLocaleDateString("en-IN", {
-    day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
-  });
+const BRAND = Object.freeze({
+  name: "Hangover Trails",
+  legalName: "Dawn Tours and Travels",
+  supportEmail: "experience@hangovertrails.com",
+  supportPhone: "+91 84159 29069",
+  supportPhoneHref: "+918415929069",
+  address: "Papu-1, Naharlagun, Arunachal Pradesh - 791110",
+  gstin: "12BSPPT9347F1Z8",
+  burgundy: "#781216",
+  burgundyDark: "#540b0e",
+  gold: "#b8943a",
+  cream: "#f5f0e6",
+  ink: "#1e1a14",
+  muted: "#6f685f",
+  border: "#e8e0d3",
+  white: "#ffffff",
+});
 
-  const displayPaymentType = paymentType === "TOKEN" ? "Booking Payment" : paymentType;
+const isPresent = (value) =>
+  value !== undefined && value !== null && String(value).trim() !== "";
 
-  await transport.sendMail({
-    from: FROM,
-    to,
-    subject: `Booking Confirmed & Invoice – ${tripTitle}`,
-    html: `
-      <div style="font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;max-width:650px;margin:0 auto;padding:30px;background:#ffffff;border:1px solid #eaeaea;border-radius:12px;color:#333;">
-        <!-- Header -->
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #f0f0f0;padding-bottom:20px;margin-bottom:20px;">
-          <div>
-            <h1 style="color:#781216;margin:0;font-size:24px;letter-spacing:1px;text-transform:uppercase;line-height:1.2;">Hangover</h1>
-            <p style="margin:4px 0 0;font-size:12px;color:#777;line-height:1.2;">Trip Booking Invoice & Receipt</p>
-          </div>
-          <div style="text-align:right;">
-            <p style="margin:0;font-size:14px;font-weight:bold;color:#333;line-height:1.2;">INVOICE #${receiptNumber}</p>
-            <p style="margin:4px 0 0;font-size:12px;color:#777;line-height:1.2;">Date: ${dateStr}</p>
-            <p style="margin:4px 0 0;font-size:12px;color:#777;line-height:1.2;font-weight:bold;">GSTIN: 12BSPPT9347F1Z8</p>
-          </div>
-        </div>
+const displayValue = (value) => {
+  if (!isPresent(value)) return null;
+  if (Array.isArray(value)) {
+    const entries = value.map(displayValue).filter(Boolean);
+    return entries.length ? entries.join(", ") : null;
+  }
+  return String(value).trim();
+};
 
-        <!-- Greeting -->
-        <h2 style="font-size:18px;margin-bottom:15px;">🎉 You're all set, ${name}!</h2>
-        <p style="font-size:14px;line-height:1.6;color:#555;">Your booking for <strong>${tripTitle}</strong> has been successfully confirmed. Please find your invoice and payment details below.</p>
+const escapeHtml = (value) =>
+  String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 
-        <!-- Booking Details -->
-        <div style="background:#fcfcfc;padding:20px;border-radius:8px;margin:25px 0;">
-          <h3 style="margin-top:0;font-size:15px;border-bottom:1px solid #eaeaea;padding-bottom:10px;margin-bottom:15px;">Booking Information</h3>
-          <table style="width:100%;font-size:14px;line-height:1.8;">
-            <tr><td style="color:#666;width:40%;">Booking Reference:</td><td style="font-weight:bold;color:#222;">${bookingRef}</td></tr>
-            <tr><td style="color:#666;">Trip Name:</td><td style="font-weight:bold;color:#222;">${tripTitle}</td></tr>
-            ${packageName ? `<tr><td style="color:#666;">Package:</td><td style="font-weight:bold;color:#222;">${packageName}</td></tr>` : ''}
-            ${slotName ? `<tr><td style="color:#666;">Slot:</td><td style="font-weight:bold;color:#222;">${slotName}</td></tr>` : ''}
-            ${tripStartDate && tripEndDate ? `<tr><td style="color:#666;">Trip Dates:</td><td style="font-weight:bold;color:#222;">${new Date(tripStartDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} - ${new Date(tripEndDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td></tr>` : ''}
-            <tr><td style="color:#666;">Number of Travelers:</td><td style="font-weight:bold;color:#222;">${travelersCount}</td></tr>
-            ${travelersDetails ? `<tr><td style="color:#666;">Travelers:</td><td style="font-weight:bold;color:#222;">${travelersDetails}</td></tr>` : ''}
+const sanitizeHeader = (value, fallback = "") =>
+  String(value ?? fallback)
+    .replace(/[\r\n]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .slice(0, 240);
+
+const appLink = (path = "/") => new URL(path, `${APP_URL}/`).toString();
+
+const safeAppUrl = (value, fallbackPath = "/") => {
+  const fallback = appLink(fallbackPath);
+  try {
+    const parsed = new URL(value || fallback, `${APP_URL}/`);
+    if (!["http:", "https:"].includes(parsed.protocol)) return fallback;
+    if (parsed.origin !== APP_ORIGIN) return fallback;
+    return parsed.toString();
+  } catch {
+    return fallback;
+  }
+};
+
+const toNumber = (value) => {
+  if (!isPresent(value)) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
+
+const firstNumber = (...values) => {
+  for (const value of values) {
+    const number = toNumber(value);
+    if (number !== null) return number;
+  }
+  return null;
+};
+
+const formatCurrency = (value, currency = "INR") => {
+  const number = toNumber(value);
+  if (number === null) return null;
+  try {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(number);
+  } catch {
+    return `₹${number.toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  }
+};
+
+const validDate = (value) => {
+  if (!isPresent(value)) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const formatDate = (value) => {
+  const date = validDate(value);
+  if (!date) return null;
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Kolkata",
+  }).format(date);
+};
+
+const formatDateTime = (value) => {
+  const date = validDate(value);
+  if (!date) return null;
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Kolkata",
+    timeZoneName: "short",
+  }).format(date);
+};
+
+const formatDateRange = (startDate, endDate) => {
+  const start = formatDate(startDate);
+  const end = formatDate(endDate);
+  if (start && end) return `${start} – ${end}`;
+  return start || end || null;
+};
+
+const sectionHeading = (title) => `
+  <tr>
+    <td style="padding:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:${BRAND.burgundy};">
+      ${escapeHtml(title)}
+    </td>
+  </tr>`;
+
+const renderDetails = (title, rows) => {
+  const visibleRows = rows
+    .map((row) => ({ ...row, value: displayValue(row.value) }))
+    .filter((row) => row.value);
+  if (!visibleRows.length) return "";
+
+  const renderedRows = visibleRows
+    .map(
+      ({ label, value, emphasis = false }, index) => `
+        <tr>
+          <td class="detail-label" width="42%" valign="top" style="width:42%;padding:${index === 0 ? "14px" : "11px"} 12px 11px 0;border-bottom:1px solid ${BRAND.border};font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:${BRAND.muted};">
+            ${escapeHtml(label)}
+          </td>
+          <td class="detail-value" width="58%" valign="top" align="right" style="width:58%;padding:${index === 0 ? "14px" : "11px"} 0 11px 12px;border-bottom:1px solid ${BRAND.border};font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;font-weight:${emphasis ? "700" : "600"};color:${emphasis ? BRAND.burgundy : BRAND.ink};word-break:break-word;">
+            ${escapeHtml(value)}
+          </td>
+        </tr>`,
+    )
+    .join("");
+
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;margin:0 0 28px 0;">
+      ${sectionHeading(title)}
+      <tr>
+        <td colspan="2" style="padding:0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;border-top:1px solid ${BRAND.border};">
+            ${renderedRows}
           </table>
-        </div>
+        </td>
+      </tr>
+    </table>`;
+};
 
-        <!-- Invoice Table -->
-        <h3 style="font-size:15px;margin-bottom:15px;">Payment Summary</h3>
-        <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:30px;">
-          <thead>
-            <tr style="background:#f5f5f5;text-align:left;">
-              <th style="padding:12px;border:1px solid #ddd;">Description</th>
-              <th style="padding:12px;border:1px solid #ddd;text-align:right;">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style="padding:12px;border:1px solid #ddd;color:#444;">${tripTitle} Package (x${travelersCount})</td>
-              <td style="padding:12px;border:1px solid #ddd;text-align:right;color:#444;">₹${Number(totalAmount / 1.05).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-            </tr>
-            <tr>
-              <td style="padding:12px;border:1px solid #ddd;color:#444;">GST (5%)</td>
-              <td style="padding:12px;border:1px solid #ddd;text-align:right;color:#444;">₹${Number(totalAmount - (totalAmount / 1.05)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-            </tr>
-          </tbody>
-          <tfoot>
-            <tr>
-              <td style="padding:12px;border:1px solid #ddd;text-align:right;font-weight:bold;">Total Amount</td>
-              <td style="padding:12px;border:1px solid #ddd;text-align:right;font-weight:bold;">₹${Number(totalAmount).toLocaleString('en-IN')}</td>
-            </tr>
-            <tr style="background:#fdfdfd;">
-              <td style="padding:12px;border:1px solid #ddd;text-align:right;color:#781216;">Amount Paid (${displayPaymentType})</td>
-              <td style="padding:12px;border:1px solid #ddd;text-align:right;font-weight:bold;color:#781216;">- ₹${Number(amountPaid).toLocaleString('en-IN')}</td>
-            </tr>
-            <tr style="background:#f4f4f4;">
-              <td style="padding:12px;border:1px solid #ddd;text-align:right;font-weight:bold;font-size:15px;">Balance Due</td>
-              <td style="padding:12px;border:1px solid #ddd;text-align:right;font-weight:bold;font-size:15px;">₹${Number(amountDue).toLocaleString('en-IN')}</td>
-            </tr>
-          </tfoot>
+const renderAmounts = (title, rows) => {
+  const visibleRows = rows.filter((row) => displayValue(row.value));
+  if (!visibleRows.length) return "";
+
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;margin:0 0 28px 0;">
+      ${sectionHeading(title)}
+      <tr>
+        <td style="padding:0;border:1px solid ${BRAND.border};">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+            ${visibleRows
+              .map(
+                ({ label, value, strong = false, accent = false }, index) => `
+                  <tr bgcolor="${strong ? BRAND.cream : BRAND.white}">
+                    <td valign="top" style="padding:${strong ? "14px 16px" : "11px 16px"};${index ? `border-top:1px solid ${BRAND.border};` : ""}font-family:Arial,Helvetica,sans-serif;font-size:${strong ? "14px" : "13px"};line-height:20px;font-weight:${strong ? "700" : "400"};color:${accent ? BRAND.burgundy : BRAND.muted};">
+                      ${escapeHtml(label)}
+                    </td>
+                    <td valign="top" align="right" style="padding:${strong ? "14px 16px" : "11px 16px"};${index ? `border-top:1px solid ${BRAND.border};` : ""}font-family:Arial,Helvetica,sans-serif;font-size:${strong ? "15px" : "13px"};line-height:20px;font-weight:700;color:${accent ? BRAND.burgundy : BRAND.ink};white-space:nowrap;">
+                      ${escapeHtml(value)}
+                    </td>
+                  </tr>`,
+              )
+              .join("")}
+          </table>
+        </td>
+      </tr>
+    </table>`;
+};
+
+const renderNotice = (text, tone = "neutral") => {
+  if (!displayValue(text)) return "";
+  const isAlert = tone === "alert";
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${isAlert ? "#fff4f2" : BRAND.cream}" style="width:100%;border-collapse:collapse;margin:0 0 28px 0;border-left:3px solid ${isAlert ? BRAND.burgundy : BRAND.gold};">
+      <tr>
+        <td style="padding:14px 16px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:${BRAND.ink};">
+          ${escapeHtml(text)}
+        </td>
+      </tr>
+    </table>`;
+};
+
+const renderButton = ({ label, url }) => `
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="left" style="border-collapse:separate;margin:0 0 14px 0;">
+    <tr>
+      <td align="center" bgcolor="${BRAND.burgundy}" style="border-radius:5px;mso-padding-alt:14px 26px;">
+        <a href="${escapeHtml(url)}" target="_blank" style="display:inline-block;padding:14px 26px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:16px;font-weight:700;letter-spacing:0.7px;text-transform:uppercase;text-decoration:none;color:${BRAND.white};border:1px solid ${BRAND.burgundy};border-radius:5px;">
+          ${escapeHtml(label)}
+        </a>
+      </td>
+    </tr>
+  </table>`;
+
+const renderEmail = ({ preheader, eyebrow, title, intro, badge, bodyHtml, cta, footerNote }) => {
+  const ctaHtml = cta
+    ? `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;margin:2px 0 26px 0;">
+        <tr><td>${renderButton(cta)}</td></tr>
+        <tr>
+          <td style="padding:0;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:17px;color:#8a8278;word-break:break-all;">
+            If the button does not open, copy this link into your browser:<br />
+            <a href="${escapeHtml(cta.url)}" style="color:${BRAND.burgundy};text-decoration:underline;">${escapeHtml(cta.url)}</a>
+          </td>
+        </tr>
+      </table>`
+    : "";
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="x-apple-disable-message-reformatting" />
+  <meta name="format-detection" content="telephone=no,address=no,email=no,date=no,url=no" />
+  <title>${escapeHtml(title)}</title>
+  <!--[if mso]><style>table,td,a,p,h1{font-family:Arial,Helvetica,sans-serif !important;}</style><![endif]-->
+  <style>
+    @media only screen and (max-width:640px) {
+      .email-shell { width:100% !important; }
+      .mobile-pad { padding-left:22px !important; padding-right:22px !important; }
+      .detail-label,.detail-value { display:block !important; width:100% !important; box-sizing:border-box !important; text-align:left !important; }
+      .detail-label { padding-bottom:2px !important; border-bottom:0 !important; }
+      .detail-value { padding-top:0 !important; padding-left:0 !important; }
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background:${BRAND.cream};-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">${escapeHtml(preheader)}&#847; &zwnj; &nbsp; &#847; &zwnj; &nbsp;</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.cream}" style="width:100%;border-collapse:collapse;">
+    <tr>
+      <td align="center" style="padding:28px 12px;">
+        <!--[if mso]><table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+        <table class="email-shell" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.white}" style="width:100%;max-width:640px;border-collapse:collapse;border:1px solid ${BRAND.border};">
+          <tr>
+            <td class="mobile-pad" bgcolor="${BRAND.ink}" style="padding:24px 34px;border-bottom:3px solid ${BRAND.gold};">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+                <tr>
+                  <td style="font-family:Arial,Helvetica,sans-serif;font-size:19px;line-height:24px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:${BRAND.white};">Hangover <span style="color:${BRAND.gold};">Trails</span></td>
+                </tr>
+                <tr>
+                  <td style="padding-top:4px;font-family:Arial,Helvetica,sans-serif;font-size:9px;line-height:14px;letter-spacing:1.8px;text-transform:uppercase;color:#c7bfae;">Curated journeys. Stories that stay.</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td class="mobile-pad" style="padding:38px 42px 34px 42px;">
+              ${badge ? `<div style="margin:0 0 13px 0;"><span style="display:inline-block;padding:5px 9px;background:${BRAND.cream};border:1px solid ${BRAND.border};font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:14px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${BRAND.burgundy};">${escapeHtml(badge)}</span></div>` : ""}
+              <p style="margin:0 0 9px 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:16px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:${BRAND.gold};">${escapeHtml(eyebrow)}</p>
+              <h1 style="margin:0 0 15px 0;font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:38px;font-weight:400;color:${BRAND.ink};">${escapeHtml(title)}</h1>
+              <p style="margin:0 0 30px 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:25px;color:${BRAND.muted};">${escapeHtml(intro)}</p>
+              ${bodyHtml}
+              ${ctaHtml}
+              <p style="margin:0;padding-top:22px;border-top:1px solid ${BRAND.border};font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:19px;color:#8a8278;">${escapeHtml(footerNote || `This is a transactional message from ${BRAND.name}.`)}</p>
+            </td>
+          </tr>
+          <tr>
+            <td class="mobile-pad" bgcolor="${BRAND.ink}" style="padding:25px 34px;">
+              <p style="margin:0 0 8px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:19px;color:${BRAND.white};"><strong>${BRAND.name}</strong> · ${BRAND.legalName}</p>
+              <p style="margin:0 0 8px 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:18px;color:#c7bfae;">${BRAND.address}</p>
+              <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:18px;color:#c7bfae;">
+                <a href="mailto:${BRAND.supportEmail}" style="color:${BRAND.gold};text-decoration:none;">${BRAND.supportEmail}</a>
+                &nbsp;·&nbsp;
+                <a href="tel:${BRAND.supportPhoneHref}" style="color:${BRAND.gold};text-decoration:none;">${BRAND.supportPhone}</a>
+              </p>
+              <p style="margin:14px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:16px;color:#91897d;">© ${new Date().getFullYear()} ${BRAND.name}. All rights reserved.</p>
+            </td>
+          </tr>
         </table>
+        <!--[if mso]></td></tr></table><![endif]-->
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+};
 
-        <!-- Footer Note -->
-        <div style="padding-top:20px;border-top:1px solid #eaeaea;text-align:center;">
-          <p style="font-size:13px;color:#666;line-height:1.5;">Thank you for choosing Hangover Trips!<br/>We'll be in touch with more details closer to the trip date. If you have any questions, simply reply to this email.</p>
-          <p style="margin-top:15px;color:#aaa;font-size:11px;">Hangover Trips • Contact: +91 98765 43210</p>
-          <p style="margin-top:4px;color:#aaa;font-size:11px;">GSTIN: 12BSPPT9347F1Z8</p>
-        </div>
-      </div>
-    `,
+const plainSection = (title, rows) => {
+  const lines = rows
+    .map((row) => ({ ...row, value: displayValue(row.value) }))
+    .filter((row) => row.value)
+    .map(({ label, value }) => `${label}: ${value}`);
+  return lines.length ? `${title.toUpperCase()}\n${lines.join("\n")}` : null;
+};
+
+const renderPlainText = ({ title, intro, sections = [], notice, cta, closing }) =>
+  [
+    BRAND.name,
+    title,
+    intro,
+    ...sections.filter(Boolean),
+    displayValue(notice),
+    cta ? `${cta.label}: ${cta.url}` : null,
+    closing || `Questions? Email ${BRAND.supportEmail} or call ${BRAND.supportPhone}.`,
+    `${BRAND.legalName}\n${BRAND.address}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+const sendTemplate = async ({ to, subject, text, ...layout }) => {
+  const recipient = sanitizeHeader(to);
+  if (!recipient) throw new TypeError("Email recipient is required.");
+
+  return transport.sendMail({
+    from: FROM,
+    replyTo: BRAND.supportEmail,
+    to: recipient,
+    subject: sanitizeHeader(subject, BRAND.name),
+    text,
+    html: renderEmail(layout),
+  });
+};
+
+const paymentTypeDetails = (paymentType) => {
+  switch (String(paymentType || "").toUpperCase()) {
+    case "TOKEN":
+      return {
+        code: "TOKEN",
+        label: "Booking payment",
+        subjectPrefix: "Trip reserved & payment received",
+        eyebrow: "Reservation confirmed",
+        title: "Your spot is reserved",
+        intro: "We have received your booking payment and reserved your place on the trip. Your booking details and payment receipt are below.",
+      };
+    case "FULL":
+      return {
+        code: "FULL",
+        label: "Full payment",
+        subjectPrefix: "Booking confirmed & payment received",
+        eyebrow: "Booking confirmed",
+        title: "Your journey is confirmed",
+        intro: "We have received your full payment and confirmed your booking. Everything you need for your records is included below.",
+      };
+    case "BALANCE":
+      return {
+        code: "BALANCE",
+        label: "Balance payment",
+        subjectPrefix: "Balance received & booking confirmed",
+        eyebrow: "Balance paid",
+        title: "You are fully paid and confirmed",
+        intro: "We have received your outstanding balance. Your booking is now fully paid and confirmed for the selected journey.",
+      };
+    default:
+      return {
+        code: "PAYMENT",
+        label: "Payment",
+        subjectPrefix: "Payment received",
+        eyebrow: "Payment received",
+        title: "Thank you — your payment is recorded",
+        intro: "We have received your payment. Your booking and transaction details are included below for your records.",
+      };
+  }
+};
+
+/**
+ * Send a reservation/payment receipt. Existing fields remain supported; richer
+ * callers may additionally pass bookingId, itemLocation, transactionAmount,
+ * cumulativeAmountPaid, previousAmountPaid, paidAt, paymentMethod, paymentId,
+ * balanceDueDate, bookingUrl, and paymentLink.
+ */
+export const sendBookingConfirmedEmail = async (options = {}) => {
+  const {
+    to,
+    name,
+    bookingRef,
+    tripTitle,
+    itemTitle,
+    tripStartDate,
+    tripEndDate,
+    totalAmount,
+    amountDue,
+    paymentType,
+    receiptNumber,
+    travelersCount,
+    packageName,
+    slotName,
+    slotTitle,
+    travelersDetails,
+    itemLocation,
+    tripLocation,
+    location,
+    duration,
+    paymentMethod,
+    paymentId,
+    razorpayPaymentId,
+    balanceDueDate,
+    bookingId,
+    bookingUrl,
+    paymentLink,
+    currency = "INR",
+  } = options;
+
+  const travelerName = displayValue(name) || "Traveler";
+  const journeyTitle = displayValue(tripTitle) || displayValue(itemTitle) || "your trip";
+  const type = paymentTypeDetails(paymentType);
+  const transactionAmount = firstNumber(options.transactionAmount, options.amountPaid);
+  const total = toNumber(totalAmount);
+  const due = toNumber(amountDue);
+  let cumulativePaid = firstNumber(
+    options.cumulativeAmountPaid,
+    options.amountPaidToDate,
+    options.totalPaid,
+  );
+  if (cumulativePaid === null && total !== null && due !== null) {
+    cumulativePaid = Math.max(0, total - due);
+  }
+  if (cumulativePaid === null) cumulativePaid = transactionAmount;
+
+  let previousPaid = firstNumber(options.previousAmountPaid, options.amountPreviouslyPaid);
+  if (previousPaid === null && cumulativePaid !== null && transactionAmount !== null) {
+    previousPaid = Math.max(0, cumulativePaid - transactionAmount);
+  }
+
+  const paidAt = options.paidAt || options.invoiceDate || options.paymentDate;
+  const dateRange = formatDateRange(tripStartDate, tripEndDate);
+  const subtotal = total === null ? null : total / 1.05;
+  const gstAmount = total === null ? null : total - subtotal;
+  const destination = itemLocation || tripLocation || location;
+  const selectedSlot = slotTitle || options.slotLabel;
+  const travelDates = dateRange || slotName;
+
+  const bookingRows = [
+    { label: "Booking reference", value: bookingRef, emphasis: true },
+    { label: "Journey", value: journeyTitle },
+    { label: "Location", value: destination },
+    { label: "Package", value: packageName },
+    { label: "Selected slot", value: selectedSlot },
+    { label: "Travel dates", value: travelDates },
+    { label: "Duration", value: duration },
+    { label: "Travelers", value: travelersCount },
+    { label: "Traveler names", value: travelersDetails },
+  ];
+
+  const transactionRows = [
+    { label: "Receipt number", value: receiptNumber ? `#${receiptNumber}` : null },
+    { label: "Payment date", value: formatDateTime(paidAt) },
+    { label: "Payment type", value: type.label },
+    { label: "Payment method", value: paymentMethod },
+    { label: "Transaction ID", value: paymentId || razorpayPaymentId },
+    { label: "GSTIN", value: BRAND.gstin },
+  ];
+
+  const amountRows = [
+    { label: `${packageName || journeyTitle} subtotal`, value: formatCurrency(subtotal, currency) },
+    { label: "GST (5%)", value: formatCurrency(gstAmount, currency) },
+    { label: "Booking total (including GST)", value: formatCurrency(total, currency), strong: true },
+    { label: "This payment", value: formatCurrency(transactionAmount, currency), accent: true },
+    ...(previousPaid > 0
+      ? [{ label: "Previously paid", value: formatCurrency(previousPaid, currency) }]
+      : []),
+    { label: "Total paid to date", value: formatCurrency(cumulativePaid, currency), strong: true },
+    { label: "Balance due", value: formatCurrency(due, currency), strong: true, accent: due > 0 },
+  ];
+
+  const dueNotice = due > 0
+    ? `Your remaining balance of ${formatCurrency(due, currency)}${formatDate(balanceDueDate) ? ` is due by ${formatDate(balanceDueDate)}` : " is still payable"}. Your place remains reserved in the meantime.`
+    : type.code === "BALANCE"
+      ? "No balance remains on this booking. Please keep this email as your payment receipt."
+      : null;
+
+  const fallbackPath = "/profile";
+  const requestedUrl = type.code === "TOKEN" && due > 0
+    ? paymentLink || (bookingId ? appLink(`/bookings/${bookingId}/pay-balance`) : bookingUrl)
+    : bookingUrl;
+  const cta = {
+    label: type.code === "TOKEN" && due > 0 ? "View booking & pay balance" : "View my booking",
+    url: safeAppUrl(requestedUrl, fallbackPath),
+  };
+
+  const bodyHtml = [
+    renderDetails("Booking details", bookingRows),
+    renderDetails("Transaction details", transactionRows),
+    renderAmounts("Payment summary", amountRows),
+    renderNotice(dueNotice),
+  ].join("");
+
+  const title = `${type.title}, ${travelerName}`;
+  const subject = `${type.subjectPrefix} – ${journeyTitle}${bookingRef ? ` (${bookingRef})` : ""}`;
+  const text = renderPlainText({
+    title: type.title,
+    intro: type.intro,
+    sections: [
+      plainSection("Booking details", bookingRows),
+      plainSection("Transaction details", transactionRows),
+      plainSection("Payment summary", amountRows),
+    ],
+    notice: dueNotice,
+    cta,
+  });
+
+  return sendTemplate({
+    to,
+    subject,
+    text,
+    preheader: `${type.subjectPrefix} for ${journeyTitle}.`,
+    eyebrow: type.eyebrow,
+    title,
+    intro: type.intro,
+    badge: bookingRef || type.label,
+    bodyHtml,
+    cta,
+    footerNote: "Keep this email for your records. Reply to it if any booking or payment detail looks incorrect.",
+  });
+};
+
+/** Send a balance payment reminder. */
+export const sendPaymentReminderEmail = async (options = {}) => {
+  const {
+    to,
+    name,
+    bookingRef,
+    tripTitle,
+    itemTitle,
+    balanceAmount,
+    dueDate,
+    paymentLink,
+    totalAmount,
+    amountPaid,
+    packageName,
+    slotName,
+    slotTitle,
+    tripStartDate,
+    tripEndDate,
+    travelersCount,
+    itemLocation,
+    tripLocation,
+    location,
+    currency = "INR",
+  } = options;
+
+  const travelerName = displayValue(name) || "Traveler";
+  const journeyTitle = displayValue(tripTitle) || displayValue(itemTitle) || "your trip";
+  const dueDateValue = validDate(dueDate);
+  const overdue = typeof options.isOverdue === "boolean"
+    ? options.isOverdue
+    : Boolean(dueDateValue && dueDateValue.getTime() < Date.now());
+  const formattedBalance = formatCurrency(balanceAmount, currency);
+
+  const bookingRows = [
+    { label: "Booking reference", value: bookingRef, emphasis: true },
+    { label: "Journey", value: journeyTitle },
+    { label: "Location", value: itemLocation || tripLocation || location },
+    { label: "Package", value: packageName },
+    { label: "Selected slot", value: slotTitle || options.slotLabel },
+    { label: "Travel dates", value: formatDateRange(tripStartDate, tripEndDate) || slotName },
+    { label: "Travelers", value: travelersCount },
+  ];
+  const amountRows = [
+    { label: "Booking total", value: formatCurrency(totalAmount, currency) },
+    { label: "Paid to date", value: formatCurrency(amountPaid, currency) },
+    { label: "Balance due", value: formattedBalance, strong: true, accent: true },
+    { label: overdue ? "Payment was due" : "Payment due date", value: formatDate(dueDate), strong: true },
+  ];
+
+  const title = overdue ? `Your balance is overdue, ${travelerName}` : `A quick payment reminder, ${travelerName}`;
+  const intro = overdue
+    ? `The balance for ${journeyTitle} has passed its due date. Please complete the payment as soon as possible to keep your booking in good standing.`
+    : `Your remaining payment for ${journeyTitle} is coming up. We have gathered the important booking and balance details below.`;
+  const notice = "If you have already completed this payment, no action is needed. Payment updates may take a few moments to appear.";
+  const cta = {
+    label: "Pay balance securely",
+    url: safeAppUrl(paymentLink, "/profile"),
+  };
+
+  return sendTemplate({
+    to,
+    subject: `${overdue ? "Balance payment overdue" : "Balance payment reminder"} – ${journeyTitle}${bookingRef ? ` (${bookingRef})` : ""}`,
+    text: renderPlainText({
+      title,
+      intro,
+      sections: [
+        plainSection("Booking details", bookingRows),
+        plainSection("Payment summary", amountRows),
+      ],
+      notice,
+      cta,
+    }),
+    preheader: `${formattedBalance || "Your booking balance"} is ${overdue ? "overdue" : "due soon"} for ${journeyTitle}.`,
+    eyebrow: overdue ? "Payment overdue" : "Payment reminder",
+    title,
+    intro,
+    badge: bookingRef,
+    bodyHtml: [
+      renderDetails("Booking details", bookingRows),
+      renderAmounts("Payment summary", amountRows),
+      renderNotice(notice, overdue ? "alert" : "neutral"),
+    ].join(""),
+    cta,
+    footerNote: "For payment questions or assistance, reply to this email and our team will help.",
+  });
+};
+
+/** Send refund initiation details. */
+export const sendRefundInitiatedEmail = async (options = {}) => {
+  const {
+    to,
+    name,
+    bookingRef,
+    tripTitle,
+    itemTitle,
+    refundAmount,
+    paymentMethod,
+    packageName,
+    tripStartDate,
+    tripEndDate,
+    travelersCount,
+    itemLocation,
+    tripLocation,
+    location,
+    bookingUrl,
+    currency = "INR",
+  } = options;
+
+  const travelerName = displayValue(name) || "Traveler";
+  const journeyTitle = displayValue(tripTitle) || displayValue(itemTitle) || "your trip";
+  const reason = options.refundReason || options.reason;
+  const refundId = options.refundId || options.refundReference;
+  const refundDate = options.refundDate || options.initiatedAt;
+  const fullRefund = options.isFullRefund === true || String(options.refundType || "").toUpperCase() === "FULL";
+  const partialRefund = options.isFullRefund === false || String(options.refundType || "").toUpperCase() === "PARTIAL";
+  const refundLabel = fullRefund ? "Full refund" : partialRefund ? "Partial refund" : "Refund amount";
+
+  const bookingRows = [
+    { label: "Booking reference", value: bookingRef, emphasis: true },
+    { label: "Journey", value: journeyTitle },
+    { label: "Location", value: itemLocation || tripLocation || location },
+    { label: "Package", value: packageName },
+    { label: "Travel dates", value: formatDateRange(tripStartDate, tripEndDate) },
+    { label: "Travelers", value: travelersCount },
+  ];
+  const refundAmountRows = [
+    { label: fullRefund ? "Full refund of this payment" : refundLabel, value: formatCurrency(refundAmount, currency), strong: true, accent: true },
+    { label: "Original payment", value: formatCurrency(options.originalPaymentAmount, currency) },
+    { label: "Booking amount paid after refund", value: formatCurrency(options.bookingAmountPaidAfterRefund ?? options.amountPaid, currency), strong: true },
+    { label: "Refundable amount remaining on this payment", value: formatCurrency(options.refundableAmountRemaining ?? options.remainingAmount, currency) },
+  ];
+  const refundDetailRows = [
+    { label: "Refund reference", value: refundId },
+    { label: "Initiated on", value: formatDateTime(refundDate) },
+    { label: "Original payment method", value: paymentMethod },
+    { label: "Reason", value: reason },
+  ];
+
+  const title = `Your refund is on its way, ${travelerName}`;
+  const intro = `We have initiated a refund for your ${journeyTitle} booking. The request has been sent to the original payment method.`;
+  const notice = options.expectedBy
+    ? `Your bank should reflect the refund by ${formatDate(options.expectedBy)}. Processing time ultimately depends on your bank or payment provider.`
+    : "Most refunds appear within 5–7 business days, although the exact timing depends on your bank or payment provider.";
+  const cta = { label: "View booking", url: safeAppUrl(bookingUrl, "/profile") };
+
+  return sendTemplate({
+    to,
+    subject: `Refund initiated – ${journeyTitle}${bookingRef ? ` (${bookingRef})` : ""}`,
+    text: renderPlainText({
+      title,
+      intro,
+      sections: [plainSection("Booking details", bookingRows), plainSection("Refund summary", refundAmountRows), plainSection("Refund processing details", refundDetailRows)],
+      notice,
+      cta,
+    }),
+    preheader: `${formatCurrency(refundAmount, currency) || "Your refund"} has been initiated for ${journeyTitle}.`,
+    eyebrow: "Refund initiated",
+    title,
+    intro,
+    badge: bookingRef,
+    bodyHtml: [renderDetails("Booking details", bookingRows), renderAmounts("Refund summary", refundAmountRows), renderDetails("Refund processing details", refundDetailRows), renderNotice(notice)].join(""),
+    cta,
+    footerNote: "Keep this email until the refund appears in your account. Reply if you need help tracing it.",
+  });
+};
+
+/** Send a payment failure notification with a safe retry path. */
+export const sendPaymentFailedEmail = async (options = {}) => {
+  const {
+    to,
+    name,
+    bookingRef,
+    tripTitle,
+    itemTitle,
+    amount,
+    paymentType,
+    packageName,
+    tripStartDate,
+    tripEndDate,
+    itemLocation,
+    tripLocation,
+    location,
+    amountDue,
+    dueDate,
+    currency = "INR",
+  } = options;
+
+  const travelerName = displayValue(name) || "Traveler";
+  const journeyTitle = displayValue(tripTitle) || displayValue(itemTitle) || "your trip";
+  const type = paymentTypeDetails(paymentType);
+  const reason = options.failureReason || options.reason;
+  const paymentId = options.paymentId || options.orderId || options.razorpayOrderId;
+  const attemptedAt = options.attemptedAt || options.failedAt;
+  const retryLink = options.retryLink || options.paymentLink;
+  const attemptedAmount = options.transactionAmount ?? amount;
+
+  const bookingRows = [
+    { label: "Booking reference", value: bookingRef, emphasis: true },
+    { label: "Journey", value: journeyTitle },
+    { label: "Location", value: itemLocation || tripLocation || location },
+    { label: "Package", value: packageName },
+    { label: "Travel dates", value: formatDateRange(tripStartDate, tripEndDate) },
+  ];
+  const failureRows = [
+    { label: "Attempted amount", value: formatCurrency(attemptedAmount, currency), strong: true, accent: true },
+    { label: "Payment type", value: type.label },
+    { label: "Attempted on", value: formatDateTime(attemptedAt) },
+    { label: "Order / transaction ID", value: paymentId },
+    { label: "Reason", value: reason },
+    { label: "Error code", value: options.code || options.failureCode },
+    { label: "Outstanding balance", value: formatCurrency(amountDue, currency) },
+    { label: "Balance due date", value: formatDate(dueDate) },
+  ];
+
+  const title = `That payment did not go through, ${travelerName}`;
+  const intro = `We could not complete your ${type.label.toLowerCase()} for ${journeyTitle}. No successful payment was recorded for this attempt.`;
+  const notice = type.code === "BALANCE"
+    ? "You can safely try the balance payment again. If money was debited despite this message, wait for your bank to reverse it before retrying or contact us with the transaction reference."
+    : "Open My Bookings to review the latest payment status. If money was debited despite this message, wait for your bank to reverse it and contact us with the transaction reference before trying again.";
+  const cta = { label: type.code === "BALANCE" ? "Try balance payment again" : "View my booking", url: safeAppUrl(retryLink, "/profile") };
+
+  return sendTemplate({
+    to,
+    subject: `Payment unsuccessful – ${journeyTitle}${bookingRef ? ` (${bookingRef})` : ""}`,
+    text: renderPlainText({
+      title,
+      intro,
+      sections: [plainSection("Booking details", bookingRows), plainSection("Attempt details", failureRows)],
+      notice,
+      cta,
+    }),
+    preheader: `Your payment attempt for ${journeyTitle} was unsuccessful. You can try again securely.`,
+    eyebrow: "Payment unsuccessful",
+    title,
+    intro,
+    badge: bookingRef,
+    bodyHtml: [renderDetails("Booking details", bookingRows), renderDetails("Attempt details", failureRows), renderNotice(notice, "alert")].join(""),
+    cta,
+    footerNote: "Hangover Trails will never ask you to share an OTP, PIN, CVV, or card password by email or phone.",
   });
 };
 
 /**
- * Send balance payment reminder email
+ * Send cancellation/refund details. Supports the legacy `(to, details)` call as
+ * well as a single options object.
  */
-export const sendPaymentReminderEmail = async ({ to, name, bookingRef, tripTitle, balanceAmount, dueDate, paymentLink }) => {
-  const formattedDue = new Date(dueDate).toLocaleDateString("en-IN", {
-    day: "numeric", month: "long", year: "numeric",
-  });
-
-  await transport.sendMail({
-    from: FROM,
+export const sendBookingCancelledRefundedEmail = async (toOrOptions, details) => {
+  const options = typeof toOrOptions === "object" && toOrOptions !== null && details === undefined
+    ? toOrOptions
+    : { ...(details || {}), to: toOrOptions };
+  const {
     to,
-    subject: `Balance Payment Due – ${tripTitle} (${bookingRef})`,
-    html: `
-      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9f9f9;border-radius:8px;">
-        <h2 style="color:#c0392b;">⏰ Balance Payment Reminder</h2>
-        <p>Hi ${name},</p>
-        <p>This is a reminder that your balance payment for <strong>${tripTitle}</strong> is due.</p>
-        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
-          <tr><td style="padding:8px;color:#555;">Booking Reference</td><td style="padding:8px;font-weight:bold;">${bookingRef}</td></tr>
-          <tr><td style="padding:8px;color:#555;">Balance Due</td><td style="padding:8px;font-weight:bold;color:#c0392b;">₹${balanceAmount}</td></tr>
-          <tr><td style="padding:8px;color:#555;">Due Date</td><td style="padding:8px;font-weight:bold;">${formattedDue}</td></tr>
-        </table>
-        <a href="${paymentLink}" style="display:inline-block;margin-top:16px;padding:12px 24px;background:#e74c3c;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Pay Now</a>
-        <p style="margin-top:24px;color:#999;font-size:12px;">If you've already paid, please ignore this email. – Hangover Trips</p>
-      </div>
-    `,
+    name,
+    bookingRef,
+    tripTitle,
+    itemTitle,
+    refundAmount,
+    packageName,
+    tripStartDate,
+    tripEndDate,
+    itemLocation,
+    tripLocation,
+    location,
+    travelersCount,
+    currency = "INR",
+  } = options;
+
+  const travelerName = displayValue(name) || "Traveler";
+  const journeyTitle = displayValue(tripTitle) || displayValue(itemTitle) || "your trip";
+  const refund = toNumber(refundAmount) || 0;
+  const hasRefund = refund > 0;
+  const fullRefund = options.isFullRefund === true || String(options.refundType || "").toUpperCase() === "FULL";
+  const partialRefund = options.isFullRefund === false || String(options.refundType || "").toUpperCase() === "PARTIAL";
+  const cancellationDate = options.cancelledAt || options.cancellationDate;
+  const reason = options.cancellationReason || options.reason;
+  const refundId = options.refundId || options.refundReference;
+
+  const bookingRows = [
+    { label: "Booking reference", value: bookingRef, emphasis: true },
+    { label: "Journey", value: journeyTitle },
+    { label: "Location", value: itemLocation || tripLocation || location },
+    { label: "Package", value: packageName },
+    { label: "Travel dates", value: formatDateRange(tripStartDate, tripEndDate) },
+    { label: "Travelers", value: travelersCount },
+    { label: "Cancelled on", value: formatDateTime(cancellationDate) },
+    { label: "Cancellation reason", value: reason },
+  ];
+  const refundAmountRows = hasRefund
+    ? [
+        {
+          label: fullRefund ? "Full refund" : partialRefund ? "Partial refund" : "Refund initiated",
+          value: formatCurrency(refund, currency),
+          strong: true,
+          accent: true,
+        },
+        { label: "Paid before cancellation", value: formatCurrency(options.totalPaid, currency) },
+        { label: "Paid amount remaining", value: formatCurrency(options.remainingPaidAmount, currency) },
+      ]
+    : [];
+  const refundDetailRows = hasRefund
+    ? [
+        { label: "Refund reference", value: refundId },
+        { label: "Original payment method", value: options.paymentMethod },
+      ]
+    : [];
+
+  const intro = hasRefund
+    ? `Your booking for ${journeyTitle} has been cancelled, and a refund of ${formatCurrency(refund, currency)} has been initiated to the original payment method.`
+    : `Your booking for ${journeyTitle} has been cancelled. No refund amount was recorded for this cancellation.`;
+  const notice = hasRefund
+    ? "Most refunds appear within 5–7 business days. Your bank or payment provider controls the final processing time."
+    : "If you believe a refund should apply, reply to this email and our team will review the booking with you.";
+  const title = `Your booking has been cancelled, ${travelerName}`;
+  const cta = { label: "Explore other journeys", url: safeAppUrl(options.exploreUrl, "/trips") };
+
+  return sendTemplate({
+    to,
+    subject: `Booking cancelled${hasRefund ? " & refund initiated" : ""} – ${journeyTitle}${bookingRef ? ` (${bookingRef})` : ""}`,
+    text: renderPlainText({
+      title,
+      intro,
+      sections: [plainSection("Booking details", bookingRows), plainSection("Refund summary", refundAmountRows), plainSection("Refund processing details", refundDetailRows)],
+      notice,
+      cta,
+    }),
+    preheader: `Your ${journeyTitle} booking has been cancelled${hasRefund ? ` and ${formatCurrency(refund, currency)} is being refunded` : ""}.`,
+    eyebrow: "Booking cancelled",
+    title,
+    intro,
+    badge: bookingRef,
+    bodyHtml: [renderDetails("Booking details", bookingRows), renderAmounts("Refund summary", refundAmountRows), renderDetails("Refund processing details", refundDetailRows), renderNotice(notice, hasRefund ? "neutral" : "alert")].join(""),
+    cta,
+    footerNote: "Reply to this email if any cancellation or refund detail looks incorrect.",
   });
 };
 
-/**
- * Send refund initiated email
- */
-export const sendRefundInitiatedEmail = async ({ to, name, bookingRef, tripTitle, refundAmount }) => {
-  await transport.sendMail({
-    from: FROM,
+/** Send a post-trip review invitation. */
+export const sendReviewRequestEmail = async (options = {}) => {
+  const {
     to,
-    subject: `Refund Initiated – ${tripTitle} (${bookingRef})`,
-    html: `
-      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9f9f9;border-radius:8px;">
-        <h2 style="color:#1a1a2e;">Refund Initiated</h2>
-        <p>Hi ${name},</p>
-        <p>A refund of <strong>₹${refundAmount}</strong> has been initiated for your booking <strong>${bookingRef}</strong> (${tripTitle}).</p>
-        <p>Refunds typically take 5–7 business days to reflect in your account depending on your bank.</p>
-        <p style="margin-top:24px;color:#999;font-size:12px;">Hangover Trips</p>
-      </div>
-    `,
+    name,
+    tripTitle,
+    itemTitle,
+    reviewLink,
+    bookingRef,
+    packageName,
+    tripStartDate,
+    tripEndDate,
+    itemLocation,
+    tripLocation,
+    location,
+  } = options;
+
+  const travelerName = displayValue(name) || "Traveler";
+  const journeyTitle = displayValue(tripTitle) || displayValue(itemTitle) || "your recent trip";
+  const tripRows = [
+    { label: "Booking reference", value: bookingRef },
+    { label: "Journey", value: journeyTitle, emphasis: true },
+    { label: "Location", value: itemLocation || tripLocation || location },
+    { label: "Package", value: packageName },
+    { label: "Travel dates", value: formatDateRange(tripStartDate, tripEndDate) },
+  ];
+  const title = `How was the journey, ${travelerName}?`;
+  const intro = `We hope ${journeyTitle} left you with stories worth retelling. Your honest feedback helps future travelers and helps our team make every departure better.`;
+  const notice = "A thoughtful review only takes a minute. Share what you loved and anything you think we could improve.";
+  const cta = { label: "Share my experience", url: safeAppUrl(reviewLink, "/profile") };
+
+  return sendTemplate({
+    to,
+    subject: `How was ${journeyTitle}? Share your experience`,
+    text: renderPlainText({
+      title,
+      intro,
+      sections: [plainSection("Your journey", tripRows)],
+      notice,
+      cta,
+    }),
+    preheader: `Tell us about your experience on ${journeyTitle}.`,
+    eyebrow: "Welcome home",
+    title,
+    intro,
+    badge: bookingRef,
+    bodyHtml: [renderDetails("Your journey", tripRows), renderNotice(notice)].join(""),
+    cta,
+    footerNote: "Thank you for traveling with Hangover Trails. We hope to see you on another trail soon.",
   });
 };
 
-/**
- * Send payment failure notification
- */
-export const sendPaymentFailedEmail = async ({ to, name, bookingRef, tripTitle, amount }) => {
-  await transport.sendMail({
-    from: FROM,
-    to,
-    subject: `Payment Failed – ${tripTitle} (${bookingRef})`,
-    html: `
-      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9f9f9;border-radius:8px;">
-        <h2 style="color:#c0392b;">Payment Failed</h2>
-        <p>Hi ${name},</p>
-        <p>Unfortunately your payment of <strong>₹${amount}</strong> for booking <strong>${bookingRef}</strong> (${tripTitle}) could not be processed.</p>
-        <p>Please try again or contact us if the issue persists.</p>
-        <p style="margin-top:24px;color:#999;font-size:12px;">Hangover Trips</p>
-      </div>
-    `,
-  });
-};
+/** Send a welcome message using the same branded transactional shell. */
+export const sendWelcomeEmail = async (options = {}) => {
+  const { to } = options;
+  const travelerName = displayValue(options.name || options.fullName) || "Traveler";
+  const title = `Welcome to the trail, ${travelerName}`;
+  const intro = "Your next great story starts here. You are now part of a community that values thoughtful journeys, local connections, and the kind of memories that stay long after the road ends.";
+  const cta = { label: "Start exploring", url: safeAppUrl(options.exploreUrl, "/trips") };
+  const welcomeRows = [
+    { label: "Curated departures", value: "Small-group journeys planned with care" },
+    { label: "Local perspective", value: "Places, people, and stories beyond the usual route" },
+    { label: "Human support", value: `Real help from our team at ${BRAND.supportEmail}` },
+  ];
 
-/**
- * Send booking cancelled and refunded notification
- */
-export const sendBookingCancelledRefundedEmail = async (to, { name, bookingRef, tripTitle, refundAmount }) => {
-  await transport.sendMail({
-    from: FROM,
+  return sendTemplate({
     to,
-    subject: `Booking Cancelled & Refunded – ${tripTitle} (${bookingRef})`,
-    html: `
-      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9f9f9;border-radius:8px;">
-        <h2 style="color:#c0392b;">Booking Cancelled & Refunded</h2>
-        <p>Hi ${name},</p>
-        <p>Your booking <strong>${bookingRef}</strong> for <strong>${tripTitle}</strong> has been cancelled.</p>
-        <p>A full refund of <strong>₹${refundAmount}</strong> has been initiated and should reflect in your original payment method within 5–7 business days.</p>
-        <p>If you have any questions or if you'd like to book another trip, please don't hesitate to contact us.</p>
-        <p style="margin-top:24px;color:#999;font-size:12px;">Hangover Trips</p>
-      </div>
-    `,
-  });
-};
-
-/**
- * Send review request email after trip completion
- */
-export const sendReviewRequestEmail = async ({ to, name, tripTitle, reviewLink }) => {
-  await transport.sendMail({
-    from: FROM,
-    to,
-    subject: `How was your trip? Review ${tripTitle}`,
-    html: `
-      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9f9f9;border-radius:8px;">
-        <h2 style="color:#1a1a2e;">We hope you had a great time!</h2>
-        <p>Hi ${name},</p>
-        <p>Your trip <strong>${tripTitle}</strong> has recently concluded, and we'd love to hear about your experience.</p>
-        <p>Please take a moment to leave a review and let us know how we did.</p>
-        <a href="${reviewLink}" style="display:inline-block;margin-top:16px;padding:12px 24px;background:#781216;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Leave a Review</a>
-        <p style="margin-top:24px;color:#999;font-size:12px;">Hangover Trips</p>
-      </div>
-    `,
+    subject: `Welcome to ${BRAND.name}`,
+    text: renderPlainText({
+      title,
+      intro,
+      sections: [plainSection("What you can expect", welcomeRows)],
+      notice: "Browse the latest trips and festivals whenever you are ready. We will be here when the right journey finds you.",
+      cta,
+      closing: `See you out there,\nThe ${BRAND.name} Team`,
+    }),
+    preheader: `Welcome to ${BRAND.name}. Your next great story starts here.`,
+    eyebrow: "Welcome aboard",
+    title,
+    intro,
+    bodyHtml: [
+      renderDetails("What you can expect", welcomeRows),
+      renderNotice("Browse the latest trips and festivals whenever you are ready. We will be here when the right journey finds you."),
+    ].join(""),
+    cta,
+    footerNote: `You received this welcome email because an account was created with ${BRAND.name}.`,
   });
 };

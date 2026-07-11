@@ -53,9 +53,10 @@ export const recordFailedPayment = async (req, res, next) => {
 export const handleWebhook = async (req, res, next) => {
   try {
     const signature = req.headers["x-razorpay-signature"];
+    const webhookEventId = req.headers["x-razorpay-event-id"];
     if (!signature) return res.status(400).json({ message: "Missing webhook signature" });
 
-    const result = await paymentService.handleWebhook(req.body, signature);
+    const result = await paymentService.handleWebhook(req.body, signature, webhookEventId);
     res.status(200).json(result);
   } catch (error) {
     next(error);

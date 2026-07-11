@@ -745,11 +745,16 @@ export default function BookingPage() {
       // Upload additional travelers govt IDs
       const additionalTravelers = await Promise.all(extractedTravelers.map(async (t) => {
         let aadhaarAssetId = null;
-        if (t.aadhaarFile && t.aadhaarFile.size > 0) {
+        if (t.aadhaarFile && t.aadhaarFile.size > 0 && t.aadhaarFile.name) {
           const idForm = new FormData();
-          idForm.append("image", t.aadhaarFile);
-          const uploadRes = await apiClient.post("/bookings/traveler/govt-id", idForm);
+          idForm.append("image", t.aadhaarFile, t.aadhaarFile.name);
+          const uploadRes = await apiClient.post("/bookings/traveler/govt-id", idForm, {
+            // apiClient defaults to application/json; this endpoint is parsed by Multer.
+            headers: { "Content-Type": "multipart/form-data" },
+          });
           aadhaarAssetId = uploadRes.data.assetId;
+        } else {
+          throw new Error("Please upload an Aadhaar card for every additional traveler.");
         }
         return {
           fullName: `${t.firstName || ""} ${t.lastName || ""}`.trim(),

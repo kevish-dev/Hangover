@@ -263,12 +263,32 @@ export const cancelBooking = async (bookingId, userId, reason) => {
     );
   }
 
-  return repo.updateBooking(bookingId, {
+  const cancelledBooking = await repo.updateBooking(bookingId, {
     status: "CANCELLED",
     cancelledAt: new Date(),
     cancelledBy: userId,
     cancellationReason: reason || null,
   });
+
+  import("../../core/services/email.service.js")
+    .then(({ sendBookingCancelledRefundedEmail }) => {
+      const item = booking.slot?.trip || booking.slot?.festival;
+      return sendBookingCancelledRefundedEmail(booking.user?.email, {
+        name: booking.user?.profile?.fullName || "Traveler",
+        bookingRef: booking.bookingReference,
+        tripTitle: item?.title || "your trip",
+        packageName: booking.package?.title,
+        tripStartDate: booking.slot?.startDate,
+        tripEndDate: booking.slot?.endDate,
+        travelersCount: booking.numberOfTravelers,
+        refundAmount: 0,
+        reason: reason || "Cancelled by traveler",
+        cancelledAt: cancelledBooking.cancelledAt,
+      });
+    })
+    .catch((error) => console.error("[Email] Failed to send cancellation email:", error));
+
+  return cancelledBooking;
 };
 
 export const getBookingById = async (id, userId, isAdmin = false) => {
@@ -339,6 +359,7 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
     where: { id: bookingId },
     include: {
       slot: { include: { trip: true, festival: true } },
+      package: true,
       user: { include: { profile: true } },
       payments: {
         where: { status: "SUCCESS" }
@@ -372,6 +393,15 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
   // 1. Process refunds via Razorpay first (outside DB transaction)
   const refundsData = [];
   let remainingRefundAmount = validRefundAmount;
+  const gatewayRefundableTotal = booking.payments
+    .filter((payment) => payment.razorpayPaymentId)
+    .reduce((sum, payment) => sum + Number(payment.amount), 0);
+
+  if (validRefundAmount > gatewayRefundableTotal) {
+    throw new ValidationError(
+      "The requested refund includes an offline payment. Process the offline portion separately before cancelling this booking.",
+    );
+  }
 
   for (const payment of booking.payments) {
     if (remainingRefundAmount <= 0) break;
@@ -422,7 +452,7 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
 
 
     // Determine new paymentStatus for booking
-    let newPaymentStatus = "CANCELLED";
+    let newPaymentStatus = booking.paymentStatus;
     if (totalPaid > 0) {
       if (validRefundAmount === totalPaid) {
         newPaymentStatus = "REFUNDED";
@@ -459,12 +489,23 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
   // Send Email (Fire and forget)
   import("../../core/services/email.service.js").then((emailService) => {
     if (emailService.sendBookingCancelledRefundedEmail) {
-      const itemTitle = booking.trip ? booking.trip.title : booking.festival.title;
+      const item = booking.slot?.trip || booking.slot?.festival;
       emailService.sendBookingCancelledRefundedEmail(booking.user.email, {
         name: booking.user.profile?.fullName || "Traveler",
-        tripTitle: itemTitle,
+        tripTitle: item?.title || "your trip",
         bookingRef: booking.bookingReference,
-        refundAmount: validRefundAmount
+        refundAmount: validRefundAmount,
+        totalPaid,
+        remainingPaidAmount: Math.max(0, totalPaid - validRefundAmount),
+        isFullRefund: validRefundAmount > 0 && validRefundAmount === totalPaid,
+        refundType: validRefundAmount === totalPaid && validRefundAmount > 0 ? "FULL" : validRefundAmount > 0 ? "PARTIAL" : "NONE",
+        reason: reason || "Admin initiated cancellation",
+        refundReference: refundsData.map(({ rzpRefund }) => rzpRefund.id).filter(Boolean).join(", "),
+        cancelledAt: new Date(),
+        tripStartDate: booking.slot?.startDate,
+        tripEndDate: booking.slot?.endDate,
+        packageName: booking.package?.title,
+        travelersCount: booking.numberOfTravelers,
       }).catch(err => console.error("Failed to send cancellation email:", err));
     }
   }).catch(err => console.error("Failed to import email service:", err));
@@ -477,7 +518,8 @@ export const finalizeBooking = async (bookingId) => {
     where: { id: bookingId },
     include: {
       user: { include: { profile: true } },
-      slot: { include: { trip: true, festival: true } }
+      slot: { include: { trip: true, festival: true } },
+      package: true,
     }
   });
 
@@ -508,7 +550,12 @@ export const finalizeBooking = async (bookingId) => {
         to: booking.user.email,
         name: booking.user.profile?.fullName || "Traveler",
         tripTitle: itemTitle,
-        reviewLink
+        bookingRef: booking.bookingReference,
+        itemLocation: booking.slot.trip?.location || booking.slot.festival?.location,
+        packageName: booking.package?.title,
+        tripStartDate: booking.slot?.startDate,
+        tripEndDate: booking.slot?.endDate,
+        reviewLink,
       });
     } catch (err) {
       console.error("Failed to send review email to", booking.user.email, err);

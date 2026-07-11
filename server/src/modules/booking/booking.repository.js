@@ -6,6 +6,7 @@ const bookingInclude = {
       festival: true,
     }
   },
+  package: true,
   travelers: { include: { aadhaarAsset: true } },
   payments: { include: { refunds: true } },
 };
