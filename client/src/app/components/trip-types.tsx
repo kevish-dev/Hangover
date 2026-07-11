@@ -3,57 +3,18 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   Users, Home, Heart, GraduationCap, Mountain, Compass
 } from "lucide-react";
+import { apiClient } from "../../lib/axios";
 
-const TRIPS = [
-  {
-    id: "group",
-    label: "Group Trip",
-    icon: Users,
-    image: "https://images.unsplash.com/photo-1539635278303-d4002c07eae3?w=700&h=900&fit=crop&auto=format&q=90",
-    description: "Travel together, make new friends, and share unforgettable moments.",
-    tag: "Social · 5–10 Days",
-  },
-  {
-    id: "family",
-    label: "Family Trip",
-    icon: Home,
-    image: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=700&h=900&fit=crop&auto=format&q=90",
-    description: "Create lifelong memories with your loved ones in beautiful destinations.",
-    tag: "Kid-Friendly · 4–8 Days",
-  },
-  {
-    id: "couple",
-    label: "Couple Trip",
-    icon: Heart,
-    image: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=700&h=900&fit=crop&auto=format&q=90",
-    description: "Romantic getaways designed for just the two of you.",
-    tag: "Romantic · 3–7 Days",
-  },
-  {
-    id: "students",
-    label: "Students Trip",
-    icon: GraduationCap,
-    image: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=700&h=900&fit=crop&auto=format&q=90",
-    description: "Budget-friendly adventures perfect for college squads.",
-    tag: "Budget · 3–5 Days",
-  },
-  {
-    id: "trekking",
-    label: "Trekking Trip",
-    icon: Mountain,
-    image: "https://images.unsplash.com/photo-1617380613434-7495e9b45dfb?w=700&h=900&fit=crop&auto=format&q=90",
-    description: "Push your limits on high altitude trails and scenic mountains.",
-    tag: "Adventure · 7–14 Days",
-  },
-  {
-    id: "customised",
-    label: "Customised Trip",
-    icon: Compass,
-    image: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=700&h=900&fit=crop&auto=format&q=90",
-    description: "Tailor-made itineraries crafted exclusively for your preferences.",
-    tag: "Flexible · Any Duration",
-  },
-];
+interface LandingTripType {
+  id: string;
+  label: string;
+  description: string;
+  tag: string;
+  imageUrl: string;
+  iconName: string;
+}
+
+const iconMap = { Users, Home, Heart, GraduationCap, Mountain, Compass };
 
 const ITEM_H = 64;
 
@@ -74,20 +35,41 @@ const getStatus = (index: number, current: number, total: number) => {
 export function TripTypes() {
   const [step, setStep] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [trips, setTrips] = useState<LandingTripType[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const current = ((step % TRIPS.length) + TRIPS.length) % TRIPS.length;
+  const current = trips.length ? ((step % trips.length) + trips.length) % trips.length : 0;
   const next = useCallback(() => setStep((s) => s + 1), []);
 
   const handleChip = (i: number) => {
-    const diff = (i - current + TRIPS.length) % TRIPS.length;
+    const diff = (i - current + trips.length) % trips.length;
     if (diff > 0) setStep((s) => s + diff);
   };
 
   useEffect(() => {
-    if (paused) return;
+    let cancelled = false;
+    apiClient.get("/landing-trip-types")
+      .then((response) => {
+        if (!cancelled && Array.isArray(response.data?.data)) setTrips(response.data.data);
+      })
+      .catch(() => {
+        if (!cancelled) setTrips([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (paused || trips.length < 2) return;
     const id = setInterval(next, 3200);
     return () => clearInterval(id);
-  }, [next, paused]);
+  }, [next, paused, trips.length]);
+
+  if (!isLoading && trips.length === 0) return null;
 
   return (
     <section
@@ -131,13 +113,12 @@ export function TripTypes() {
               background: "#1e1a14",
               position: "relative",
               overflow: "hidden",
-              display: "flex",
               alignItems: "center",
               justifyContent: "flex-start",
               padding: "clamp(1.5rem, 6vw, 2rem) clamp(1rem, 6vw, 2.5rem)",
               minHeight: "300px",
             }}
-            className="w-full lg:w-[38%]"
+            className="hidden lg:flex lg:w-[38%]"
           >
             {/* top/bottom fades */}
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "90px", background: "linear-gradient(to bottom, #1e1a14 20%, transparent)", zIndex: 3, pointerEvents: "none" }} />
@@ -145,11 +126,11 @@ export function TripTypes() {
 
             {/* drum */}
             <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "flex-start", zIndex: 2 }}>
-              {TRIPS.map((trip, i) => {
+              {trips.map((trip, i) => {
                 const isActive = i === current;
                 const dist = i - current;
-                const wrapped = wrap(-(TRIPS.length / 2), TRIPS.length / 2, dist);
-                const Icon = trip.icon;
+                const wrapped = wrap(-(trips.length / 2), trips.length / 2, dist);
+                const Icon = iconMap[trip.iconName as keyof typeof iconMap] || Compass;
 
                 return (
                   <motion.div
@@ -206,15 +187,16 @@ export function TripTypes() {
               overflow: "hidden",
               minHeight: "480px",
             }}
+            className="w-full"
           >
             {/* card stack */}
             <div style={{ position: "relative", width: "min(100%, 340px)", aspectRatio: "3/4" }}>
-              {TRIPS.map((trip, i) => {
-                const status = getStatus(i, current, TRIPS.length);
+              {trips.map((trip, i) => {
+                const status = getStatus(i, current, trips.length);
                 const isActive = status === "active";
                 const isPrev = status === "prev";
                 const isNext = status === "next";
-                const Icon = trip.icon;
+                const Icon = iconMap[trip.iconName as keyof typeof iconMap] || Compass;
 
                 return (
                   <motion.div
@@ -240,7 +222,7 @@ export function TripTypes() {
                     }}
                   >
                     <img
-                      src={trip.image}
+                      src={trip.imageUrl}
                       alt={trip.label}
                       style={{
                         width: "100%",
@@ -314,7 +296,7 @@ export function TripTypes() {
 
             {/* dot indicators */}
             <div style={{ position: "absolute", bottom: "20px", left: "50%", transform: "translateX(-50%)", display: "flex", gap: "5px" }}>
-              {TRIPS.map((_, i) => (
+              {trips.map((_, i) => (
                 <button
                   key={i}
                   onClick={() => handleChip(i)}

@@ -18,6 +18,7 @@ import AdminInquiriesPage from "./pages/admin/inquiries";
 import AdminFestivalsPage from "./pages/admin/festivals";
 import ReviewSubmitPage from "./pages/review-submit";
 import AdminReviewsPage from "./pages/admin/reviews";
+import AdminLandingPage from "./pages/admin/landing-page";
 
 export const router = createBrowserRouter([
   {
@@ -48,6 +49,7 @@ export const router = createBrowserRouter([
       { path: "payments", Component: AdminPaymentsPage },
       { path: "inquiries", Component: AdminInquiriesPage },
       { path: "reviews", Component: AdminReviewsPage },
+      { path: "landing-page", Component: AdminLandingPage },
     ],
   },
   {

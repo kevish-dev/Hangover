@@ -1,47 +1,39 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowRight } from "lucide-react";
+import { apiClient } from "../../lib/axios";
 
-const REASONS = [
-  {
-    id: 1,
-    title: "Cultural Immersion with the Local Tribe",
-    description: "Deep dive into local traditions.",
-    detail: "Experience the vibrant heritage, rituals, and daily life of indigenous tribes, gaining a profound understanding of their ancient customs.",
-    imageUrl: "https://images.unsplash.com/photo-1771766995256-1618791109d5?w=900&h=520&fit=crop&auto=format&q=90",
-  },
-  {
-    id: 2,
-    title: "Trekking and Village Trails",
-    description: "Explore the untouched paths.",
-    detail: "Hike through breathtaking landscapes, hidden valleys, and remote villages that remain untouched by commercial tourism.",
-    imageUrl: "https://images.unsplash.com/photo-1621531518034-94ecf4778186?w=900&h=520&fit=crop&auto=format&q=90",
-  },
-  {
-    id: 3,
-    title: "Community Led Travel",
-    description: "Empowering local hosts.",
-    detail: "Our journeys directly support local communities, ensuring sustainable tourism that benefits the people who call these places home.",
-    imageUrl: "https://images.unsplash.com/photo-1536607961765-592e80bcc19e?w=900&h=520&fit=crop&auto=format&q=90",
-  },
-  {
-    id: 4,
-    title: "Authentic Culinary Experience",
-    description: "Taste the true local flavors.",
-    detail: "From foraging wild ingredients to cooking alongside local hosts, immerse yourself in the rich and diverse culinary traditions of the region.",
-    imageUrl: "https://images.unsplash.com/photo-1576656501005-5c5e7543bfaa?w=900&h=520&fit=crop&auto=format&q=90",
-  },
-  {
-    id: 5,
-    title: "Memories by the Fire (BBQ & Bonfire)",
-    description: "Unwind under the stars.",
-    detail: "End your days sharing stories, enjoying warm BBQ, and building lifelong connections under a starlit sky.",
-    imageUrl: "https://images.unsplash.com/photo-1532458605850-e9f7a26d9f80?w=900&h=520&fit=crop&auto=format&q=90",
-  },
-];
+interface LandingReason {
+  id: string;
+  title: string;
+  description: string;
+  detail: string;
+  imageUrl: string;
+}
 
 export function WhyHangover() {
   const [active, setActive] = useState(0);
+  const [reasons, setReasons] = useState<LandingReason[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiClient.get("/landing-reasons")
+      .then((response) => {
+        if (!cancelled && Array.isArray(response.data?.data)) setReasons(response.data.data);
+      })
+      .catch(() => {
+        if (!cancelled) setReasons([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!isLoading && reasons.length === 0) return null;
 
   return (
     <section
@@ -126,7 +118,7 @@ export function WhyHangover() {
           className="hidden md:flex"
           style={{ height: "480px", gap: "6px", overflow: "hidden" }}
         >
-          {REASONS.map((item, index) => (
+          {reasons.map((item, index) => (
             <AccordionPanel
               key={item.id}
               item={item}
@@ -138,7 +130,7 @@ export function WhyHangover() {
 
         {/* Accordion — mobile vertical */}
         <div className="flex flex-col md:hidden" style={{ gap: "6px" }}>
-          {REASONS.map((item, index) => (
+          {reasons.map((item, index) => (
             <MobilePanel
               key={item.id}
               item={item}
@@ -157,7 +149,7 @@ function AccordionPanel({
   isActive,
   onEnter,
 }: {
-  item: (typeof REASONS)[0];
+  item: LandingReason;
   isActive: boolean;
   onEnter: () => void;
 }) {
@@ -304,7 +296,7 @@ function MobilePanel({
   isActive,
   onToggle,
 }: {
-  item: (typeof REASONS)[0];
+  item: LandingReason;
   isActive: boolean;
   onToggle: () => void;
 }) {

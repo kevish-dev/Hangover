@@ -199,7 +199,12 @@ export const remove = async (id) => {
 
 export const getFeaturedFestivals = async () => {
   let featuredFestivals = await prisma.festival.findMany({
-    where : { isFeatured : true, isActive: true, isPublished: true },
+    where: {
+      isFeatured: true,
+      isActive: true,
+      isPublished: true,
+      OR: [{ videoUrl: { not: null } }, { bannerImages: { isEmpty: false } }],
+    },
     select: {
       id: true,
       title: true,

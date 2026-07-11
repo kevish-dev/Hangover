@@ -75,6 +75,8 @@ model Trip {
   tripType            TripType
   isActive            Boolean      @default(true)
   isFeatured          Boolean      @default(false)
+  isSignature         Boolean      @default(false)
+  signatureOrder      Int          @default(0)
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
   destinationId       String?
@@ -94,9 +96,66 @@ model Trip {
   @@index([tripType])
   @@index([isActive])
   @@index([isFeatured])
+  @@index([isSignature, signatureOrder])
   @@index([isPublished])
   @@index([location])
   @@index([destinationId])
+}
+
+model LandingReason {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  detail      String
+  imageUrl    String
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
+model LandingTripType {
+  id          String   @id @default(uuid())
+  label       String
+  description String
+  tag         String
+  imageUrl    String
+  iconName    String   @default("Compass")
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
+model LandingFootprint {
+  id        String   @id @default(uuid())
+  value     Float
+  suffix    String   @default("")
+  label     String
+  sublabel  String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([isActive, sortOrder])
+}
+
+model LandingJourneyMilestone {
+  id          String   @id @default(uuid())
+  period      String
+  title       String
+  tagline     String
+  description String
+  iconName    String   @default("MapPin")
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([isActive, sortOrder])
 }
 
 model FestivalTag {
@@ -574,4 +633,3 @@ model Review {
   @@index([festivalId])
   @@index([isPublished])
 }
-

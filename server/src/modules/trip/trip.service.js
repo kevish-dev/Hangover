@@ -232,3 +232,30 @@ export const getFeaturedTrips = async () => {
 
   return {data}
 }
+
+export const getSignatureTrips = async () => {
+  const data = await tripRepo.getSignatureTrips();
+  return { data };
+};
+
+export const updateSignatureTrips = async (tripIds) => {
+  if (!Array.isArray(tripIds) || tripIds.some((id) => typeof id !== "string")) {
+    throw new ValidationError("tripIds must be an array of trip IDs.");
+  }
+  if (tripIds.length > 6) {
+    throw new ValidationError("Select up to 6 trips for the Signature Collection.");
+  }
+  if (new Set(tripIds).size !== tripIds.length) {
+    throw new ValidationError("Each trip can only be selected once.");
+  }
+
+  if (tripIds.length > 0) {
+    const { trips } = await tripRepo.findAll(0, tripIds.length, { id: { in: tripIds } }, true);
+    if (trips.length !== tripIds.length || trips.some((trip) => !trip.isActive || !trip.isPublished || trip.bannerImages.length === 0)) {
+      throw new ValidationError("Only active, published trips with a banner image can be in the Signature Collection.");
+    }
+  }
+
+  await tripRepo.setSignatureTrips(tripIds);
+  return getSignatureTrips();
+};

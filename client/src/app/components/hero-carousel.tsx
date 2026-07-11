@@ -279,15 +279,11 @@ export function HeroCarousel() {
 
       {/* HERO CONTENT */}
       <div className="absolute inset-0 z-30 flex items-center pb-24 pt-24 md:py-0">
-        <div className="px-5 sm:px-6 md:px-10 lg:px-12 max-w-2xl w-full">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={slide.id}
-              initial={{ opacity: 0, y: 32 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.75, ease: [0.25, 0.1, 0.25, 1] }}
-            >
+        <div className="px-5 sm:px-6 md:px-10 lg:px-12 max-w-2xl w-full overflow-hidden">
+          <motion.div
+            initial={false}
+            animate={{ opacity: 1, y: 0 }}
+          >
               {/* Location chip */}
               <div
                 className="flex items-center gap-2 mb-4 md:mb-6"
@@ -416,8 +412,7 @@ export function HeroCarousel() {
                   className="group-hover:translate-x-1 transition-transform duration-300"
                 />
               </button>
-            </motion.div>
-          </AnimatePresence>
+          </motion.div>
         </div>
       </div>
 
@@ -441,20 +436,9 @@ export function HeroCarousel() {
         </div>
       )}
 
-      {/* SLIDE COUNTER + DOTS */}
+      {/* SLIDE INDICATORS */}
       {trips.length > 1 && (
-        <div className="absolute bottom-10 left-5 sm:left-6 md:left-16 lg:left-24 z-30 flex items-center gap-4 md:gap-6">
-          <span
-            className="text-[#f2ede4]/65 tabular-nums"
-            style={{
-              fontFamily: "'Poppins', sans-serif",
-              fontWeight: 300,
-              fontSize: "0.75rem",
-            }}
-          >
-            {String(current + 1).padStart(2, "0")} /{" "}
-            {String(trips.length).padStart(2, "0")}
-          </span>
+        <div className="absolute bottom-10 left-5 sm:left-6 md:left-16 lg:left-24 z-30">
           <div className="flex items-center gap-2">
             {trips.map((_, i) => (
               <button

@@ -242,6 +242,13 @@ export function TripFormModal({
           isPublished: trip.isPublished || false,
           isFeatured: trip.isFeatured || false,
         });
+        // Keep the field-array source of truth in sync with the values shown
+        // after editing an existing trip. This prevents validation from reading
+        // a stale array while the inputs appear populated.
+        replaceSlots(form.getValues("slots"));
+        replaceInclusions(form.getValues("inclusions"));
+        replaceExclusions(form.getValues("exclusions"));
+        form.clearErrors();
 
         // Initialize Highlight items
         let parsedHighlights = trip.highlights || [];
@@ -289,6 +296,10 @@ export function TripFormModal({
           isPublished: false,
           isFeatured: false,
         });
+        replaceSlots(form.getValues("slots"));
+        replaceInclusions(form.getValues("inclusions"));
+        replaceExclusions(form.getValues("exclusions"));
+        form.clearErrors();
         setStayItems([]);
         setHighlightItems([]);
       }
@@ -302,6 +313,7 @@ export function TripFormModal({
     fields: inclusionFields,
     append: addInclusion,
     remove: removeInclusion,
+    replace: replaceInclusions,
   } = useFieldArray({
     control: form.control,
     name: "inclusions",
@@ -310,6 +322,7 @@ export function TripFormModal({
     fields: exclusionFields,
     append: addExclusion,
     remove: removeExclusion,
+    replace: replaceExclusions,
   } = useFieldArray({
     control: form.control,
     name: "exclusions",
@@ -334,6 +347,7 @@ export function TripFormModal({
     fields: slotFields,
     append: appendSlot,
     remove: removeSlot,
+    replace: replaceSlots,
   } = useFieldArray({
     name: "slots",
     control: form.control,
@@ -596,7 +610,14 @@ export function TripFormModal({
     if (await validateStep()) {
       setStep((s) => Math.min(STEPS.length - 1, s + 1));
     } else {
-      const errors = form.formState.errors;
+      const errors = fieldsToValidate.reduce<Record<string, unknown>>(
+        (stepErrors, field) => {
+          const error = form.getFieldState(field).error;
+          if (error) stepErrors[field] = error;
+          return stepErrors;
+        },
+        {},
+      );
       const missing = getStepErrors(errors, fieldsToValidate);
       if (missing.length > 0) {
         toast.error(

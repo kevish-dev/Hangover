@@ -156,3 +156,21 @@ export const getFeaturedTrips = async (req, res, next) => {
     next(error);
   }
 }
+
+export const getSignatureTrips = async (req, res, next) => {
+  try {
+    const result = await tripService.getSignatureTrips();
+    res.status(200).json({ message: "Signature collection trips", result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateSignatureTrips = async (req, res, next) => {
+  try {
+    const result = await tripService.updateSignatureTrips(req.body?.tripIds);
+    res.status(200).json({ message: "Signature collection updated", result });
+  } catch (error) {
+    next(error);
+  }
+};

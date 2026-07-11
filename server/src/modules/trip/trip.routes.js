@@ -15,11 +15,13 @@ router.use("/:tripId/faqs", faqRoutes);
 
 // Public routes (with optional auth for admin view)
 router.get("/featured", optionalAuth, tripController.getFeaturedTrips);
+router.get("/signature-collection", optionalAuth, tripController.getSignatureTrips);
 router.get("/", optionalAuth, tripController.getTrips);
 router.get("/:id", optionalAuth, tripController.getTripById);
 
 // Admin routes
 router.use(requireAuth, requireAdmin);
+router.put("/signature-collection", tripController.updateSignatureTrips);
 router.post("/", tripController.createTrip);
 router.put("/:id", tripController.updateTrip);
 router.delete("/:id", tripController.deleteTrip);
