@@ -30,6 +30,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ItineraryStep } from "./ItineraryStep";
+import { uploadBannerImagesDirect } from "../../../lib/directImageUpload";
 
 // --- VALIDATION SCHEMA ---
 const festivalSchema = z.object({
@@ -742,12 +743,11 @@ export function FestivalFormModal({
 
       // Sync Banners
       if (images.length > 0) {
-        const formData = new FormData();
-        images.forEach((img) => formData.append("banners", img));
-        await apiClient.post(`/festivals/${festivalId}/banner-images`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
+        const uploadToast = toast.loading(`Uploading banners (0/${images.length})…`);
+        await uploadBannerImagesDirect("festivals", festivalId, images, (completed, total) => {
+          toast.loading(`Uploading banners (${completed}/${total})…`, { id: uploadToast });
         });
-        toast.success("Banner images uploaded!");
+        toast.success("Banner images uploaded!", { id: uploadToast });
       }
 
       // Sync Video

@@ -73,9 +73,11 @@ export function SignatureDestinations() {
             alignItems: "flex-end",
             justifyContent: "space-between",
             marginBottom: "clamp(2.5rem, 5vw, 5rem)",
+            gap: "20px",
+            flexWrap: "wrap",
           }}
         >
-          <div>
+          <div style={{ minWidth: 0 }}>
             <p
               style={{
                 color: "#b8943a",
@@ -133,15 +135,16 @@ export function SignatureDestinations() {
                     index < SIGNATURES.length - 1
                       ? "1px solid rgba(0,0,0,0.07)"
                       : "none",
-                  padding: "18px 0",
+                  padding: "clamp(14px, 4vw, 18px) 0",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
+                  gap: "14px",
                   cursor: "pointer",
                 }}
               >
                 {/* Index + name */}
-                <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "clamp(12px, 4vw, 20px)", minWidth: 0 }}>
                   <span
                     style={{
                       color: "rgba(30,26,20,0.42)",
@@ -154,7 +157,7 @@ export function SignatureDestinations() {
                     {String(index + 1).padStart(2, "0")}
                   </span>
 
-                  <div>
+                  <div style={{ minWidth: 0 }}>
                     <TextStaggerHover
                       text={dest.name}
                       index={index}
@@ -166,6 +169,7 @@ export function SignatureDestinations() {
                         lineHeight: 1,
                         display: "block",
                         fontFamily: "'Poppins', sans-serif",
+                        overflowWrap: "anywhere",
                       }}
                     />
                     <span
@@ -215,8 +219,8 @@ export function SignatureDestinations() {
 
           {/* Right: sticky image */}
           <div
-            className="w-full lg:w-5/12 sticky top-24 self-start mt-12 lg:mt-0"
-            style={{ aspectRatio: "4/3", }}
+            className="w-full lg:w-5/12 lg:sticky lg:top-24 self-start mt-10 lg:mt-0"
+            style={{ aspectRatio: "4/3", minHeight: "240px" }}
           >
             <HoverSliderImageWrap style={{ width: "100%", height: "100%" }}>
               {SIGNATURES.map((dest, index) => (

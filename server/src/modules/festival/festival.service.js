@@ -1,5 +1,6 @@
 import * as festivalRepo from "./festival.repository.js";
-import { uploadToCloudinary, uploadPublicVideo, deleteFromCloudinary, deleteFestivalAssets } from "../../core/services/upload.service.js";
+import { uploadToCloudinary, uploadPublicVideo, deleteFromCloudinary, deleteFestivalAssets, createDirectImageUploadSignature, isExpectedPublicImageUrl } from "../../core/services/upload.service.js";
+import { ValidationError } from "../../core/errors/errors.js";
 import { randomUUID } from "crypto";
 
 const generateSlug = (title) => {
@@ -124,6 +125,23 @@ export const uploadBannerImages = async (festivalId, imageBuffers) => {
   return festivalRepo.update(festivalId, {
     bannerImages: [...existingBanners, ...imageUrls]
   });
+};
+
+export const createBannerUploadSignature = async (festivalId) => {
+  await getFestivalById(festivalId, true);
+  return createDirectImageUploadSignature(`uploads/festivals/${festivalId}/bannerimages`);
+};
+
+export const attachBannerImages = async (festivalId, imageUrls) => {
+  if (!Array.isArray(imageUrls) || imageUrls.length === 0 || imageUrls.length > 10) {
+    throw new ValidationError("Provide between 1 and 10 banner image URLs.");
+  }
+  const folder = `uploads/festivals/${festivalId}/bannerimages`;
+  if (!imageUrls.every((url) => typeof url === "string" && isExpectedPublicImageUrl(url, folder))) {
+    throw new ValidationError("One or more banner URLs are invalid.");
+  }
+  const festival = await getFestivalById(festivalId, true);
+  return festivalRepo.update(festivalId, { bannerImages: [...(festival.bannerImages || []), ...imageUrls] });
 };
 
 export const syncHighlights = async (festivalId, payloadStr, files) => {

@@ -28,6 +28,8 @@ router.post(
   imageUploadMiddleware.array("banners", 10),
   tripController.uploadBanners
 );
+router.post("/:id/banner-upload-signature", tripController.createBannerUploadSignature);
+router.post("/:id/banner-images/attach", tripController.attachBannerImages);
 router.delete("/:id/banner-images", tripController.deleteBanner);
 router.delete("/:id/gallery-images", tripController.deleteGalleryImage);
 

@@ -77,6 +77,34 @@ export const uploadPublicImage = async (buffer, options = {}) => {
   });
 };
 
+/** Creates a short-lived signature for a browser to upload a public image directly to Cloudinary. */
+export const createDirectImageUploadSignature = (folder) => {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const cloudConfig = cloudinary.config();
+  if (!cloudConfig.cloud_name || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET) {
+    throw new Error("Cloudinary upload credentials are not configured.");
+  }
+  return {
+    timestamp,
+    folder,
+    apiKey: env.CLOUDINARY_API_KEY,
+    cloudName: cloudConfig.cloud_name,
+    signature: cloudinary.utils.api_sign_request({ folder, timestamp }, env.CLOUDINARY_API_SECRET),
+  };
+};
+
+export const isExpectedPublicImageUrl = (url, folder) => {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:"
+      && parsed.hostname === "res.cloudinary.com"
+      && parsed.pathname.startsWith(`/${cloudinary.config().cloud_name}/image/upload/`)
+      && parsed.pathname.includes(`/${folder}/`);
+  } catch {
+    return false;
+  }
+};
+
 /** Upload a sensitive ID as an authenticated Cloudinary asset. */
 export const uploadSensitiveDocument = async (file, options = {}) => {
   const { folder, publicId } = options;

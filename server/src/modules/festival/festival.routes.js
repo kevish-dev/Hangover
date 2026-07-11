@@ -27,6 +27,8 @@ router.post(
   imageUploadMiddleware.array("banners", 10),
   festivalController.uploadBanners
 );
+router.post("/:id/banner-upload-signature", festivalController.createBannerUploadSignature);
+router.post("/:id/banner-images/attach", festivalController.attachBannerImages);
 router.delete("/:id/banner-images", festivalController.deleteBanner);
 
 router.post(

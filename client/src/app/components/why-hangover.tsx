@@ -309,15 +309,22 @@ function MobilePanel({
   onToggle: () => void;
 }) {
   return (
-    <div
+    <button
       onClick={onToggle}
       style={{
         position: "relative",
+        display: "block",
+        width: "100%",
         overflow: "hidden",
         borderRadius: "4px",
         cursor: "pointer",
-        height: isActive ? "280px" : "64px",
+        height: isActive ? "min(340px, 78vw)" : "auto",
+        minHeight: isActive ? "280px" : "64px",
         transition: "height 0.55s cubic-bezier(0.25,0.46,0.45,0.94)",
+        border: "none",
+        padding: 0,
+        textAlign: "left",
+        fontFamily: "'Poppins', sans-serif",
       }}
     >
       <img
@@ -354,11 +361,13 @@ function MobilePanel({
           <span
             style={{
               color: "#f2ede4",
-              fontSize: "0.88rem",
-              fontWeight: 500,
-              letterSpacing: "0.04em",
-            }}
-          >
+            fontSize: "0.88rem",
+            fontWeight: 500,
+            letterSpacing: "0.04em",
+            lineHeight: 1.3,
+            paddingRight: "12px",
+          }}
+        >
             {item.title}
           </span>
           <ArrowRight size={14} color="rgba(242,237,228,0.6)" />
@@ -391,9 +400,10 @@ function MobilePanel({
           <h3
             style={{
               color: "#f2ede4",
-              fontSize: "1.15rem",
+              fontSize: "clamp(1rem, 4.5vw, 1.15rem)",
               fontWeight: 400,
               marginBottom: "6px",
+              lineHeight: 1.25,
             }}
           >
             {item.title}
@@ -401,7 +411,7 @@ function MobilePanel({
           <p
             style={{
               color: "rgba(242,237,228,0.7)",
-              fontSize: "0.78rem",
+              fontSize: "clamp(0.74rem, 3.2vw, 0.78rem)",
               fontWeight: 300,
               lineHeight: 1.7,
             }}
@@ -422,6 +432,6 @@ function MobilePanel({
           transition: "background 0.3s ease",
         }}
       />
-    </div>
+    </button>
   );
 }

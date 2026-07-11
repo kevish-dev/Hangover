@@ -138,6 +138,7 @@ export function OurJourney() {
     <>
       {/* Tall scroll driver — 100vh per milestone */}
       <div
+        className="hidden md:block"
         ref={sectionRef}
         style={{
           height: `${MILESTONES.length * 100}vh`,

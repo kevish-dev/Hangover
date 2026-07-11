@@ -1,5 +1,6 @@
 import * as tripRepo from "./trip.repository.js";
-import { uploadToCloudinary, deleteFromCloudinary, deleteTripAssets } from "../../core/services/upload.service.js";
+import { uploadToCloudinary, deleteFromCloudinary, deleteTripAssets, createDirectImageUploadSignature, isExpectedPublicImageUrl } from "../../core/services/upload.service.js";
+import { ValidationError } from "../../core/errors/errors.js";
 import { randomUUID } from "crypto";
 
 const generateSlug = (title) => {
@@ -129,6 +130,23 @@ export const uploadBannerImages = async (tripId, imageBuffers) => {
   return tripRepo.update(tripId, {
     bannerImages: [...existingBanners, ...imageUrls]
   });
+};
+
+export const createBannerUploadSignature = async (tripId) => {
+  await getTripById(tripId, true);
+  return createDirectImageUploadSignature(`uploads/trips/${tripId}/bannerimages`);
+};
+
+export const attachBannerImages = async (tripId, imageUrls) => {
+  if (!Array.isArray(imageUrls) || imageUrls.length === 0 || imageUrls.length > 10) {
+    throw new ValidationError("Provide between 1 and 10 banner image URLs.");
+  }
+  const folder = `uploads/trips/${tripId}/bannerimages`;
+  if (!imageUrls.every((url) => typeof url === "string" && isExpectedPublicImageUrl(url, folder))) {
+    throw new ValidationError("One or more banner URLs are invalid.");
+  }
+  const trip = await getTripById(tripId, true);
+  return tripRepo.update(tripId, { bannerImages: [...(trip.bannerImages || []), ...imageUrls] });
 };
 
 export const syncHighlights = async (tripId, payloadStr, files) => {
