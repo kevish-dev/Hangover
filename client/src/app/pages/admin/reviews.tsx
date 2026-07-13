@@ -53,7 +53,7 @@ export default function AdminReviewsPage() {
     <div className="max-w-7xl mx-auto pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
             <MessageSquare className="w-6 h-6 text-[#c8a96e]" />
             Reviews Dashboard
           </h1>
@@ -74,7 +74,57 @@ export default function AdminReviewsPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="md:hidden space-y-3">
+        {filteredReviews.length === 0 ? (
+          <div className="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-500">
+            No reviews found.
+          </div>
+        ) : (
+          filteredReviews.map((review) => (
+            <article key={review.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-gray-900">{review.user?.profile?.fullName || "Anonymous"}</p>
+                  <p className="mt-0.5 truncate text-xs text-gray-500">{review.trip?.title || review.festival?.title || "Unknown"}</p>
+                </div>
+                <span className={`shrink-0 rounded px-2 py-1 text-[11px] font-medium tracking-wide ${review.isPublished ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                  {review.isPublished ? "PUBLISHED" : "HIDDEN"}
+                </span>
+              </div>
+              <div className="mt-3 flex items-center justify-between text-xs">
+                <div className="flex items-center font-semibold text-yellow-500">
+                  {review.rating}<Star className="ml-1 h-4 w-4 fill-current" />
+                </div>
+                <span className="text-gray-500">{format(new Date(review.createdAt), "MMM d, yyyy")}</span>
+              </div>
+              <p className="mt-3 whitespace-pre-wrap break-words rounded-lg bg-gray-50 p-3 text-sm leading-6 text-gray-700">
+                {review.comment || "No comment provided."}
+              </p>
+              <div className="mt-3 flex justify-end gap-2 border-t border-gray-100 pt-3">
+                <button
+                  onClick={() => toggleMutation.mutate(review.id)}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-600"
+                >
+                  {review.isPublished ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {review.isPublished ? "Hide" : "Publish"}
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm("Are you sure you want to permanently delete this review?")) {
+                      deleteMutation.mutate(review.id);
+                    }
+                  }}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-red-100 px-3 text-xs font-medium text-red-600"
+                >
+                  <Trash2 className="h-4 w-4" /> Delete
+                </button>
+              </div>
+            </article>
+          ))
+        )}
+      </div>
+
+      <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>

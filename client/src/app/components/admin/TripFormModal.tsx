@@ -826,10 +826,10 @@ export function TripFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
-        <div className="px-6 pt-6 pb-4 border-b">
+      <DialogContent className="!w-[calc(100%-0.75rem)] !max-h-[calc(100dvh-0.75rem)] sm:!w-full sm:!max-h-[90vh] sm:max-w-[700px] flex flex-col p-0 overflow-hidden">
+        <div className="px-4 pt-5 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-bold">
+            <DialogTitle className="text-xl sm:text-2xl font-bold pr-6">
               {isEdit ? "Edit Trip" : "Create New Trip"}
             </DialogTitle>
             <DialogDescription>
@@ -840,11 +840,11 @@ export function TripFormModal({
           </DialogHeader>
 
           {/* Progress Steps */}
-          <div className="flex items-center gap-2 mt-6">
+          <div className="flex items-center gap-2 mt-4 sm:mt-6 overflow-x-auto pb-1">
             {STEPS.map((s, i) => (
               <React.Fragment key={s}>
                 <div
-                  className={`flex flex-col items-center gap-1.5 ${i <= step ? "text-[#781216]" : "text-gray-400"}`}
+                  className={`flex min-w-10 sm:min-w-0 flex-col items-center gap-1.5 ${i <= step ? "text-[#781216]" : "text-gray-400"}`}
                 >
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-colors duration-300 ${i <= step ? "border-[#781216] bg-[#781216] text-white" : "border-gray-300 bg-white text-gray-500"}`}
@@ -857,7 +857,7 @@ export function TripFormModal({
                 </div>
                 {i < STEPS.length - 1 && (
                   <div
-                    className={`flex-1 h-[2px] -mt-5 ${i < step ? "bg-[#781216]" : "bg-gray-200"}`}
+                    className={`flex-1 min-w-3 sm:min-w-0 h-[2px] -mt-5 ${i < step ? "bg-[#781216]" : "bg-gray-200"}`}
                   />
                 )}
               </React.Fragment>
@@ -865,7 +865,7 @@ export function TripFormModal({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 scroll-smooth">
           <form
             id="trip-form"
             onSubmit={form.handleSubmit(onSubmit as any, onError)}
@@ -874,8 +874,8 @@ export function TripFormModal({
           >
             {/* STEP 0: BASICS */}
             <div className={step === 0 ? "block" : "hidden"}>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2 space-y-2">
                   <Label>Trip Title <span className="text-red-500">*</span></Label>
                   <Input
                     {...form.register("title")}
@@ -931,7 +931,7 @@ export function TripFormModal({
                 </div>
 
                 {/* Pricing Packages Section */}
-                <div className="col-span-2 space-y-3 border-2 border-[#c8a96e]/30 bg-amber-50/30 p-4 rounded-md">
+                <div className="md:col-span-2 space-y-3 border-2 border-[#c8a96e]/30 bg-amber-50/30 p-3 sm:p-4 rounded-md">
                   <div className="flex justify-between items-center">
                     <div>
                       <h3 className="font-semibold text-gray-900">Pricing Packages <span className="text-red-500">*</span></h3>
@@ -942,7 +942,7 @@ export function TripFormModal({
                     <p className="text-sm text-red-500">{form.formState.errors.packages.root.message}</p>
                   )}
                   {packageFields.map((field, index) => (
-                    <div key={field.id} className="flex gap-4 items-start relative p-3 border rounded-md">
+                    <div key={field.id} className="flex flex-col md:flex-row gap-3 md:gap-4 items-stretch md:items-start relative p-3 border rounded-md">
                       <div className="flex-1 space-y-2">
                         <Label>Title</Label>
                         <Input
@@ -982,7 +982,7 @@ export function TripFormModal({
                       <Button
                         type="button"
                         variant="ghost"
-                        className="text-red-500 mt-7"
+                        className="text-red-500 self-end md:self-auto mt-0 md:mt-7"
                         onClick={() => removePackage(index)}
                         disabled={packageFields.length === 1}
                         title={packageFields.length === 1 ? "At least one package is required" : "Remove package"}
@@ -1001,7 +1001,7 @@ export function TripFormModal({
                     <Plus className="w-4 h-4 mr-2" /> Add Package
                   </Button>
                 </div>
-                <div className="space-y-2 col-span-2 flex flex-col sm:flex-row sm:items-center gap-4 mt-2">
+                <div className="space-y-2 md:col-span-2 flex flex-col md:flex-row md:items-center gap-4 mt-2">
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -1042,9 +1042,9 @@ export function TripFormModal({
                   )}
                   <div className="space-y-4">
                     {slotFields.map((field, index) => (
-                      <div key={field.id} className="flex items-start gap-4 p-4 border rounded-md relative group">
+                      <div key={field.id} className="flex items-start gap-4 p-3 sm:p-4 pr-10 border rounded-md relative group">
                         <div className="flex-1 space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label>Start Date <span className="text-red-500">*</span></Label>
                               <Input
@@ -1084,7 +1084,7 @@ export function TripFormModal({
                                 {...form.register(`slots.${index}.priority`)}
                               />
                             </div>
-                            <div className="space-y-2 col-span-2">
+                            <div className="space-y-2 md:col-span-2">
                               <Label>Capacity for this Slot <span className="text-red-500">*</span></Label>
                               <Input
                                 type="number"
@@ -1102,7 +1102,7 @@ export function TripFormModal({
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity absolute top-2 right-2"
+                          className="text-red-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity absolute top-2 right-2"
                           onClick={() => removeSlot(index)}
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1158,9 +1158,9 @@ export function TripFormModal({
                     highlightItems.map((item, index) => (
                       <div
                         key={item.id}
-                        className="p-4 border rounded-lg bg-white shadow-sm flex items-start gap-4 group"
+                        className="p-3 sm:p-4 border rounded-lg bg-white shadow-sm flex flex-col md:flex-row items-stretch md:items-start gap-3 md:gap-4 group"
                       >
-                        <div className="w-24 h-24 shrink-0 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center relative overflow-hidden">
+                        <div className="w-full h-32 md:w-24 md:h-24 shrink-0 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center relative overflow-hidden">
                           {item.preview ? (
                             <img
                               src={item.preview}
@@ -1194,7 +1194,7 @@ export function TripFormModal({
                           variant="ghost"
                           size="icon"
                           onClick={() => removeHighlightItem(index)}
-                          className="text-red-500 hover:bg-red-50 mt-6 shrink-0"
+                          className="text-red-500 hover:bg-red-50 self-end md:self-auto mt-0 md:mt-6 shrink-0"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -1324,7 +1324,7 @@ export function TripFormModal({
                           <Label className="text-xs text-gray-500 uppercase tracking-wider font-semibold">
                             Question {index + 1}
                           </Label>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                             <Button
                               type="button"
                               variant="ghost"
@@ -1476,9 +1476,9 @@ export function TripFormModal({
                     stayItems.map((item, index) => (
                       <div
                         key={item.id}
-                        className="p-4 border rounded-lg bg-white shadow-sm flex items-start gap-4 group"
+                        className="p-3 sm:p-4 border rounded-lg bg-white shadow-sm flex flex-col md:flex-row items-stretch md:items-start gap-3 md:gap-4 group"
                       >
-                        <div className="w-24 h-24 shrink-0 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center relative overflow-hidden">
+                        <div className="w-full h-32 md:w-24 md:h-24 shrink-0 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center relative overflow-hidden">
                           {item.preview ? (
                             <img
                               src={item.preview}
@@ -1512,7 +1512,7 @@ export function TripFormModal({
                           variant="ghost"
                           size="icon"
                           onClick={() => removeStayItem(index)}
-                          className="text-red-500 hover:bg-red-50 mt-6 shrink-0"
+                          className="text-red-500 hover:bg-red-50 self-end md:self-auto mt-0 md:mt-6 shrink-0"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -1549,7 +1549,7 @@ export function TripFormModal({
                             alt={`Existing ${i}`}
                             className="w-full h-full object-cover"
                           />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <div className="absolute inset-0 bg-black/30 opacity-100 md:bg-black/40 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <button
                               type="button"
                               onClick={() => deleteExistingImage(url)}
@@ -1564,7 +1564,7 @@ export function TripFormModal({
                     </div>
                   </div>
                 )}
-                <div className="p-8 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 flex flex-col items-center justify-center text-center">
+                <div className="p-4 sm:p-8 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 flex flex-col items-center justify-center text-center">
                   <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 mb-4">
                     <UploadCloud className="w-8 h-8 text-[#c8a96e]" />
                   </div>
@@ -1611,7 +1611,7 @@ export function TripFormModal({
                             alt={`Preview ${i}`}
                             className="w-full h-full object-cover"
                           />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <div className="absolute inset-0 bg-black/30 opacity-100 md:bg-black/40 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <button
                               type="button"
                               onClick={() => removeImage(i)}
@@ -1633,7 +1633,7 @@ export function TripFormModal({
         </div>
 
         {/* Footer Navigation */}
-        <div className="px-6 py-4 border-t bg-gray-50 flex flex-row items-center justify-between shrink-0">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-t bg-gray-50 flex flex-row items-center justify-between gap-2 shrink-0">
           <Button
             type="button"
             variant="outline"
@@ -1659,7 +1659,7 @@ export function TripFormModal({
               type="submit"
               form="trip-form"
               disabled={isSubmitting}
-              className="bg-[#781216] hover:bg-[#9a1a1f] text-white flex items-center gap-2 px-8 shadow-md"
+              className="bg-[#781216] hover:bg-[#9a1a1f] text-white flex items-center gap-2 px-4 sm:px-8 shadow-md"
             >
               {isSubmitting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

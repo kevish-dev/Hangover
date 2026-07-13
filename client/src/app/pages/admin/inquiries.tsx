@@ -74,9 +74,9 @@ export default function AdminInquiriesPage() {
 
   return (
     <div className="w-full">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
             <MessageSquare className="w-6 h-6 text-[#c8a96e]" />
             Inquiries
           </h1>
@@ -84,7 +84,7 @@ export default function AdminInquiriesPage() {
             Manage and respond to customer inquiries from the website.
           </p>
         </div>
-        <div className="relative w-full sm:w-64">
+        <div className="relative w-full md:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
             placeholder="Search inquiries..."
@@ -95,7 +95,50 @@ export default function AdminInquiriesPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="md:hidden space-y-3">
+        {filteredInquiries.length === 0 ? (
+          <div className="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-500">
+            No inquiries found.
+          </div>
+        ) : (
+          filteredInquiries.map((inq: any) => (
+            <article key={inq.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="truncate text-sm font-semibold text-gray-900">{inq.name}</h2>
+                  <p className="mt-1 flex items-start gap-1 break-all text-xs text-gray-500">
+                    <Mail className="mt-0.5 h-3 w-3 shrink-0" />{inq.email}
+                  </p>
+                </div>
+                {inq.isResolved ? (
+                  <Badge className="shrink-0 bg-green-100 text-green-700 hover:bg-green-100 border-green-200 font-medium">
+                    <CheckCircle className="w-3 h-3 mr-1" /> Resolved
+                  </Badge>
+                ) : (
+                  <Badge className="shrink-0 bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200 font-medium">
+                    <Clock className="w-3 h-3 mr-1" /> Pending
+                  </Badge>
+                )}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="rounded bg-gray-100 px-2 py-1 text-gray-700">
+                  {inq.tripType ? formatTripType(inq.tripType) : "General"}
+                </span>
+                <span className="text-gray-500">{format(new Date(inq.createdAt), "MMM d, yyyy · h:mm a")}</span>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setSelectedInquiry(inq)}
+                className="mt-3 min-h-10 w-full text-xs"
+              >
+                View Details
+              </Button>
+            </article>
+          ))
+        )}
+      </div>
+
+      <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-200 uppercase tracking-wider text-xs">
@@ -168,9 +211,9 @@ export default function AdminInquiriesPage() {
       </div>
 
       {selectedInquiry && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedInquiry(null)}>
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center shrink-0">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedInquiry(null)}>
+          <div className="bg-white rounded-none md:rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col h-dvh md:h-auto max-h-dvh md:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 md:px-6 py-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center gap-3 shrink-0">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-[#c8a96e]" />
                 Inquiry Details
@@ -180,8 +223,8 @@ export default function AdminInquiriesPage() {
               </button>
             </div>
             
-            <div className="p-6 overflow-y-auto space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="p-4 md:p-6 overflow-y-auto space-y-5 md:space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Name</label>
                   <p className="font-medium text-gray-900">{selectedInquiry.name}</p>
@@ -192,7 +235,7 @@ export default function AdminInquiriesPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Email</label>
-                  <a href={`mailto:${selectedInquiry.email}`} className="text-blue-600 hover:underline">{selectedInquiry.email}</a>
+                  <a href={`mailto:${selectedInquiry.email}`} className="break-all text-blue-600 hover:underline">{selectedInquiry.email}</a>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Phone</label>
@@ -223,22 +266,23 @@ export default function AdminInquiriesPage() {
               </div>
             </div>
 
-            <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-between shrink-0">
+            <div className="p-4 md:p-6 bg-gray-50 border-t border-gray-100 flex flex-col-reverse md:flex-row md:justify-between gap-3 shrink-0">
               <Button 
                 variant="destructive" 
                 size="sm"
                 onClick={() => handleDelete(selectedInquiry.id)}
+                className="w-full md:w-auto"
               >
                 Delete
               </Button>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setSelectedInquiry(null)}>
+              <div className="flex flex-col-reverse md:flex-row gap-2">
+                <Button variant="outline" size="sm" onClick={() => setSelectedInquiry(null)} className="w-full md:w-auto">
                   Close
                 </Button>
                 {!selectedInquiry.isResolved && (
                   <Button 
                     size="sm" 
-                    className="bg-green-600 hover:bg-green-700 text-white"
+                    className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white"
                     onClick={() => handleResolve(selectedInquiry.id)}
                   >
                     <CheckCircle className="w-4 h-4 mr-2" />

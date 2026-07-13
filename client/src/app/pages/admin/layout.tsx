@@ -93,13 +93,13 @@ export default function AdminLayout() {
            </SidebarMenu>
         </div>
       </Sidebar>
-      <SidebarInset className="bg-gray-50 flex flex-col flex-1 h-screen overflow-hidden">
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-white px-4">
+      <SidebarInset className="bg-gray-50 flex flex-col flex-1 min-w-0 h-dvh md:h-screen overflow-hidden">
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-white px-3 md:px-4">
           <SidebarTrigger className="-ml-1" />
           <div className="w-px h-4 bg-gray-200 mx-2" />
           <h1 className="text-sm font-medium">Dashboard</h1>
         </header>
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6">
           <Outlet />
         </main>
       </SidebarInset>

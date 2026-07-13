@@ -395,10 +395,28 @@ function SectionNav() {
     return () => observers.forEach((o) => o.disconnect());
   }, []);
 
+  useEffect(() => {
+    const scroller = navRef.current?.querySelector(
+      ".trip-section-nav-scroll",
+    ) as HTMLDivElement | null;
+    const activeItem = navRef.current?.querySelector(
+      `[data-section-id="${active}"]`,
+    ) as HTMLButtonElement | null;
+    if (!scroller || !activeItem) return;
+
+    scroller.scrollTo({
+      left:
+        activeItem.offsetLeft -
+        scroller.clientWidth / 2 +
+        activeItem.clientWidth / 2,
+      behavior: "smooth",
+    });
+  }, [active]);
+
   const scrollTo = (id: string) => {
     const el = document.getElementById(id);
     if (!el) return;
-    const offset = 72 + 45 + 16;
+    const offset = (window.innerWidth < 768 ? 56 : 72) + 45 + 16;
     const top = el.getBoundingClientRect().top + window.scrollY - offset;
     window.scrollTo({ top, behavior: "smooth" });
   };
@@ -407,6 +425,7 @@ function SectionNav() {
 
   return (
     <motion.div
+      className="trip-section-nav"
       ref={navRef}
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
@@ -423,6 +442,7 @@ function SectionNav() {
       }}
     >
       <div
+        className="trip-section-nav-scroll"
         style={{
           maxWidth: "1280px",
           margin: "0 auto",
@@ -436,6 +456,8 @@ function SectionNav() {
       >
         {NAV_SECTIONS.map(({ id, label }) => (
           <button
+            className="trip-section-nav-item"
+            data-section-id={id}
             key={id}
             onClick={() => scrollTo(id)}
             style={{
@@ -837,6 +859,7 @@ function ItineraryAccordion({
 
         return (
           <div 
+            className="trip-itinerary-card"
             key={index}
             style={{
               background: "#ffffff",
@@ -848,8 +871,8 @@ function ItineraryAccordion({
             }}
             onClick={() => setOpenIndex(isOpen ? null : index)}
           >
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px" }}>
-              <div style={{ display: "flex", gap: "16px", alignItems: "flex-start" }}>
+            <div className="trip-itinerary-header" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px" }}>
+              <div className="trip-itinerary-heading" style={{ display: "flex", gap: "16px", alignItems: "flex-start", minWidth: 0 }}>
                 {/* Number Badge */}
                 <div style={{
                   width: "30px", height: "30px", borderRadius: "50%",
@@ -862,14 +885,14 @@ function ItineraryAccordion({
                   {numericDay}
                 </div>
                 {/* Text */}
-                <div style={{ paddingTop: "2px" }}>
-                  <div style={{ 
-                    fontSize: "0.55rem", fontWeight: 600, color: "rgba(30,26,20,0.4)", 
-                    letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "4px" 
+                <div style={{ paddingTop: "2px", minWidth: 0 }}>
+                  <div style={{
+                    fontSize: "0.55rem", fontWeight: 600, color: "rgba(30,26,20,0.4)",
+                    letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "4px"
                   }}>
                     DAY {numericDay}
                   </div>
-                  <div style={{ 
+                  <div className="trip-itinerary-title" style={{
                     fontSize: "0.95rem", fontWeight: 600, color: "#1e1a14",
                     letterSpacing: "-0.01em"
                   }}>
@@ -893,9 +916,9 @@ function ItineraryAccordion({
                   transition={{ duration: 0.3 }}
                   style={{ overflow: "hidden" }}
                 >
-                  <div style={{ 
+                  <div className="trip-itinerary-content" style={{
                     paddingTop: "12px", paddingLeft: "46px",
-                    color: "rgba(30,26,20,0.65)", fontSize: "0.8rem", lineHeight: 1.5 
+                    color: "rgba(30,26,20,0.65)", fontSize: "0.8rem", lineHeight: 1.5
                   }}>
                     {acts.length > 0 ? (
                       <ul style={{ listStyleType: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -1064,7 +1087,22 @@ export default function TripDetail() {
         ),
       )
       .finally(() => setLoading(false));
-  }, [slug]);
+  }, [slug, isFestival]);
+
+  useEffect(() => {
+    const slots = trip?.slots || [];
+    const currentSlot = slots.find((slot: any) => slot.id === selectedSlotId);
+    const currentAvailable = currentSlot
+      ? currentSlot.capacity - (currentSlot.filledSpots || 0) > 0
+      : false;
+
+    if (currentAvailable) return;
+
+    const firstAvailable = slots.find(
+      (slot: any) => slot.capacity - (slot.filledSpots || 0) > 0,
+    );
+    setSelectedSlotId(firstAvailable?.id || null);
+  }, [trip, selectedSlotId]);
 
   useEffect(() => {
     if (user && trip) {
@@ -1089,7 +1127,7 @@ export default function TripDetail() {
         })
         .catch(console.error);
     }
-  }, [user, trip]);
+  }, [user, trip, isFestival]);
 
   if (loading) return <DetailLoadingSkeleton />;
 
@@ -1149,7 +1187,14 @@ export default function TripDetail() {
   const typeLabel = trip.tripType ? formatTripType(trip.tripType) : "Festival";
   const priceStr = formatPrice(trip.price);
   const durationStr = formatDuration(trip.duration);
-  const spots = spotsLeft(trip.capacity, trip.filledSpots);
+  const slots = Array.isArray(trip.slots) ? trip.slots : [];
+  const spots = slots.length > 0
+    ? slots.reduce(
+        (total: number, slot: any) =>
+          total + Math.max(0, slot.capacity - (slot.filledSpots || 0)),
+        0,
+      )
+    : spotsLeft(trip.capacity, trip.filledSpots);
   const tags = trip.tripTags?.map((t: any) => t.tag) || [];
   const stayItems = (
     Array.isArray(trip.stayTransportImages) ? trip.stayTransportImages : []
@@ -1475,6 +1520,10 @@ function TripDetailContent({
 
   const safeAllImages =
     allImages.length > 0 ? allImages : [heroImage].filter(Boolean);
+  const bookingParams = new URLSearchParams();
+  if (isFestival) bookingParams.set("type", "festival");
+  if (selectedSlotId) bookingParams.set("slotId", selectedSlotId);
+  const bookingPath = `/book/${trip.slug}${bookingParams.size ? `?${bookingParams.toString()}` : ""}`;
 
   const prevHero = () =>
     setHeroIndex((i) => (i - 1 + safeAllImages.length) % safeAllImages.length);
@@ -1508,6 +1557,7 @@ function TripDetailContent({
 
   return (
     <div
+      className="trip-detail-page"
       style={{
         background: "#f5f0e6",
         minHeight: "100vh",
@@ -1691,6 +1741,7 @@ function TripDetailContent({
 
       {/* ── Hero Carousel ── */}
       <div
+        className="trip-detail-hero"
         style={{
           position: "relative",
           height: "70vh",
@@ -1940,6 +1991,7 @@ function TripDetailContent({
 
       {/* ── Main content ── */}
       <div
+        className="trip-detail-main"
         style={{
           maxWidth: "1280px",
           margin: "0 auto",
@@ -1952,7 +2004,7 @@ function TripDetailContent({
             gridTemplateColumns: "1fr 360px",
             gap: "clamp(2rem,4vw,4rem)",
           }}
-          className="grid-cols-1 lg:grid-cols-[1fr_360px]"
+          className="trip-detail-grid grid-cols-1 lg:grid-cols-[1fr_360px]"
         >
           {/* ── LEFT COLUMN ── */}
           <div
@@ -1963,7 +2015,7 @@ function TripDetailContent({
             }}
           >
             {/* Quick stats row */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
+            <div className="trip-quick-stats" style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
               {[
                 { icon: Clock, label: "Duration", value: durationStr },
                 {
@@ -1982,6 +2034,7 @@ function TripDetailContent({
                 },
               ].map(({ icon: Icon, label, value }) => (
                 <div
+                  className={`trip-stat-card ${label === "Best Time" ? "trip-stat-card-wide" : ""}`}
                   key={label}
                   style={{
                     display: "flex",
@@ -1995,7 +2048,7 @@ function TripDetailContent({
                   }}
                 >
                   <Icon size={15} color="#781216" strokeWidth={1.5} />
-                  <div>
+                  <div className="trip-stat-content">
                     <p
                       style={{
                         color: "rgba(30,26,20,0.42)",
@@ -2008,6 +2061,7 @@ function TripDetailContent({
                       {label}
                     </p>
                     <p
+                      className="trip-stat-value"
                       style={{
                         color: "#1e1a14",
                         fontSize: "0.82rem",
@@ -2103,12 +2157,12 @@ function TripDetailContent({
             <div id="included">
               <SectionTitle>What's Included</SectionTitle>
               <div
+                className="trip-inclusions-grid grid-cols-1 sm:grid-cols-2"
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
                   gap: "24px",
                 }}
-                className="grid-cols-1 sm:grid-cols-2"
               >
                 <div>
                   <p
@@ -2399,7 +2453,7 @@ function TripDetailContent({
                   </Link>
                 ) : (
                   <Link
-                    to={`/book/${trip.slug}${isFestival ? '?type=festival' : ''}`}
+                    to={bookingPath}
                     style={{
                       display: "block",
                       width: "100%",
@@ -2429,7 +2483,7 @@ function TripDetailContent({
                         "#781216")
                     }
                   >
-                    Book This Trip
+                    Book This {isFestival ? "Festival" : "Trip"}
                   </Link>
                 )}
 
@@ -2560,11 +2614,58 @@ function TripDetailContent({
         </div>
       </div>
 
+      {/* Mobile booking summary and primary action */}
+      <div
+        className="mobile-booking-bar lg:hidden"
+        style={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 170,
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          padding: "10px 16px max(10px, env(safe-area-inset-bottom))",
+          background: "rgba(255,255,255,0.97)",
+          borderTop: "1px solid rgba(30,26,20,0.1)",
+          boxShadow: "0 -8px 24px rgba(30,26,20,0.12)",
+          backdropFilter: "blur(16px)",
+        }}
+      >
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <p style={{ margin: 0, color: "rgba(30,26,20,0.46)", fontSize: "0.58rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+            Starting from
+          </p>
+          <p style={{ margin: "2px 0 0", color: "#1e1a14", fontSize: "1rem", fontWeight: 700, whiteSpace: "nowrap" }}>
+            {priceStr}
+          </p>
+          <p style={{ margin: "1px 0 0", color: spots > 0 ? "#4f7a46" : "#c0392b", fontSize: "0.62rem", fontWeight: 500 }}>
+            {spots > 0 ? `${spots} spots available` : "Currently sold out"}
+          </p>
+        </div>
+
+        {hasBooked ? (
+          <div className="mobile-booking-action mobile-booking-action-disabled">Already Booked</div>
+        ) : reservedBookingId ? (
+          <Link className="mobile-booking-action mobile-booking-action-balance" to={`/bookings/${reservedBookingId}/pay-balance`}>
+            Pay Balance
+          </Link>
+        ) : spots > 0 && selectedSlotId ? (
+          <Link className="mobile-booking-action" to={bookingPath}>
+            Book Now
+          </Link>
+        ) : (
+          <div className="mobile-booking-action mobile-booking-action-disabled">Sold Out</div>
+        )}
+      </div>
+
       {/* ── Related Trips ── */}
       {!isFestival && <RelatedTrips currentId={trip.id} currentType={trip.tripType} />}
 
       {/* ── WhatsApp FAB — always visible ── */}
       <a
+        className="trip-whatsapp-fab"
         href={waLink}
         target="_blank"
         rel="noopener noreferrer"
@@ -2599,6 +2700,111 @@ function TripDetailContent({
       </a>
 
       <SiteFooter />
+      <style>{`
+        .mobile-booking-action {
+          min-width: 128px;
+          min-height: 46px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          box-sizing: border-box;
+          border-radius: 8px;
+          background: #781216;
+          color: #ffffff;
+          font-size: 0.72rem;
+          font-weight: 700;
+          letter-spacing: 0.1em;
+          text-decoration: none;
+          text-transform: uppercase;
+        }
+        .mobile-booking-action-balance {
+          background: #b8943a;
+        }
+        .mobile-booking-action-disabled {
+          background: rgba(30,26,20,0.1);
+          color: rgba(30,26,20,0.45);
+        }
+        @media (min-width: 1024px) {
+          .mobile-booking-bar {
+            display: none !important;
+          }
+        }
+        @media (max-width: 1023px) {
+          .trip-detail-page {
+            padding-bottom: calc(78px + env(safe-area-inset-bottom));
+          }
+          .trip-detail-grid {
+            grid-template-columns: minmax(0, 1fr) !important;
+          }
+          .trip-whatsapp-fab {
+            display: none !important;
+          }
+        }
+        @media (max-width: 639px) {
+          .trip-detail-hero {
+            height: 62vh !important;
+            min-height: 420px !important;
+          }
+        }
+        @media (max-width: 767px) {
+          .trip-section-nav {
+            top: 56px !important;
+            max-width: 100vw;
+          }
+          .trip-section-nav-scroll {
+            width: 100%;
+            max-width: 100vw;
+            box-sizing: border-box;
+            padding: 0 8px !important;
+            overscroll-behavior-x: contain;
+          }
+          .trip-section-nav-item {
+            min-height: 42px;
+            padding: 10px 12px !important;
+          }
+          .trip-detail-main {
+            padding: 24px 16px 36px !important;
+          }
+          .trip-quick-stats {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px !important;
+            width: 100%;
+          }
+          .trip-stat-card {
+            min-width: 0;
+            padding: 12px !important;
+            flex-shrink: 1 !important;
+          }
+          .trip-stat-card-wide {
+            grid-column: 1 / -1;
+          }
+          .trip-stat-content {
+            min-width: 0;
+          }
+          .trip-stat-value,
+          .trip-itinerary-title {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+          }
+          .trip-inclusions-grid {
+            grid-template-columns: minmax(0, 1fr) !important;
+            gap: 24px !important;
+          }
+          .trip-itinerary-card {
+            padding: 12px !important;
+          }
+          .trip-itinerary-header {
+            gap: 8px !important;
+          }
+          .trip-itinerary-heading {
+            gap: 10px !important;
+          }
+          .trip-itinerary-content {
+            padding-left: 40px !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

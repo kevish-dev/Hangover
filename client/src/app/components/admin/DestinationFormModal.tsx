@@ -126,7 +126,7 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-6 sm:p-8">
+      <DialogContent className="!w-[calc(100%-0.75rem)] !max-h-[calc(100dvh-0.75rem)] sm:!w-full sm:!max-h-[90vh] sm:max-w-[600px] overflow-y-auto p-4 sm:p-8">
         <DialogHeader>
           <DialogTitle>{destination ? "Edit Destination" : "Create New Destination"}</DialogTitle>
         </DialogHeader>
@@ -227,11 +227,11 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <div className="flex flex-col-reverse md:flex-row md:justify-end gap-3 pt-4 border-t border-gray-100">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full md:w-auto">
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="bg-[#c8a96e] hover:bg-[#b8943a] text-white">
+            <Button type="submit" disabled={isSubmitting} className="w-full md:w-auto bg-[#c8a96e] hover:bg-[#b8943a] text-white">
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />

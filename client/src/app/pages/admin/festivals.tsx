@@ -99,7 +99,7 @@ function FestivalBookingsDrawer({ festivalId }: { festivalId: string }) {
   return (
     <div className="divide-y divide-gray-100">
       {bookings.map((b: any) => (
-        <div key={b.id} className="px-5 py-4 hover:bg-gray-50 transition-colors">
+        <div key={b.id} className="px-3 py-4 md:px-5 hover:bg-gray-50 transition-colors">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2.5 min-w-0">
               <UserCircle className="w-8 h-8 text-gray-300 shrink-0" />
@@ -111,7 +111,7 @@ function FestivalBookingsDrawer({ festivalId }: { festivalId: string }) {
               </div>
             </div>
 
-            <div className="flex flex-col items-end gap-1.5 shrink-0">
+            <div className="flex w-full md:w-auto flex-col items-start md:items-end gap-1.5 md:shrink-0">
               <span className="font-mono text-xs text-gray-500">{b.bookingReference}</span>
               <div className="flex items-center gap-1.5">
                 <BookingStatusBadge status={b.status} />
@@ -120,7 +120,7 @@ function FestivalBookingsDrawer({ festivalId }: { festivalId: string }) {
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-3 gap-3 text-xs">
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-3 text-xs">
             <div className="bg-gray-50 rounded-lg px-3 py-2">
               <p className="text-gray-400 mb-0.5">Travelers</p>
               <p className="font-semibold text-gray-800">{b.numberOfTravelers}</p>
@@ -242,15 +242,15 @@ export default function AdminFestivalsPage() {
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+      <div className="flex flex-col items-stretch md:flex-row md:items-center justify-between mb-6 md:mb-8 gap-4">
+        <div className="min-w-0">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Tent className="w-6 h-6 text-[#c8a96e]" />
             Festival Management
           </h1>
           <p className="text-gray-500 text-sm mt-1">Manage your festivals, tickets, and details.</p>
         </div>
-        <Button onClick={() => { setEditingFestival(null); setIsModalOpen(true); }} className="bg-[#c8a96e] hover:bg-[#b8943a] text-white flex items-center gap-2">
+        <Button onClick={() => { setEditingFestival(null); setIsModalOpen(true); }} className="w-full md:w-auto bg-[#c8a96e] hover:bg-[#b8943a] text-white flex items-center justify-center gap-2">
           <Plus className="w-4 h-4" /> Create Festival
         </Button>
       </div>
@@ -265,8 +265,8 @@ export default function AdminFestivalsPage() {
         ) : (
           festivals.map((fest: any) => (
             <div key={fest.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="flex items-center gap-4 p-4">
-                <div className="w-20 h-16 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+              <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 md:gap-4 p-3 md:p-4">
+                <div className="w-full h-32 md:w-20 md:h-16 rounded-lg overflow-hidden bg-gray-100 shrink-0">
                   {fest.bannerImages?.length > 0 ? (
                     <img src={fest.bannerImages[0]} alt={fest.title} className="w-full h-full object-cover" />
                   ) : <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs">No img</div>}
@@ -285,17 +285,17 @@ export default function AdminFestivalsPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => setExpandedId(expandedId === fest.id ? null : fest.id)} className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-[#781216] transition-colors px-3 py-2 rounded-lg hover:bg-gray-50 border border-gray-200">
+                <div className="grid grid-cols-2 md:flex md:items-center gap-2 md:gap-1 w-full md:w-auto md:shrink-0">
+                  <button onClick={() => setExpandedId(expandedId === fest.id ? null : fest.id)} className="flex items-center justify-center gap-1.5 text-xs font-medium text-gray-600 hover:text-[#781216] transition-colors px-3 py-2 rounded-lg hover:bg-gray-50 border border-gray-200">
                     {expandedId === fest.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />} Bookings
                   </button>
-                  <button onClick={() => handleTogglePublish(fest)} className={`text-xs font-medium transition-colors flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-50 border border-gray-200 ${fest.isPublished ? "text-gray-500 hover:text-orange-600" : "text-gray-500 hover:text-green-600"}`}>
+                  <button onClick={() => handleTogglePublish(fest)} className={`text-xs font-medium transition-colors flex items-center justify-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-50 border border-gray-200 ${fest.isPublished ? "text-gray-500 hover:text-orange-600" : "text-gray-500 hover:text-green-600"}`}>
                     {fest.isPublished ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />} {fest.isPublished ? "Unpublish" : "Publish"}
                   </button>
-                  <button onClick={() => openEditModal(fest)} className="text-xs font-medium text-gray-500 hover:text-[#c8a96e] transition-colors flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-50 border border-gray-200">
+                  <button onClick={() => openEditModal(fest)} className="text-xs font-medium text-gray-500 hover:text-[#c8a96e] transition-colors flex items-center justify-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-50 border border-gray-200">
                     <Edit2 className="w-3.5 h-3.5" /> Edit
                   </button>
-                  <button onClick={() => handleDelete(fest.id)} className="text-xs font-medium text-gray-500 hover:text-red-600 transition-colors flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-50 border border-gray-200">
+                  <button onClick={() => handleDelete(fest.id)} className="text-xs font-medium text-gray-500 hover:text-red-600 transition-colors flex items-center justify-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-50 border border-gray-200">
                     <Trash2 className="w-3.5 h-3.5" /> Delete
                   </button>
                 </div>
@@ -303,7 +303,7 @@ export default function AdminFestivalsPage() {
 
               {expandedId === fest.id && (
                 <div className="border-t border-gray-100">
-                  <div className="px-5 py-3 bg-gray-50 flex items-center justify-between">
+                  <div className="px-3 md:px-5 py-3 bg-gray-50 flex items-center justify-between">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Bookings for this festival</p>
                   </div>
                   <FestivalBookingsDrawer festivalId={fest.id} />

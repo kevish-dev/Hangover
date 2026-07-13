@@ -348,7 +348,7 @@ function FormSection({
           gridTemplateColumns: "1fr 1fr",
           gap: "14px",
         }}
-        className="grid-cols-1 sm:grid-cols-2"
+        className="booking-field-grid grid-cols-1 sm:grid-cols-2"
       >
         {children}
       </div>
@@ -460,7 +460,7 @@ function TravelerForm({
           gridTemplateColumns: "1fr 1fr",
           gap: "14px",
         }}
-        className="grid-cols-1 sm:grid-cols-2"
+        className="booking-field-grid grid-cols-1 sm:grid-cols-2"
       >
         <Field label="First Name" required>
           <Input name={`traveler-${index}-firstName`} type="text" placeholder="First name" required />
@@ -507,6 +507,7 @@ export default function BookingPage() {
   const resumeBookingId = searchParams.get("resume"); // set when coming from "Complete Payment" CTA
   const isFestival = searchParams.get("type") === "festival";
   const urlSlotId = searchParams.get("slotId");
+  const bookingRedirectPath = `/book/${slug}${searchParams.size ? `?${searchParams.toString()}` : ""}`;
   const { user, isLoading: authLoading } = useAuth();
 
   const [trip, setTrip] = useState<any>(null); // polymorphic
@@ -637,9 +638,17 @@ export default function BookingPage() {
   }, [trip, selectedPackageId]);
 
   useEffect(() => {
-    if (trip?.slots?.length > 0 && !selectedSlotId) {
-      setSelectedSlotId(trip.slots[0].id);
-    }
+    const slots = trip?.slots || [];
+    const selected = slots.find((slot: any) => slot.id === selectedSlotId);
+    const selectedIsAvailable = selected
+      ? selected.capacity - (selected.filledSpots || 0) > 0
+      : false;
+    if (selectedIsAvailable) return;
+
+    const firstAvailable = slots.find(
+      (slot: any) => slot.capacity - (slot.filledSpots || 0) > 0,
+    );
+    setSelectedSlotId(firstAvailable?.id || "");
   }, [trip, selectedSlotId]);
 
   // Prevent scrolling when forced login is active
@@ -699,7 +708,7 @@ export default function BookingPage() {
 
     // 1. Auth guard — redirect to Google login if not logged in
     if (!user) {
-      localStorage.setItem("booking_redirect_intent", `/book/${slug}`);
+      localStorage.setItem("booking_redirect_intent", bookingRedirectPath);
       window.location.href = `${API_URL}/auth/google`;
       return;
     }
@@ -1678,6 +1687,7 @@ export default function BookingPage() {
 
   return (
     <div
+      className="booking-page"
       style={{
         background: "#f5f0e6",
         minHeight: "100vh",
@@ -1686,6 +1696,7 @@ export default function BookingPage() {
     >
       {/* ── Page banner ── */}
       <div
+        className="booking-banner"
         style={{
           background: "#1e1a14",
           paddingTop: "100px",
@@ -1771,6 +1782,7 @@ export default function BookingPage() {
 
       {/* ── Main form + summary ── */}
       <div
+        className="booking-main"
         style={{
           maxWidth: "1280px",
           margin: "0 auto",
@@ -1784,12 +1796,47 @@ export default function BookingPage() {
             gap: "clamp(2rem,4vw,4rem)",
             alignItems: "start",
           }}
-          className="grid-cols-1 lg:grid-cols-[1fr_340px]"
+          className="booking-main-grid grid-cols-1 lg:grid-cols-[1fr_340px]"
         >
           {/* ══ LEFT: Selection & Form ══ */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "2.5rem" }}>
+          <div className="booking-form-column" style={{ display: "flex", flexDirection: "column", gap: "2.5rem" }}>
+            {/* Mobile booking overview */}
+            <div
+              className="booking-mobile-summary lg:hidden"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "14px",
+                padding: "14px",
+                background: "#ffffff",
+                border: "1px solid rgba(30,26,20,0.08)",
+                borderRadius: "12px",
+                boxShadow: "0 3px 14px rgba(30,26,20,0.05)",
+              }}
+            >
+              {tripImage && (
+                <img
+                  src={mediaImageUrl(tripImage, { width: 180, height: 180 })}
+                  alt=""
+                  style={{ width: "72px", height: "72px", borderRadius: "9px", objectFit: "cover", flexShrink: 0 }}
+                />
+              )}
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <p style={{ margin: 0, color: "#781216", fontSize: "0.62rem", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                  {tripDestination}
+                </p>
+                <h2 style={{ margin: "3px 0 8px", color: "#1e1a14", fontSize: "0.95rem", fontWeight: 600, lineHeight: 1.3 }}>
+                  {tripName}
+                </h2>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", color: "rgba(30,26,20,0.55)", fontSize: "0.7rem" }}>
+                  <span>{tripDuration}</span>
+                  <strong style={{ color: "#781216", fontSize: "0.8rem" }}>{tripPrice}</strong>
+                </div>
+              </div>
+            </div>
+
             {/* ══ Slots & Packages Selection ══ */}
-            <div style={{
+            <div className="booking-options-grid" style={{
               display: "grid",
               gridTemplateColumns: trip?.packages?.length > 0 ? "1fr 1fr" : "1fr",
               gap: "24px"
@@ -1817,8 +1864,19 @@ export default function BookingPage() {
                     const isSelected = selectedSlotId === slot.id;
                     return (
                       <div
+                        className="booking-choice-card"
                         key={slot.id}
+                        role="radio"
+                        aria-checked={isSelected}
+                        aria-disabled={isSoldOut}
+                        tabIndex={isSoldOut ? -1 : 0}
                         onClick={() => !isSoldOut && setSelectedSlotId(slot.id)}
+                        onKeyDown={(event) => {
+                          if (!isSoldOut && (event.key === "Enter" || event.key === " ")) {
+                            event.preventDefault();
+                            setSelectedSlotId(slot.id);
+                          }
+                        }}
                         style={{
                           padding: "10px 12px",
                           borderRadius: "6px",
@@ -1842,6 +1900,11 @@ export default function BookingPage() {
                       </div>
                     );
                   })}
+                  {(!trip?.slots?.length || !(trip.slots || []).some((slot: any) => slot.capacity - (slot.filledSpots || 0) > 0)) && (
+                    <div style={{ padding: "14px", borderRadius: "8px", background: "rgba(192,57,43,0.06)", border: "1px solid rgba(192,57,43,0.16)", color: "#c0392b", fontSize: "0.78rem", lineHeight: 1.6 }}>
+                      No bookable slots are currently available. Please check back later or contact support.
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1863,8 +1926,18 @@ export default function BookingPage() {
                       const isSelected = selectedPackageId === pkg.id;
                       return (
                         <div
+                          className="booking-choice-card"
                           key={pkg.id}
+                          role="radio"
+                          aria-checked={isSelected}
+                          tabIndex={0}
                           onClick={() => setSelectedPackageId(pkg.id)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              setSelectedPackageId(pkg.id);
+                            }
+                          }}
                           style={{
                             padding: "8px 10px",
                             borderRadius: "6px",
@@ -1895,6 +1968,8 @@ export default function BookingPage() {
 
             {/* ══ Form ══ */}
             <form
+            id="booking-form"
+            className="booking-form"
             onSubmit={handleSubmit}
             onInvalid={(e) => {
               e.preventDefault();
@@ -2199,7 +2274,7 @@ export default function BookingPage() {
                     — helps us plan the group better
                   </span>
                 </p>
-                <div style={{ display: "flex", gap: "10px" }}>
+                <div className="booking-solo-options" style={{ display: "flex", gap: "10px" }}>
                   {(["yes", "no"] as const).map((v) => (
                     <button
                       key={v}
@@ -2538,6 +2613,7 @@ export default function BookingPage() {
                     Select Payment Option
                   </h4>
                   <div
+                    className="booking-payment-options"
                     style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}
                   >
                     <label
@@ -2680,10 +2756,10 @@ export default function BookingPage() {
             <div>
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || !selectedSlot}
                 style={{
                   width: "100%",
-                  background: submitting ? "rgba(120,18,22,0.5)" : "#781216",
+                  background: submitting || !selectedSlot ? "rgba(120,18,22,0.45)" : "#781216",
                   color: "#fff",
                   border: "none",
                   borderRadius: "10px",
@@ -2693,7 +2769,7 @@ export default function BookingPage() {
                   fontWeight: 700,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  cursor: submitting ? "not-allowed" : "pointer",
+                  cursor: submitting || !selectedSlot ? "not-allowed" : "pointer",
                   transition: "background 0.25s ease",
                   display: "flex",
                   alignItems: "center",
@@ -2701,13 +2777,15 @@ export default function BookingPage() {
                   gap: "8px",
                 }}
                 onMouseEnter={(e) => {
-                  if (!submitting) e.currentTarget.style.background = "#9a1a1f";
+                  if (!submitting && selectedSlot) e.currentTarget.style.background = "#9a1a1f";
                 }}
                 onMouseLeave={(e) => {
-                  if (!submitting) e.currentTarget.style.background = "#781216";
+                  if (!submitting && selectedSlot) e.currentTarget.style.background = "#781216";
                 }}
               >
-                {submitting ? (
+                {!selectedSlot ? (
+                  "No Slots Available"
+                ) : submitting ? (
                   <>
                     <Loader2
                       size={16}
@@ -3026,6 +3104,7 @@ export default function BookingPage() {
       {/* Forced Login Overlay if not logged in */}
       {!authLoading && !user && (
         <div
+          className="booking-login-overlay"
           style={{
             position: "fixed",
             inset: 0,
@@ -3039,6 +3118,7 @@ export default function BookingPage() {
           }}
         >
           <div
+            className="booking-login-card"
             style={{
               background: "#fff",
               width: "100%",
@@ -3076,7 +3156,7 @@ export default function BookingPage() {
               onClick={() => {
                 localStorage.setItem(
                   "booking_redirect_intent",
-                  `/book/${slug}`,
+                  bookingRedirectPath,
                 );
                 window.location.href = `${API_URL}/auth/google`;
               }}
@@ -3125,11 +3205,85 @@ export default function BookingPage() {
               </svg>
               Continue with Google
             </button>
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              style={{
+                width: "100%",
+                marginTop: "10px",
+                padding: "0.7rem",
+                border: "none",
+                background: "transparent",
+                color: "rgba(30,26,20,0.55)",
+                fontSize: "0.8rem",
+                fontWeight: 500,
+                cursor: "pointer",
+              }}
+            >
+              Not now — return to trip
+            </button>
           </div>
         </div>
       )}
 
       <SiteFooter />
+      <style>{`
+        @media (min-width: 1024px) {
+          .booking-mobile-summary {
+            display: none !important;
+          }
+        }
+        @media (max-width: 1023px) {
+          .booking-main-grid {
+            grid-template-columns: minmax(0, 1fr) !important;
+          }
+        }
+        @media (max-width: 639px) {
+          .booking-banner {
+            padding: 88px 16px 28px !important;
+          }
+          .booking-main {
+            padding: 24px 16px 40px !important;
+          }
+          .booking-form-column {
+            gap: 28px !important;
+          }
+          .booking-options-grid,
+          .booking-field-grid {
+            grid-template-columns: minmax(0, 1fr) !important;
+          }
+          .booking-choice-card {
+            align-items: flex-start !important;
+            gap: 10px;
+          }
+          .booking-choice-card > :last-child {
+            flex-shrink: 0;
+            text-align: right;
+          }
+          .booking-form {
+            gap: 24px !important;
+          }
+          .booking-solo-options,
+          .booking-payment-options {
+            flex-direction: column;
+          }
+          .booking-solo-options > button,
+          .booking-payment-options > label {
+            width: 100%;
+            box-sizing: border-box;
+            justify-content: flex-start;
+          }
+          .booking-login-overlay {
+            align-items: flex-end !important;
+            padding: 12px !important;
+          }
+          .booking-login-card {
+            max-width: none !important;
+            padding: 28px 20px max(20px, env(safe-area-inset-bottom)) !important;
+            border-radius: 16px 16px 10px 10px !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

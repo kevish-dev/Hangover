@@ -86,15 +86,15 @@ export default function AdminLandingPage() {
 
   return (
     <div className="w-full max-w-6xl">
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6 md:mb-8">
+        <div className="min-w-0">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Image className="w-6 h-6 text-[#c8a96e]" />
             Landing Page
           </h1>
           <p className="text-gray-500 text-sm mt-1">Choose and arrange the trips shown in the Signature Collection below the homepage hero.</p>
         </div>
-        <Button onClick={saveCollection} disabled={isSaving} className="bg-[#c8a96e] hover:bg-[#b8943a] text-white gap-2">
+        <Button onClick={saveCollection} disabled={isSaving} className="w-full md:w-auto bg-[#c8a96e] hover:bg-[#b8943a] text-white gap-2">
           {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Save collection
         </Button>
@@ -110,7 +110,7 @@ export default function AdminLandingPage() {
             {selectedTrips.length === 0 ? (
               <div className="p-8 text-center text-sm text-gray-500">Select published trips from the list to build this collection.</div>
             ) : selectedTrips.map((trip, index) => (
-              <div key={trip.id} className="p-4 flex items-center gap-3">
+              <div key={trip.id} className="p-3 md:p-4 flex flex-wrap md:flex-nowrap items-center gap-3">
                 <span className="w-6 text-xs font-semibold text-gray-400">{String(index + 1).padStart(2, "0")}</span>
                 <div className="w-14 h-12 rounded overflow-hidden bg-gray-100 shrink-0">
                   {trip.bannerImages?.[0] ? <img src={trip.bannerImages[0]} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full grid place-items-center text-gray-300"><Image className="w-4 h-4" /></div>}
@@ -119,7 +119,7 @@ export default function AdminLandingPage() {
                   <p className="font-medium text-sm text-gray-900 truncate">{trip.title}</p>
                   <p className="text-xs text-gray-500 truncate">{trip.location} · {formatPrice(trip.price)}</p>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex w-full md:w-auto items-center justify-end gap-1 shrink-0">
                   <button type="button" onClick={() => moveTrip(index, -1)} disabled={index === 0} className="p-1.5 text-gray-500 hover:text-[#781216] disabled:opacity-30" aria-label={`Move ${trip.title} up`}><ArrowUp className="w-4 h-4" /></button>
                   <button type="button" onClick={() => moveTrip(index, 1)} disabled={index === selectedTrips.length - 1} className="p-1.5 text-gray-500 hover:text-[#781216] disabled:opacity-30" aria-label={`Move ${trip.title} down`}><ArrowDown className="w-4 h-4" /></button>
                   <button type="button" onClick={() => toggleTrip(trip.id)} className="p-1.5 text-gray-500 hover:text-red-600" aria-label={`Remove ${trip.title}`}><X className="w-4 h-4" /></button>
@@ -272,13 +272,13 @@ function LandingReasonsManager() {
   };
 
   return (
-    <section className="mt-10 bg-white border border-gray-200 rounded-lg overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+    <section className="mt-6 md:mt-10 bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div className="px-4 md:px-5 py-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h2 className="font-semibold text-gray-900">Why Hangover Trails</h2>
           <p className="text-xs text-gray-500 mt-1">Manage the accordion panels shown after the Signature Collection.</p>
         </div>
-        <Button onClick={openCreate} className="bg-[#781216] hover:bg-[#5e0e12] text-white gap-2"><Plus className="w-4 h-4" /> Add panel</Button>
+        <Button onClick={openCreate} className="w-full md:w-auto bg-[#781216] hover:bg-[#5e0e12] text-white gap-2"><Plus className="w-4 h-4" /> Add panel</Button>
       </div>
 
       {isLoading ? <div className="p-6 text-sm text-gray-500">Loading panels...</div> : (
@@ -293,7 +293,7 @@ function LandingReasonsManager() {
                 <p className="text-xs text-gray-500 truncate">{reason.description}</p>
               </div>
               {!reason.isActive && <span className="text-xs font-medium text-orange-700 bg-orange-50 px-2 py-1 rounded">Hidden</span>}
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex w-full md:w-auto items-center justify-end gap-1 shrink-0">
                 <button type="button" onClick={() => toggleActive(reason)} className="p-2 text-gray-500 hover:text-[#781216]" aria-label={reason.isActive ? `Hide ${reason.title}` : `Show ${reason.title}`}>{reason.isActive ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
                 <button type="button" onClick={() => openEdit(reason)} className="p-2 text-gray-500 hover:text-[#781216]" aria-label={`Edit ${reason.title}`}><Edit2 className="w-4 h-4" /></button>
                 <button type="button" onClick={() => deleteReason(reason)} className="p-2 text-gray-500 hover:text-red-600" aria-label={`Delete ${reason.title}`}><Trash2 className="w-4 h-4" /></button>
@@ -305,7 +305,7 @@ function LandingReasonsManager() {
       )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="!w-[calc(100%-0.75rem)] !max-h-[calc(100dvh-0.75rem)] md:!w-full md:!max-h-[90vh] sm:max-w-xl overflow-y-auto p-4 md:p-6">
           <DialogHeader><DialogTitle>{editingReason ? "Edit Why Hangover panel" : "Add Why Hangover panel"}</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2"><Label htmlFor="reason-title">Title</Label><Input id="reason-title" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></div>
@@ -319,7 +319,7 @@ function LandingReasonsManager() {
             </div>
             <div className="grid gap-2"><Label htmlFor="reason-order">Display order</Label><Input id="reason-order" type="number" min="0" value={form.sortOrder} onChange={(event) => setForm({ ...form, sortOrder: Number(event.target.value) })} /></div>
           </div>
-          <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button><Button onClick={saveReason} disabled={isSaving || isUploadingImage} className="bg-[#781216] hover:bg-[#5e0e12] text-white">{(isSaving || isUploadingImage) && <Loader2 className="w-4 h-4 animate-spin mr-2" />}{isUploadingImage ? "Uploading image" : "Save panel"}</Button></div>
+          <div className="flex flex-col-reverse md:flex-row md:justify-end gap-2"><Button variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full md:w-auto">Cancel</Button><Button onClick={saveReason} disabled={isSaving || isUploadingImage} className="w-full md:w-auto bg-[#781216] hover:bg-[#5e0e12] text-white">{(isSaving || isUploadingImage) && <Loader2 className="w-4 h-4 animate-spin mr-2" />}{isUploadingImage ? "Uploading image" : "Save panel"}</Button></div>
         </DialogContent>
       </Dialog>
     </section>
@@ -396,28 +396,28 @@ function LandingTripTypesManager() {
   };
 
   return (
-    <section className="mt-10 bg-white border border-gray-200 rounded-lg overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+    <section className="mt-6 md:mt-10 bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div className="px-4 md:px-5 py-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div><h2 className="font-semibold text-gray-900">Types of Trips</h2><p className="text-xs text-gray-500 mt-1">Manage the independent trip-type carousel on the landing page.</p></div>
-        <Button onClick={openCreate} className="bg-[#781216] hover:bg-[#5e0e12] text-white gap-2"><Plus className="w-4 h-4" /> Add type</Button>
+        <Button onClick={openCreate} className="w-full md:w-auto bg-[#781216] hover:bg-[#5e0e12] text-white gap-2"><Plus className="w-4 h-4" /> Add type</Button>
       </div>
       {isLoading ? <div className="p-6 text-sm text-gray-500">Loading trip types...</div> : <div className="divide-y divide-gray-100">
         {tripTypes.map((tripType) => <div key={tripType.id} className="p-4 flex flex-wrap items-center gap-3">
           <div className="w-16 h-12 rounded bg-gray-100 overflow-hidden shrink-0"><img src={tripType.imageUrl} alt="" className="w-full h-full object-cover" /></div>
           <div className="min-w-0 flex-1"><p className="font-medium text-sm text-gray-900 truncate">{tripType.sortOrder}. {tripType.label}</p><p className="text-xs text-gray-500 truncate">{tripType.tag}</p></div>
           {!tripType.isActive && <span className="text-xs font-medium text-orange-700 bg-orange-50 px-2 py-1 rounded">Hidden</span>}
-          <div className="flex items-center gap-1 shrink-0"><button type="button" onClick={() => toggleActive(tripType)} className="p-2 text-gray-500 hover:text-[#781216]" aria-label={tripType.isActive ? `Hide ${tripType.label}` : `Show ${tripType.label}`}>{tripType.isActive ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button><button type="button" onClick={() => openEdit(tripType)} className="p-2 text-gray-500 hover:text-[#781216]" aria-label={`Edit ${tripType.label}`}><Edit2 className="w-4 h-4" /></button><button type="button" onClick={() => remove(tripType)} className="p-2 text-gray-500 hover:text-red-600" aria-label={`Delete ${tripType.label}`}><Trash2 className="w-4 h-4" /></button></div>
+          <div className="flex w-full md:w-auto items-center justify-end gap-1 shrink-0"><button type="button" onClick={() => toggleActive(tripType)} className="p-2 text-gray-500 hover:text-[#781216]" aria-label={tripType.isActive ? `Hide ${tripType.label}` : `Show ${tripType.label}`}>{tripType.isActive ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button><button type="button" onClick={() => openEdit(tripType)} className="p-2 text-gray-500 hover:text-[#781216]" aria-label={`Edit ${tripType.label}`}><Edit2 className="w-4 h-4" /></button><button type="button" onClick={() => remove(tripType)} className="p-2 text-gray-500 hover:text-red-600" aria-label={`Delete ${tripType.label}`}><Trash2 className="w-4 h-4" /></button></div>
         </div>)}
         {tripTypes.length === 0 && <div className="p-6 text-sm text-gray-500">No trip types have been added yet.</div>}
       </div>}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}><DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{editing ? "Edit trip type" : "Add trip type"}</DialogTitle></DialogHeader><div className="grid gap-4 py-2">
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}><DialogContent className="!w-[calc(100%-0.75rem)] !max-h-[calc(100dvh-0.75rem)] md:!w-full md:!max-h-[90vh] sm:max-w-xl overflow-y-auto p-4 md:p-6"><DialogHeader><DialogTitle>{editing ? "Edit trip type" : "Add trip type"}</DialogTitle></DialogHeader><div className="grid gap-4 py-2">
         <div className="grid gap-2"><Label htmlFor="type-label">Label</Label><Input id="type-label" value={form.label} onChange={(event) => setForm({ ...form, label: event.target.value })} /></div>
         <div className="grid gap-2"><Label htmlFor="type-description">Description</Label><Textarea id="type-description" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></div>
         <div className="grid gap-2"><Label htmlFor="type-tag">Tag</Label><Input id="type-tag" value={form.tag} onChange={(event) => setForm({ ...form, tag: event.target.value })} /></div>
         <div className="grid gap-2"><Label htmlFor="type-icon">Icon</Label><select id="type-icon" value={form.iconName} onChange={(event) => setForm({ ...form, iconName: event.target.value })} className="h-10 w-full rounded-md border border-input bg-input-background px-3 text-sm"><option value="Users">Group</option><option value="Home">Family</option><option value="Heart">Couple</option><option value="GraduationCap">Students</option><option value="Mountain">Trekking</option><option value="Compass">Custom</option></select></div>
         <div className="grid gap-2"><Label htmlFor="type-image">Image</Label>{form.imageUrl && <img src={form.imageUrl} alt="Trip type preview" className="w-full h-40 object-cover rounded border border-gray-200" />}<Input id="type-image" type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={isUploadingImage} onChange={(event) => uploadImage(event.target.files?.[0])} /><p className="text-xs text-gray-500 flex items-center gap-1"><Upload className="w-3 h-3" /> Upload to Cloudinary.</p></div>
         <div className="grid gap-2"><Label htmlFor="type-order">Display order</Label><Input id="type-order" type="number" min="0" value={form.sortOrder} onChange={(event) => setForm({ ...form, sortOrder: Number(event.target.value) })} /></div>
-      </div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button><Button onClick={save} disabled={isSaving || isUploadingImage} className="bg-[#781216] hover:bg-[#5e0e12] text-white">{(isSaving || isUploadingImage) && <Loader2 className="w-4 h-4 animate-spin mr-2" />}{isUploadingImage ? "Uploading image" : "Save type"}</Button></div></DialogContent></Dialog>
+      </div><div className="flex flex-col-reverse md:flex-row md:justify-end gap-2"><Button variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full md:w-auto">Cancel</Button><Button onClick={save} disabled={isSaving || isUploadingImage} className="w-full md:w-auto bg-[#781216] hover:bg-[#5e0e12] text-white">{(isSaving || isUploadingImage) && <Loader2 className="w-4 h-4 animate-spin mr-2" />}{isUploadingImage ? "Uploading image" : "Save type"}</Button></div></DialogContent></Dialog>
     </section>
   );
 }

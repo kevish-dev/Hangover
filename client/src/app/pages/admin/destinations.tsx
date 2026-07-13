@@ -80,9 +80,9 @@ export default function AdminDestinationsPage() {
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+      <div className="flex flex-col items-stretch md:flex-row md:items-center justify-between mb-6 md:mb-8 gap-4">
+        <div className="min-w-0">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
             <MapPin className="w-6 h-6 text-[#c8a96e]" />
             Destinations
           </h1>
@@ -90,7 +90,7 @@ export default function AdminDestinationsPage() {
             Manage destinations and map trips to them.
           </p>
         </div>
-        <Button onClick={openCreateModal} className="bg-[#c8a96e] hover:bg-[#b8943a] text-white flex items-center gap-2">
+        <Button onClick={openCreateModal} className="w-full md:w-auto bg-[#c8a96e] hover:bg-[#b8943a] text-white flex items-center justify-center gap-2">
           <Plus className="w-4 h-4" /> Create Destination
         </Button>
       </div>
@@ -101,7 +101,7 @@ export default function AdminDestinationsPage() {
         destination={editingDestination} 
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
         {destinations.length === 0 ? (
           <div className="col-span-full py-12 text-center bg-white border border-gray-200 border-dashed rounded-xl">
             <p className="text-gray-500">No destinations found. Create your first destination above!</p>
@@ -133,21 +133,21 @@ export default function AdminDestinationsPage() {
                   </span>
                 </div>
                 
-                <div className="mt-auto pt-4 flex items-center justify-end gap-2 border-t border-gray-100 mt-6">
+                <div className="mt-auto pt-4 flex flex-wrap items-center justify-start md:justify-end gap-3 md:gap-2 border-t border-gray-100 mt-6">
                   <button 
                     onClick={() => handleTogglePublish(destination)}
                     className={`text-sm font-medium transition-colors flex items-center gap-1 ${destination.isPublished ? 'text-gray-500 hover:text-orange-600' : 'text-gray-500 hover:text-green-600'}`}
                   >
                     {destination.isPublished ? <><EyeOff className="w-3.5 h-3.5" /> Unpublish</> : <><Eye className="w-3.5 h-3.5" /> Publish</>}
                   </button>
-                  <div className="w-px h-3 bg-gray-300 mx-1" />
+                  <div className="hidden md:block w-px h-3 bg-gray-300 mx-1" />
                   <button 
                     onClick={() => openEditModal(destination)}
                     className="text-sm font-medium text-gray-500 hover:text-[#c8a96e] transition-colors flex items-center gap-1"
                   >
                     <Edit2 className="w-3.5 h-3.5" /> Edit
                   </button>
-                  <div className="w-px h-3 bg-gray-300 mx-1" />
+                  <div className="hidden md:block w-px h-3 bg-gray-300 mx-1" />
                   <button 
                     onClick={() => handleDelete(destination.id)}
                     className="text-sm font-medium text-gray-500 hover:text-red-600 transition-colors flex items-center gap-1"

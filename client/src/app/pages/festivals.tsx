@@ -1433,7 +1433,7 @@ export default function FestivalsPage() {
 
           <button
             onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
-            className="lg:hidden"
+            className="festivals-filter-toggle lg:hidden"
             style={{
               display: "flex",
               alignItems: "center",
@@ -1599,9 +1599,9 @@ export default function FestivalsPage() {
                     position: "fixed",
                     inset: 0,
                     background: "rgba(0,0,0,0.4)",
-                    zIndex: 90,
+                    zIndex: 190,
                   }}
-                  className="lg:hidden"
+                  className="festivals-filter-overlay lg:hidden"
                 />
                 <motion.div
                   initial={{ x: "-100%" }}
@@ -1613,13 +1613,14 @@ export default function FestivalsPage() {
                     top: 0,
                     left: 0,
                     bottom: 0,
-                    width: "280px",
+                    width: "min(86vw, 320px)",
                     background: "#ffffff",
-                    zIndex: 91,
+                    zIndex: 200,
                     overflowY: "auto",
-                    padding: "24px 20px",
+                    padding: "16px 20px 24px",
+                    boxSizing: "border-box",
                   }}
-                  className="lg:hidden"
+                  className="festivals-filter-drawer lg:hidden"
                 >
                   <div
                     style={{
@@ -1640,14 +1641,20 @@ export default function FestivalsPage() {
                       Filters
                     </span>
                     <button
+                      aria-label="Close filters"
                       onClick={() => setMobileFiltersOpen(false)}
                       style={{
+                        width: "40px",
+                        height: "40px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                         background: "none",
                         border: "none",
                         cursor: "pointer",
                       }}
                     >
-                      <X size={18} color="#1e1a14" />
+                      <X size={20} color="#1e1a14" />
                     </button>
                   </div>
                   <FilterSidebar
@@ -1774,6 +1781,15 @@ export default function FestivalsPage() {
         </div>
 
       <SiteFooter />
+      <style>{`
+        @media (min-width: 1024px) {
+          .festivals-filter-toggle,
+          .festivals-filter-overlay,
+          .festivals-filter-drawer {
+            display: none !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

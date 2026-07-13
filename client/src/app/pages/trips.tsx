@@ -422,6 +422,7 @@ function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
 
   return (
     <motion.div
+      className="trip-card"
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 12 }}
@@ -460,7 +461,7 @@ function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
           </div>
         )}
       </div>
-      <div style={{ padding: "20px 22px 22px" }}>
+      <div className="trip-card-content" style={{ padding: "20px 22px 22px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "7px" }}>
           <MapPin size={11} color="#781216" />
           <span style={{ color: "#781216", fontSize: "0.65rem", fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase" }}>
@@ -482,8 +483,8 @@ function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
             <span style={{ color: "rgba(30,26,20,0.3)", fontSize: "0.6rem", fontStyle: "italic" }}>No tags</span>
           )}
         </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "14px", borderTop: "1px solid rgba(30,26,20,0.07)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+        <div className="trip-card-footer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "14px", borderTop: "1px solid rgba(30,26,20,0.07)" }}>
+          <div className="trip-card-meta" style={{ display: "flex", alignItems: "center", gap: "14px" }}>
             <span style={{ display: "flex", alignItems: "center", gap: "4px", color: "rgba(30,26,20,0.5)", fontSize: "0.72rem" }}>
               <Clock size={11} />{isNotAvailable(durationStr) ? <NA /> : durationStr}
             </span>
@@ -491,7 +492,7 @@ function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
               {isNotAvailable(priceStr) ? <NA /> : priceStr}
             </span>
           </div>
-          <Link to={(trip as any).isFestival ? `/festivals/${trip.slug}` : `/trips/${trip.slug}`} style={{ background: hovered ? "#C8A96E" : "transparent", border: `1.5px solid ${hovered ? "#C8A96E" : "rgba(30,26,20,0.15)"}`, color: hovered ? "#1e1a14" : "rgba(30,26,20,0.6)", borderRadius: "4px", padding: "7px 16px", fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Poppins', sans-serif", transition: "all 0.25s ease", display: "flex", alignItems: "center", gap: "5px", textDecoration: "none" }}>
+          <Link className="trip-card-link" to={(trip as any).isFestival ? `/festivals/${trip.slug}` : `/trips/${trip.slug}`} style={{ background: hovered ? "#C8A96E" : "transparent", border: `1.5px solid ${hovered ? "#C8A96E" : "rgba(30,26,20,0.15)"}`, color: hovered ? "#1e1a14" : "rgba(30,26,20,0.6)", borderRadius: "4px", padding: "7px 16px", fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Poppins', sans-serif", transition: "all 0.25s ease", display: "flex", alignItems: "center", gap: "5px", textDecoration: "none" }}>
             View {(trip as any).isFestival ? "Festival" : "Trip"} <ArrowRight size={11} />
           </Link>
         </div>
@@ -528,6 +529,7 @@ function DestinationAccordion({ destKey, label, region, tagline, trips, defaultO
     >
       {/* ── Accordion header ── */}
       <button
+        className="destination-header"
         onClick={() => setOpen(!open)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
@@ -592,7 +594,7 @@ function DestinationAccordion({ destKey, label, region, tagline, trips, defaultO
         </div>
 
         {/* Right: trip count + chevron */}
-        <div style={{ display: "flex", alignItems: "center", gap: "14px", flexShrink: 0 }}>
+        <div className="destination-header-meta" style={{ display: "flex", alignItems: "center", gap: "14px", flexShrink: 0 }}>
           <div style={{ textAlign: "right" }}>
             <p style={{ color: open ? "#781216" : "rgba(30,26,20,0.55)", fontSize: "clamp(1.2rem,2.5vw,1.7rem)", fontWeight: 300, letterSpacing: "-0.04em", lineHeight: 1, margin: 0, transition: "color 0.25s ease" }}>
               {trips.length}
@@ -850,7 +852,7 @@ export default function TripsPage() {
     <div style={{ background: "#f5f0e6", minHeight: "100vh", fontFamily: "'Poppins', sans-serif" }}>
 
       {/* ── Hero banner ── */}
-      <div style={{ background: "#1e1a14", paddingTop: "110px", paddingBottom: "clamp(2.5rem,5vw,4rem)", paddingLeft: "clamp(1.5rem,5vw,6rem)", paddingRight: "clamp(1.5rem,5vw,6rem)", position: "relative", overflow: "hidden" }}>
+      <div className="trips-hero" style={{ background: "#1e1a14", paddingTop: "110px", paddingBottom: "clamp(2.5rem,5vw,4rem)", paddingLeft: "clamp(1.5rem,5vw,6rem)", paddingRight: "clamp(1.5rem,5vw,6rem)", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "flex-end", pointerEvents: "none", overflow: "hidden" }}>
           <span style={{ fontSize: "clamp(5rem,15vw,14rem)", fontWeight: 700, color: "rgba(242,237,228,0.03)", letterSpacing: "-0.04em", lineHeight: 1, paddingRight: "2rem", userSelect: "none" }}>TRIPS</span>
         </div>
@@ -866,11 +868,11 @@ export default function TripsPage() {
       </div>
 
       {/* ── Top bar: search + sort + mobile filter toggle ── */}
-      <div style={{ background: "#ffffff", borderBottom: "1px solid rgba(30,26,20,0.07)", position: "sticky", top: "72px", zIndex: 50, boxShadow: "0 2px 12px rgba(30,26,20,0.05)" }}>
-        <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "12px clamp(1.5rem,5vw,6rem)", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+      <div className="trips-toolbar" style={{ background: "#ffffff", borderBottom: "1px solid rgba(30,26,20,0.07)", position: "sticky", top: "72px", zIndex: 50, boxShadow: "0 2px 12px rgba(30,26,20,0.05)" }}>
+        <div className="trips-toolbar-inner" style={{ maxWidth: "1280px", margin: "0 auto", padding: "12px clamp(1.5rem,5vw,6rem)", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
 
           {/* Search */}
-          <div style={{ position: "relative", flex: "1 1 200px", maxWidth: "300px" }}>
+          <div className="trips-search" style={{ position: "relative", flex: "1 1 200px", maxWidth: "300px" }}>
             <Search size={13} color="rgba(30,26,20,0.35)" style={{ position: "absolute", left: "11px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
             <input type="text" placeholder="Search trips…" value={search} onChange={(e) => setSearch(e.target.value)}
               style={{ width: "100%", padding: "9px 32px 9px 34px", background: "#f5f0e6", border: "1px solid rgba(30,26,20,0.1)", borderRadius: "6px", fontSize: "0.8rem", fontFamily: "'Poppins', sans-serif", fontWeight: 300, color: "#1e1a14", outline: "none", boxSizing: "border-box" as const }} />
@@ -878,21 +880,21 @@ export default function TripsPage() {
           </div>
 
           {/* Sort */}
-          <select value={sort} onChange={(e) => setSort(e.target.value)}
+          <select className="trips-sort" value={sort} onChange={(e) => setSort(e.target.value)}
             style={{ padding: "9px 12px", background: "#f5f0e6", border: "1px solid rgba(30,26,20,0.1)", borderRadius: "6px", fontSize: "0.78rem", fontFamily: "'Poppins', sans-serif", color: "rgba(30,26,20,0.7)", cursor: "pointer", outline: "none", flexShrink: 0 }}>
             {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
 
           {/* Mobile filter toggle */}
           <button onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
-            className="lg:hidden"
+            className="trips-filter-toggle lg:hidden"
             style={{ display: "flex", alignItems: "center", gap: "6px", padding: "9px 14px", background: activeCount > 0 ? "rgba(120,18,22,0.06)" : "transparent", border: `1.5px solid ${activeCount > 0 ? "#781216" : "rgba(30,26,20,0.12)"}`, borderRadius: "6px", color: activeCount > 0 ? "#781216" : "rgba(30,26,20,0.6)", fontFamily: "'Poppins', sans-serif", fontSize: "0.78rem", cursor: "pointer", flexShrink: 0 }}>
             <SlidersHorizontal size={13} />
             Filters {activeCount > 0 && `(${activeCount})`}
           </button>
 
           {/* Results count */}
-          <span style={{ color: "rgba(30,26,20,0.38)", fontSize: "0.72rem", letterSpacing: "0.06em", marginLeft: "auto" }}>
+          <span className="trips-results" style={{ color: "rgba(30,26,20,0.38)", fontSize: "0.72rem", letterSpacing: "0.06em", marginLeft: "auto" }}>
             {loading ? "…" : `${filtered.length} trip${filtered.length !== 1 ? "s" : ""} found`}
           </span>
         </div>
@@ -923,7 +925,7 @@ export default function TripsPage() {
       </div>
 
       {/* ── Body: sidebar + grid ── */}
-      <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "clamp(2rem,4vw,3rem) clamp(1.5rem,5vw,6rem)" }}>
+      <div className="trips-body" style={{ maxWidth: "1280px", margin: "0 auto", padding: "clamp(2rem,4vw,3rem) clamp(1.5rem,5vw,6rem)" }}>
         <div style={{ display: "flex", gap: "clamp(1.5rem,3vw,3rem)", alignItems: "flex-start" }}>
 
           {/* Sidebar — desktop */}
@@ -937,16 +939,16 @@ export default function TripsPage() {
               <>
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                   onClick={() => setMobileFiltersOpen(false)}
-                  style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 90 }}
-                  className="lg:hidden"
+                  style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 190 }}
+                  className="trips-filter-overlay lg:hidden"
                 />
                 <motion.div initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }} transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  style={{ position: "fixed", top: 0, left: 0, bottom: 0, width: "280px", background: "#ffffff", zIndex: 91, overflowY: "auto", padding: "24px 20px" }}
-                  className="lg:hidden"
+                  style={{ position: "fixed", top: 0, left: 0, bottom: 0, width: "min(86vw, 320px)", background: "#ffffff", zIndex: 200, overflowY: "auto", padding: "16px 20px 24px", boxSizing: "border-box" }}
+                  className="trips-filter-drawer lg:hidden"
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
                     <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, color: "#1e1a14", fontSize: "0.9rem" }}>Filters</span>
-                    <button onClick={() => setMobileFiltersOpen(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#1e1a14" /></button>
+                    <button aria-label="Close filters" onClick={() => setMobileFiltersOpen(false)} style={{ width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer" }}><X size={20} color="#1e1a14" /></button>
                   </div>
                   <FilterSidebar filters={filters} setFilters={setFilters} availableDestinations={availableDestinations} availableCategories={availableCategories} availableDurations={availableDurations} availablePriceRanges={availablePriceRanges} />
                 </motion.div>
@@ -976,6 +978,73 @@ export default function TripsPage() {
       </div>
 
       <SiteFooter />
+      <style>{`
+        @media (min-width: 1024px) {
+          .trips-filter-toggle,
+          .trips-filter-overlay,
+          .trips-filter-drawer {
+            display: none !important;
+          }
+        }
+        @media (max-width: 767px) {
+          .trips-hero {
+            padding: 92px 16px 36px !important;
+          }
+          .trips-toolbar {
+            top: 56px !important;
+          }
+          .trips-toolbar-inner {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 8px !important;
+            padding: 10px 16px !important;
+          }
+          .trips-search {
+            grid-column: 1 / -1;
+            max-width: none !important;
+            width: 100%;
+          }
+          .trips-sort {
+            min-width: 0;
+            width: 100%;
+          }
+          .trips-filter-toggle {
+            justify-self: end;
+          }
+          .trips-results {
+            grid-column: 1 / -1;
+            margin-left: 0 !important;
+          }
+          .trips-body {
+            padding: 24px 16px 36px !important;
+          }
+          .destination-header {
+            align-items: flex-start !important;
+            gap: 10px !important;
+            padding: 16px !important;
+          }
+          .destination-header-meta {
+            gap: 8px !important;
+          }
+          .trip-card-content {
+            padding: 16px !important;
+          }
+          .trip-card-footer {
+            align-items: stretch !important;
+            flex-direction: column;
+            gap: 12px;
+          }
+          .trip-card-meta {
+            justify-content: space-between;
+            width: 100%;
+          }
+          .trip-card-link {
+            box-sizing: border-box;
+            justify-content: center;
+            width: 100%;
+          }
+        }
+      `}</style>
     </div>
   );
 }

@@ -35,7 +35,7 @@ const inputBase: React.CSSProperties = {
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+    <div className="profile-settings-field" style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
       <label
         style={{
           color: "#1e1a14",
@@ -54,6 +54,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
 function SectionCard({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) {
   return (
     <div
+      className="profile-settings-section"
       style={{
         background: "#ffffff",
         border: "1px solid rgba(30,26,20,0.08)",
@@ -64,7 +65,7 @@ function SectionCard({ title, icon: Icon, children }: { title: string; icon: any
         boxShadow: "0 2px 10px rgba(30,26,20,0.02)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
+      <div className="profile-settings-section-heading" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
         <Icon size={18} color="#781216" strokeWidth={1.5} />
         <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600, color: "#1e1a14" }}>{title}</h3>
       </div>
@@ -170,10 +171,10 @@ export function ProfileSettings() {
   const dobValue = profile.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().split("T")[0] : "";
 
   return (
-    <div style={{ maxWidth: "800px", margin: "0 auto" }}>
+    <div className="profile-settings" style={{ maxWidth: "800px", margin: "0 auto" }}>
       {/* Basic Info */}
       <SectionCard title="Basic Information" icon={User}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }} className="grid-cols-1 md:grid-cols-2">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }} className="profile-settings-grid grid-cols-1 md:grid-cols-2">
           <Field label="Full Name">
             <input
               type="text"
@@ -228,7 +229,7 @@ export function ProfileSettings() {
               placeholder="Street address, P.O. box, etc."
             />
           </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }} className="grid-cols-1 md:grid-cols-2">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }} className="profile-settings-grid grid-cols-1 md:grid-cols-2">
             <Field label="City">
               <input
                 type="text"
@@ -267,7 +268,7 @@ export function ProfileSettings() {
 
       {/* Emergency & Medical */}
       <SectionCard title="Emergency & Medical" icon={HeartPulse}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }} className="grid-cols-1 md:grid-cols-2">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }} className="profile-settings-grid grid-cols-1 md:grid-cols-2">
           <Field label="Emergency Contact Name">
             <input
               type="text"
@@ -321,8 +322,9 @@ export function ProfileSettings() {
       </SectionCard>
 
       {/* Save Button */}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "40px" }}>
+      <div className="profile-settings-save-row" style={{ display: "flex", justifyContent: "flex-end", marginBottom: "40px" }}>
         <button
+          className="profile-settings-save-button"
           onClick={handleSaveProfile}
           disabled={saving}
           style={{
@@ -348,13 +350,14 @@ export function ProfileSettings() {
 
       {/* Government ID Upload */}
       <SectionCard title="Government ID" icon={CreditCard}>
-        <p style={{ color: "rgba(30,26,20,0.6)", fontSize: "0.8rem", marginBottom: "20px" }}>
+        <p className="profile-settings-id-copy" style={{ color: "rgba(30,26,20,0.6)", fontSize: "0.8rem", marginBottom: "20px" }}>
           A valid Government ID is required to book trips. This is securely stored and only used for verification and permit purposes.
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           <Field label="ID Type">
             <select
+              className="profile-settings-id-select"
               style={{ ...inputBase, appearance: "auto", maxWidth: "300px" }}
               value={govtIdType}
               onChange={(e) => setGovtIdType(e.target.value as "AADHAAR" | "PASSPORT")}
@@ -364,8 +367,9 @@ export function ProfileSettings() {
             </select>
           </Field>
 
-          <div style={{ display: "flex", justifyContent: "center" }}>
+          <div className="profile-settings-upload-wrap" style={{ display: "flex", justifyContent: "center" }}>
             <div
+              className="profile-settings-upload-card"
               style={{
                 border: "2px dashed rgba(30,26,20,0.15)",
                 borderRadius: "12px",
@@ -386,7 +390,7 @@ export function ProfileSettings() {
                   {profile.govtIdMimeType === "application/pdf" ? (
                     <a href={profile.govtIdImageUrl} target="_blank" rel="noreferrer" className="text-sm text-[#781216] underline">View uploaded PDF</a>
                   ) : (
-                    <div style={{ width: "100%", height: "200px", borderRadius: "8px", overflow: "hidden", marginBottom: "10px" }}>
+                    <div className="profile-settings-id-preview" style={{ width: "100%", height: "200px", borderRadius: "8px", overflow: "hidden", marginBottom: "10px" }}>
                       <img src={profile.govtIdImageUrl} alt="Government ID" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     </div>
                   )}
@@ -399,6 +403,7 @@ export function ProfileSettings() {
                 </>
               )}
               <label
+                className="profile-settings-file-label"
                 style={{
                   background: "#ffffff",
                   border: "1px solid rgba(30,26,20,0.2)",
@@ -423,8 +428,9 @@ export function ProfileSettings() {
           </div>
 
           {imageFile && (
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "10px" }}>
+            <div className="profile-settings-upload-action" style={{ display: "flex", justifyContent: "flex-end", marginTop: "10px" }}>
               <button
+                className="profile-settings-upload-button"
                 onClick={handleUploadGovtId}
                 disabled={uploading}
                 style={{
@@ -450,6 +456,77 @@ export function ProfileSettings() {
           )}
         </div>
       </SectionCard>
+      <style>{`
+        @media (max-width: 767px) {
+          .profile-settings {
+            min-width: 0;
+            width: 100%;
+          }
+          .profile-settings-section {
+            padding: 16px !important;
+            margin-bottom: 16px !important;
+            border-radius: 10px !important;
+          }
+          .profile-settings-section-heading {
+            gap: 8px !important;
+            margin-bottom: 16px !important;
+          }
+          .profile-settings-section-heading h3 {
+            font-size: 0.98rem !important;
+          }
+          .profile-settings-grid {
+            grid-template-columns: minmax(0, 1fr) !important;
+            gap: 12px !important;
+          }
+          .profile-settings-field {
+            min-width: 0;
+            gap: 4px !important;
+          }
+          .profile-settings input,
+          .profile-settings select,
+          .profile-settings textarea {
+            min-height: 44px;
+            font-size: 16px !important;
+          }
+          .profile-settings-save-row {
+            margin-bottom: 24px !important;
+          }
+          .profile-settings-save-button,
+          .profile-settings-upload-button {
+            justify-content: center;
+            min-height: 44px;
+            width: 100%;
+          }
+          .profile-settings-id-copy {
+            line-height: 1.6;
+            margin-bottom: 16px !important;
+          }
+          .profile-settings-id-select {
+            max-width: none !important;
+          }
+          .profile-settings-upload-wrap {
+            width: 100%;
+          }
+          .profile-settings-upload-card {
+            box-sizing: border-box;
+            min-width: 0;
+            padding: 14px !important;
+            border-radius: 10px !important;
+          }
+          .profile-settings-id-preview {
+            height: 150px !important;
+          }
+          .profile-settings-file-label {
+            box-sizing: border-box;
+            max-width: 100%;
+            line-height: 1.4;
+            overflow-wrap: anywhere;
+          }
+          .profile-settings-upload-action {
+            justify-content: stretch !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

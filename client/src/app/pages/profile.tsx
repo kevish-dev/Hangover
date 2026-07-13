@@ -47,6 +47,7 @@ function StatusBadge({ status }: { status: string }) {
   const s = STATUS_STYLES[status] || STATUS_STYLES.PENDING;
   return (
     <span
+      className="profile-booking-status"
       style={{
         display: "inline-block",
         padding: "3px 10px",
@@ -99,6 +100,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
 
   return (
     <motion.div
+      className="profile-booking-card"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
@@ -124,7 +126,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
     >
       {/* Thumbnail */}
       <div
-        className="hidden sm:block"
+        className="profile-booking-thumbnail hidden sm:block"
         style={{
           width: "180px",
           minHeight: "160px",
@@ -194,6 +196,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
 
       {/* Content */}
       <div
+        className="profile-booking-content"
         style={{
           flex: 1,
           padding: "18px 22px",
@@ -206,8 +209,8 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
       >
         {/* Top: state + title + status */}
         <div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", marginBottom: "4px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+          <div className="profile-booking-heading" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", marginBottom: "4px" }}>
+            <div className="profile-booking-location" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
               <MapPin size={10} color="#781216" />
               <span
                 style={{
@@ -224,6 +227,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
             <StatusBadge status={badgeStatus} />
           </div>
           <h3
+            className="profile-booking-title"
             style={{
               color: "#1e1a14",
               fontSize: "1rem",
@@ -236,6 +240,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
             {item?.title}
           </h3>
           <p
+            className="profile-booking-reference"
             style={{
               color: "rgba(30,26,20,0.38)",
               fontSize: "0.64rem",
@@ -249,6 +254,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
 
         {/* Meta row */}
         <div
+          className="profile-booking-meta"
           style={{
             display: "flex",
             alignItems: "center",
@@ -261,7 +267,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
             { icon: Users, text: `${booking.numberOfTravelers} Traveler${booking.numberOfTravelers > 1 ? "s" : ""}` },
             ...(item?.duration ? [{ icon: Clock, text: formatDuration(item.duration) }] : []),
           ].map(({ icon: Icon, text }, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+            <div className="profile-booking-meta-item" key={i} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
               <Icon size={11} color="rgba(30,26,20,0.35)" strokeWidth={1.5} />
               <span style={{ color: "rgba(30,26,20,0.5)", fontSize: "0.68rem", fontWeight: 400 }}>
                 {text}
@@ -272,7 +278,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
 
         {/* Refund receipt info — shown for refunded bookings */}
         {isRefunded && totalRefunded > 0 && (
-          <div style={{
+          <div className="profile-booking-refund" style={{
             display: "flex",
             alignItems: "center",
             gap: "6px",
@@ -296,6 +302,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
 
         {/* Price + action */}
         <div
+          className="profile-booking-footer"
           style={{
             display: "flex",
             alignItems: "center",
@@ -306,7 +313,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
             gap: "8px",
           }}
         >
-          <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
+          <div className="profile-booking-payment" style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
             {paid > 0 && !isFullyRefunded && (
               <div>
                 <span style={{ color: "rgba(30,26,20,0.35)", fontSize: "0.55rem", fontWeight: 400, display: "block", letterSpacing: "0.06em", textTransform: "uppercase" }}>
@@ -345,9 +352,10 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
           </div>
 
           {/* CTAs */}
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div className="profile-booking-actions" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             {canPayBalance && (
               <Link
+                className="profile-booking-primary-action"
                 to={`/bookings/${booking.id}/pay-balance`}
                 style={{
                   display: "flex",
@@ -373,6 +381,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
             {/* Book Again — only shown for fully refunded trips */}
             {isFullyRefunded && (
               <Link
+                className="profile-booking-primary-action"
                 to={`/book/${item?.slug}${isFestival ? "?type=festival" : ""}`}
                 style={{
                   display: "flex",
@@ -396,6 +405,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
               </Link>
             )}
             <Link
+              className="profile-booking-view-action"
               to={isFestival ? `/festivals/${item?.slug}` : `/trips/${item?.slug}`}
               style={{
                 display: "flex",
@@ -423,6 +433,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
 function SectionHeader({ title, count }: { title: string; count: number }) {
   return (
     <div
+      className="profile-section-header"
       style={{
         display: "flex",
         alignItems: "center",
@@ -477,6 +488,7 @@ function SectionHeader({ title, count }: { title: string; count: number }) {
 function EmptyState({ message }: { message: string }) {
   return (
     <div
+      className="profile-empty-state"
       style={{
         display: "flex",
         flexDirection: "column",
@@ -580,9 +592,10 @@ export default function ProfilePage() {
   const initials = displayName.charAt(0).toUpperCase();
 
   return (
-    <div style={{ background: "#f5f0e6", minHeight: "100vh", fontFamily: "'Poppins', sans-serif" }}>
+    <div className="profile-page" style={{ background: "#f5f0e6", minHeight: "100vh", fontFamily: "'Poppins', sans-serif" }}>
       {/* ── Dark header ── */}
       <div
+        className="profile-header"
         style={{
           background: "#1e1a14",
           paddingTop: "100px",
@@ -590,6 +603,7 @@ export default function ProfilePage() {
         }}
       >
         <div
+          className="profile-header-inner"
           style={{
             maxWidth: "1080px",
             margin: "0 auto",
@@ -598,6 +612,7 @@ export default function ProfilePage() {
         >
           {/* Profile info row */}
           <div
+            className="profile-hero-row"
             style={{
               display: "flex",
               alignItems: "center",
@@ -608,8 +623,9 @@ export default function ProfilePage() {
             }}
           >
             {/* Left: avatar + name */}
-            <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
+            <div className="profile-identity" style={{ display: "flex", alignItems: "center", gap: "18px" }}>
               <div
+                className="profile-avatar"
                 style={{
                   width: "56px",
                   height: "56px",
@@ -626,7 +642,7 @@ export default function ProfilePage() {
               >
                 {initials}
               </div>
-              <div>
+              <div className="profile-identity-copy">
                 <p
                   style={{
                     color: "rgba(242,237,228,0.45)",
@@ -640,6 +656,7 @@ export default function ProfilePage() {
                   / Traveler Profile
                 </p>
                 <h1
+                  className="profile-display-name"
                   style={{
                     color: "#f2ede4",
                     fontSize: "1.5rem",
@@ -651,6 +668,7 @@ export default function ProfilePage() {
                   {displayName}
                 </h1>
                 <p
+                  className="profile-email"
                   style={{
                     color: "rgba(242,237,228,0.4)",
                     fontSize: "0.75rem",
@@ -664,7 +682,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Right: stats */}
-            <div style={{ display: "flex", gap: "24px" }}>
+            <div className="profile-stats" style={{ display: "flex", gap: "24px" }}>
               {[
                 { value: upcoming.length, label: "Upcoming" },
                 { value: completedCount, label: "Completed" },
@@ -672,6 +690,7 @@ export default function ProfilePage() {
                 ...(refundedCount > 0 ? [{ value: refundedCount, label: "Refunded" }] : []),
               ].map(({ value, label }) => (
                 <div
+                  className="profile-stat-card"
                   key={label}
                   style={{
                     textAlign: "center",
@@ -681,6 +700,7 @@ export default function ProfilePage() {
                   }}
                 >
                   <p
+                    className="profile-stat-value"
                     style={{
                       color: "#f2ede4",
                       fontSize: "1.4rem",
@@ -692,6 +712,7 @@ export default function ProfilePage() {
                     {value}
                   </p>
                   <p
+                    className="profile-stat-label"
                     style={{
                       color: "rgba(242,237,228,0.35)",
                       fontSize: "0.55rem",
@@ -710,6 +731,7 @@ export default function ProfilePage() {
 
           {/* Tab bar */}
           <div
+            className="profile-tabs-bar"
             style={{
               display: "flex",
               alignItems: "center",
@@ -717,12 +739,13 @@ export default function ProfilePage() {
               borderTop: "1px solid rgba(242,237,228,0.06)",
             }}
           >
-            <div style={{ display: "flex", gap: "0" }}>
+            <div className="profile-tabs" style={{ display: "flex", gap: "0" }}>
               {([
                 { key: "bookings" as Tab, label: "My Bookings", icon: Ticket },
                 { key: "settings" as Tab, label: "Profile Settings", icon: Settings },
               ]).map(({ key, label, icon: Icon }) => (
                 <button
+                  className="profile-tab"
                   key={key}
                   onClick={() => setActiveTab(key)}
                   style={{
@@ -748,6 +771,8 @@ export default function ProfilePage() {
               ))}
             </div>
             <button
+              className="profile-signout"
+              aria-label="Sign out"
               onClick={logout}
               style={{
                 display: "flex",
@@ -767,7 +792,7 @@ export default function ProfilePage() {
               onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(242,237,228,0.35)")}
             >
               <LogOut size={12} strokeWidth={1.5} />
-              Sign Out
+              <span className="profile-signout-label">Sign Out</span>
             </button>
           </div>
         </div>
@@ -775,6 +800,7 @@ export default function ProfilePage() {
 
       {/* ── Tab content ── */}
       <div
+        className="profile-content"
         style={{
           maxWidth: "1080px",
           margin: "0 auto",
@@ -859,6 +885,179 @@ export default function ProfilePage() {
       </div>
 
       <SiteFooter />
+      <style>{`
+        @media (max-width: 767px) {
+          .profile-page {
+            overflow-x: hidden;
+          }
+          .profile-header {
+            padding-top: 72px !important;
+          }
+          .profile-header-inner {
+            padding: 0 16px !important;
+          }
+          .profile-hero-row {
+            align-items: stretch !important;
+            flex-direction: column;
+            flex-wrap: nowrap !important;
+            gap: 16px !important;
+            padding-bottom: 16px !important;
+          }
+          .profile-identity {
+            gap: 12px !important;
+            min-width: 0;
+          }
+          .profile-avatar {
+            width: 48px !important;
+            height: 48px !important;
+            font-size: 1.1rem !important;
+          }
+          .profile-identity-copy {
+            min-width: 0;
+          }
+          .profile-display-name {
+            font-size: 1.2rem !important;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+          }
+          .profile-email {
+            font-size: 0.68rem !important;
+            overflow-wrap: anywhere;
+          }
+          .profile-stats {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+            gap: 8px !important;
+            width: 100%;
+          }
+          .profile-stat-card {
+            min-width: 0;
+            padding: 7px 4px !important;
+          }
+          .profile-stat-value {
+            font-size: 1.08rem !important;
+          }
+          .profile-stat-label {
+            font-size: 0.48rem !important;
+            letter-spacing: 0.06em !important;
+          }
+          .profile-tabs-bar {
+            align-items: stretch !important;
+            min-width: 0;
+          }
+          .profile-tabs {
+            flex: 1 1 auto;
+            min-width: 0;
+          }
+          .profile-tab {
+            flex: 1 1 0;
+            justify-content: center;
+            gap: 4px !important;
+            min-width: 0;
+            min-height: 44px;
+            padding: 10px 5px !important;
+            font-size: 0.64rem !important;
+            line-height: 1.2;
+          }
+          .profile-signout {
+            flex: 0 0 42px;
+            justify-content: center;
+            min-height: 44px;
+            padding: 10px 8px !important;
+          }
+          .profile-signout-label {
+            display: none;
+          }
+          .profile-content {
+            padding: 20px 12px 48px !important;
+          }
+          .profile-section-header {
+            margin-bottom: 12px !important;
+          }
+          .profile-empty-state {
+            padding: 2rem 12px !important;
+          }
+          .profile-booking-card {
+            flex-direction: column;
+            border-radius: 10px !important;
+          }
+          .profile-booking-thumbnail {
+            display: block !important;
+            width: 100% !important;
+            height: 112px;
+            min-height: 0 !important;
+          }
+          .profile-booking-content {
+            padding: 13px 14px !important;
+            gap: 9px !important;
+          }
+          .profile-booking-heading {
+            align-items: flex-start !important;
+            gap: 8px !important;
+          }
+          .profile-booking-location {
+            min-width: 0;
+          }
+          .profile-booking-location span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+          .profile-booking-status {
+            flex-shrink: 0;
+            padding: 3px 7px !important;
+            font-size: 0.54rem !important;
+          }
+          .profile-booking-title {
+            font-size: 0.92rem !important;
+            overflow-wrap: anywhere;
+          }
+          .profile-booking-reference {
+            font-size: 0.59rem !important;
+            overflow-wrap: anywhere;
+          }
+          .profile-booking-meta {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 7px 10px !important;
+          }
+          .profile-booking-meta-item {
+            min-width: 0;
+          }
+          .profile-booking-meta-item span {
+            font-size: 0.63rem !important;
+            overflow-wrap: anywhere;
+          }
+          .profile-booking-refund {
+            align-items: flex-start !important;
+            padding: 7px 8px !important;
+          }
+          .profile-booking-refund span {
+            overflow-wrap: anywhere;
+          }
+          .profile-booking-footer {
+            align-items: stretch !important;
+            flex-direction: column;
+            gap: 10px !important;
+          }
+          .profile-booking-payment {
+            width: 100%;
+          }
+          .profile-booking-actions {
+            align-items: stretch !important;
+            gap: 8px !important;
+            width: 100%;
+          }
+          .profile-booking-primary-action,
+          .profile-booking-view-action {
+            flex: 1 1 0;
+            justify-content: center;
+            box-sizing: border-box;
+            min-height: 38px;
+            padding: 8px 10px !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

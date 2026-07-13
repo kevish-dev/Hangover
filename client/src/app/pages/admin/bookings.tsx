@@ -112,10 +112,10 @@ function ConfirmCancelModal({ booking, onConfirm, onClose }: { booking: any, onC
   const [refundAmount, setRefundAmount] = useState<string>("");
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="px-6 py-4 bg-red-50 border-b border-red-100 flex justify-between items-center">
-          <h2 className="text-lg font-bold text-red-900 flex items-center gap-2">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 md:p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm max-h-[calc(100dvh-1rem)] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="px-4 md:px-6 py-4 bg-red-50 border-b border-red-100 flex justify-between items-center gap-3">
+          <h2 className="text-base md:text-lg font-bold text-red-900 flex items-center gap-2">
             <AlertCircle className="w-5 h-5 text-red-600" />
             Confirm Cancellation
           </h2>
@@ -123,7 +123,7 @@ function ConfirmCancelModal({ booking, onConfirm, onClose }: { booking: any, onC
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-6">
+        <div className="p-4 md:p-6">
           {totalPaid > 0 ? (
             <>
               <p className="text-sm text-gray-700 mb-4 leading-relaxed">
@@ -153,10 +153,10 @@ function ConfirmCancelModal({ booking, onConfirm, onClose }: { booking: any, onC
             </p>
           )}
 
-          <div className="flex gap-3 justify-end">
+          <div className="flex flex-col-reverse md:flex-row gap-3 md:justify-end">
             <button 
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              className="min-h-10 w-full md:w-auto px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             >
               No, keep booking
             </button>
@@ -177,7 +177,7 @@ function ConfirmCancelModal({ booking, onConfirm, onClose }: { booking: any, onC
                   onConfirm();
                 }
               }}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors shadow-sm"
+              className="min-h-10 w-full md:w-auto px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors shadow-sm"
             >
               {totalPaid > 0 ? "Cancel & Refund" : "Yes, Cancel Booking"}
             </button>
@@ -297,7 +297,7 @@ export default function AdminBookingsPage() {
     <div className="max-w-7xl mx-auto pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
             <CalendarCheck className="w-6 h-6 text-[#c8a96e]" />
             Bookings Dashboard
           </h1>
@@ -307,24 +307,24 @@ export default function AdminBookingsPage() {
         </div>
 
         {/* Toolbar */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          <div className="relative w-full sm:w-auto">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full md:w-auto">
+          <div className="relative w-full md:w-auto">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input 
               type="text"
               placeholder="Search by name, ref, trip/festival..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e] focus:border-transparent w-full sm:w-64"
+              className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e] focus:border-transparent w-full md:w-64"
             />
           </div>
 
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-2 w-full md:flex md:items-center md:w-auto">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#c8a96e] w-full sm:w-auto"
+              className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-base md:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#c8a96e] w-full md:w-auto"
             >
               <option value="ALL">All Status</option>
               <option value="CONFIRMED">Confirmed</option>
@@ -336,7 +336,7 @@ export default function AdminBookingsPage() {
             <select
               value={sortBy}
               onChange={(e: any) => setSortBy(e.target.value)}
-              className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#c8a96e] w-full sm:w-auto"
+              className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-base md:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#c8a96e] w-full md:w-auto"
             >
               <option value="date_desc">Newest First</option>
               <option value="date_asc">Oldest First</option>
@@ -347,7 +347,68 @@ export default function AdminBookingsPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="md:hidden space-y-3">
+        {processedBookings.length === 0 ? (
+          <div className="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-500">
+            No bookings found matching your criteria.
+          </div>
+        ) : (
+          processedBookings.map((b: any) => (
+            <article
+              key={b.id}
+              onClick={() => setSelectedBooking(b)}
+              className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-mono text-xs font-semibold text-[#781216]">{b.bookingReference}</p>
+                  <h2 className="mt-1 break-words text-sm font-semibold text-gray-900">{b.trip?.title || b.festival?.title}</h2>
+                </div>
+                <div onClick={(event) => event.stopPropagation()} className="shrink-0">
+                  <ActionMenu
+                    booking={b}
+                    onRemind={() => handleRemind(b.id)}
+                    onCancelAndRefund={() => setConfirmCancelId(b.id)}
+                    onFinalize={() => handleFinalize(b.id)}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-lg bg-gray-50 p-3">
+                <p className="break-words text-sm font-medium text-gray-900">{b.user?.profile?.fullName || "N/A"}</p>
+                <p className="break-all text-xs text-gray-500">{b.user?.email}</p>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <BookingStatusBadge status={b.status} />
+                <PaymentStatusBadge status={b.paymentStatus} />
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-3 border-t border-gray-100 pt-3 text-xs">
+                <div>
+                  <p className="text-gray-400">Travelers</p>
+                  <p className="mt-0.5 font-semibold text-gray-900">{b.numberOfTravelers}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400">Booked</p>
+                  <p className="mt-0.5 font-medium text-gray-700">{format(new Date(b.createdAt), "MMM d, yyyy")}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400">Total</p>
+                  <p className="mt-0.5 font-semibold text-gray-900">₹{Number(b.totalAmount).toLocaleString("en-IN")}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400">Received</p>
+                  <p className="mt-0.5 font-semibold text-green-600">₹{Number(b.amountPaid || 0).toLocaleString("en-IN")}</p>
+                </div>
+              </div>
+              <p className="mt-3 text-right text-xs font-medium text-[#781216]">Tap to view details</p>
+            </article>
+          ))
+        )}
+      </div>
+
+      <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto min-h-[400px]">
           <table className="w-full text-sm text-left">
             <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-medium">
@@ -437,33 +498,33 @@ export default function AdminBookingsPage() {
       )}
 
       {selectedBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedBooking(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedBooking(null)}>
           <div 
-            className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-none md:rounded-xl shadow-xl w-full max-w-4xl h-dvh md:h-auto max-h-dvh md:max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between z-10">
-              <h2 className="text-lg font-bold text-gray-900">
+            <div className="sticky top-0 bg-white border-b border-gray-100 px-4 md:px-6 py-4 flex items-start md:items-center justify-between gap-3 z-10">
+              <h2 className="min-w-0 break-words text-base md:text-lg font-bold text-gray-900">
                 Booking Details - <span className="font-mono text-[#c8a96e]">{selectedBooking.bookingReference}</span>
               </h2>
               <button 
                 onClick={() => setSelectedBooking(null)}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
+                className="shrink-0 p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
               {/* Left Column */}
-              <div className="space-y-8">
+              <div className="space-y-5 md:space-y-8">
                 {/* User Profile */}
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
                     <User className="w-4 h-4 text-[#781216]" /> Primary Traveler
                   </h3>
                   <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                    <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div className="admin-booking-detail-grid grid grid-cols-3 gap-2 text-sm">
                       <span className="text-gray-500">Name:</span>
                       <span className="col-span-2 font-medium text-gray-900">{selectedBooking.user?.profile?.fullName || "N/A"}</span>
                       
@@ -526,7 +587,7 @@ export default function AdminBookingsPage() {
                       {selectedBooking.travelers.map((traveler: any, idx: number) => (
                         <div key={traveler.id || idx} className="bg-gray-50 p-4 rounded-lg text-sm">
                           <div className="font-medium text-gray-900 mb-2">Traveler {idx + 1}: {traveler.fullName}</div>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="admin-booking-detail-grid grid grid-cols-3 gap-2">
                             <span className="text-gray-500">Gender:</span>
                             <span className="col-span-2 text-gray-900">{traveler.gender || "N/A"}</span>
                             
@@ -555,14 +616,14 @@ export default function AdminBookingsPage() {
               </div>
 
               {/* Right Column */}
-              <div className="space-y-8">
+              <div className="space-y-5 md:space-y-8">
                 {/* Item Details */}
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-[#781216]" /> Item Details
                   </h3>
                   <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                    <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div className="admin-booking-detail-grid grid grid-cols-3 gap-2 text-sm">
                       <span className="text-gray-500">Item:</span>
                       <span className="col-span-2 font-medium text-gray-900">{selectedBooking.trip?.title || selectedBooking.festival?.title || "N/A"}</span>
                       
@@ -594,7 +655,7 @@ export default function AdminBookingsPage() {
                     <IndianRupee className="w-4 h-4 text-[#781216]" /> Payment Breakdown
                   </h3>
                   <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                    <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div className="admin-booking-detail-grid grid grid-cols-3 gap-2 text-sm">
                       <span className="text-gray-500">Total Amount:</span>
                       <span className="col-span-2 font-medium text-gray-900">₹{Number(selectedBooking.totalAmount).toLocaleString("en-IN")}</span>
                       
@@ -627,7 +688,7 @@ export default function AdminBookingsPage() {
             <div className="bg-gray-50 border-t border-gray-100 p-4 text-right sticky bottom-0 z-10">
               <button 
                 onClick={() => setSelectedBooking(null)}
-                className="px-4 py-2 bg-gray-200 text-gray-800 font-medium rounded-lg hover:bg-gray-300 transition-colors text-sm"
+                className="w-full md:w-auto min-h-10 px-4 py-2 bg-gray-200 text-gray-800 font-medium rounded-lg hover:bg-gray-300 transition-colors text-sm"
               >
                 Close
               </button>
@@ -635,6 +696,20 @@ export default function AdminBookingsPage() {
           </div>
         </div>
       )}
+      <style>{`
+        @media (max-width: 767px) {
+          .admin-booking-detail-grid {
+            grid-template-columns: minmax(82px, 0.8fr) minmax(0, 2fr) !important;
+          }
+          .admin-booking-detail-grid > * {
+            min-width: 0;
+            overflow-wrap: anywhere;
+          }
+          .admin-booking-detail-grid > .col-span-2 {
+            grid-column: span 1 / span 1 !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
