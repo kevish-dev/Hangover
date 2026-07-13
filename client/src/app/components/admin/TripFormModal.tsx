@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import imageCompression from "browser-image-compression";
 import {
   Dialog,
   DialogContent,
@@ -683,34 +682,16 @@ export function TripFormModal({
         const stayPayload: any[] = [];
         let fileIndex = 0;
 
-        const compressionPromises = stayItems.map(async (item) => {
+        stayItems.forEach((item) => {
           if (item.type === "NEW" && item.file) {
-            try {
-              const compressedFile = await imageCompression(item.file, { 
-                maxSizeMB: 10, 
-                initialQuality: 0.9,
-                useWebWorker: true
-              });
-              return { file: compressedFile, item, type: "NEW" };
-            } catch (err) {
-              return { file: item.file, item, type: "NEW" };
-            }
-          }
-          return { item, type: "EXISTING" };
-        });
-
-        const stayResults = await Promise.all(compressionPromises);
-
-        stayResults.forEach((result) => {
-          if (result.type === "NEW" && result.file) {
-            stayFormData.append("images", result.file);
-            stayPayload.push({ text: result.item.text, type: "NEW", fileIndex });
+            stayFormData.append("images", item.file);
+            stayPayload.push({ text: item.text, type: "NEW", fileIndex });
             fileIndex++;
-          } else if (result.type === "EXISTING") {
+          } else if (item.type === "EXISTING") {
             stayPayload.push({
-              text: result.item.text,
+              text: item.text,
               type: "EXISTING",
-              url: result.item.url,
+              url: item.url,
             });
           }
         });
@@ -734,34 +715,16 @@ export function TripFormModal({
         const highlightPayload: any[] = [];
         let highlightFileIndex = 0;
 
-        const highlightPromises = highlightItems.map(async (item) => {
+        highlightItems.forEach((item) => {
           if (item.type === "NEW" && item.file) {
-            try {
-              const compressedFile = await imageCompression(item.file, { 
-                maxSizeMB: 10, 
-                initialQuality: 0.9,
-                useWebWorker: true
-              });
-              return { file: compressedFile, item, type: "NEW" };
-            } catch (err) {
-              return { file: item.file, item, type: "NEW" };
-            }
-          }
-          return { item, type: "EXISTING" };
-        });
-
-        const highlightResults = await Promise.all(highlightPromises);
-
-        highlightResults.forEach((result) => {
-          if (result.type === "NEW" && result.file) {
-            highlightFormData.append("images", result.file);
-            highlightPayload.push({ text: result.item.text, type: "NEW", fileIndex: highlightFileIndex });
+            highlightFormData.append("images", item.file);
+            highlightPayload.push({ text: item.text, type: "NEW", fileIndex: highlightFileIndex });
             highlightFileIndex++;
-          } else if (result.type === "EXISTING") {
+          } else if (item.type === "EXISTING") {
             highlightPayload.push({
-              text: result.item.text,
+              text: item.text,
               type: "EXISTING",
-              url: result.item.url,
+              url: item.url,
             });
           }
         });

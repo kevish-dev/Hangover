@@ -575,3 +575,176 @@ model Review {
   @@index([isPublished])
 }
 
+
+xmodel ItineraryTemplate {
+  id           String   @id @default(uuid())
+
+  title        String
+  circuit      String
+  description  String?
+
+  inclusions   String[]
+  exclusions   String[]
+
+  days         ItineraryTemplateDay[]
+  packages     Package[]
+  trips        Trip[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ItineraryTemplateDay {
+  id          String   @id @default(uuid())
+
+  templateId  String
+  dayNumber   Int
+
+  title       String?
+  subtitle    String?
+
+  todos       String[]
+
+  expenses    TemplateExpense[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  template    ItineraryTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+}
+
+model TemplateExpense {
+  id          String   @id @default(uuid())
+
+  dayId        String
+
+  expenseName  String
+  quantity     Int
+  amount       Decimal @db.Decimal(10, 2)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  day          ItineraryTemplateDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+
+  @@index([dayId])
+}
+
+model Package {
+  id          String   @id @default(uuid())
+
+  templateId  String
+
+  name        String
+  description String?
+
+  price       Decimal @db.Decimal(10,2)
+
+  template    ItineraryTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  trips       Trip[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([templateId])
+}
+
+model Trip {
+  id          String   @id @default(uuid())
+
+  templateId  String
+  packageId   String?
+
+  title       String
+
+  startDate   DateTime
+  endDate     DateTime
+
+  visibility  TripVisibility
+  status      TripStatus
+
+  template    ItineraryTemplate @relation(fields: [templateId], references: [id])
+  package     Package? @relation(fields: [packageId], references: [id])
+
+  slots       TripSlot[]
+  days        TripDay[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([templateId])
+  @@index([packageId])
+}
+
+model TripDay {
+  id          String   @id @default(uuid())
+
+  tripId       String
+  dayNumber    Int
+
+  title         String?
+  subtitle      String?
+
+  todos         String[]
+
+  expenses      TripExpense[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  trip          Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+}
+
+model TripExpense {
+  id           String   @id @default(uuid())
+
+  dayId         String
+
+  expenseName   String
+  quantity      Int
+  amount        Decimal @db.Decimal(10,2)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  day           TripDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+
+  @@index([dayId])
+}
+
+model TripSlot {
+  id            String   @id @default(uuid())
+
+  tripId        String
+
+  name          String
+  capacity      Int
+  booked        Int      @default(0)
+
+  priceOverride Decimal? @db.Decimal(10,2)
+
+  trip          Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+}
+
+enum TripVisibility {
+  PUBLIC
+  PRIVATE
+  INVITE_ONLY
+  DRAFT
+}
+
+enum TripStatus {
+  PLANNING
+  OPEN
+  FULL
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
