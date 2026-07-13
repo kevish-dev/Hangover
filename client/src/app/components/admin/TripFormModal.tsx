@@ -826,7 +826,7 @@ export function TripFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!w-[calc(100%-0.75rem)] !max-h-[calc(100dvh-0.75rem)] sm:!w-full sm:!max-h-[90vh] sm:max-w-[700px] flex flex-col p-0 overflow-hidden">
+      <DialogContent className="!w-[calc(100%-0.75rem)] !max-h-[calc(100dvh-0.75rem)] md:!w-full md:!max-h-[90vh] sm:max-w-[700px] flex flex-col p-0 overflow-hidden">
         <div className="px-4 pt-5 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b">
           <DialogHeader>
             <DialogTitle className="text-xl sm:text-2xl font-bold pr-6">

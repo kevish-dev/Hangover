@@ -126,7 +126,7 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!w-[calc(100%-0.75rem)] !max-h-[calc(100dvh-0.75rem)] sm:!w-full sm:!max-h-[90vh] sm:max-w-[600px] overflow-y-auto p-4 sm:p-8">
+      <DialogContent className="!w-[calc(100%-0.75rem)] !max-h-[calc(100dvh-0.75rem)] md:!w-full md:!max-h-[90vh] sm:max-w-[600px] overflow-y-auto p-4 sm:p-8">
         <DialogHeader>
           <DialogTitle>{destination ? "Edit Destination" : "Create New Destination"}</DialogTitle>
         </DialogHeader>

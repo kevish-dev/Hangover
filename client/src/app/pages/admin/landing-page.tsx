@@ -434,5 +434,78 @@ function LandingContentManager({ type, title }: { type: "footprints" | "journey"
   const save = async () => { try { if (editing) await apiClient.put(`/landing-content/${type}/${editing.id}`, form); else await apiClient.post(`/landing-content/${type}`, form); await refresh(); setOpen(false); toast.success(`${title} updated`); } catch { toast.error(`Failed to save ${title}`); } };
   const toggle = async (item: any) => { await apiClient.put(`/landing-content/${type}/${item.id}`, { isActive: !item.isActive }); await refresh(); };
   const remove = async (item: any) => { await apiClient.delete(`/landing-content/${type}/${item.id}`); await refresh(); };
-  return <section className="mt-10 bg-white border border-gray-200 rounded-lg overflow-hidden"><div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3"><div><h2 className="font-semibold text-gray-900">{title}</h2><p className="text-xs text-gray-500 mt-1">Manage the landing page {type === "footprints" ? "numbers" : "milestones"}.</p></div><Button onClick={() => edit()} className="bg-[#781216] hover:bg-[#5e0e12] text-white gap-2"><Plus className="w-4 h-4" /> Add</Button></div>{isLoading ? <div className="p-6 text-sm text-gray-500">Loading...</div> : <div className="divide-y divide-gray-100">{items.map((item: any) => <div key={item.id} className="p-4 flex items-center gap-3"><div className="min-w-0 flex-1"><p className="font-medium text-sm text-gray-900 truncate">{type === "footprints" ? `${item.value}${item.suffix} ${item.label}` : `${item.period} - ${item.title}`}</p><p className="text-xs text-gray-500 truncate">{type === "footprints" ? item.sublabel : item.tagline}</p></div>{!item.isActive && <span className="text-xs text-orange-700">Hidden</span>}<button onClick={() => toggle(item)} className="p-2 text-gray-500">{item.isActive ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button><button onClick={() => edit(item)} className="p-2 text-gray-500"><Edit2 className="w-4 h-4" /></button><button onClick={() => remove(item)} className="p-2 text-red-600"><Trash2 className="w-4 h-4" /></button></div>)}</div>}<Dialog open={open} onOpenChange={setOpen}><DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} {title}</DialogTitle></DialogHeader><div className="grid gap-4">{fields.map((field) => <div key={field} className="grid gap-2"><Label htmlFor={`${type}-${field}`}>{field}</Label>{field === "description" ? <Textarea id={`${type}-${field}`} value={form[field] ?? ""} onChange={e => setForm({ ...form, [field]: e.target.value })} /> : field === "iconName" ? <select id={`${type}-${field}`} value={form[field] ?? "MapPin"} onChange={e => setForm({ ...form, [field]: e.target.value })} className="h-10 rounded-md border px-3"><option>MapPin</option><option>Lightbulb</option><option>User</option><option>Users</option><option>GraduationCap</option><option>Music2</option><option>Flame</option></select> : <Input id={`${type}-${field}`} type={field === "value" || field === "sortOrder" ? "number" : "text"} value={form[field] ?? ""} onChange={e => setForm({ ...form, [field]: field === "value" || field === "sortOrder" ? Number(e.target.value) : e.target.value })} />}</div>)}</div><div className="flex justify-end gap-2 mt-4"><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={save} className="bg-[#781216] text-white">Save</Button></div></DialogContent></Dialog></section>;
+  return (
+    <section className="mt-6 md:mt-10 overflow-hidden rounded-lg border border-gray-200 bg-white">
+      <div className="flex flex-col gap-3 border-b border-gray-100 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-5">
+        <div>
+          <h2 className="font-semibold text-gray-900">{title}</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            Manage the landing page {type === "footprints" ? "numbers" : "milestones"}.
+          </p>
+        </div>
+        <Button onClick={() => edit()} className="w-full gap-2 bg-[#781216] text-white hover:bg-[#5e0e12] md:w-auto">
+          <Plus className="h-4 w-4" /> Add
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="p-6 text-sm text-gray-500">Loading...</div>
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {items.map((item: any) => (
+            <div key={item.id} className="flex flex-wrap items-center gap-3 p-4">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-gray-900">
+                  {type === "footprints" ? `${item.value}${item.suffix} ${item.label}` : `${item.period} - ${item.title}`}
+                </p>
+                <p className="truncate text-xs text-gray-500">
+                  {type === "footprints" ? item.sublabel : item.tagline}
+                </p>
+              </div>
+              {!item.isActive && <span className="text-xs text-orange-700">Hidden</span>}
+              <div className="flex w-full items-center justify-end gap-1 md:w-auto">
+                <button onClick={() => toggle(item)} className="p-2 text-gray-500" aria-label={item.isActive ? "Hide item" : "Show item"}>
+                  {item.isActive ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                </button>
+                <button onClick={() => edit(item)} className="p-2 text-gray-500" aria-label="Edit item">
+                  <Edit2 className="h-4 w-4" />
+                </button>
+                <button onClick={() => remove(item)} className="p-2 text-red-600" aria-label="Delete item">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="!w-[calc(100%-0.75rem)] !max-h-[calc(100dvh-0.75rem)] overflow-y-auto p-4 sm:max-w-xl md:!w-full md:!max-h-[90vh] md:p-6">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Edit" : "Add"} {title}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4">
+            {fields.map((field) => (
+              <div key={field} className="grid gap-2">
+                <Label htmlFor={`${type}-${field}`}>{field}</Label>
+                {field === "description" ? (
+                  <Textarea id={`${type}-${field}`} value={form[field] ?? ""} onChange={(event) => setForm({ ...form, [field]: event.target.value })} />
+                ) : field === "iconName" ? (
+                  <select id={`${type}-${field}`} value={form[field] ?? "MapPin"} onChange={(event) => setForm({ ...form, [field]: event.target.value })} className="h-10 rounded-md border px-3 text-base md:text-sm">
+                    <option>MapPin</option><option>Lightbulb</option><option>User</option><option>Users</option><option>GraduationCap</option><option>Music2</option><option>Flame</option>
+                  </select>
+                ) : (
+                  <Input id={`${type}-${field}`} type={field === "value" || field === "sortOrder" ? "number" : "text"} value={form[field] ?? ""} onChange={(event) => setForm({ ...form, [field]: field === "value" || field === "sortOrder" ? Number(event.target.value) : event.target.value })} />
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex flex-col-reverse gap-2 md:flex-row md:justify-end">
+            <Button variant="outline" onClick={() => setOpen(false)} className="w-full md:w-auto">Cancel</Button>
+            <Button onClick={save} className="w-full bg-[#781216] text-white md:w-auto">Save</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </section>
+  );
 }

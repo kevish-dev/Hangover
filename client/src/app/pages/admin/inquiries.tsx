@@ -211,14 +211,14 @@ export default function AdminInquiriesPage() {
       </div>
 
       {selectedInquiry && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedInquiry(null)}>
+        <div role="dialog" aria-modal="true" aria-label="Inquiry details" className="fixed inset-0 z-[60] flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedInquiry(null)}>
           <div className="bg-white rounded-none md:rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col h-dvh md:h-auto max-h-dvh md:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             <div className="px-4 md:px-6 py-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center gap-3 shrink-0">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-[#c8a96e]" />
                 Inquiry Details
               </h2>
-              <button onClick={() => setSelectedInquiry(null)} className="p-1.5 hover:bg-gray-200 rounded-full text-gray-500 transition-colors">
+              <button aria-label="Close inquiry details" onClick={() => setSelectedInquiry(null)} className="flex h-10 w-10 shrink-0 items-center justify-center hover:bg-gray-200 rounded-full text-gray-500 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>

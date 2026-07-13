@@ -99,10 +99,37 @@ export default function AdminLayout() {
           <div className="w-px h-4 bg-gray-200 mx-2" />
           <h1 className="text-sm font-medium">Dashboard</h1>
         </header>
-        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6">
+        <main className="admin-main flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6">
           <Outlet />
         </main>
       </SidebarInset>
+      <style>{`
+        @media (max-width: 767px) {
+          .admin-main {
+            overscroll-behavior: contain;
+          }
+          .admin-main input:not([type="checkbox"]):not([type="radio"]),
+          .admin-main select,
+          .admin-main textarea,
+          [role="dialog"] input:not([type="checkbox"]):not([type="radio"]),
+          [role="dialog"] select,
+          [role="dialog"] textarea {
+            font-size: 16px !important;
+          }
+          [role="dialog"] {
+            overscroll-behavior: contain;
+          }
+          [role="dialog"] > button.absolute {
+            display: flex;
+            width: 40px;
+            height: 40px;
+            align-items: center;
+            justify-content: center;
+            top: 8px;
+            right: 8px;
+          }
+        }
+      `}</style>
     </SidebarProvider>
   );
 }

@@ -64,6 +64,8 @@ function ActionMenu({ booking, onRemind, onCancelAndRefund, onFinalize }: { book
   return (
     <div className="relative inline-block text-right" ref={menuRef}>
       <button 
+        aria-label={`Open actions for booking ${booking.bookingReference}`}
+        aria-expanded={open}
         onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
         className="p-1.5 rounded-full hover:bg-gray-200 text-gray-500 transition-colors focus:outline-none"
       >
@@ -112,14 +114,14 @@ function ConfirmCancelModal({ booking, onConfirm, onClose }: { booking: any, onC
   const [refundAmount, setRefundAmount] = useState<string>("");
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 md:p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+    <div role="dialog" aria-modal="true" aria-label="Confirm booking cancellation" className="fixed inset-0 z-[60] flex items-center justify-center p-2 md:p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm max-h-[calc(100dvh-1rem)] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="px-4 md:px-6 py-4 bg-red-50 border-b border-red-100 flex justify-between items-center gap-3">
           <h2 className="text-base md:text-lg font-bold text-red-900 flex items-center gap-2">
             <AlertCircle className="w-5 h-5 text-red-600" />
             Confirm Cancellation
           </h2>
-          <button onClick={onClose} className="p-1.5 hover:bg-red-100 rounded-full text-red-500 transition-colors">
+          <button aria-label="Close cancellation dialog" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center hover:bg-red-100 rounded-full text-red-500 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -142,7 +144,7 @@ function ConfirmCancelModal({ booking, onConfirm, onClose }: { booking: any, onC
                     placeholder="Enter amount"
                     max={totalPaid}
                     min={0}
-                    className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+                    className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-base md:text-sm"
                   />
                 </div>
               </div>
@@ -498,7 +500,7 @@ export default function AdminBookingsPage() {
       )}
 
       {selectedBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedBooking(null)}>
+        <div role="dialog" aria-modal="true" aria-label="Booking details" className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedBooking(null)}>
           <div 
             className="bg-white rounded-none md:rounded-xl shadow-xl w-full max-w-4xl h-dvh md:h-auto max-h-dvh md:max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
@@ -507,9 +509,10 @@ export default function AdminBookingsPage() {
               <h2 className="min-w-0 break-words text-base md:text-lg font-bold text-gray-900">
                 Booking Details - <span className="font-mono text-[#c8a96e]">{selectedBooking.bookingReference}</span>
               </h2>
-              <button 
+              <button
+                aria-label="Close booking details"
                 onClick={() => setSelectedBooking(null)}
-                className="shrink-0 p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
+                className="flex h-10 w-10 shrink-0 items-center justify-center hover:bg-gray-100 rounded-full transition-colors text-gray-500"
               >
                 <X className="w-5 h-5" />
               </button>
