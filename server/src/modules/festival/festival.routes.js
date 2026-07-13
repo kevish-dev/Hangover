@@ -1,7 +1,7 @@
 import { Router } from "express";
 import * as festivalController from "./festival.controller.js";
 import { requireAuth, requireAdmin, optionalAuth } from "../../core/middlewares/auth.middleware.js";
-import { uploadMiddleware } from "../../core/services/upload.service.js";
+import { imageUploadMiddleware, videoUploadMiddleware } from "../../core/services/upload.service.js";
 import faqRoutes from "../faq/faq.routes.js";
 
 import "./festival.docs.js"; // Register OpenAPI specs
@@ -24,27 +24,29 @@ router.delete("/:id", festivalController.deleteFestival);
 
 router.post(
   "/:id/banner-images",
-  uploadMiddleware.array("banners", 10), // Allow up to 10 banners at once
+  imageUploadMiddleware.array("banners", 10),
   festivalController.uploadBanners
 );
+router.post("/:id/banner-upload-signature", festivalController.createBannerUploadSignature);
+router.post("/:id/banner-images/attach", festivalController.attachBannerImages);
 router.delete("/:id/banner-images", festivalController.deleteBanner);
 
 router.post(
   "/:id/video",
-  uploadMiddleware.single("video"),
+  videoUploadMiddleware.single("video"),
   festivalController.uploadVideo
 );
 router.delete("/:id/video", festivalController.deleteVideo);
 
 router.post(
   "/:id/highlights",
-  uploadMiddleware.array("images", 15),
+  imageUploadMiddleware.array("images", 15),
   festivalController.syncHighlights
 );
 
 router.post(
   "/:id/stay-transport",
-  uploadMiddleware.array("images", 15),
+  imageUploadMiddleware.array("images", 15),
   festivalController.syncStayTransport
 );
 

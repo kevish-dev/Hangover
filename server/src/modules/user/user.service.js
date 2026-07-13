@@ -1,5 +1,38 @@
 import * as userRepo from "./user.repository.js";
-import { uploadToCloudinary } from "../../core/services/upload.service.js";
+import { prisma } from "../../prisma/client.js";
+import { randomUUID } from "crypto";
+import {
+  createAuthenticatedDeliveryUrl,
+  deleteFromCloudinary,
+  deleteMediaAsset,
+  uploadSensitiveDocument,
+} from "../../core/services/upload.service.js";
+
+const serializeProfile = (profile) => {
+  if (!profile) return {};
+  const { govtIdAsset, ...safeProfile } = profile;
+  return {
+    ...safeProfile,
+    // Legacy public URLs remain readable while existing records are migrated.
+    govtIdImageUrl: govtIdAsset
+      ? createAuthenticatedDeliveryUrl(govtIdAsset)
+      : safeProfile.govtIdImageUrl || null,
+    govtIdMimeType: govtIdAsset
+      ? (govtIdAsset.resourceType === "RAW" ? "application/pdf" : `image/${govtIdAsset.format || "webp"}`)
+      : null,
+  };
+};
+
+const PROFILE_FIELDS = new Set([
+  "fullName", "phone", "alternatePhone", "dateOfBirth", "gender",
+  "addressLine1", "addressLine2", "city", "state", "postalCode", "country",
+  "emergencyContactName", "emergencyContactPhone", "emergencyContactRelation",
+  "bloodGroup", "medicalNotes", "govtIdType", "govtIdNumber",
+]);
+
+const editableProfileData = (data = {}) => Object.fromEntries(
+  Object.entries(data).filter(([key]) => PROFILE_FIELDS.has(key)),
+);
 
 export const getUsers = async (page = 1, limit = 10) => {
   const skip = (page - 1) * limit;
@@ -24,14 +57,21 @@ export const getUserById = async (id) => {
   return user;
 };
 
+export const getMyProfile = async (userId) => {
+  const user = await getUserById(userId);
+  return serializeProfile(user.profile);
+};
+
 export const updateMyProfile = async (userId, data) => {
   // We can add data validation here if needed, stripping out admin-only fields
-  return userRepo.updateUserProfile(userId, data);
+  const profile = await userRepo.updateUserProfile(userId, editableProfileData(data));
+  return serializeProfile(profile);
 };
 
 export const updateUserProfile = async (id, data) => {
   await getUserById(id); // Ensure user exists
-  return userRepo.updateUserProfile(id, data);
+  const profile = await userRepo.updateUserProfile(id, editableProfileData(data));
+  return serializeProfile(profile);
 };
 
 export const updateUserStatus = async (id, isActive) => {
@@ -39,19 +79,51 @@ export const updateUserStatus = async (id, isActive) => {
   return userRepo.updateUserStatus(id, isActive);
 };
 
-export const uploadGovtIdImage = async (userId, govtIdType, imageBuffer) => {
+export const uploadGovtIdImage = async (userId, govtIdType, file) => {
   const folder = `uploads/users/${userId}/govtid/${govtIdType}`;
-  
-  const url = await uploadToCloudinary(imageBuffer, {
+  const uploaded = await uploadSensitiveDocument(file, {
     folder,
-    publicId: "doc",
-    optimize: true,
+    publicId: randomUUID(),
   });
-  
-  const updateData = {
-    govtIdType,
-    govtIdImageUrl: url
+
+  const user = await getUserById(userId);
+  const assetData = {
+    publicId: uploaded.public_id,
+    resourceType: uploaded.resource_type.toUpperCase(),
+    deliveryType: "AUTHENTICATED",
+    format: uploaded.format || null,
+    version: uploaded.version ? String(uploaded.version) : null,
+    bytes: uploaded.bytes || null,
+    width: uploaded.width || null,
+    height: uploaded.height || null,
+    folder,
+    uploadedById: userId,
   };
-  
-  return userRepo.updateUserProfile(userId, updateData);
+
+  const asset = await prisma.mediaAsset.create({ data: assetData });
+
+  let profile;
+  try {
+    profile = await userRepo.updateUserProfile(userId, {
+      govtIdType,
+      govtIdImageUrl: null,
+      govtIdAssetId: asset.id,
+    });
+  } catch (error) {
+    await Promise.allSettled([
+      deleteMediaAsset(asset),
+      prisma.mediaAsset.delete({ where: { id: asset.id } }),
+    ]);
+    throw error;
+  }
+  if (user.profile?.govtIdImageUrl) {
+    await deleteFromCloudinary(user.profile.govtIdImageUrl).catch(() => undefined);
+  }
+  if (user.profile?.govtIdAsset) {
+    await Promise.allSettled([
+      deleteMediaAsset(user.profile.govtIdAsset),
+      prisma.mediaAsset.delete({ where: { id: user.profile.govtIdAsset.id } }),
+    ]);
+  }
+  return serializeProfile(profile);
 };

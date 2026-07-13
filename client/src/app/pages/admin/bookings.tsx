@@ -4,6 +4,8 @@ import { CalendarCheck, IndianRupee, Loader2, Bell, X, User, MapPin, Mail, Phone
 import { format } from "date-fns";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
+import { finalizeBooking } from "../../../lib/bookingApi";
+import { useMutation } from "@tanstack/react-query";
 
 function BookingStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -35,7 +37,7 @@ function PaymentStatusBadge({ status }: { status: string }) {
   );
 }
 
-function ActionMenu({ booking, onRemind, onCancelAndRefund }: { booking: any, onRemind: () => void, onCancelAndRefund: () => void }) {
+function ActionMenu({ booking, onRemind, onCancelAndRefund, onFinalize }: { booking: any, onRemind: () => void, onCancelAndRefund: () => void, onFinalize: () => void }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -53,7 +55,9 @@ function ActionMenu({ booking, onRemind, onCancelAndRefund }: { booking: any, on
   const isCancellable = booking.status !== "CANCELLED" && booking.status !== "COMPLETED";
   const totalPaid = Number(booking.amountPaid) || 0;
 
-  if (booking.status === "PENDING" || (booking.paymentStatus !== "PARTIALLY_PAID" && !hasSuccessfulPayments && !isCancellable)) {
+  const isFinalizable = booking.status === "CONFIRMED";
+
+  if (booking.status === "PENDING" || (booking.paymentStatus !== "PARTIALLY_PAID" && !hasSuccessfulPayments && !isCancellable && !isFinalizable)) {
     return <div className="text-gray-400 text-xs italic">No actions</div>;
   }
 
@@ -75,6 +79,16 @@ function ActionMenu({ booking, onRemind, onCancelAndRefund }: { booking: any, on
             >
               <Bell className="w-4 h-4 text-blue-600" />
               Remind Balance
+            </button>
+          )}
+
+          {isFinalizable && (
+            <button 
+              onClick={(e) => { e.stopPropagation(); setOpen(false); onFinalize(); }}
+              className="w-full text-left px-4 py-2.5 text-sm text-green-600 hover:bg-green-50 flex items-center gap-2 transition-colors border-b border-gray-50"
+            >
+              <CalendarCheck className="w-4 h-4 text-green-600" />
+              Finalize Trip
             </button>
           )}
 
@@ -184,6 +198,19 @@ export default function AdminBookingsPage() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [sortBy, setSortBy] = useState<"date_desc" | "date_asc" | "amount_desc" | "amount_asc">("date_desc");
 
+
+
+  const finalizeMutation = useMutation({
+    mutationFn: finalizeBooking,
+    onSuccess: (data) => {
+      toast.success(data.message);
+      queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || "Failed to finalize booking");
+    }
+  });
+
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin", "bookings"],
     queryFn: async () => {
@@ -214,6 +241,12 @@ export default function AdminBookingsPage() {
       refetch();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to cancel booking.", { id: toastId });
+    }
+  };
+
+  const handleFinalize = (bookingId: string) => {
+    if (window.confirm("Are you sure you want to mark this trip as COMPLETED and send a review email to the user?")) {
+      finalizeMutation.mutate(bookingId);
     }
   };
 
@@ -285,6 +318,8 @@ export default function AdminBookingsPage() {
               className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e] focus:border-transparent w-full sm:w-64"
             />
           </div>
+
+
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <select
               value={statusFilter}
@@ -382,6 +417,7 @@ export default function AdminBookingsPage() {
                         booking={b} 
                         onRemind={() => handleRemind(b.id)} 
                         onCancelAndRefund={() => setConfirmCancelId(b.id)}
+                        onFinalize={() => handleFinalize(b.id)}
                       />
                     </td>
                   </tr>
@@ -457,6 +493,9 @@ export default function AdminBookingsPage() {
                     <ImageIcon className="w-4 h-4 text-[#781216]" /> Government ID
                   </h3>
                   {selectedBooking.user?.profile?.govtIdImageUrl ? (
+                    selectedBooking.user.profile.govtIdMimeType === "application/pdf" ? (
+                      <a href={selectedBooking.user.profile.govtIdImageUrl} target="_blank" rel="noreferrer" className="block text-sm text-[#781216] underline">View Government ID PDF</a>
+                    ) : (
                     <a 
                       href={selectedBooking.user.profile.govtIdImageUrl} 
                       target="_blank" 
@@ -469,6 +508,7 @@ export default function AdminBookingsPage() {
                         className="w-full h-48 object-cover"
                       />
                     </a>
+                    )
                   ) : (
                     <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-500 text-center">
                       No Government ID provided.

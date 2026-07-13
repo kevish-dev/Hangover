@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon ."
+    "dev": "nodemon .",
+    "media:prune": "node src/utils/scripts/pruneMediaAssets.js"
   },
   "keywords": [],
   "author": "",

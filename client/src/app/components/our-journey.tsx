@@ -1,56 +1,21 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence, useScroll, useMotionValue, useTransform, MotionValue } from "motion/react";
 import { Lightbulb, MapPin, User, Users, GraduationCap, Music2, Flame } from "lucide-react";
+import { apiClient } from "../../lib/axios";
 
 // Curvy path: smooth S-curve through all 7 node positions
 // viewBox coords: (cx, cy) within "0 0 1200 110"
 const SVG_PATH =
   "M 30,55 C 87,55 143,22 200,22 C 267,22 333,85 400,85 C 467,85 533,32 600,32 C 667,32 733,88 800,88 C 867,88 933,25 1000,25 C 1057,25 1113,55 1170,55";
 
-const MILESTONES = [
-  {
-    id: 1, period: "Jan 2023", title: "Idea Conceived", tagline: "The spark.",
-    desc: "Two wanderers with a stubborn belief that travel should feel more human — and less like a package tour. Scribbled on a napkin in a Ziro dhaba.",
-    icon: Lightbulb, above: false,
-    cx: 30, cy: 55,   // on the curve, middle height
-  },
-  {
-    id: 2, period: "Mar 2023", title: "First Trip Conducted", tagline: "We just went.",
-    desc: "Eight people, one valley, zero expectations. Arunachal Pradesh taught us everything we needed to know about building experiences that last.",
-    icon: MapPin, above: true,
-    cx: 200, cy: 22,  // peak — label above
-  },
-  {
-    id: 3, period: "May 2023", title: "First Paying Traveler", tagline: "Someone believed.",
-    desc: "A stranger paid us real money to take them somewhere real. That single act of trust became the foundation of everything Hangover Trails stands for.",
-    icon: User, above: false,
-    cx: 400, cy: 85,  // valley — label below
-  },
-  {
-    id: 4, period: "Sep 2023", title: "50 Travelers Milestone", tagline: "A community formed.",
-    desc: "Fifty stories, fifty homecomings, fifty people who came back changed. We knew then — this wasn't a side project anymore.",
-    icon: Users, above: true,
-    cx: 600, cy: 32,  // peak
-  },
-  {
-    id: 5, period: "Jan 2024", title: "Institute Collaborations", tagline: "Education meets adventure.",
-    desc: "Universities and colleges began trusting us with their students. Educational travel got a soul — field trips became field experiences.",
-    icon: GraduationCap, above: false,
-    cx: 800, cy: 88,  // valley
-  },
-  {
-    id: 6, period: "Aug 2024", title: "Festival Partnerships", tagline: "Culture came alive.",
-    desc: "We partnered with India's most raw and authentic festivals — Ziro Music Festival, Hornbill, Rann Utsav. Hangover Trails became a festival home.",
-    icon: Music2, above: true,
-    cx: 1000, cy: 25, // peak
-  },
-  {
-    id: 7, period: "Feb 2025", title: "Community Events", tagline: "Beyond the trip.",
-    desc: "Bonfires before departures, meetups between journeys, reunions after them. Hangover Trails stopped being a travel company and became a tribe.",
-    icon: Flame, above: true,
-    cx: 1170, cy: 55, // end, middle
-  },
+const LAYOUT = [
+  { cx: 30, cy: 55, above: false }, { cx: 200, cy: 22, above: true },
+  { cx: 400, cy: 85, above: false }, { cx: 600, cy: 32, above: true },
+  { cx: 800, cy: 88, above: false }, { cx: 1000, cy: 25, above: true },
+  { cx: 1170, cy: 55, above: true },
 ];
+const ICONS = { Lightbulb, MapPin, User, Users, GraduationCap, Music2, Flame };
+type JourneyRecord = { id: string; period: string; title: string; tagline: string; description: string; iconName: string };
 
 // Glowing dot that tracks the drawn tip of the path
 // Uses a short stroke with a large dashoffset that equals total-length minus drawn amount
@@ -109,22 +74,39 @@ function useElementScrollProgress(ref: React.RefObject<HTMLDivElement | null>) {
 
 export function OurJourney() {
   const [active, setActive] = useState(0);
+  const [records, setRecords] = useState<JourneyRecord[]>([]);
   const sectionRef = useRef<HTMLDivElement>(null);
   const scrollProgress = useElementScrollProgress(sectionRef);
+  const milestones = records.map((record, index) => ({
+    ...record,
+    desc: record.description,
+    icon: ICONS[record.iconName as keyof typeof ICONS] || MapPin,
+    ...(LAYOUT[index] || { cx: 30 + (1140 * index) / Math.max(1, records.length - 1), cy: index % 2 ? 25 : 85, above: index % 2 === 1 }),
+  }));
+
+  useEffect(() => {
+    let cancelled = false;
+    apiClient.get("/landing-content/journey")
+      .then((response) => { if (!cancelled) setRecords(response.data?.data || []); })
+      .catch(() => { if (!cancelled) setRecords([]); });
+    return () => { cancelled = true; };
+  }, []);
 
   // Drive active milestone from scroll
   useEffect(() => {
     const unsub = scrollProgress.on("change", (v) => {
-      const idx = Math.min(Math.floor(v * MILESTONES.length), MILESTONES.length - 1);
+      if (!milestones.length) return;
+      const idx = Math.min(Math.floor(v * milestones.length), milestones.length - 1);
       setActive(idx);
     });
     return unsub;
-  }, [scrollProgress]);
+  }, [scrollProgress, milestones.length]);
 
   // Drive the path drawing: 0 → 1 across the scroll section
   const pathLength = useTransform(scrollProgress, [0, 1], [0, 1]);
 
-  const milestone = MILESTONES[active];
+  if (!milestones.length) return null;
+  const milestone = milestones[Math.min(active, milestones.length - 1)];
   const Icon = milestone.icon;
 
   // SVG viewBox dimensions for % → px conversion
@@ -138,9 +120,10 @@ export function OurJourney() {
     <>
       {/* Tall scroll driver — 100vh per milestone */}
       <div
+        className="hidden md:block"
         ref={sectionRef}
         style={{
-          height: `${MILESTONES.length * 100}vh`,
+          height: `${milestones.length * 100}vh`,
           position: "relative",
           background: "#f5f0e6",
           borderTop: "1px solid rgba(0,0,0,0.06)",
@@ -254,7 +237,7 @@ export function OurJourney() {
                 <GlowDot path={SVG_PATH} pathLength={pathLength} />
 
                 {/* Milestone nodes */}
-                {MILESTONES.map((m, i) => {
+                {milestones.map((m, i) => {
                   const isActive = i === active;
                   const isPast = i <= active;
                   return (
@@ -282,7 +265,7 @@ export function OurJourney() {
               </svg>
 
               {/* Overlay: node labels (HTML for Poppins + rich layout) */}
-              {MILESTONES.map((m, i) => {
+              {milestones.map((m, i) => {
                 const isActive = i === active;
                 const isPast = i <= active;
                 // Convert SVG coords → % / px
@@ -338,10 +321,10 @@ export function OurJourney() {
             {/* Progress bar */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "clamp(0.8rem,2vh,1.5rem)", paddingTop: "8px", borderTop: "1px solid rgba(30,26,20,0.06)" }}>
               <span style={{ color: "rgba(30,26,20,0.3)", fontSize: "0.6rem", letterSpacing: "0.14em", textTransform: "uppercase" }}>
-                {String(active + 1).padStart(2, "0")} / {String(MILESTONES.length).padStart(2, "0")} milestones
+                {String(active + 1).padStart(2, "0")} / {String(milestones.length).padStart(2, "0")} milestones
               </span>
               <div style={{ display: "flex", gap: "5px" }}>
-                {MILESTONES.map((_, i) => (
+                {milestones.map((_, i) => (
                   <button key={i} onClick={() => setActive(i)} style={{ width: i === active ? "16px" : "4px", height: "2px", borderRadius: "1px", background: i === active ? "#b8943a" : "rgba(30,26,20,0.16)", border: "none", cursor: "pointer", padding: 0, transition: "width 0.4s ease, background 0.3s ease" }} />
                 ))}
               </div>
@@ -362,11 +345,11 @@ export function OurJourney() {
         </h2>
         <div style={{ position: "relative", paddingLeft: "34px" }}>
           <div style={{ position: "absolute", left: "9px", top: "6px", bottom: "6px", width: "1.5px", background: "linear-gradient(to bottom, #781216, rgba(120,18,22,0.12))" }} />
-          {MILESTONES.map((m, i) => {
+          {milestones.map((m, i) => {
             const isActive = i === active;
             const MIcon = m.icon;
             return (
-              <motion.div key={m.id} initial={{ opacity: 0, x: -14 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, amount: 0.3 }} transition={{ duration: 0.45, delay: i * 0.05 }} onClick={() => setActive(i)} style={{ position: "relative", marginBottom: i < MILESTONES.length - 1 ? "26px" : 0, cursor: "pointer" }}>
+              <motion.div key={m.id} initial={{ opacity: 0, x: -14 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, amount: 0.3 }} transition={{ duration: 0.45, delay: i * 0.05 }} onClick={() => setActive(i)} style={{ position: "relative", marginBottom: i < milestones.length - 1 ? "26px" : 0, cursor: "pointer" }}>
                 <div style={{ position: "absolute", left: "-28px", top: "5px", width: isActive ? "20px" : "15px", height: isActive ? "20px" : "15px", borderRadius: "50%", background: isActive ? "#781216" : "rgba(120,18,22,0.15)", border: `2px solid ${isActive ? "#781216" : "rgba(120,18,22,0.3)"}`, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.3s ease", boxShadow: isActive ? "0 0 0 5px rgba(120,18,22,0.12)" : "none", marginLeft: isActive ? "-2.5px" : "0", marginTop: isActive ? "-2.5px" : "0" }}>
                   <MIcon size={isActive ? 9 : 6} color={isActive ? "#ffffff" : "#781216"} strokeWidth={2} />
                 </div>

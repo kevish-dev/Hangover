@@ -27,6 +27,7 @@ import { SiteFooter } from "../components/site-footer";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { getMyProfile } from "../../lib/profileApi";
+import { mediaImageUrl } from "../../lib/media";
 
 // Razorpay is loaded as a static <script> in index.html
 declare const Razorpay: any;
@@ -152,6 +153,7 @@ function FilePickerField({
   file,
   onChange,
   existingUrl,
+  existingMimeType,
 }: {
   label: string;
   required?: boolean;
@@ -159,12 +161,14 @@ function FilePickerField({
   file: File | null;
   onChange: (f: File | null) => void;
   existingUrl?: string | null;
+  existingMimeType?: string | null;
 }) {
   const previewUrl = file ? URL.createObjectURL(file) : existingUrl;
+  const isPdf = file ? file.type === "application/pdf" : existingMimeType === "application/pdf";
 
   return (
     <Field label={label} required={required} hint={hint}>
-      {previewUrl && (
+      {previewUrl && !isPdf && (
         <div style={{ marginBottom: "12px" }}>
           <img
             src={previewUrl}
@@ -179,6 +183,11 @@ function FilePickerField({
             }}
           />
         </div>
+      )}
+      {previewUrl && isPdf && (
+        <a href={previewUrl} target="_blank" rel="noreferrer" style={{ color: "#781216", fontSize: "0.78rem" }}>
+          View uploaded PDF
+        </a>
       )}
       <label
         style={{
@@ -210,7 +219,7 @@ function FilePickerField({
         </span>
         <input
           type="file"
-          accept="image/*,.pdf"
+          accept="image/jpeg,image/png,image/webp,image/avif,application/pdf"
           required={required && !existingUrl && !file}
           style={{ display: "none" }}
           onChange={(e) => onChange(e.target.files?.[0] ?? null)}
@@ -265,7 +274,7 @@ function UncontrolledFilePicker({
         <input
           type="file"
           name={name}
-          accept="image/*,.pdf"
+          accept="image/jpeg,image/png,image/webp,image/avif,application/pdf"
           required={required && !file}
           style={{ display: "none" }}
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
@@ -481,7 +490,7 @@ function TravelerForm({
           <UncontrolledFilePicker
             label="Upload Aadhaar Card"
             name={`traveler-${index}-aadhaar`}
-            hint="Clear photo or scan — max 5 MB"
+            hint="Clear photo or scan — max 8 MB"
             required={true}
           />
         </div>
@@ -550,9 +559,9 @@ export default function BookingPage() {
   // Govt ID upload state
   const [govtIdImage, setGovtIdImage] = useState<File | null>(null);
 
-  // Check if already booked or just reserved (partial payment)
   const [hasBooked, setHasBooked] = useState(false);
   const [reservedBooking, setReservedBooking] = useState<any>(null);
+  const [pendingBooking, setPendingBooking] = useState<any>(null);
 
   // Payment choice
   const [paymentChoice, setPaymentChoice] = useState<"FULL" | "TOKEN">("FULL");
@@ -594,14 +603,24 @@ export default function BookingPage() {
         .get(`/bookings/me?limit=100`)
         .then((res) => {
           const bookings = res.data?.data || [];
+          const belongsToCurrentItem = (booking: any) => {
+            const itemId = isFestival
+              ? booking.festivalId || booking.festival?.id || booking.slot?.festivalId
+              : booking.tripId || booking.trip?.id || booking.slot?.tripId;
+            return itemId === trip.id;
+          };
           const confirmed = bookings.find(
-            (b: any) => (isFestival ? b.festivalId === trip.id : b.tripId === trip.id) && (b.status === "CONFIRMED" || b.status === "COMPLETED"),
+            (b: any) => belongsToCurrentItem(b) && b.status === "CONFIRMED",
           );
           const reserved = bookings.find(
-            (b: any) => (isFestival ? b.festivalId === trip.id : b.tripId === trip.id) && b.status === "RESERVED",
+            (b: any) => belongsToCurrentItem(b) && b.status === "RESERVED",
+          );
+          const pending = bookings.find(
+            (b: any) => belongsToCurrentItem(b) && b.status === "PENDING",
           );
           setHasBooked(!!confirmed);
           setReservedBooking(reserved || null);
+          setPendingBooking(pending || null);
         })
         .catch(console.error);
     }
@@ -725,12 +744,17 @@ export default function BookingPage() {
 
       // Upload additional travelers govt IDs
       const additionalTravelers = await Promise.all(extractedTravelers.map(async (t) => {
-        let aadhaarUrl = null;
-        if (t.aadhaarFile && t.aadhaarFile.size > 0) {
+        let aadhaarAssetId = null;
+        if (t.aadhaarFile && t.aadhaarFile.size > 0 && t.aadhaarFile.name) {
           const idForm = new FormData();
-          idForm.append("image", t.aadhaarFile);
-          const uploadRes = await apiClient.post("/bookings/traveler/govt-id", idForm);
-          aadhaarUrl = uploadRes.data.url;
+          idForm.append("image", t.aadhaarFile, t.aadhaarFile.name);
+          const uploadRes = await apiClient.post("/bookings/traveler/govt-id", idForm, {
+            // apiClient defaults to application/json; this endpoint is parsed by Multer.
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+          aadhaarAssetId = uploadRes.data.assetId;
+        } else {
+          throw new Error("Please upload an Aadhaar card for every additional traveler.");
         }
         return {
           fullName: `${t.firstName || ""} ${t.lastName || ""}`.trim(),
@@ -738,7 +762,7 @@ export default function BookingPage() {
           phone: t.phone,
           dateOfBirth: t.dob,
           gender: t.gender,
-          aadhaar: aadhaarUrl,
+          aadhaarAssetId,
         };
       }));
 
@@ -1506,6 +1530,79 @@ export default function BookingPage() {
     );
   }
 
+  if (pendingBooking) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f5f0e6",
+          fontFamily: "'Poppins', sans-serif",
+        }}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          style={{
+            textAlign: "center",
+            maxWidth: "480px",
+            padding: "3rem 2rem",
+          }}
+        >
+          <AlertCircle
+            size={52}
+            color="#b8943a"
+            strokeWidth={1.2}
+            style={{ margin: "0 auto 20px" }}
+          />
+          <h2
+            style={{
+              color: "#1e1a14",
+              fontSize: "1.6rem",
+              fontWeight: 300,
+              letterSpacing: "-0.02em",
+              margin: "0 0 8px",
+            }}
+          >
+            Pending Payment
+          </h2>
+          <p
+            style={{
+              color: "rgba(30,26,20,0.55)",
+              fontSize: "0.88rem",
+              fontWeight: 300,
+              lineHeight: 1.8,
+              margin: "0 0 28px",
+            }}
+          >
+            You already have a pending booking for this trip. Please complete the payment from your profile.
+          </p>
+          <Link
+            to={`/profile`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              color: "#781216",
+              fontSize: "0.78rem",
+              fontWeight: 600,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              textDecoration: "none",
+              borderBottom: "1.5px solid rgba(120,18,22,0.25)",
+              paddingBottom: "3px",
+            }}
+          >
+            Go to Profile Dashboard →
+          </Link>
+        </motion.div>
+      </div>
+    );
+  }
+
   if (hasBooked) {
     return (
       <div
@@ -1603,7 +1700,7 @@ export default function BookingPage() {
           style={{
             position: "absolute",
             inset: 0,
-            backgroundImage: `url(${tripImage})`,
+            backgroundImage: `url(${mediaImageUrl(tripImage, { width: 1280, height: 480, fit: "fill" })})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
             opacity: 0.08,
@@ -2006,10 +2103,11 @@ export default function BookingPage() {
                   <FilePickerField
                     label="Aadhaar / Govt ID"
                     required={!profile?.govtIdImageUrl}
-                    hint="Clear photo or scan — max 5 MB"
+                    hint="Clear photo or scan — max 8 MB"
                     file={govtIdImage}
                     onChange={setGovtIdImage}
                     existingUrl={profile?.govtIdImageUrl}
+                    existingMimeType={profile?.govtIdMimeType}
                   />
                 </div>
               </FormSection>
@@ -2669,8 +2767,10 @@ export default function BookingPage() {
                   }}
                 >
                   <img
-                    src={tripImage}
+                    src={mediaImageUrl(tripImage, { width: 640, height: 400 })}
                     alt={tripName}
+                    loading="lazy"
+                    decoding="async"
                     style={{
                       width: "100%",
                       height: "100%",

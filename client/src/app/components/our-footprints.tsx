@@ -1,14 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
+import { apiClient } from "../../lib/axios";
 
-const STATS = [
-  { value: 100, suffix: "+", label: "Travellers", sublabel: "and counting" },
-  { value: 15,  suffix: "+", label: "Trips Completed", sublabel: "across India" },
-  { value: 5,   suffix: "",  label: "Institutes Collaborated", sublabel: "edu partnerships" },
-  { value: 5,   suffix: "/5", label: "Customer Rating", sublabel: "average score" },
-  { value: 10,  suffix: "+", label: "Solo Travellers", sublabel: "found their tribe" },
-  { value: 90,  suffix: "+", label: "Group Travellers", sublabel: "lifetime memories" },
-];
+interface Footprint { id: string; value: number; suffix: string; label: string; sublabel: string; }
 
 /* ── animated counter hook ─────────────────────────────────────── */
 function useCountUp(
@@ -48,8 +42,8 @@ function useCountUp(
 }
 
 /* ── single stat ───────────────────────────────────────────────── */
-function Stat({ stat, index }: { stat: typeof STATS[0]; index: number }) {
-  const { count, ref } = useCountUp(stat.value, stat.decimals ?? 0, 2000 + index * 120);
+function Stat({ stat, index }: { stat: Footprint; index: number }) {
+  const { count, ref } = useCountUp(stat.value, 0, 2000 + index * 120);
 
   return (
     <motion.div
@@ -132,6 +126,10 @@ function Stat({ stat, index }: { stat: typeof STATS[0]; index: number }) {
 
 /* ── main export ───────────────────────────────────────────────── */
 export function OurFootprints() {
+  const [stats, setStats] = useState<Footprint[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  useEffect(() => { let cancelled = false; apiClient.get("/landing-content/footprints").then(r => { if (!cancelled) setStats(r.data?.data || []); }).catch(() => { if (!cancelled) setStats([]); }).finally(() => { if (!cancelled) setIsLoading(false); }); return () => { cancelled = true; }; }, []);
+  if (!isLoading && stats.length === 0) return null;
   return (
     <section
       style={{
@@ -231,7 +229,7 @@ export function OurFootprints() {
           style={{ display: "flex", flexWrap: "wrap" }}
           className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6"
         >
-          {STATS.map((stat, i) => (
+          {stats.map((stat, i) => (
             <Stat key={stat.label} stat={stat} index={i} />
           ))}
         </div>

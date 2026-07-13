@@ -15,7 +15,7 @@ import {
   SidebarTrigger,
   SidebarInset,
 } from "../../components/ui/sidebar";
-import { LayoutDashboard, Map, MapPin, CalendarCheck, Users, Settings, LogOut, CreditCard, MessageSquare, Home, Tent } from "lucide-react";
+import { LayoutDashboard, Map, MapPin, CalendarCheck, Users, Settings, LogOut, CreditCard, MessageSquare, Home, Tent, Star, Images } from "lucide-react";
 
 const navItems = [
   { title: "Home", url: "/", icon: Home },
@@ -25,6 +25,8 @@ const navItems = [
   { title: "Bookings", url: "/dashboard/bookings", icon: CalendarCheck },
   { title: "Payments", url: "/dashboard/payments", icon: CreditCard },
   { title: "Inquiries", url: "/dashboard/inquiries", icon: MessageSquare },
+  { title: "Reviews", url: "/dashboard/reviews", icon: Star },
+  { title: "Landing Page", url: "/dashboard/landing-page", icon: Images },
 ];
 
 export default function AdminLayout() {

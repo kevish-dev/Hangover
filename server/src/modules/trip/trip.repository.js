@@ -22,6 +22,8 @@ export const findAll = async (skip, take, where = {}, isAdmin = false) => {
         isActive: true,
         isPublished: true,
         isFeatured: true,
+        isSignature: true,
+        signatureOrder: true,
         createdAt: true,
         destination: true,
         tripTags: true,
@@ -198,7 +200,12 @@ export const remove = async (id) => {
 
 export const getFeaturedTrips = async () => {
   let featuredTrips = await prisma.trip.findMany({
-    where : { isFeatured : true, isActive: true, isPublished: true },
+    where : {
+      isFeatured: true,
+      isActive: true,
+      isPublished: true,
+      bannerImages: { isEmpty: false },
+    },
     select: {
       id: true,
       title: true,
@@ -220,3 +227,40 @@ export const getFeaturedTrips = async () => {
 
   return featuredTrips;
 }
+
+export const getSignatureTrips = async () => {
+  return prisma.trip.findMany({
+    where: {
+      isSignature: true,
+      isActive: true,
+      isPublished: true,
+      bannerImages: { isEmpty: false },
+    },
+    orderBy: [{ signatureOrder: "asc" }, { title: "asc" }],
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      overview: true,
+      location: true,
+      duration: true,
+      price: true,
+      bannerImages: true,
+    },
+  });
+};
+
+export const setSignatureTrips = async (tripIds) => {
+  return prisma.$transaction(async (tx) => {
+    await tx.trip.updateMany({ data: { isSignature: false, signatureOrder: 0 } });
+
+    await Promise.all(
+      tripIds.map((id, index) =>
+        tx.trip.update({
+          where: { id },
+          data: { isSignature: true, signatureOrder: index + 1 },
+        })
+      )
+    );
+  });
+};

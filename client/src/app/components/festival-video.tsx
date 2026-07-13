@@ -1,7 +1,9 @@
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { MapPin, Calendar, ArrowRight } from "lucide-react";
+import { fetchFeaturedFestivals, type ApiFestival } from "../../lib/festivalApi";
+import { mediaImageUrl, mediaVideoUrl } from "../../lib/media";
 import {
   ContainerStagger,
   ContainerAnimated,
@@ -51,69 +53,52 @@ function useElementScrollProgress(
   return progress;
 }
 
-// ── Data ──────────────────────────────────────────────────────────────────────
-
-const UPCOMING = [
-  {
-    name: "Ziro Music Festival",
-    place: "Arunachal Pradesh",
-    date: "24 - 28 September, 2025",
-    tag: "Music · Tribal · Indie",
-  },
-  // {
-  //   name: "Rann Utsav",
-  //   place: "Kutch, Gujarat",
-  //   date: "Nov 2025",
-  //   tag: "Culture · Desert · Craft",
-  // },
-  // {
-  //   name: "Hornbill Festival",
-  //   place: "Nagaland",
-  //   date: "Dec 2025",
-  //   tag: "Tribe · Dance · Heritage",
-  // },
-  // {
-  //   name: "Hampi Utsav",
-  //   place: "Karnataka",
-  //   date: "Jan 2026",
-  //   tag: "Ruins · Art · Classical",
-  // },
-];
-
-const VIDEOS = [
-  {
-    src: "https://videos.pexels.com/video-files/8086707/8086707-uhd_2560_1440_25fps.mp4",
-    label: "Ziro Music Festival",
-    location: "Arunachal Pradesh",
-    date: "Oct 2025",
-    quote: "Where indie music meets the mountains.",
-    range: [0, 0.38] as [number, number],
-    zIndex: 1,
-  },
-  {
-    src: "https://videos.pexels.com/video-files/8084758/8084758-uhd_2560_1440_25fps.mp4",
-    label: "Rann Utsav",
-    location: "Kutch, Gujarat",
-    date: "Nov 2025",
-    quote: "A full moon over the white desert.",
-    range: [0.33, 0.68] as [number, number],
-    zIndex: 2,
-  },
-  // {
-  //   src: video3Src as string,
-  //   label: "Hornbill Festival",
-  //   location: "Nagaland",
-  //   date: "Dec 2025",
-  //   quote: "Ancient tribes, living culture.",
-  //   range: [0.63, 1.0] as [number, number],
-  //   zIndex: 3,
-  // },
-];
+function formatFestivalDate(festival: ApiFestival) {
+  const slot = festival.slots?.[0];
+  if (!slot?.startDate) return festival.bestTimeToVisit || "Dates to be announced";
+  return new Intl.DateTimeFormat("en-IN", { month: "short", year: "numeric" }).format(new Date(slot.startDate));
+}
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export function FestivalVideo() {
   const navigate = useNavigate();
+  const [festivals, setFestivals] = useState<ApiFestival[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchFeaturedFestivals()
+      .then((data) => {
+        if (!cancelled) setFestivals(data.filter((festival) => festival.videoUrl || festival.bannerImages?.length > 0));
+      })
+      .catch(() => {
+        if (!cancelled) setFestivals([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!isLoading && festivals.length === 0) return null;
+
+  const videos = festivals.map((festival, index) => {
+    const step = 1 / Math.max(festivals.length, 1);
+    return {
+      id: festival.id,
+      videoUrl: festival.videoUrl,
+      imageUrl: festival.bannerImages?.[0] || "",
+      label: festival.title,
+      location: festival.location,
+      date: formatFestivalDate(festival),
+      quote: festival.overview,
+      range: [Math.max(0, index * step - 0.08), Math.min(1, (index + 1) * step + 0.08)] as [number, number],
+      zIndex: index + 1,
+    };
+  });
   return (
     <div
       style={{
@@ -201,8 +186,8 @@ export function FestivalVideo() {
                 margin: "0 auto 44px",
               }}
             >
-              {UPCOMING.map((f) => (
-                <FestivalChip key={f.name} festival={f} />
+              {festivals.map((festival) => (
+                <FestivalChip key={festival.id} festival={{ name: festival.title, place: festival.location, date: formatFestivalDate(festival), tag: festival.bestTimeToVisit || "Featured Festival" }} />
               ))}
             </div>
           </ContainerAnimated>
@@ -228,14 +213,14 @@ export function FestivalVideo() {
       </section>
 
       {/* Stacked scroll videos */}
-      <StackedVideos />
+      {isLoading ? <div style={{ height: "min(160vh, 900px)", background: "#1a1612" }} /> : <StackedVideos videos={videos} />}
     </div>
   );
 }
 
 // ── Stacked Videos ────────────────────────────────────────────────────────────
 
-function StackedVideos() {
+function StackedVideos({ videos }: { videos: VideoMeta[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollYProgress =
     useElementScrollProgress(containerRef);
@@ -244,7 +229,7 @@ function StackedVideos() {
     <div
       ref={containerRef}
       style={{
-        height: "300vh",
+        height: "min(300vh, 2100px)",
         background: "#1a1612",
         position: "relative",
       }}
@@ -262,7 +247,7 @@ function StackedVideos() {
           pointerEvents: "none",
         }}
       />
-      {VIDEOS.map((v) => (
+      {videos.map((v) => (
         <VideoLayer
           key={v.label}
           video={v}
@@ -274,7 +259,9 @@ function StackedVideos() {
 }
 
 interface VideoMeta {
-  src: string;
+  id: string;
+  videoUrl: string | null;
+  imageUrl: string;
   label: string;
   location: string;
   date: string;
@@ -290,6 +277,33 @@ function VideoLayer({
   video: VideoMeta;
   scrollYProgress: MotionValue<number>;
 }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [shouldLoad, setShouldLoad] = useState(false);
+
+  useEffect(() => {
+    const node = videoRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setShouldLoad(entry.isIntersecting),
+      { rootMargin: "150px 0px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const node = videoRef.current;
+    if (!node) return;
+    if (shouldLoad) {
+      node.load();
+      node.play().catch(() => undefined);
+    }
+    else {
+      node.pause();
+      node.removeAttribute("src");
+      node.load();
+    }
+  }, [shouldLoad]);
   const progress = useTransform(
     scrollYProgress,
     video.range,
@@ -310,10 +324,9 @@ function VideoLayer({
 
   return (
     <div
+      className="aspect-[9/16] w-full max-h-[85vh] top-[7.5vh] md:max-h-none md:aspect-auto md:h-screen md:top-0 mx-auto"
       style={{
         position: "sticky",
-        top: 0,
-        height: "100vh",
         zIndex: video.zIndex,
         overflow: "hidden",
       }}
@@ -328,10 +341,11 @@ function VideoLayer({
         }}
       >
         <motion.video
-          autoPlay
+          ref={videoRef}
           muted
           loop
           playsInline
+          preload="none"
           style={{
             width: "100%",
             height: "100%",
@@ -340,8 +354,16 @@ function VideoLayer({
             scale,
           }}
         >
-          <source src={video.src} type="video/mp4" />
+          {shouldLoad && video.videoUrl && <source src={mediaVideoUrl(video.videoUrl)} type="video/mp4" />}
         </motion.video>
+
+        {!video.videoUrl && (
+          <img
+            src={mediaImageUrl(video.imageUrl, { width: 1920, fit: "fit" })}
+            alt={video.label}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
 
         <div
           style={{
@@ -361,43 +383,17 @@ function VideoLayer({
             right: "clamp(20px,4vw,56px)",
             display: "flex",
             alignItems: "flex-end",
-            justifyContent: "space-between",
+            justifyContent: "flex-end",
             pointerEvents: "none",
           }}
         >
-          <div>
-            <p
-              style={{
-                color: "#b8943a",
-                fontSize: "0.6rem",
-                fontWeight: 500,
-                letterSpacing: "0.24em",
-                textTransform: "uppercase",
-                marginBottom: "5px",
-                fontFamily: "'Poppins', sans-serif",
-              }}
-            >
-              {video.location} · {video.date}
-            </p>
-            <p
-              style={{
-                color: "#f2ede4",
-                fontSize: "clamp(1rem,2.2vw,1.5rem)",
-                fontWeight: 300,
-                letterSpacing: "-0.01em",
-                fontStyle: "italic",
-                fontFamily: "'Poppins', sans-serif",
-              }}
-            >
-              "{video.quote}"
-            </p>
-          </div>
           <div
             style={{
               background: "rgba(242,237,228,0.08)",
               border: "1px solid rgba(242,237,228,0.18)",
               padding: "8px 16px",
               backdropFilter: "blur(6px)",
+              maxWidth: "100%",
             }}
           >
             <span
@@ -408,6 +404,7 @@ function VideoLayer({
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
                 fontFamily: "'Poppins', sans-serif",
+                lineHeight: 1.4,
               }}
             >
               {video.label}
@@ -454,7 +451,9 @@ function GoldButton({
         cursor: "pointer",
         display: "inline-flex",
         alignItems: "center",
+        justifyContent: "center",
         gap: "8px",
+        width: "min(100%, 260px)",
         fontFamily: "'Poppins', sans-serif",
         transition: "background 0.25s ease",
       }}
@@ -490,6 +489,7 @@ function OutlineButton({
         letterSpacing: "0.1em",
         textTransform: "uppercase",
         cursor: "pointer",
+        width: "min(100%, 260px)",
         fontFamily: "'Poppins', sans-serif",
         transition: "border-color 0.25s ease, color 0.25s ease",
       }}
@@ -511,7 +511,7 @@ function OutlineButton({
 function FestivalChip({
   festival,
 }: {
-  festival: (typeof UPCOMING)[0];
+  festival: { name: string; place: string; date: string; tag: string };
 }) {
   return (
     <div
@@ -525,7 +525,9 @@ function FestivalChip({
         padding: "22px 28px",
         cursor: "pointer",
         textAlign: "left",
-        minWidth: "220px",
+        width: "100%",
+        minWidth: 0,
+        maxWidth: "420px",
         flex: "1 1 220px",
         transition:
           "border-color 0.25s ease, background 0.25s ease, transform 0.2s ease",

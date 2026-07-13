@@ -15,6 +15,7 @@ import {
   type ApiTrip,
 } from "../../lib/tripApi";
 import { fetchAllFestivals } from "../../lib/festivalApi";
+import { mediaImageUrl } from "../../lib/media";
 
 export type ExtendedTrip = ApiTrip & { isFestival?: boolean };
 
@@ -438,7 +439,7 @@ function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
     >
       <div style={{ position: "relative", aspectRatio: "16/10", overflow: "hidden" }}>
         {heroImage ? (
-          <img src={heroImage} alt={trip.title} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.55s ease", transform: hovered ? "scale(1.05)" : "scale(1)" }} />
+          <img src={mediaImageUrl(heroImage, { width: 640, height: 400 })} alt={trip.title} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.55s ease", transform: hovered ? "scale(1.05)" : "scale(1)" }} />
         ) : (
           <div style={{ width: "100%", height: "100%", background: "#ede8dc", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <NA text="No Image" />
@@ -798,7 +799,7 @@ export default function TripsPage() {
   const activeCount = Object.values(filters).flat().filter(Boolean).length;
 
   const filtered = useMemo(() => {
-    let list = trips.filter((t) => {
+    let list = trips?.filter((t) => {
       // Search
       const q = search.toLowerCase();
       const tags = t.tripTags?.map((tg) => tg.tag) || [];
@@ -856,7 +857,7 @@ export default function TripsPage() {
         <div style={{ maxWidth: "1280px", margin: "0 auto", position: "relative", zIndex: 1 }}>
           <p style={{ color: "#C8A96E", fontSize: "0.7rem", fontWeight: 500, letterSpacing: "0.28em", textTransform: "uppercase", marginBottom: "12px" }}>/ Our Trips</p>
           <h1 style={{ color: "#f2ede4", fontSize: "clamp(2.2rem,5vw,4rem)", fontWeight: 300, letterSpacing: "-0.03em", lineHeight: 1.1, margin: "0 0 16px" }}>
-            Find your kind of <em style={{ color: "#C8A96E", fontStyle: "italic" }}>adventure.</em>
+            Find your kind of <strong><em style={{ color: "#C8A96E", fontStyle: "italic" }}>experience.</em></strong>
           </h1>
           <p style={{ color: "rgba(242,237,228,0.5)", fontSize: "0.88rem", fontWeight: 300, lineHeight: 1.8, maxWidth: "480px", margin: 0 }}>
             {loading ? "Loading trips…" : `${trips.length} handcrafted trips across India and beyond — each one built around real experiences.`}

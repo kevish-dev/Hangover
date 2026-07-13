@@ -14,6 +14,7 @@ import {
   PackageOpen,
   RotateCcw,
   ReceiptText,
+  CreditCard,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -28,6 +29,7 @@ import {
 import { formatPrice, formatDuration, formatTripType } from "../../lib/tripApi";
 import { SiteFooter } from "../components/site-footer";
 import { ProfileSettings } from "../components/profile-settings";
+import { mediaImageUrl } from "../../lib/media";
 
 // ── Status badge styling ──────────────────────────────────────────
 
@@ -76,6 +78,10 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
   const isFullyRefunded = booking.paymentStatus === "REFUNDED";
   const isPartiallyRefunded = booking.paymentStatus === "PARTIALLY_REFUNDED";
   const isRefunded = isFullyRefunded || isPartiallyRefunded;
+  const canPayBalance =
+    due > 0 &&
+    booking.status === "RESERVED" &&
+    booking.paymentStatus === "PARTIALLY_PAID";
 
   // Sum up all successful or pending refunds across payments
   const totalRefunded = (booking.payments || []).reduce((sum, p) => {
@@ -129,8 +135,10 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
       >
         {heroImage ? (
           <img
-            src={heroImage}
+            src={mediaImageUrl(heroImage, { width: 400, height: 320 })}
             alt={item?.title}
+            loading="lazy"
+            decoding="async"
             style={{
               width: "100%",
               height: "100%",
@@ -338,6 +346,30 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
 
           {/* CTAs */}
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {canPayBalance && (
+              <Link
+                to={`/bookings/${booking.id}/pay-balance`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  background: "#b8943a",
+                  color: "#fff",
+                  fontSize: "0.68rem",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  padding: "5px 12px",
+                  borderRadius: "6px",
+                  whiteSpace: "nowrap",
+                  transition: "background 0.2s ease",
+                  letterSpacing: "0.02em",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#9f7f2f")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "#b8943a")}
+              >
+                <CreditCard size={10} /> Pay Balance
+              </Link>
+            )}
             {/* Book Again — only shown for fully refunded trips */}
             {isFullyRefunded && (
               <Link

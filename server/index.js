@@ -15,6 +15,10 @@ import tripTagRoutes from "./src/modules/trip-tag/trip-tag.routes.js";
 import inquiryRoutes from "./src/modules/inquiry/inquiry.routes.js";
 import paymentRoutes from "./src/modules/payment/payment.routes.js";
 import destinationRoutes from "./src/modules/destination/destination.routes.js";
+import reviewRoutes from "./src/modules/review/review.routes.js";
+import landingReasonRoutes from "./src/modules/landing-reason/landing-reason.routes.js";
+import landingTripTypeRoutes from "./src/modules/landing-trip-type/landing-trip-type.routes.js";
+import landingContentRoutes from "./src/modules/landing-content/landing-content.routes.js";
 import { errorHandler } from "./src/core/errors/errorHandler.js";
 import { prisma } from "./src/prisma/client.js";
 const app = express();
@@ -50,6 +54,10 @@ app.use("/api/v1/trip-tags", tripTagRoutes);
 app.use("/api/v1/inquiries", inquiryRoutes);
 app.use("/api/v1/payments", paymentRoutes);
 app.use("/api/v1/destinations", destinationRoutes);
+app.use("/api/v1/reviews", reviewRoutes);
+app.use("/api/v1/landing-reasons", landingReasonRoutes);
+app.use("/api/v1/landing-trip-types", landingTripTypeRoutes);
+app.use("/api/v1/landing-content", landingContentRoutes);
 
 app.get("/openapi.json", (req, res) => {
   res.json(generateOpenApiDocument());

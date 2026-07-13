@@ -71,6 +71,8 @@ export interface ApiTrip {
   isActive: boolean;
   isPublished: boolean;
   isFeatured: boolean;
+  isSignature?: boolean;
+  signatureOrder?: number;
   destinationId: string | null;
   destination: ApiDestination | null;
   tripTags: ApiTripTag[];

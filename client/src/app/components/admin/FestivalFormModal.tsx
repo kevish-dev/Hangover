@@ -30,6 +30,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ItineraryStep } from "./ItineraryStep";
+import { uploadBannerImagesDirect } from "../../../lib/directImageUpload";
 
 // --- VALIDATION SCHEMA ---
 const festivalSchema = z.object({
@@ -228,6 +229,13 @@ export function FestivalFormModal({
           isPublished: festival.isPublished || false,
           isFeatured: festival.isFeatured || false,
         });
+        // Keep the field-array source of truth in sync with the values shown
+        // after editing an existing festival. This prevents validation from
+        // reading a stale array while the inputs appear populated.
+        replaceSlots(form.getValues("slots"));
+        replaceInclusions(form.getValues("inclusions"));
+        replaceExclusions(form.getValues("exclusions"));
+        form.clearErrors();
 
         // Initialize Highlight items
         let parsedHighlights = festival.highlights || [];
@@ -275,6 +283,10 @@ export function FestivalFormModal({
           isPublished: false,
           isFeatured: false,
         });
+        replaceSlots(form.getValues("slots"));
+        replaceInclusions(form.getValues("inclusions"));
+        replaceExclusions(form.getValues("exclusions"));
+        form.clearErrors();
         setStayItems([]);
         setHighlightItems([]);
       }
@@ -290,6 +302,7 @@ export function FestivalFormModal({
     fields: inclusionFields,
     append: addInclusion,
     remove: removeInclusion,
+    replace: replaceInclusions,
   } = useFieldArray({
     control: form.control,
     name: "inclusions",
@@ -298,6 +311,7 @@ export function FestivalFormModal({
     fields: exclusionFields,
     append: addExclusion,
     remove: removeExclusion,
+    replace: replaceExclusions,
   } = useFieldArray({
     control: form.control,
     name: "exclusions",
@@ -323,6 +337,7 @@ export function FestivalFormModal({
     fields: slotFields,
     append: appendSlot,
     remove: removeSlot,
+    replace: replaceSlots,
   } = useFieldArray({
     name: "slots",
     control: form.control,
@@ -594,7 +609,14 @@ export function FestivalFormModal({
         return next;
       });
     } else {
-      const errors = form.formState.errors;
+      const errors = fieldsToValidate.reduce<Record<string, unknown>>(
+        (stepErrors, field) => {
+          const error = form.getFieldState(field).error;
+          if (error) stepErrors[field] = error;
+          return stepErrors;
+        },
+        {},
+      );
       const missing = getStepErrors(errors, fieldsToValidate);
       if (missing.length > 0) {
         toast.error(
@@ -742,12 +764,11 @@ export function FestivalFormModal({
 
       // Sync Banners
       if (images.length > 0) {
-        const formData = new FormData();
-        images.forEach((img) => formData.append("banners", img));
-        await apiClient.post(`/festivals/${festivalId}/banner-images`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
+        const uploadToast = toast.loading(`Uploading banners (0/${images.length})…`);
+        await uploadBannerImagesDirect("festivals", festivalId, images, (completed, total) => {
+          toast.loading(`Uploading banners (${completed}/${total})…`, { id: uploadToast });
         });
-        toast.success("Banner images uploaded!");
+        toast.success("Banner images uploaded!", { id: uploadToast });
       }
 
       // Sync Video

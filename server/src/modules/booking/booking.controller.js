@@ -1,5 +1,4 @@
 import * as bookingService from "./booking.service.js";
-import { uploadToCloudinary } from "../../core/services/upload.service.js";
 import { ValidationError } from "../../core/errors/errors.js";
 
 export const createBooking = async (req, res, next) => {
@@ -82,8 +81,17 @@ export const cancelAndRefundBooking = async (req, res, next) => {
 export const uploadTravelerGovtId = async (req, res, next) => {
   try {
     if (!req.file) throw new ValidationError("No file uploaded");
-    const url = await uploadToCloudinary(req.file.buffer, { folder: `uploads/travelers/${req.user.id}/govtid` });
-    res.status(200).json({ url });
+    const asset = await bookingService.uploadTravelerGovtId(req.user.id, req.file);
+    res.status(200).json({ assetId: asset.id });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const finalizeBooking = async (req, res, next) => {
+  try {
+    const result = await bookingService.finalizeBooking(req.params.id);
+    res.status(200).json(result);
   } catch (error) {
     next(error);
   }

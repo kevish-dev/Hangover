@@ -34,7 +34,7 @@ registry.registerPath({
   method: "post",
   path: "/payments/balance/initiate",
   summary: "Initiate balance payment",
-  description: "Creates a Razorpay order for the outstanding balance on a RESERVED/PARTIALLY_PAID booking. Blocked after the balance due date (10 days before trip) unless admin.",
+  description: "Creates a Razorpay order for the outstanding balance on a RESERVED/PARTIALLY_PAID booking.",
   tags: ["Payment"],
   security: [{ cookieAuth: [] }],
   request: {
@@ -48,7 +48,7 @@ registry.registerPath({
   },
   responses: {
     200: { description: "Razorpay order created for balance payment" },
-    400: { description: "Balance due date passed or no outstanding balance" },
+    400: { description: "Booking is not eligible or has no outstanding balance" },
     404: { description: "Booking not found" },
   },
 });

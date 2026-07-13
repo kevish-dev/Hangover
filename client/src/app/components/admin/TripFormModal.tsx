@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ItineraryStep } from "./ItineraryStep";
 import { formatTripType } from "../../../lib/tripApi";
+import { uploadBannerImagesDirect } from "../../../lib/directImageUpload";
 
 // --- VALIDATION SCHEMA ---
 const tripSchema = z.object({
@@ -241,6 +242,13 @@ export function TripFormModal({
           isPublished: trip.isPublished || false,
           isFeatured: trip.isFeatured || false,
         });
+        // Keep the field-array source of truth in sync with the values shown
+        // after editing an existing trip. This prevents validation from reading
+        // a stale array while the inputs appear populated.
+        replaceSlots(form.getValues("slots"));
+        replaceInclusions(form.getValues("inclusions"));
+        replaceExclusions(form.getValues("exclusions"));
+        form.clearErrors();
 
         // Initialize Highlight items
         let parsedHighlights = trip.highlights || [];
@@ -288,6 +296,10 @@ export function TripFormModal({
           isPublished: false,
           isFeatured: false,
         });
+        replaceSlots(form.getValues("slots"));
+        replaceInclusions(form.getValues("inclusions"));
+        replaceExclusions(form.getValues("exclusions"));
+        form.clearErrors();
         setStayItems([]);
         setHighlightItems([]);
       }
@@ -301,6 +313,7 @@ export function TripFormModal({
     fields: inclusionFields,
     append: addInclusion,
     remove: removeInclusion,
+    replace: replaceInclusions,
   } = useFieldArray({
     control: form.control,
     name: "inclusions",
@@ -309,6 +322,7 @@ export function TripFormModal({
     fields: exclusionFields,
     append: addExclusion,
     remove: removeExclusion,
+    replace: replaceExclusions,
   } = useFieldArray({
     control: form.control,
     name: "exclusions",
@@ -333,6 +347,7 @@ export function TripFormModal({
     fields: slotFields,
     append: appendSlot,
     remove: removeSlot,
+    replace: replaceSlots,
   } = useFieldArray({
     name: "slots",
     control: form.control,
@@ -595,7 +610,14 @@ export function TripFormModal({
     if (await validateStep()) {
       setStep((s) => Math.min(STEPS.length - 1, s + 1));
     } else {
-      const errors = form.formState.errors;
+      const errors = fieldsToValidate.reduce<Record<string, unknown>>(
+        (stepErrors, field) => {
+          const error = form.getFieldState(field).error;
+          if (error) stepErrors[field] = error;
+          return stepErrors;
+        },
+        {},
+      );
       const missing = getStepErrors(errors, fieldsToValidate);
       if (missing.length > 0) {
         toast.error(
@@ -682,7 +704,7 @@ export function TripFormModal({
         const stayPayload: any[] = [];
         let fileIndex = 0;
 
-        for (const item of stayItems) {
+        const compressionPromises = stayItems.map(async (item) => {
           if (item.type === "NEW" && item.file) {
             try {
               const compressedFile = await imageCompression(item.file, { 
@@ -690,28 +712,41 @@ export function TripFormModal({
                 initialQuality: 0.9,
                 useWebWorker: true
               });
-              stayFormData.append("images", compressedFile);
+              return { file: compressedFile, item, type: "NEW" };
             } catch (err) {
-              stayFormData.append("images", item.file);
+              return { file: item.file, item, type: "NEW" };
             }
-            stayPayload.push({ text: item.text, type: "NEW", fileIndex });
+          }
+          return { item, type: "EXISTING" };
+        });
+
+        const stayResults = await Promise.all(compressionPromises);
+
+        stayResults.forEach((result) => {
+          if (result.type === "NEW" && result.file) {
+            stayFormData.append("images", result.file);
+            stayPayload.push({ text: result.item.text, type: "NEW", fileIndex });
             fileIndex++;
-          } else if (item.type === "EXISTING") {
+          } else if (result.type === "EXISTING") {
             stayPayload.push({
-              text: item.text,
+              text: result.item.text,
               type: "EXISTING",
-              url: item.url,
+              url: result.item.url,
             });
           }
-        }
+        });
         stayFormData.append("payload", JSON.stringify(stayPayload));
 
-        await apiClient.post(`/trips/${tripId}/stay-transport`, stayFormData);
+        await apiClient.post(`/trips/${tripId}/stay-transport`, stayFormData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
         toast.success("Stay & Transport updated!");
       } else if (isEdit) {
         const stayFormData = new FormData();
         stayFormData.append("payload", JSON.stringify([]));
-        await apiClient.post(`/trips/${tripId}/stay-transport`, stayFormData);
+        await apiClient.post(`/trips/${tripId}/stay-transport`, stayFormData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
       }
 
       // Sync Highlights
@@ -720,7 +755,7 @@ export function TripFormModal({
         const highlightPayload: any[] = [];
         let highlightFileIndex = 0;
 
-        for (const item of highlightItems) {
+        const highlightPromises = highlightItems.map(async (item) => {
           if (item.type === "NEW" && item.file) {
             try {
               const compressedFile = await imageCompression(item.file, { 
@@ -728,47 +763,50 @@ export function TripFormModal({
                 initialQuality: 0.9,
                 useWebWorker: true
               });
-              highlightFormData.append("images", compressedFile);
+              return { file: compressedFile, item, type: "NEW" };
             } catch (err) {
-              highlightFormData.append("images", item.file);
+              return { file: item.file, item, type: "NEW" };
             }
-            highlightPayload.push({ text: item.text, type: "NEW", fileIndex: highlightFileIndex });
+          }
+          return { item, type: "EXISTING" };
+        });
+
+        const highlightResults = await Promise.all(highlightPromises);
+
+        highlightResults.forEach((result) => {
+          if (result.type === "NEW" && result.file) {
+            highlightFormData.append("images", result.file);
+            highlightPayload.push({ text: result.item.text, type: "NEW", fileIndex: highlightFileIndex });
             highlightFileIndex++;
-          } else if (item.type === "EXISTING") {
+          } else if (result.type === "EXISTING") {
             highlightPayload.push({
-              text: item.text,
+              text: result.item.text,
               type: "EXISTING",
-              url: item.url,
+              url: result.item.url,
             });
           }
-        }
+        });
         highlightFormData.append("payload", JSON.stringify(highlightPayload));
 
-        await apiClient.post(`/trips/${tripId}/highlights`, highlightFormData);
+        await apiClient.post(`/trips/${tripId}/highlights`, highlightFormData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
         toast.success("Highlights updated!");
       } else if (isEdit) {
         const highlightFormData = new FormData();
         highlightFormData.append("payload", JSON.stringify([]));
-        await apiClient.post(`/trips/${tripId}/highlights`, highlightFormData);
+        await apiClient.post(`/trips/${tripId}/highlights`, highlightFormData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
       }
 
       // Sync Banners
       if (images.length > 0) {
-        const formData = new FormData();
-        for (const img of images) {
-          try {
-            const compressedFile = await imageCompression(img, { 
-              maxSizeMB: 10, 
-              initialQuality: 0.9,
-              useWebWorker: true
-            });
-            formData.append("banners", compressedFile);
-          } catch (err) {
-            formData.append("banners", img);
-          }
-        }
-        await apiClient.post(`/trips/${tripId}/banner-images`, formData);
-        toast.success("Banner images uploaded!");
+        const uploadToast = toast.loading(`Uploading banners (0/${images.length})…`);
+        await uploadBannerImagesDirect("trips", tripId, images, (completed, total) => {
+          toast.loading(`Uploading banners (${completed}/${total})…`, { id: uploadToast });
+        });
+        toast.success("Banner images uploaded!", { id: uploadToast });
       }
 
       queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
