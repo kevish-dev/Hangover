@@ -57,11 +57,6 @@ const cloudinaryResourceType = (resourceType) => resourceType?.toLowerCase?.() |
  */
 export const uploadPublicImage = async (buffer, options = {}) => {
   const { folder, publicId } = options;
-  const normalized = await sharp(buffer, { limitInputPixels: 40_000_000 })
-    .rotate()
-    .resize(2560, 1920, { fit: "inside", withoutEnlargement: true })
-    .webp({ quality: 84, smartSubsample: true })
-    .toBuffer();
 
   return new Promise((resolve, reject) => {
     cloudinary.uploader.upload_stream(
@@ -70,10 +65,9 @@ export const uploadPublicImage = async (buffer, options = {}) => {
         public_id: publicId,
         overwrite: Boolean(publicId),
         resource_type: "image",
-        format: "webp",
       },
       (error, result) => (error ? reject(error) : resolve(result)),
-    ).end(normalized);
+    ).end(buffer);
   });
 };
 
@@ -140,6 +134,7 @@ export const uploadPublicVideo = async (file, options = {}) => {
   return new Promise((resolve, reject) => {
     cloudinary.uploader.upload_stream(
       {
+        chunk_size: 6000000,
         folder,
         public_id: publicId,
         overwrite: Boolean(publicId),

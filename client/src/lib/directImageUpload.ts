@@ -1,31 +1,14 @@
 import { apiClient } from "./axios";
-import imageCompression from "browser-image-compression";
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
-
-const prepareImage = async (file: File) => {
-  if (file.size <= 2.5 * 1024 * 1024) return file;
-  try {
-    return await imageCompression(file, {
-      maxSizeMB: 2.5,
-      maxWidthOrHeight: 2560,
-      initialQuality: 0.86,
-      useWebWorker: true,
-    });
-  } catch {
-    // Cloudinary can still accept the original if a browser cannot decode it locally.
-    return file;
-  }
-};
 
 const uploadOne = async (file: File, signature: { cloudName: string; apiKey: string; timestamp: number; folder: string; signature: string }) => {
   if (!IMAGE_TYPES.has(file.type)) throw new Error(`${file.name}: use JPG, PNG, WebP, or AVIF.`);
   if (file.size > MAX_IMAGE_BYTES) throw new Error(`${file.name}: maximum file size is 12 MB.`);
 
-  const prepared = await prepareImage(file);
   const body = new FormData();
-  body.append("file", prepared, prepared.name || file.name);
+  body.append("file", file, file.name);
   body.append("api_key", signature.apiKey);
   body.append("timestamp", String(signature.timestamp));
   body.append("folder", signature.folder);

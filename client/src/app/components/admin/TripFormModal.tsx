@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import imageCompression from "browser-image-compression";
 import {
   Dialog,
   DialogContent,
@@ -704,23 +703,14 @@ export function TripFormModal({
         const stayPayload: any[] = [];
         let fileIndex = 0;
 
-        const compressionPromises = stayItems.map(async (item) => {
+        const stayPromises = stayItems.map(async (item) => {
           if (item.type === "NEW" && item.file) {
-            try {
-              const compressedFile = await imageCompression(item.file, { 
-                maxSizeMB: 10, 
-                initialQuality: 0.9,
-                useWebWorker: true
-              });
-              return { file: compressedFile, item, type: "NEW" };
-            } catch (err) {
-              return { file: item.file, item, type: "NEW" };
-            }
+            return { file: item.file, item, type: "NEW" };
           }
           return { item, type: "EXISTING" };
         });
 
-        const stayResults = await Promise.all(compressionPromises);
+        const stayResults = await Promise.all(stayPromises);
 
         stayResults.forEach((result) => {
           if (result.type === "NEW" && result.file) {
@@ -757,16 +747,7 @@ export function TripFormModal({
 
         const highlightPromises = highlightItems.map(async (item) => {
           if (item.type === "NEW" && item.file) {
-            try {
-              const compressedFile = await imageCompression(item.file, { 
-                maxSizeMB: 10, 
-                initialQuality: 0.9,
-                useWebWorker: true
-              });
-              return { file: compressedFile, item, type: "NEW" };
-            } catch (err) {
-              return { file: item.file, item, type: "NEW" };
-            }
+            return { file: item.file, item, type: "NEW" };
           }
           return { item, type: "EXISTING" };
         });
