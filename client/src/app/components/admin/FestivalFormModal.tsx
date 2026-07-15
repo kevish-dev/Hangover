@@ -59,6 +59,7 @@ const festivalSchema = z.object({
   tags: z.array(z.object({ value: z.string().min(1) })).optional(),
   packages: z.array(
     z.object({
+      id: z.string().uuid().optional(),
       title: z.string().min(1, "Package name is required"),
       price: z.coerce.number().min(1, "Price must be greater than 0"),
       tokenAmount: z.coerce.number().min(0, "Booking amount must be 0 or more"),
@@ -206,6 +207,7 @@ export function FestivalFormModal({
             : [{ value: "" }],
           packages: festival.packages?.length
             ? festival.packages.map((p: any) => ({
+                id: p.id,
                 title: p.title,
                 price: Number(p.price),
                 tokenAmount: Number(p.tokenAmount),

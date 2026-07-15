@@ -282,16 +282,16 @@ model Booking {
   updatedAt          DateTime          @updatedAt
   packageId          String?
   slotId             String
-  package            Package?          @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  slot               Slot              @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  package            Package?          @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  slot               Slot              @relation(fields: [slotId], references: [id], onDelete: Restrict)
   user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   payments           Payment[]
   paymentIntents     PaymentIntent[]
   reminders          PaymentReminder[]
   travelers          Traveler[]
-  trip               Trip?             @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  trip               Trip?             @relation(fields: [tripId], references: [id], onDelete: Restrict)
   tripId             String?
-  festival           Festival?         @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  festival           Festival?         @relation(fields: [festivalId], references: [id], onDelete: Restrict)
   festivalId         String?
   review             Review?
 

@@ -135,13 +135,47 @@ export const update = async (id, data) => {
   }
 
   if (packages && Array.isArray(packages)) {
+    const existingPackages = await prisma.package.findMany({
+      where: { festivalId: id },
+      select: { id: true },
+    });
+    const incomingPackageIds = packages.map(pkg => pkg.id).filter(Boolean);
+    const existingPackageIds = new Set(existingPackages.map(pkg => pkg.id));
+
+    if (new Set(incomingPackageIds).size !== incomingPackageIds.length) {
+      throw new Error("Duplicate package IDs are not allowed");
+    }
+
+    if (incomingPackageIds.some(packageId => !existingPackageIds.has(packageId))) {
+      throw new Error("One or more packages do not belong to this festival");
+    }
+
+    const packagesToDelete = existingPackages.filter(pkg => !incomingPackageIds.includes(pkg.id));
+    if (packagesToDelete.length > 0) {
+      const packageWithBookings = await prisma.booking.findFirst({
+        where: { packageId: { in: packagesToDelete.map(pkg => pkg.id) } },
+        select: { id: true },
+      });
+      if (packageWithBookings) {
+        throw new Error("Cannot delete packages that have existing bookings");
+      }
+    }
+
     payload.packages = {
-      deleteMany: {},
-      create: packages.map(pkg => ({
-        title: pkg.title,
-        price: pkg.price,
-        tokenAmount: pkg.tokenAmount
-      }))
+      deleteMany: { id: { in: packagesToDelete.map(pkg => pkg.id) } },
+      upsert: packages.map(pkg => ({
+        where: { id: pkg.id || "00000000-0000-0000-0000-000000000000" },
+        update: {
+          title: pkg.title,
+          price: pkg.price,
+          tokenAmount: pkg.tokenAmount,
+        },
+        create: {
+          title: pkg.title,
+          price: pkg.price,
+          tokenAmount: pkg.tokenAmount,
+        },
+      })),
     };
   }
   
