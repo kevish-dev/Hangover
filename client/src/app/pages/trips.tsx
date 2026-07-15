@@ -34,6 +34,7 @@ const PRICE_RANGES = [
 ];
 
 const SORT_OPTIONS = [
+  { label: "Browse by Destination", value: "destination" },
   { label: "Most Popular",     value: "popular" },
   { label: "Price: Low → High", value: "price_asc" },
   { label: "Price: High → Low", value: "price_desc" },
@@ -688,6 +689,56 @@ function DestinationSections({ trips }: { trips: ApiTrip[] }) {
   );
 }
 
+function GlobalTripGrid({ trips }: { trips: ApiTrip[] }) {
+  return (
+    <div>
+      <p
+        style={{
+          color: "rgba(30,26,20,0.46)",
+          fontSize: "0.68rem",
+          letterSpacing: "0.08em",
+          margin: "0 0 12px",
+          textTransform: "uppercase",
+        }}
+      >
+        Sorted across all destinations
+      </p>
+      <div
+        className="grid-cols-1 sm:grid-cols-2"
+        style={{ display: "grid", gap: "16px" }}
+      >
+        {trips.map((trip, index) => (
+          <TripCard key={trip.id} trip={trip} index={index} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function getPopularityScore(trip: ApiTrip): number {
+  if (Array.isArray(trip.slots) && trip.slots.length > 0) {
+    return trip.slots.reduce(
+      (total, slot) => total + Math.max(0, Number(slot?.filledSpots) || 0),
+      0,
+    );
+  }
+  return Math.max(0, Number(trip.filledSpots) || 0);
+}
+
+function getSortablePrice(trip: ApiTrip): number | null {
+  const price = Number.parseFloat(String(trip.price));
+  return Number.isFinite(price) ? price : null;
+}
+
+function getSortableDuration(trip: ApiTrip): number | null {
+  const duration = Number(trip.duration);
+  return Number.isFinite(duration) && duration > 0 ? duration : null;
+}
+
+function compareTitles(a: ApiTrip, b: ApiTrip): number {
+  return a.title.localeCompare(b.title);
+}
+
 // ── Loading skeleton ──────────────────────────────────────────────
 function LoadingSkeleton() {
   return (
@@ -736,7 +787,7 @@ export default function TripsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch]   = useState("");
-  const [sort, setSort]       = useState("popular");
+  const [sort, setSort]       = useState("destination");
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
@@ -840,10 +891,38 @@ export default function TripsPage() {
       return true;
     });
 
-    const pn = priceToNumber;
-    if (sort === "price_asc")    list = [...list].sort((a, b) => pn(a.price) - pn(b.price));
-    if (sort === "price_desc")   list = [...list].sort((a, b) => pn(b.price) - pn(a.price));
-    if (sort === "duration_asc") list = [...list].sort((a, b) => a.duration - b.duration);
+    if (sort === "popular") {
+      list = [...list].sort(
+        (a, b) => getPopularityScore(b) - getPopularityScore(a) || compareTitles(a, b),
+      );
+    }
+    if (sort === "price_asc") {
+      list = [...list].sort((a, b) => {
+        const aPrice = getSortablePrice(a);
+        const bPrice = getSortablePrice(b);
+        if (aPrice === null) return bPrice === null ? compareTitles(a, b) : 1;
+        if (bPrice === null) return -1;
+        return aPrice - bPrice || compareTitles(a, b);
+      });
+    }
+    if (sort === "price_desc") {
+      list = [...list].sort((a, b) => {
+        const aPrice = getSortablePrice(a);
+        const bPrice = getSortablePrice(b);
+        if (aPrice === null) return bPrice === null ? compareTitles(a, b) : 1;
+        if (bPrice === null) return -1;
+        return bPrice - aPrice || compareTitles(a, b);
+      });
+    }
+    if (sort === "duration_asc") {
+      list = [...list].sort((a, b) => {
+        const aDuration = getSortableDuration(a);
+        const bDuration = getSortableDuration(b);
+        if (aDuration === null) return bDuration === null ? compareTitles(a, b) : 1;
+        if (bDuration === null) return -1;
+        return aDuration - bDuration || compareTitles(a, b);
+      });
+    }
 
     return list;
   }, [trips, search, filters, sort]);
@@ -971,7 +1050,11 @@ export default function TripsPage() {
                 </button>
               </div>
             ) : (
-              <DestinationSections trips={filtered} />
+              sort === "destination" ? (
+                <DestinationSections trips={filtered} />
+              ) : (
+                <GlobalTripGrid trips={filtered} />
+              )
             )}
           </div>
         </div>
