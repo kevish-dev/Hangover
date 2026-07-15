@@ -16,12 +16,45 @@ export interface ApiPayment {
   currency: string;
   razorpayOrderId: string;
   razorpayPaymentId: string | null;
+  paymentMethod: string | null;
+  failureCode: string | null;
+  failureReason: string | null;
+  receiptNumber: string | null;
   createdAt: string;
   paidAt: string | null;
+  refunds: Array<{
+    id: string;
+    amount: string;
+    status: "PENDING" | "SUCCESS" | "FAILED";
+    reason: string | null;
+    razorpayRefundId: string | null;
+    processedAt: string | null;
+    createdAt: string;
+  }>;
   booking: {
+    id: string;
     bookingReference: string;
-    trip: { title: string };
-    user: { email: string; profile?: { fullName: string | null } };
+    status: "PENDING" | "RESERVED" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+    paymentStatus: string;
+    numberOfTravelers: number;
+    totalAmount: string;
+    amountPaid: string;
+    amountDue: string;
+    trip: { id: string; title: string; location: string; slug: string } | null;
+    festival: { id: string; title: string; location: string; slug: string } | null;
+    slot: {
+      id: string;
+      title: string | null;
+      startDate: string | null;
+      endDate: string | null;
+      trip: { id: string; title: string; location: string; slug: string } | null;
+      festival: { id: string; title: string; location: string; slug: string } | null;
+    };
+    package: { id: string; title: string; price: string; tokenAmount: string } | null;
+    user: {
+      email: string;
+      profile?: { fullName: string | null; phone: string | null } | null;
+    };
   };
 }
 
@@ -32,7 +65,10 @@ export const paymentApi = {
     limit?: number;
     status?: string;
   }) => {
-    const res = await apiClient.get<{ data: ApiPayment[]; meta: { total: number } }>(
+    const res = await apiClient.get<{
+      data: ApiPayment[];
+      meta: { total: number; page: number; limit: number; totalPages: number };
+    }>(
       "/payments",
       { params }
     );

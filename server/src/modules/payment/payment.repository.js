@@ -80,7 +80,7 @@ export const getAllPayments = async (skip, take, filter = {}) => {
     prisma.payment.findMany({
       where: filter,
       include: {
-        booking: { include: { trip: true, user: true } },
+        booking: { include: bookingEmailInclude },
         refunds: true,
       },
       orderBy: { createdAt: "desc" },
