@@ -26,7 +26,31 @@ export const errorHandler = (err, req, res, next) => {
       success: false,
       code: "VALIDATION_ERROR",
       message: "Validation failed",
-      details: err.errors,
+      details: err.issues,
+    });
+  }
+
+  if (err?.code === "P2002") {
+    return res.status(409).json({
+      success: false,
+      code: "CONFLICT",
+      message: "A record with the same unique details already exists.",
+    });
+  }
+
+  if (err?.code === "P2003") {
+    return res.status(400).json({
+      success: false,
+      code: "INVALID_REFERENCE",
+      message: "One of the selected records does not exist.",
+    });
+  }
+
+  if (err?.code === "P2025") {
+    return res.status(404).json({
+      success: false,
+      code: "NOT_FOUND",
+      message: "The requested record was not found.",
     });
   }
 

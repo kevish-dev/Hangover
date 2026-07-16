@@ -12,6 +12,7 @@ const envSchema = z.object({
   SMTP_USER: z.string(),
   SMTP_PASS: z.string(),
   SMTP_FROM: z.string(),
+  INQUIRY_NOTIFICATION_EMAIL: z.string().email().optional(),
 
   ACCESS_SECRET: z.string().min(10),
   ACCESS_EXPIRY: z.string(),

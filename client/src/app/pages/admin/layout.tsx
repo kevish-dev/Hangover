@@ -15,10 +15,11 @@ import {
   SidebarTrigger,
   SidebarInset,
 } from "../../components/ui/sidebar";
-import { LayoutDashboard, Map, MapPin, CalendarCheck, Users, Settings, LogOut, CreditCard, MessageSquare, Home, Tent, Star, Images } from "lucide-react";
+import { ClipboardCheck, Map, MapPin, CalendarCheck, LogOut, CreditCard, MessageSquare, Home, Tent, Star, Images } from "lucide-react";
 
 const navItems = [
   { title: "Home", url: "/", icon: Home },
+  { title: "Operations", url: "/dashboard/operations", icon: ClipboardCheck },
   { title: "Destinations", url: "/dashboard/destinations", icon: MapPin },
   { title: "Trips", url: "/dashboard/trips", icon: Map },
   { title: "Festivals", url: "/dashboard/festivals", icon: Tent },

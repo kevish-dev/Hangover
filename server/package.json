@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon .",
-    "media:prune": "node src/utils/scripts/pruneMediaAssets.js"
+    "media:prune": "node src/utils/scripts/pruneMediaAssets.js",
+    "crm:backfill": "node src/utils/scripts/backfillCrm.js",
+    "crm:operations:smoke": "node src/utils/scripts/smokeTestOperations.js"
   },
   "keywords": [],
   "author": "",

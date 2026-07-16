@@ -3,6 +3,7 @@ import env from "../../core/env/env.js";
 import * as authRepo from "./auth.repository.js";
 import { generateTokens, verifyRefreshToken } from "../../utils/jwt.util.js";
 import { sendWelcomeEmail } from "../../core/services/email.service.js";
+import { syncRegisteredUserContact } from "../crm/crm.service.js";
 
 export const googleLogin = async (code) => {
   // Exchange code for Google tokens
@@ -58,6 +59,12 @@ export const googleLogin = async (code) => {
   if (!user.isActive) {
     throw new Error("User account is disabled.");
   }
+
+  syncRegisteredUserContact({ id: user.id, email: user.email, fullName })
+    .then((result) => {
+      if (result.conflict) console.warn(`[CRM] Contact conflict for registered user ${user.id}`);
+    })
+    .catch((error) => console.error("[CRM] Failed to sync registered user contact:", error));
 
   await authRepo.updateLastLogin(user.id);
 

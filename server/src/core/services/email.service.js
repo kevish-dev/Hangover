@@ -334,17 +334,70 @@ const renderPlainText = ({ title, intro, sections = [], notice, cta, closing }) 
     .filter(Boolean)
     .join("\n\n");
 
-const sendTemplate = async ({ to, subject, text, ...layout }) => {
+const sendTemplate = async ({ to, subject, text, replyTo, ...layout }) => {
   const recipient = sanitizeHeader(to);
   if (!recipient) throw new TypeError("Email recipient is required.");
 
   return transport.sendMail({
     from: FROM,
-    replyTo: BRAND.supportEmail,
+    replyTo: sanitizeHeader(replyTo) || BRAND.supportEmail,
     to: recipient,
     subject: sanitizeHeader(subject, BRAND.name),
     text,
     html: renderEmail(layout),
+  });
+};
+
+export const sendNewInquiryNotificationEmail = async (options = {}) => {
+  const {
+    name,
+    email,
+    phone,
+    subject,
+    message,
+    tripType,
+    inquiryId,
+  } = options;
+  const recipient = options.to || env.INQUIRY_NOTIFICATION_EMAIL || BRAND.supportEmail;
+  const interest = options.itemTitle || options.tripTitle || options.festivalTitle || tripType || "General travel inquiry";
+  const rows = [
+    { label: "Customer", value: name, emphasis: true },
+    { label: "Email", value: email },
+    { label: "Phone", value: phone },
+    { label: "Interest", value: interest },
+    { label: "Subject", value: subject },
+    { label: "Inquiry ID", value: inquiryId },
+  ];
+  const notice = displayValue(message) || "No message was supplied.";
+  const cta = {
+    label: "Open inquiry dashboard",
+    url: safeAppUrl(options.crmUrl, "/dashboard/inquiries"),
+  };
+  const title = `New inquiry from ${displayValue(name) || "a traveler"}`;
+  const intro = "A new website inquiry has been captured and added to the CRM lead pipeline.";
+
+  return sendTemplate({
+    to: recipient,
+    replyTo: email,
+    subject: `New website inquiry – ${displayValue(name) || displayValue(interest) || "Hangover Trails"}`,
+    text: renderPlainText({
+      title,
+      intro,
+      sections: [plainSection("Inquiry details", rows)],
+      notice: `MESSAGE\n${notice}`,
+      cta,
+    }),
+    preheader: `${displayValue(name) || "A traveler"} submitted a new website inquiry.`,
+    eyebrow: "New CRM lead",
+    title,
+    intro,
+    badge: "Website inquiry",
+    bodyHtml: [
+      renderDetails("Inquiry details", rows),
+      renderNotice(notice),
+    ].join(""),
+    cta,
+    footerNote: "Reply directly to this email to contact the traveler, then log the interaction in the CRM.",
   });
 };
 
