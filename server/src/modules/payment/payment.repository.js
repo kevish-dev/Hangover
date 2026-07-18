@@ -4,6 +4,7 @@ const bookingEmailInclude = {
   user: { include: { profile: true } },
   trip: true,
   festival: true,
+  customTrip: true,
   slot: { include: { trip: true, festival: true } },
   package: true,
   travelers: true,

@@ -42,6 +42,7 @@ export interface ApiPayment {
     amountDue: string;
     trip: { id: string; title: string; location: string; slug: string } | null;
     festival: { id: string; title: string; location: string; slug: string } | null;
+    customTrip: { id: string; reference: string; title: string; startDate: string; endDate: string; durationDays: number } | null;
     slot: {
       id: string;
       title: string | null;
@@ -49,7 +50,7 @@ export interface ApiPayment {
       endDate: string | null;
       trip: { id: string; title: string; location: string; slug: string } | null;
       festival: { id: string; title: string; location: string; slug: string } | null;
-    };
+    } | null;
     package: { id: string; title: string; price: string; tokenAmount: string } | null;
     user: {
       email: string;

@@ -442,6 +442,39 @@ const paymentTypeDetails = (paymentType) => {
   }
 };
 
+/** Send the private, expiring offer prepared by an administrator for one customer. */
+export const sendCustomTripOfferEmail = async (options = {}) => {
+  const travelerName = displayValue(options.name) || "Traveler";
+  const journeyTitle = displayValue(options.tripTitle) || "Your custom trip";
+  const offerRows = [
+    { label: "Offer reference", value: options.customTripRef },
+    { label: "Journey", value: journeyTitle, emphasis: true },
+    { label: "Travel dates", value: formatDateRange(options.tripStartDate, options.tripEndDate) },
+    { label: "Travelers", value: options.travelersCount },
+    { label: "Total price", value: formatCurrency(options.totalAmount, options.currency || "INR"), emphasis: true },
+    { label: "Booking payment", value: formatCurrency(options.tokenAmount, options.currency || "INR") },
+    { label: "Offer valid until", value: formatDateTime(options.validUntil) },
+  ];
+  const title = `Your custom journey is ready, ${travelerName}`;
+  const intro = `We have prepared ${journeyTitle} exclusively for you. Review the day-wise plan, dates, highlights, and pricing through the private link below.`;
+  const notice = "This link is private and expires with the offer. Please do not forward it. Sign in with the email address this offer was prepared for when you are ready to book.";
+  const cta = { label: "Review my custom trip", url: safeAppUrl(options.offerLink, "/trips") };
+
+  return sendTemplate({
+    to: options.to,
+    subject: `${journeyTitle} — your private custom trip offer`,
+    text: renderPlainText({ title, intro, sections: [plainSection("Offer details", offerRows)], notice, cta }),
+    preheader: `Your private ${journeyTitle} itinerary and price are ready.`,
+    eyebrow: "Private custom trip",
+    title,
+    intro,
+    badge: options.customTripRef,
+    bodyHtml: [renderDetails("Offer details", offerRows), renderNotice(notice)].join(""),
+    cta,
+    footerNote: "This custom trip was created independently for you by the Hangover Trails team.",
+  });
+};
+
 /**
  * Send a reservation/payment receipt. Existing fields remain supported; richer
  * callers may additionally pass bookingId, itemLocation, transactionAmount,

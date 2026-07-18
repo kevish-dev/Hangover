@@ -7,6 +7,7 @@ const bookingInclude = {
     }
   },
   package: true,
+  customTrip: true,
   travelers: { include: { aadhaarAsset: true } },
   payments: { include: { refunds: true } },
 };
@@ -40,7 +41,7 @@ export const getUserBookings = async (userId, skip, take) => {
   const [bookings, total] = await Promise.all([
     prisma.booking.findMany({
       where: { userId },
-      include: { slot: { include: { trip: true, festival: true } }, package: true, travelers: { include: { aadhaarAsset: true } }, payments: { include: { refunds: true } } },
+      include: { slot: { include: { trip: true, festival: true } }, customTrip: true, package: true, travelers: { include: { aadhaarAsset: true } }, payments: { include: { refunds: true } } },
       orderBy: { createdAt: "desc" },
       skip,
       take,
@@ -53,7 +54,7 @@ export const getUserBookings = async (userId, skip, take) => {
 export const getAllBookings = async (skip, take) => {
   const [bookings, total] = await Promise.all([
     prisma.booking.findMany({
-      include: { slot: { include: { trip: true, festival: true } }, package: true, travelers: { include: { aadhaarAsset: true } }, user: { include: { profile: { include: { govtIdAsset: true } } } }, payments: { include: { refunds: true } } },
+      include: { slot: { include: { trip: true, festival: true } }, customTrip: true, package: true, travelers: { include: { aadhaarAsset: true } }, user: { include: { profile: { include: { govtIdAsset: true } } } }, payments: { include: { refunds: true } } },
       orderBy: { createdAt: "desc" },
       skip,
       take,

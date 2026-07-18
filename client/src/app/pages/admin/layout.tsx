@@ -15,13 +15,26 @@ import {
   SidebarTrigger,
   SidebarInset,
 } from "../../components/ui/sidebar";
-import { ClipboardCheck, Map, MapPin, CalendarCheck, LogOut, CreditCard, MessageSquare, Home, Tent, Star, Images } from "lucide-react";
+import {
+  Map,
+  MapPin,
+  CalendarCheck,
+  LogOut,
+  CreditCard,
+  MessageSquare,
+  Home,
+  Tent,
+  Star,
+  Images,
+  FilePlus2,
+} from "lucide-react";
 
 const navItems = [
   { title: "Home", url: "/", icon: Home },
   { title: "Operations", url: "/dashboard/operations", icon: ClipboardCheck },
   { title: "Destinations", url: "/dashboard/destinations", icon: MapPin },
   { title: "Trips", url: "/dashboard/trips", icon: Map },
+  { title: "Custom Trips", url: "/dashboard/custom-trips", icon: FilePlus2 },
   { title: "Festivals", url: "/dashboard/festivals", icon: Tent },
   { title: "Bookings", url: "/dashboard/bookings", icon: CalendarCheck },
   { title: "Payments", url: "/dashboard/payments", icon: CreditCard },
@@ -49,16 +62,24 @@ export default function AdminLayout() {
 
   return (
     <SidebarProvider>
-      <Sidebar variant="inset" collapsible="icon" className="border-r border-gray-200">
+      <Sidebar
+        variant="inset"
+        collapsible="icon"
+        className="border-r border-gray-200"
+      >
         <SidebarHeader className="border-b border-gray-200 flex flex-row items-center justify-between">
           <div className="flex items-center gap-2 overflow-hidden">
-             <div className="size-8 rounded-md bg-[#781216] flex items-center justify-center shrink-0">
-               <span className="text-white font-bold text-lg leading-none">H</span>
-             </div>
-             <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden">
-               <span className="font-semibold text-sm">Hangover</span>
-               <span className="text-xs text-muted-foreground">Admin Portal</span>
-             </div>
+            <div className="size-8 rounded-md bg-[#781216] flex items-center justify-center shrink-0">
+              <span className="text-white font-bold text-lg leading-none">
+                H
+              </span>
+            </div>
+            <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden">
+              <span className="font-semibold text-sm">Hangover</span>
+              <span className="text-xs text-muted-foreground">
+                Admin Portal
+              </span>
+            </div>
           </div>
         </SidebarHeader>
         <SidebarContent>
@@ -67,10 +88,17 @@ export default function AdminLayout() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {navItems.map((item) => {
-                  const isActive = item.url === "/" ? location.pathname === "/" : location.pathname.startsWith(item.url);
+                  const isActive =
+                    item.url === "/"
+                      ? location.pathname === "/"
+                      : location.pathname.startsWith(item.url);
                   return (
                     <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        tooltip={item.title}
+                      >
                         <Link to={item.url}>
                           <item.icon />
                           <span>{item.title}</span>
@@ -84,14 +112,18 @@ export default function AdminLayout() {
           </SidebarGroup>
         </SidebarContent>
         <div className="mt-auto p-4 border-t border-gray-200">
-           <SidebarMenu>
-             <SidebarMenuItem>
-                <SidebarMenuButton onClick={logout} tooltip="Log out" className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                  <LogOut />
-                  <span>Log out</span>
-                </SidebarMenuButton>
-             </SidebarMenuItem>
-           </SidebarMenu>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={logout}
+                tooltip="Log out"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <LogOut />
+                <span>Log out</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
         </div>
       </Sidebar>
       <SidebarInset className="bg-gray-50 flex flex-col flex-1 min-w-0 h-dvh md:h-screen overflow-hidden">

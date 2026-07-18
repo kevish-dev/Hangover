@@ -19,20 +19,23 @@ export default function AdminLandingPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin", "trips"],
+    // Keep this key distinct from the trip-management query. That query caches
+    // the full paginated response, while this one caches only the trip array.
+    queryKey: ["admin", "trips", "signature-collection-options"],
     queryFn: async () => {
       const response = await apiClient.get("/trips?adminView=true&limit=200");
       return response.data.data as ApiTrip[];
     },
   });
 
-  const trips = data ?? [];
+  // Do not let malformed or legacy cached data take down the entire route.
+  const trips = Array.isArray(data) ? data : [];
   const selectedTrips = useMemo(
     () => selectedIds.map((id) => trips.find((trip) => trip.id === id)).filter(Boolean) as ApiTrip[],
     [selectedIds, trips]
   );
   const eligibleTrips = useMemo(
-    () => trips?.filter((trip) => trip.isActive && trip.isPublished && trip.bannerImages?.length > 0),
+    () => trips.filter((trip) => trip.isActive && trip.isPublished && trip.bannerImages?.length > 0),
     [trips]
   );
 

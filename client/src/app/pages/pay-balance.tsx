@@ -141,8 +141,8 @@ function ResultPage({
   onBack: () => void;
   errorMessage?: string;
 }) {
-  const item = booking.trip || booking.festival || booking.slot?.trip || booking.slot?.festival;
-  const itemPath = booking.festival
+  const item = booking.customTrip || booking.trip || booking.festival || booking.slot?.trip || booking.slot?.festival;
+  const itemPath = booking.customTrip ? "/profile" : booking.festival
     ? `/festivals/${item?.slug}`
     : item?.slug
       ? `/trips/${item.slug}`
@@ -248,9 +248,12 @@ export default function PayBalancePage() {
     }
   }, [paymentStep]);
 
-  const item = booking?.trip || booking?.festival || booking?.slot?.trip || booking?.slot?.festival;
+  const item = booking?.customTrip || booking?.trip || booking?.festival || booking?.slot?.trip || booking?.slot?.festival;
+  const isCustom = booking?.source === "CUSTOM" || Boolean(booking?.customTrip);
   const isFestival = Boolean(booking?.festival || booking?.slot?.festival);
-  const itemPath = item?.slug ? (isFestival ? `/festivals/${item.slug}` : `/trips/${item.slug}`) : "/trips";
+  const itemPath = isCustom ? "/profile" : item?.slug ? (isFestival ? `/festivals/${item.slug}` : `/trips/${item.slug}`) : "/trips";
+  const tripStartDate = booking?.customTrip?.startDate || booking?.slot?.startDate;
+  const tripEndDate = booking?.customTrip?.endDate || booking?.slot?.endDate;
   const totalAmount = Number(booking?.totalAmount || 0);
   const amountPaid = Number(booking?.amountPaid || 0);
   const amountDue = Number(booking?.amountDue || 0);
@@ -390,13 +393,13 @@ export default function PayBalancePage() {
               <div style={{ padding: "clamp(24px,4vw,34px)" }}>
                 <p style={{ color: "#b8943a", fontSize: "0.61rem", fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase", margin: "0 0 9px" }}>Your Booking</p>
                 <h2 style={{ color: "#1e1a14", fontSize: "clamp(1.35rem,3vw,1.9rem)", fontWeight: 500, letterSpacing: "-0.03em", lineHeight: 1.2, margin: "0 0 11px" }}>{item?.title || "Upcoming Journey"}</h2>
-                <p style={{ display: "flex", alignItems: "center", gap: 6, color: "rgba(30,26,20,0.5)", fontSize: "0.75rem", margin: "0 0 22px" }}><MapPin size={14} color="#781216" strokeWidth={1.5} /> {item?.location || "Location to be announced"}</p>
+                <p style={{ display: "flex", alignItems: "center", gap: 6, color: "rgba(30,26,20,0.5)", fontSize: "0.75rem", margin: "0 0 22px" }}><MapPin size={14} color="#781216" strokeWidth={1.5} /> {isCustom ? "Private custom itinerary" : item?.location || "Location to be announced"}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 16 }}>
                   {[
-                    { icon: CalendarDays, label: "Travel dates", value: formatDateRange(booking.slot?.startDate, booking.slot?.endDate) },
-                    { icon: Clock3, label: "Duration", value: item?.duration ? `${item.duration} ${item.duration === 1 ? "day" : "days"}` : "To be announced" },
+                    { icon: CalendarDays, label: "Travel dates", value: formatDateRange(tripStartDate, tripEndDate) },
+                    { icon: Clock3, label: "Duration", value: (item?.duration || item?.durationDays) ? `${item.duration || item.durationDays} ${(item.duration || item.durationDays) === 1 ? "day" : "days"}` : "To be announced" },
                     { icon: Users, label: "Travel party", value: `${booking.numberOfTravelers} ${booking.numberOfTravelers === 1 ? "traveler" : "travelers"}` },
-                    { icon: Package, label: "Selected plan", value: booking.package?.title || booking.slot?.title || "Standard trip plan" },
+                    { icon: Package, label: "Selected plan", value: isCustom ? "Private custom trip" : booking.package?.title || booking.slot?.title || "Standard trip plan" },
                   ].map(({ icon: Icon, label, value }) => (
                     <div key={label} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                       <div style={{ width: 30, height: 30, borderRadius: 8, display: "grid", placeItems: "center", flexShrink: 0, background: "rgba(120,18,22,0.055)" }}><Icon size={14} color="#781216" strokeWidth={1.5} /></div>

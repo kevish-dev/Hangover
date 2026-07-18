@@ -6,6 +6,7 @@ import * as email from "../../core/services/email.service.js";
 import { AppError, NotFoundError, ForbiddenError, ValidationError } from "../../core/errors/errors.js";
 import env from "../../core/env/env.js";
 import crypto from "crypto";
+import { getBookingJourney } from "../booking/booking-journey.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -26,13 +27,6 @@ const markPaymentCreation = (payment, wasCreated) => {
 };
 
 const frontendUrl = (path) => `${env.ORIGIN.replace(/\/$/, "")}${path}`;
-
-const getBookingItem = (booking) =>
-  booking?.trip ||
-  booking?.festival ||
-  booking?.slot?.trip ||
-  booking?.slot?.festival ||
-  null;
 
 const formatEmailDate = (value) => {
   if (!value) return null;
@@ -56,7 +50,7 @@ const getSlotName = (slot) => {
 };
 
 const getBookingEmailDetails = (booking) => {
-  const item = getBookingItem(booking);
+  const journey = getBookingJourney(booking);
   const travelerNames = [
     booking?.user?.profile?.fullName,
     ...(booking?.travelers || []).map((traveler) => traveler.fullName),
@@ -66,13 +60,13 @@ const getBookingEmailDetails = (booking) => {
 
   return {
     bookingId: booking?.id,
-    tripTitle: item?.title || "your trip",
-    itemLocation: item?.location || null,
-    packageName: booking?.package?.title || null,
-    slotName: getSlotName(booking?.slot),
-    slotTitle: booking?.slot?.title || null,
-    tripStartDate: booking?.slot?.startDate || null,
-    tripEndDate: booking?.slot?.endDate || null,
+    tripTitle: journey.title,
+    itemLocation: journey.location,
+    packageName: journey.packageName,
+    slotName: booking?.source === "CUSTOM" ? "Private dates" : getSlotName(booking?.slot),
+    slotTitle: booking?.source === "CUSTOM" ? "Private custom trip" : booking?.slot?.title || null,
+    tripStartDate: journey.startDate,
+    tripEndDate: journey.endDate,
     travelersCount: booking?.numberOfTravelers || 1,
     travelersDetails: travelerNames.join(", ") || null,
     travelerNames,
@@ -278,6 +272,9 @@ export const initiatePayment = async (userId, bookingId, type) => {
 
   if (!["TOKEN", "FULL"].includes(type)) {
     throw new ValidationError("Payment type must be TOKEN or FULL");
+  }
+  if (type === "TOKEN" && Number(booking.tokenAmount) <= 0) {
+    throw new ValidationError("This booking does not offer a token payment. Choose FULL payment.");
   }
 
   if (booking.status !== "PENDING") {
