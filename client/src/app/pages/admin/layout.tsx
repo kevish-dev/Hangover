@@ -20,12 +20,26 @@ import {
   Home,
   MapPin,
   Map,
+  CalendarRange,
+  ClipboardCheck,
+  CalendarCheck,
+  BookOpen,
+  CreditCard,
+  Star,
+  LayoutDashboard,
 } from "lucide-react";
 
 const navItems = [
-  { title: "Home", url: "/", icon: Home },
+  { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
   { title: "Destinations", url: "/dashboard/destinations", icon: MapPin },
   { title: "Circuits", url: "/dashboard/circuits", icon: Map },
+  { title: "Trips & departures", url: "/dashboard/trips", icon: CalendarRange },
+  { title: "Bookings", url: "/dashboard/bookings", icon: CalendarCheck },
+  { title: "Operations", url: "/dashboard/operations", icon: ClipboardCheck },
+  { title: "Balance sheet", url: "/dashboard/ledger", icon: BookOpen },
+  { title: "Payments", url: "/dashboard/payments", icon: CreditCard },
+  { title: "Reviews", url: "/dashboard/reviews", icon: Star },
+  { title: "Public site", url: "/", icon: Home },
 ];
 
 export default function AdminLayout() {
@@ -73,9 +87,10 @@ export default function AdminLayout() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {navItems.map((item) => {
-                  const isActive =
-                    item.url === "/"
-                      ? location.pathname === "/"
+                  const isActive = item.url === "/"
+                    ? location.pathname === "/"
+                    : item.url === "/dashboard"
+                      ? location.pathname === "/dashboard"
                       : location.pathname.startsWith(item.url);
                   return (
                     <SidebarMenuItem key={item.title}>

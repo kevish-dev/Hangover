@@ -1,23 +1,32 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../lib/axios";
 import { CircuitFormModal } from "../../components/admin/CircuitFormModal";
-import { Map, Plus, Edit2, Trash2, Navigation, Eye, EyeOff } from "lucide-react";
+import { TripFormModal } from "../../components/admin/TripFormModal";
+import { Map, Plus, Edit2, Trash2, Navigation, Eye, EyeOff, Rocket, Loader2, ClipboardList, CalendarDays } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { toast } from "sonner";
+import { getErrorMessage, showErrorToast } from "../../../lib/errors";
 
 export default function AdminCircuitsPage() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCircuit, setEditingCircuit] = useState<any>(null);
+  const [sourceCircuit, setSourceCircuit] = useState<any>(null);
+  const [isTripModalOpen, setIsTripModalOpen] = useState(false);
+  const [loadingCircuitId, setLoadingCircuitId] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const circuitsQuery = useQuery({
     queryKey: ["admin", "circuits"],
     queryFn: async () => {
-      const res = await apiClient.get("/circuits?adminView=true");
+      const res = await apiClient.get("/circuits", { params: { adminView: true, limit: 200 } });
       return res.data;
     },
   });
+  const { data, isLoading } = circuitsQuery;
+  useEffect(() => {
+    if (circuitsQuery.isError) toast.error(getErrorMessage(circuitsQuery.error, "Circuits could not be loaded"), { id: "admin-circuits-load-error" });
+  }, [circuitsQuery.error, circuitsQuery.isError]);
 
   const confirmAction = (title: string, description: string, actionLabel: string, actionFn: () => Promise<void>) => {
     toast(title, {
@@ -39,7 +48,7 @@ export default function AdminCircuitsPage() {
           toast.success("Circuit deleted successfully");
           queryClient.invalidateQueries({ queryKey: ["admin", "circuits"] });
         } catch (error) {
-          toast.error("Failed to delete circuit");
+          showErrorToast(error, "Failed to delete circuit");
         }
       }
     );
@@ -56,7 +65,7 @@ export default function AdminCircuitsPage() {
           toast.success(circuit.isActive ? "Circuit deactivated" : "Circuit activated");
           queryClient.invalidateQueries({ queryKey: ["admin", "circuits"] });
         } catch (error) {
-          toast.error("Failed to update status");
+          showErrorToast(error, "Failed to update circuit status");
         }
       }
     );
@@ -67,13 +76,38 @@ export default function AdminCircuitsPage() {
     setIsModalOpen(true);
   };
 
-  const openEditModal = (circuit: any) => {
-    setEditingCircuit(circuit);
-    setIsModalOpen(true);
+  const loadFullCircuit = async (circuitId: string) => {
+    setLoadingCircuitId(circuitId);
+    try {
+      return (await apiClient.get(`/circuits/${circuitId}`)).data;
+    } finally {
+      setLoadingCircuitId(null);
+    }
+  };
+
+  const openEditModal = async (circuit: any) => {
+    try {
+      setEditingCircuit(await loadFullCircuit(circuit.id));
+      setIsModalOpen(true);
+    } catch (error) {
+      showErrorToast(error, "Could not load the circuit template");
+    }
+  };
+
+  const openTripFromCircuit = async (circuit: any) => {
+    try {
+      setSourceCircuit(await loadFullCircuit(circuit.id));
+      setIsTripModalOpen(true);
+    } catch (error) {
+      showErrorToast(error, "Could not prepare a trip from this circuit");
+    }
   };
 
   if (isLoading) {
     return <div className="p-8 text-gray-500">Loading circuits...</div>;
+  }
+  if (circuitsQuery.isError) {
+    return <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-800"><p className="font-bold">Circuits could not be loaded.</p><button type="button" onClick={() => circuitsQuery.refetch()} className="mt-3 text-sm font-semibold underline">Try again</button></div>;
   }
 
   const circuits = data?.data || [];
@@ -99,6 +133,11 @@ export default function AdminCircuitsPage() {
         open={isModalOpen} 
         onOpenChange={setIsModalOpen} 
         circuit={editingCircuit} 
+      />
+      <TripFormModal
+        open={isTripModalOpen}
+        onOpenChange={setIsTripModalOpen}
+        sourceCircuit={sourceCircuit}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
@@ -133,6 +172,21 @@ export default function AdminCircuitsPage() {
                     ₹{circuit.basePrice}
                   </span>
                 </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-gray-500">
+                  <span className="flex items-center gap-1.5"><ClipboardList className="h-3.5 w-3.5" />{circuit._count?.days || 0} itinerary days</span>
+                  <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" />{circuit._count?.trips || 0} created trips</span>
+                </div>
+
+                <Button
+                  type="button"
+                  onClick={() => openTripFromCircuit(circuit)}
+                  disabled={!circuit.isActive || loadingCircuitId === circuit.id}
+                  className="mt-5 w-full bg-[#781216] text-white hover:bg-[#5f0e11]"
+                >
+                  {loadingCircuitId === circuit.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rocket className="mr-2 h-4 w-4" />}
+                  Create trip from circuit
+                </Button>
                 
                 <div className="mt-auto pt-4 flex flex-wrap items-center justify-start md:justify-end gap-3 md:gap-2 border-t border-gray-100 mt-6">
                   <button 

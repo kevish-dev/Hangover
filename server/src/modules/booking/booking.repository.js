@@ -7,6 +7,7 @@ const bookingInclude = {
     }
   },
   package: true,
+  addOns: { include: { addOn: true } },
   
   travelers: { include: { aadhaarAsset: true } },
   payments: { include: { refunds: true } },
@@ -41,7 +42,7 @@ export const getUserBookings = async (userId, skip, take) => {
   const [bookings, total] = await Promise.all([
     prisma.booking.findMany({
       where: { userId },
-      include: { slot: { include: { trip: true, festival: true } }, package: true, travelers: { include: { aadhaarAsset: true } }, payments: { include: { refunds: true } } },
+      include: { slot: { include: { trip: true, festival: true } }, package: true, addOns: { include: { addOn: true } }, review: true, travelers: { include: { aadhaarAsset: true } }, payments: { include: { refunds: true } } },
       orderBy: { createdAt: "desc" },
       skip,
       take,
@@ -54,7 +55,7 @@ export const getUserBookings = async (userId, skip, take) => {
 export const getAllBookings = async (skip, take) => {
   const [bookings, total] = await Promise.all([
     prisma.booking.findMany({
-      include: { slot: { include: { trip: true, festival: true } }, package: true, travelers: { include: { aadhaarAsset: true } }, user: { include: { profile: { include: { govtIdAsset: true } } } }, payments: { include: { refunds: true } } },
+      include: { slot: { include: { trip: true, festival: true } }, package: true, addOns: { include: { addOn: true } }, travelers: { include: { aadhaarAsset: true } }, user: { include: { profile: { include: { govtIdAsset: true } } } }, payments: { include: { refunds: true } } },
       orderBy: { createdAt: "desc" },
       skip,
       take,
@@ -73,6 +74,7 @@ export const getBookingsByTripId = async (tripId) => {
       slot: true,
       package: true,
       payments: { include: { refunds: true } },
+      addOns: { include: { addOn: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -87,6 +89,7 @@ export const getBookingsByFestivalId = async (festivalId) => {
       slot: true,
       package: true,
       payments: { include: { refunds: true } },
+      addOns: { include: { addOn: true } },
     },
     orderBy: { createdAt: "desc" },
   });

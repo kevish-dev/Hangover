@@ -32,9 +32,12 @@ import { format } from "date-fns";
 import { ItineraryStep } from "./ItineraryStep";
 import { formatTripType } from "../../../lib/tripApi";
 import { uploadBannerImagesDirect } from "../../../lib/directImageUpload";
+import { showErrorToast } from "../../../lib/errors";
 
 // --- VALIDATION SCHEMA ---
 const tripSchema = z.object({
+  circuitId: z.string().uuid().optional(),
+  destinationId: z.string().uuid().optional(),
   title: z.string().min(3, "Title must be at least 3 characters"),
   location: z.string().min(2, "Location is required"),
   tripType: z.string().min(1, "Trip type is required"),
@@ -42,13 +45,23 @@ const tripSchema = z.object({
   slots: z.array(
     z.object({
       id: z.string().optional(),
-      startDate: z.string().optional(),
-      endDate: z.string().optional(),
+      startDate: z.string().min(1, "Start date is required"),
+      endDate: z.string().min(1, "End date is required"),
       title: z.string().optional(),
       priority: z.coerce.number().optional(),
       capacity: z.coerce.number().min(1, "Capacity must be at least 1"),
     })
-  ).min(1, "At least one slot is required"),
+  ).min(1, "At least one slot is required").superRefine((slots, context) => {
+    slots.forEach((slot, index) => {
+      if (slot.startDate && slot.endDate && new Date(slot.endDate) <= new Date(slot.startDate)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "End date must be after the start date",
+          path: [index, "endDate"],
+        });
+      }
+    });
+  }),
 
   overview: z.string().min(10, "Overview must be detailed"),
   inclusions: z
@@ -72,10 +85,15 @@ const tripSchema = z.object({
       title: z.string().min(1, "Package name is required"),
       price: z.coerce.number().min(1, "Price must be greater than 0"),
       tokenAmount: z.coerce.number().min(0, "Booking amount must be 0 or more"),
+    }).refine((value) => value.tokenAmount <= value.price, {
+      message: "Booking amount cannot exceed the package price",
+      path: ["tokenAmount"],
     })
   ).min(1, "At least one pricing package is required"),
   isPublished: z.boolean().default(false),
   isFeatured: z.boolean().default(false),
+  isActive: z.boolean().default(true),
+  isListed: z.boolean().default(true),
   itinerary: z.array(
     z.object({
       day: z.string().min(1, "Day is required"),
@@ -114,12 +132,14 @@ const STEPS = [
 
 interface TripFormModalProps {
   trip?: any;
+  sourceCircuit?: any;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function TripFormModal({
   trip,
+  sourceCircuit,
   open,
   onOpenChange,
 }: TripFormModalProps) {
@@ -169,6 +189,8 @@ export function TripFormModal({
   const form = useForm<TripFormValues>({
     resolver: zodResolver(tripSchema),
     defaultValues: {
+      circuitId: undefined,
+      destinationId: undefined,
       title: "",
       location: "",
       tripType: "MOUNTAIN_TREK",
@@ -182,6 +204,8 @@ export function TripFormModal({
       faqs: [],
       isPublished: false,
       isFeatured: false,
+      isActive: true,
+      isListed: true,
     },
     mode: "onTouched",
   });
@@ -192,6 +216,8 @@ export function TripFormModal({
       if (trip) {
         form.reset({
           title: trip.title || "",
+          circuitId: trip.circuitId || undefined,
+          destinationId: trip.destinationId || undefined,
           location: trip.location || "",
           tripType: trip.tripType || "MOUNTAIN_TREK",
           bestTimeToVisit: trip.bestTimeToVisit || "",
@@ -234,14 +260,18 @@ export function TripFormModal({
           itinerary: Array.isArray(trip.itinerary) ? trip.itinerary.map((day: any) => ({
             day: day.day || `Day ${day.dayNumber || 1}`,
             title: day.title || "",
-            activities: typeof day.activities === 'string' 
-              ? day.activities 
-              : Array.isArray(day.activities) 
-                ? day.activities.join('\n') 
-                : ""
+            activities: Array.isArray(day.todos) && day.todos.length > 0
+              ? day.todos.join('\n')
+              : typeof day.activities === 'string'
+              ? day.activities
+              : Array.isArray(day.activities)
+                ? day.activities.join('\n')
+                : day.description || ""
           })) : [],
           isPublished: trip.isPublished || false,
           isFeatured: trip.isFeatured || false,
+          isActive: trip.isActive ?? true,
+          isListed: trip.isListed ?? true,
         });
         // Keep the field-array source of truth in sync with the values shown
         // after editing an existing trip. This prevents validation from reading
@@ -280,8 +310,57 @@ export function TripFormModal({
             preview: item.imageUrl,
           })) : []
         );
+      } else if (sourceCircuit) {
+        form.reset({
+          circuitId: sourceCircuit.id,
+          destinationId: sourceCircuit.destinationId || undefined,
+          title: sourceCircuit.title || "",
+          location: sourceCircuit.location || "",
+          tripType: sourceCircuit.tripType || "MOUNTAIN_TREK",
+          bestTimeToVisit: sourceCircuit.bestTimeToVisit || "",
+          slots: [{ startDate: "", endDate: "", capacity: 12, title: "", priority: 0 }],
+          overview: sourceCircuit.overview || "",
+          inclusions: (sourceCircuit.inclusions || []).map((value: string) => ({ value })),
+          exclusions: (sourceCircuit.exclusions || []).map((value: string) => ({ value })),
+          tripTags: (sourceCircuit.tags || []).map((tag: any) => ({ value: tag.tag })),
+          packages: (sourceCircuit.packages || []).map((item: any) => ({
+            title: item.title,
+            price: Number(item.price),
+            tokenAmount: Number(item.tokenAmount),
+          })),
+          faqs: (sourceCircuit.faqs || []).map((item: any) => ({ question: item.question, answer: item.answer })),
+          itinerary: (sourceCircuit.days || []).map((day: any) => ({
+            day: `Day ${day.dayNumber}`,
+            title: day.title,
+            activities: (day.todos || []).join("\n") || day.description || "Planned activities",
+          })),
+          isPublished: false,
+          isFeatured: false,
+          isActive: true,
+          isListed: true,
+        });
+        replaceSlots(form.getValues("slots"));
+        replaceInclusions(form.getValues("inclusions"));
+        replaceExclusions(form.getValues("exclusions"));
+        setHighlightItems((Array.isArray(sourceCircuit.highlights) ? sourceCircuit.highlights : []).map((item: any) => ({
+          id: Math.random().toString(),
+          text: item.text || "",
+          type: "EXISTING" as const,
+          url: item.imageUrl,
+          preview: item.imageUrl,
+        })));
+        setStayItems((Array.isArray(sourceCircuit.stayTransportImages) ? sourceCircuit.stayTransportImages : []).map((item: any) => ({
+          id: Math.random().toString(),
+          text: item.text || "",
+          type: "EXISTING" as const,
+          url: item.imageUrl,
+          preview: item.imageUrl,
+        })));
+        form.clearErrors();
       } else {
         form.reset({
+          circuitId: undefined,
+          destinationId: undefined,
           title: "",
           location: "",
           tripType: "MOUNTAIN_TREK",
@@ -296,6 +375,8 @@ export function TripFormModal({
           itinerary: [],
           isPublished: false,
           isFeatured: false,
+          isActive: true,
+          isListed: true,
         });
         replaceSlots(form.getValues("slots"));
         replaceInclusions(form.getValues("inclusions"));
@@ -308,7 +389,7 @@ export function TripFormModal({
       setImages([]);
       setImagePreviews([]);
     }
-  }, [trip, open, form]);
+  }, [trip, sourceCircuit, open, form]);
 
   const {
     fields: inclusionFields,
@@ -486,8 +567,8 @@ export function TripFormModal({
         (img: string) => img !== url,
       );
       queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Failed to delete image");
+    } catch (error: unknown) {
+      showErrorToast(error, "Failed to delete image");
     }
   };
 
@@ -509,8 +590,8 @@ export function TripFormModal({
         (img: string) => img !== url,
       );
       queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Failed to delete image");
+    } catch (error: unknown) {
+      showErrorToast(error, "Failed to delete image");
     }
   };
 
@@ -658,6 +739,9 @@ export function TripFormModal({
     if (step !== STEPS.length - 1) return;
 
     setIsSubmitting(true);
+    let tripId = trip?.id;
+    let coreTripSaved = false;
+    let createdNewTrip = false;
     try {
       // Derive price/tokenAmount from cheapest package for DB compatibility
       const sortedPkgs = [...data.packages].sort((a, b) => Number(a.price) - Number(b.price));
@@ -688,14 +772,15 @@ export function TripFormModal({
         ),
       };
 
-      let tripId = trip?.id;
-
       if (isEdit) {
         await apiClient.put(`/trips/${tripId}`, payload);
+        coreTripSaved = true;
         toast.success("Trip updated successfully!");
       } else {
         const createRes = await apiClient.post("/trips", payload);
         tripId = createRes.data.trip.id;
+        coreTripSaved = true;
+        createdNewTrip = true;
         toast.success("Trip created successfully!");
       }
 
@@ -795,7 +880,15 @@ export function TripFormModal({
       queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
       onOpenChange(false);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Failed to save trip");
+      if (coreTripSaved) {
+        await queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
+        toast.warning(createdNewTrip ? "Trip created, but some media could not be uploaded" : "Trip saved, but some media could not be updated", {
+          description: "The trip itself is safe. Open it from Trip Management and retry the media update.",
+        });
+        onOpenChange(false);
+      } else {
+        showErrorToast(error, isEdit ? "Could not update the trip" : "Could not create the trip");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -813,12 +906,14 @@ export function TripFormModal({
         <div className="px-4 pt-5 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b">
           <DialogHeader>
             <DialogTitle className="text-xl sm:text-2xl font-bold pr-6">
-              {isEdit ? "Edit Trip" : "Create New Trip"}
+              {isEdit ? "Edit Trip" : sourceCircuit ? "Create trip from circuit" : "Create New Trip"}
             </DialogTitle>
             <DialogDescription>
               {isEdit
                 ? "Modify the details of your trip below."
-                : "Follow the steps to configure all details for the new trip."}
+                : sourceCircuit
+                  ? `Forked from ${sourceCircuit.title}. Add departure dates and adjust anything that differs.`
+                  : "Follow the steps to configure all details for the new trip."}
             </DialogDescription>
           </DialogHeader>
 
@@ -857,6 +952,11 @@ export function TripFormModal({
           >
             {/* STEP 0: BASICS */}
             <div className={step === 0 ? "block" : "hidden"}>
+              {sourceCircuit && !isEdit && (
+                <div className="mb-4 rounded-xl border border-[#e8d9b7] bg-[#fbf7ed] p-4 text-sm text-[#6d541f]">
+                  Content, pricing, itinerary, task templates, tags, and add-ons are inherited from this circuit. This trip will remain linked to the template for booking operations.
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2 space-y-2">
                   <Label>Trip Title <span className="text-red-500">*</span></Label>
@@ -1005,6 +1105,28 @@ export function TripFormModal({
                     />
                     <Label htmlFor="isFeatured" className="mb-0 cursor-pointer">
                       Feature this trip (highlight on homepage)
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="isListed"
+                      {...form.register("isListed")}
+                      className="w-4 h-4 text-[#c8a96e] rounded border-gray-300 focus:ring-[#c8a96e]"
+                    />
+                    <Label htmlFor="isListed" className="mb-0 cursor-pointer">
+                      List in the public catalog
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="isActive"
+                      {...form.register("isActive")}
+                      className="w-4 h-4 text-[#c8a96e] rounded border-gray-300 focus:ring-[#c8a96e]"
+                    />
+                    <Label htmlFor="isActive" className="mb-0 cursor-pointer">
+                      Accept bookings
                     </Label>
                   </div>
                 </div>

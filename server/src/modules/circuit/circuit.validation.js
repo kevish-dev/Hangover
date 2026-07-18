@@ -28,6 +28,7 @@ export const OPERATIONAL_TASK_CATEGORIES = [
 
 // ── CircuitDayTask sub-schema ──────────────────────────────────────────────
 const circuitDayTaskSchema = z.object({
+  id: z.string().uuid().optional(),
   category: z.enum(OPERATIONAL_TASK_CATEGORIES),
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().max(2000).optional(),
@@ -38,6 +39,7 @@ const circuitDayTaskSchema = z.object({
 
 // ── CircuitDay sub-schema ─────────────────────────────────────────────────
 const circuitDaySchema = z.object({
+  id: z.string().uuid().optional(),
   dayNumber: z.number().int().positive(),
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().max(5000).optional(),
@@ -47,13 +49,15 @@ const circuitDaySchema = z.object({
 
 // ── Package sub-schema ────────────────────────────────────────────────────
 const packageSchema = z.object({
+  id: z.string().uuid().optional(),
   title: z.string().trim().min(1).max(200),
   price: z.number().positive(),
-  tokenAmount: z.number().positive(),
+  tokenAmount: z.number().nonnegative(),
 });
 
 // ── AddOn sub-schema ──────────────────────────────────────────────────────
 const addOnSchema = z.object({
+  id: z.string().uuid().optional(),
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().max(2000).optional(),
   imageUrl: z.string().url().optional(),
@@ -84,8 +88,9 @@ export const createCircuitSchema = z.object({
   inclusions: z.array(z.string().trim()).default([]),
   exclusions: z.array(z.string().trim()).default([]),
   basePrice: z.number().positive(),
-  baseTokenAmount: z.number().positive(),
+  baseTokenAmount: z.number().nonnegative(),
   isActive: z.boolean().default(true),
+  operationsReminderDays: z.number().int().nonnegative().default(3),
   internalNotes: z.string().trim().max(5000).optional(),
   // Nested creations ─────────────────────────────────────────────
   days: z.array(circuitDaySchema).default([]),
@@ -97,8 +102,7 @@ export const createCircuitSchema = z.object({
 
 // ── UPDATE Circuit (root fields only – days/tasks via sub-routes) ─────────
 export const updateCircuitSchema = createCircuitSchema
-  .partial()
-  .omit({ days: true, packages: true, addOns: true, tagIds: true });
+  .partial();
 
 // ── CREATE / UPDATE CircuitDay ────────────────────────────────────────────
 export const createCircuitDaySchema = circuitDaySchema;

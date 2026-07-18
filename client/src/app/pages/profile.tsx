@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -15,6 +15,7 @@ import {
   RotateCcw,
   ReceiptText,
   CreditCard,
+  Star,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -30,6 +31,8 @@ import { formatPrice, formatDuration, formatTripType } from "../../lib/tripApi";
 import { SiteFooter } from "../components/site-footer";
 import { ProfileSettings } from "../components/profile-settings";
 import { mediaImageUrl } from "../../lib/media";
+import { toast } from "sonner";
+import { getErrorMessage } from "../../lib/errors";
 
 // ── Status badge styling ──────────────────────────────────────────
 
@@ -355,6 +358,27 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
 
           {/* CTAs */}
           <div className="profile-booking-actions" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {booking.status === "COMPLETED" && !booking.review && (
+              <Link
+                className="profile-booking-primary-action"
+                to={`/bookings/${booking.id}/review`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  background: "#781216",
+                  color: "#fff",
+                  fontSize: "0.68rem",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  padding: "5px 12px",
+                  borderRadius: "6px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <Star size={10} /> Leave a review
+              </Link>
+            )}
             {canPayBalance && (
               <Link
                 className="profile-booking-primary-action"
@@ -549,16 +573,25 @@ export default function ProfilePage() {
     }
   }, [authLoading, user, navigate]);
 
-  // Fetch bookings
-  useEffect(() => {
+  const loadBookings = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     setError(null);
-    fetchMyBookings()
-      .then((data) => setBookings(data))
-      .catch((err) => setError(err?.response?.data?.message || err?.message || "Failed to load bookings"))
-      .finally(() => setLoading(false));
+    try {
+      setBookings(await fetchMyBookings());
+    } catch (err) {
+      const message = getErrorMessage(err, "Failed to load bookings");
+      setError(message);
+      toast.error(message, { id: "profile-bookings-load-error" });
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
+
+  // Fetch bookings
+  useEffect(() => {
+    loadBookings();
+  }, [loadBookings]);
 
   if (authLoading) {
     return (
@@ -838,7 +871,8 @@ export default function ProfilePage() {
                     fontWeight: 500,
                   }}
                 >
-                  {error}
+                  <p>{error}</p>
+                  <button type="button" onClick={loadBookings} style={{ marginTop: "12px", color: "#781216", background: "none", border: 0, textDecoration: "underline", fontWeight: 600, cursor: "pointer" }}>Try again</button>
                 </div>
               ) : bookings.length === 0 ? (
                 <EmptyState message="You haven't booked any trips yet. Start exploring!" />

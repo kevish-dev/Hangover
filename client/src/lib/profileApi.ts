@@ -60,6 +60,7 @@ export interface ApiBooking {
   package?: any; // Add package type
   slot?: any; // Add slot type
   payments: ApiPayment[];
+  review?: { id: string; rating: number } | null;
 }
 
 export interface ApiBookingsResponse {

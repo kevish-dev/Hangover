@@ -16,6 +16,8 @@ import {
 } from "../../lib/tripApi";
 import { fetchAllFestivals } from "../../lib/festivalApi";
 import { mediaImageUrl } from "../../lib/media";
+import { toast } from "sonner";
+import { getErrorMessage } from "../../lib/errors";
 
 export type ExtendedTrip = ApiTrip & { isFestival?: boolean };
 
@@ -415,7 +417,9 @@ function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
   const [hovered, setHovered] = useState(false);
   const heroImage = trip.bannerImages?.[0] || trip.highlights?.[0]?.imageUrl || "";
   const priceNum = priceToNumber(trip.price);
-  const spots = spotsLeft(trip.capacity, trip.filledSpots);
+  const spots = Array.isArray(trip.slots)
+    ? trip.slots.reduce((total, slot) => total + spotsLeft(Number(slot.capacity || 0), Number(slot.filledSpots || 0)), 0)
+    : spotsLeft(trip.capacity, trip.filledSpots);
   const tags = trip.tripTags?.map((t) => t.tag) || [];
   const typeLabel = formatTripType(trip.tripType);
   const durationStr = formatDuration(trip.duration);
@@ -806,8 +810,10 @@ export default function TripsPage() {
         tripTags: f.tags ? f.tags.map((t: any) => ({ tag: t.tag })) : []
       }));
       setTrips([...tripsData, ...festivalsAsTrips]);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || "Something went wrong");
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, "Trips could not be loaded");
+      setError(message);
+      toast.error(message, { id: "public-trips-load-error" });
     } finally {
       setLoading(false);
     }

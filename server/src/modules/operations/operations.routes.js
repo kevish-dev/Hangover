@@ -6,6 +6,8 @@ const router = Router();
 
 router.use(requireAuth);
 
+router.get("/", requireAdmin, operationsController.listOperationalTasks);
 router.get("/bookings/:bookingId", requireAdmin, operationsController.getBookingOperations);
+router.patch("/:taskId", requireAdmin, operationsController.updateOperationalTask);
 
 export default router;

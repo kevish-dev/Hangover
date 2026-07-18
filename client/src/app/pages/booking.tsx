@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { getMyProfile } from "../../lib/profileApi";
 import { mediaImageUrl } from "../../lib/media";
+import { getErrorMessage } from "../../lib/errors";
 
 // Razorpay is loaded as a static <script> in index.html
 declare const Razorpay: any;
@@ -507,6 +508,7 @@ export default function BookingPage() {
   const resumeBookingId = searchParams.get("resume"); // set when coming from "Complete Payment" CTA
   const isFestival = searchParams.get("type") === "festival";
   const urlSlotId = searchParams.get("slotId");
+  const shareToken = searchParams.get("share");
   const bookingRedirectPath = `/book/${slug}${searchParams.size ? `?${searchParams.toString()}` : ""}`;
   const { user, isLoading: authLoading } = useAuth();
 
@@ -567,6 +569,7 @@ export default function BookingPage() {
   // Payment choice
   const [paymentChoice, setPaymentChoice] = useState<"FULL" | "TOKEN">("FULL");
   const [selectedPackageId, setSelectedPackageId] = useState<string | null | undefined>(undefined);
+  const [selectedAddOns, setSelectedAddOns] = useState<Record<string, number>>({});
 
   // Booking flow state
   const [bookingStep, setBookingStep] = useState<
@@ -591,12 +594,15 @@ export default function BookingPage() {
   useEffect(() => {
     if (!slug) return;
     setLoading(true);
-    const fetcher = isFestival ? fetchFestivalBySlug : fetchTripBySlug;
-    fetcher(slug)
+    const request = isFestival ? fetchFestivalBySlug(slug) : fetchTripBySlug(slug, shareToken);
+    request
       .then((data) => setTrip(data))
-      .catch(() => setTrip(null))
+      .catch((error) => {
+        setTrip(null);
+        toast.error(getErrorMessage(error, isFestival ? "Festival could not be loaded" : "Trip could not be loaded"), { id: `booking-trip-load-${slug}` });
+      })
       .finally(() => setLoading(false));
-  }, [slug]);
+  }, [slug, isFestival, shareToken]);
 
   useEffect(() => {
     if (user && trip) {
@@ -623,9 +629,9 @@ export default function BookingPage() {
           setReservedBooking(reserved || null);
           setPendingBooking(pending || null);
         })
-        .catch(console.error);
+        .catch((error) => toast.error(getErrorMessage(error, "Your existing bookings could not be checked"), { id: `booking-status-${trip.id}` }));
     }
-  }, [user, trip]);
+  }, [user, trip, isFestival]);
 
   useEffect(() => {
     if (selectedPackageId === undefined && trip) {
@@ -791,6 +797,9 @@ export default function BookingPage() {
       if (selectedSlotId) {
         payload.slotId = selectedSlotId;
       }
+      payload.addOns = Object.entries(selectedAddOns)
+        .filter(([addOnId, quantity]) => quantity > 0 && availableAddOns.some((addOn: any) => addOn.id === addOnId))
+        .map(([addOnId, quantity]) => ({ addOnId, quantity }));
       
       const bookingRes = await apiClient.post("/bookings", payload);
       const {
@@ -867,12 +876,10 @@ export default function BookingPage() {
 
         rzp.open();
       });
-    } catch (err: any) {
-      const msg =
-        err?.response?.data?.message ||
-        err?.message ||
-        "Something went wrong. Please try again.";
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err, "Something went wrong. Please try again.");
       setBookingError(msg);
+      toast.error(msg, { id: "booking-submit-error" });
       setBookingStep("form");
     } finally {
       setSubmitting(false);
@@ -897,11 +904,10 @@ export default function BookingPage() {
         });
         setBookingStep("success");
       })
-      .catch((err: any) => {
-        setBookingError(
-          err?.response?.data?.message ||
-            "Payment verification failed. Please contact support.",
-        );
+      .catch((err: unknown) => {
+        const message = getErrorMessage(err, "Payment verification failed. Please contact support.");
+        setBookingError(message);
+        toast.error(message, { id: "booking-payment-verification-error" });
         setBookingStep("failed");
       });
   }, [pendingVerify, bookingStep]);
@@ -1079,10 +1085,21 @@ export default function BookingPage() {
   const basePrice = activePackage ? Number(activePackage.price) : Number(trip.price || 0);
   const baseToken = activePackage ? Number(activePackage.tokenAmount) : Number(trip.tokenAmount || 0);
 
+  const availableAddOns = (trip.addOns || []).filter((addOn: any) => {
+    if (!addOn.isActive) return false;
+    if (!selectedSlot?.startDate || addOn.purchaseCutoffOffsetDays == null) return true;
+    const cutoff = new Date(selectedSlot.startDate).getTime() - Number(addOn.purchaseCutoffOffsetDays) * 86400000;
+    return Date.now() <= cutoff;
+  });
+  const addOnTotal = availableAddOns.reduce(
+    (total: number, addOn: any) => total + Number(addOn.price) * Number(selectedAddOns[addOn.id] || 0),
+    0,
+  );
+
   const tripPrice = formatPrice(basePrice);
 
   const numTravelers = 1 + travelers.length;
-  const baseTotalAmount = basePrice * numTravelers;
+  const baseTotalAmount = basePrice * numTravelers + addOnTotal;
   const totalGst = baseTotalAmount * 0.05;
   const totalAmountDue = baseTotalAmount + totalGst;
 
@@ -1489,9 +1506,10 @@ export default function BookingPage() {
                   });
                   rzp.open();
                 });
-              } catch (err: any) {
-                const msg = err?.response?.data?.message || err?.message || "Something went wrong.";
+              } catch (err: unknown) {
+                const msg = getErrorMessage(err, "Something went wrong.");
                 setBookingError(msg);
+                toast.error(msg, { id: "booking-balance-payment-error" });
                 setBookingStep("form");
               } finally {
                 setSubmitting(false);
@@ -1963,6 +1981,49 @@ export default function BookingPage() {
                 </div>
               )}
             </div>
+
+            {availableAddOns.length > 0 && (
+              <section style={{ marginTop: "4px" }}>
+                <div style={{ marginBottom: "12px" }}>
+                  <h3 style={{ color: "#1e1a14", fontSize: "1rem", fontWeight: 400, margin: 0, fontFamily: "'Playfair Display', serif" }}>
+                    Make it yours
+                  </h3>
+                  <p style={{ margin: "4px 0 0", color: "rgba(30,26,20,0.48)", fontSize: "0.72rem" }}>
+                    Optional extras are added once per booking and included in the final total.
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {availableAddOns.map((addOn: any) => {
+                    const quantity = Number(selectedAddOns[addOn.id] || 0);
+                    const maxQuantity = Number(addOn.maxQuantityPerBooking || 10);
+                    return (
+                      <article key={addOn.id} style={{ display: "flex", gap: "12px", border: quantity > 0 ? "1.5px solid #c8a96e" : "1px solid rgba(30,26,20,0.1)", borderRadius: "10px", background: quantity > 0 ? "rgba(200,169,110,0.05)" : "#fff", padding: "12px" }}>
+                        {addOn.imageUrl && <img src={addOn.imageUrl} alt="" style={{ width: "62px", height: "62px", borderRadius: "8px", objectFit: "cover", flexShrink: 0 }} />}
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}>
+                            <div>
+                              <h4 style={{ margin: 0, color: "#1e1a14", fontSize: "0.82rem", fontWeight: 600 }}>{addOn.title}</h4>
+                              {addOn.description && <p style={{ margin: "3px 0 0", color: "rgba(30,26,20,0.5)", fontSize: "0.68rem", lineHeight: 1.45 }}>{addOn.description}</p>}
+                            </div>
+                            <strong style={{ color: "#781216", fontSize: "0.8rem", whiteSpace: "nowrap" }}>{formatPrice(addOn.price)}</strong>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "10px" }}>
+                            <span style={{ color: "rgba(30,26,20,0.45)", fontSize: "0.65rem" }}>
+                              {addOn.purchaseCutoffOffsetDays != null ? `Closes ${addOn.purchaseCutoffOffsetDays} day(s) before` : "Available until departure"}
+                            </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <button type="button" aria-label={`Remove ${addOn.title}`} disabled={quantity === 0} onClick={() => setSelectedAddOns((current) => ({ ...current, [addOn.id]: Math.max(0, quantity - 1) }))} style={{ width: "28px", height: "28px", borderRadius: "50%", border: "1px solid rgba(30,26,20,0.15)", background: "#fff", color: quantity === 0 ? "rgba(30,26,20,0.25)" : "#781216", cursor: quantity === 0 ? "not-allowed" : "pointer" }}>−</button>
+                              <span style={{ minWidth: "18px", textAlign: "center", fontSize: "0.78rem", fontWeight: 600 }}>{quantity}</span>
+                              <button type="button" aria-label={`Add ${addOn.title}`} disabled={quantity >= maxQuantity} onClick={() => setSelectedAddOns((current) => ({ ...current, [addOn.id]: Math.min(maxQuantity, quantity + 1) }))} style={{ width: "28px", height: "28px", borderRadius: "50%", border: "none", background: quantity >= maxQuantity ? "rgba(120,18,22,0.25)" : "#781216", color: "#fff", cursor: quantity >= maxQuantity ? "not-allowed" : "pointer" }}>+</button>
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
             <hr style={{ border: "none", borderTop: "1px solid rgba(30,26,20,0.1)", margin: "0" }} />
 
@@ -2528,6 +2589,10 @@ export default function BookingPage() {
                     label: `Travelers`,
                     val: `x ${numTravelers}`,
                   },
+                  ...(addOnTotal > 0 ? [{
+                    label: "Selected add-ons",
+                    val: formatPrice(addOnTotal),
+                  }] : []),
                   {
                     label: `GST (5%)`,
                     val: formatPrice(totalGst),

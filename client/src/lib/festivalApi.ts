@@ -31,9 +31,12 @@ export interface ApiActivity {
 
 export interface ApiItineraryDay {
   id?: string;
-  day: string;
+  day?: string;
+  dayNumber?: number;
   title: string;
-  activities: string;
+  description?: string | null;
+  todos?: string[];
+  activities?: string | string[];
 }
 
 export interface ApiItinerary {
@@ -80,7 +83,7 @@ export interface ApiFestival {
   tags: ApiTag[];
   faqs: ApiFaq[];
   slots: ApiSlot[];
-  itinerary?: any;
+  itinerary?: ApiItineraryDay[];
   createdAt: string;
   updatedAt: string;
 }

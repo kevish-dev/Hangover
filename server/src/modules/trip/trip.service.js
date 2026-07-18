@@ -1,7 +1,7 @@
 import * as tripRepo from "./trip.repository.js";
 import { uploadToCloudinary, deleteFromCloudinary, deleteTripAssets, createDirectImageUploadSignature, isExpectedPublicImageUrl } from "../../core/services/upload.service.js";
 import { ValidationError } from "../../core/errors/errors.js";
-import { randomUUID } from "crypto";
+import { createHash, randomBytes, randomUUID } from "crypto";
 import { prisma } from "../../prisma/client.js";
 
 const generateSlug = (title) => {
@@ -29,56 +29,138 @@ export const getTrips = async (page = 1, limit = 10, isAdmin = false) => {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export const getTripById = async (id, isAdmin = false) => {
+const hashShareToken = (token) => createHash("sha256").update(token).digest("hex");
+
+export const getTripById = async (id, isAdmin = false, shareToken = null) => {
   const idField = UUID_RE.test(id) ? 'id' : 'slug';
-  const where = isAdmin ? { [idField]: id } : { [idField]: id, isPublished: true };
+  const where = isAdmin
+    ? { [idField]: id }
+    : shareToken
+      ? {
+          [idField]: id,
+          OR: [
+            { isPublished: true },
+            {
+              shareTokenHash: hashShareToken(shareToken),
+              OR: [
+                { shareTokenExpiresAt: null },
+                { shareTokenExpiresAt: { gt: new Date() } },
+              ],
+            },
+          ],
+        }
+      : { [idField]: id, isPublished: true };
   const trip = await tripRepo.findById(where, isAdmin);
   if (!trip) throw new Error("Trip not found");
   return trip;
 };
 
 export const createTrip = async (data) => {
-  if (!data.slug) {
-    data.slug = generateSlug(data.title) + "-" + Date.now();
-  }
-  if (!data.stayTransportImages) data.stayTransportImages = [];
+  let createData = { ...data };
 
-  if (data.slots && data.slots.length > 0 && data.slots[0].startDate && data.slots[0].endDate) {
-    const start = new Date(data.slots[0].startDate);
-    const end = new Date(data.slots[0].endDate);
-    if (end <= start) {
-      throw new Error("End date must be strictly after start date");
-    }
-    const diffTime = Math.abs(end - start);
-    data.duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  }
-  if (!data.duration) data.duration = 1;
-
-  // price and tokenAmount are required Decimal columns — ensure they're set
-  if (data.price === undefined || data.price === null) data.price = 0;
-  if (data.tokenAmount === undefined || data.tokenAmount === null) data.tokenAmount = 0;
-
-  const trip = await tripRepo.create(data);
-
-  if (data.circuitId) {
+  if (createData.circuitId) {
     const circuit = await prisma.circuit.findUnique({
-      where: { id: data.circuitId },
-      include: { days: true }
+      where: { id: createData.circuitId },
+      include: {
+        days: { orderBy: { dayNumber: "asc" } },
+        packages: true,
+        faqs: { orderBy: { order: "asc" } },
+        tags: true,
+        addOns: { where: { isActive: true }, orderBy: { createdAt: "asc" } },
+      },
     });
-    
-    if (circuit && circuit.days.length > 0) {
-      const itineraryDays = circuit.days.map(day => ({
-        tripId: trip.id,
+    if (!circuit) throw new ValidationError("Circuit not found.");
+
+    createData = {
+      title: circuit.title,
+      location: circuit.location,
+      bannerImages: circuit.bannerImages,
+      duration: circuit.duration,
+      bestTimeToVisit: circuit.bestTimeToVisit,
+      overview: circuit.overview,
+      galleryImages: circuit.galleryImages,
+      inclusions: circuit.inclusions,
+      exclusions: circuit.exclusions,
+      price: Number(circuit.basePrice),
+      tokenAmount: Number(circuit.baseTokenAmount),
+      tripType: circuit.tripType,
+      destinationId: circuit.destinationId,
+      highlights: circuit.highlights,
+      stayTransportImages: circuit.stayTransportImages,
+      packages: circuit.packages.map(({ title, price, tokenAmount }) => ({
+        title,
+        price: Number(price),
+        tokenAmount: Number(tokenAmount),
+      })),
+      faqs: circuit.faqs.map(({ question, answer, order }) => ({ question, answer, order })),
+      tripTags: circuit.tags.map(({ tag }) => tag),
+      addOns: circuit.addOns.map((addOn) => ({
+        title: addOn.title,
+        description: addOn.description,
+        imageUrl: addOn.imageUrl,
+        price: Number(addOn.price),
+        maxQuantityPerBooking: addOn.maxQuantityPerBooking,
+        purchaseCutoffOffsetDays: addOn.purchaseCutoffOffsetDays,
+        isActive: addOn.isActive,
+      })),
+      itinerary: circuit.days.map((day) => ({
         dayNumber: day.dayNumber,
         title: day.title,
         description: day.description,
         todos: day.todos,
-      }));
-      await prisma.itineraryDay.createMany({ data: itineraryDays });
-    }
+      })),
+      ...createData,
+    };
   }
 
-  return trip;
+  if (!createData.title) throw new ValidationError("Trip title is required.");
+  if (!createData.slug) {
+    createData.slug = generateSlug(createData.title) + "-" + Date.now();
+  }
+  if (!createData.stayTransportImages) createData.stayTransportImages = [];
+  if (!createData.bannerImages) createData.bannerImages = [];
+  if (!createData.galleryImages) createData.galleryImages = [];
+
+  if (createData.slots && createData.slots.length > 0) {
+    for (const slot of createData.slots) {
+      if (!slot.startDate || !slot.endDate) {
+        throw new ValidationError("Every trip slot needs a start and end date.");
+      }
+      if (new Date(slot.endDate) <= new Date(slot.startDate)) {
+        throw new ValidationError("Every slot end date must be after its start date.");
+      }
+    }
+    const start = new Date(createData.slots[0].startDate);
+    const end = new Date(createData.slots[0].endDate);
+    const diffTime = Math.abs(end - start);
+    createData.duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  }
+  if (!createData.duration) createData.duration = 1;
+
+  // price and tokenAmount are required Decimal columns — ensure they're set
+  if (createData.price === undefined || createData.price === null) createData.price = 0;
+  if (createData.tokenAmount === undefined || createData.tokenAmount === null) createData.tokenAmount = 0;
+
+  return tripRepo.create(createData);
+};
+
+export const createShareLink = async (id, expiresAt) => {
+  await getTripById(id, true);
+  const token = randomBytes(32).toString("base64url");
+  const parsedExpiry = expiresAt ? new Date(expiresAt) : null;
+  if (parsedExpiry && Number.isNaN(parsedExpiry.getTime())) {
+    throw new ValidationError("Invalid share link expiry.");
+  }
+  const trip = await tripRepo.update(id, {
+    shareTokenHash: hashShareToken(token),
+    shareTokenExpiresAt: parsedExpiry,
+  });
+  return { token, slug: trip.slug, expiresAt: trip.shareTokenExpiresAt };
+};
+
+export const revokeShareLink = async (id) => {
+  await getTripById(id, true);
+  await tripRepo.update(id, { shareTokenHash: null, shareTokenExpiresAt: null });
 };
 
 export const updateTrip = async (id, data) => {

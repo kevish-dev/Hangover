@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../lib/axios";
 import { TripFormModal } from "../../components/admin/TripFormModal";
@@ -19,10 +19,14 @@ import {
   ChevronUp,
   UserCircle,
   CreditCard,
+  Link2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "../../components/ui/button";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../components/ui/dialog";
+import { Input } from "../../components/ui/input";
+import { getErrorMessage, showErrorToast } from "../../../lib/errors";
 
 // ── Booking status badge ──────────────────────────────────────────
 function BookingStatusBadge({ status }: { status: string }) {
@@ -59,13 +63,17 @@ function PaymentStatusBadge({ status }: { status: string }) {
 function TripBookingsDrawer({ tripId }: { tripId: string }) {
   const queryClient = useQueryClient();
 
-  const { data: bookings, isLoading } = useQuery({
+  const bookingsQuery = useQuery({
     queryKey: ["admin", "bookings", "trip", tripId],
     queryFn: async () => {
       const res = await apiClient.get(`/bookings/trip/${tripId}`);
       return res.data as any[];
     },
   });
+  const { data: bookings, isLoading } = bookingsQuery;
+  useEffect(() => {
+    if (bookingsQuery.isError) toast.error(getErrorMessage(bookingsQuery.error, "Bookings could not be loaded"), { id: `trip-bookings-error-${tripId}` });
+  }, [bookingsQuery.error, bookingsQuery.isError, tripId]);
 
   if (isLoading) {
     return (
@@ -73,6 +81,10 @@ function TripBookingsDrawer({ tripId }: { tripId: string }) {
         <Loader2 className="w-4 h-4 animate-spin" /> Loading bookings…
       </div>
     );
+  }
+
+  if (bookingsQuery.isError) {
+    return <div role="alert" className="px-5 py-6 text-center text-sm text-red-700">Bookings could not be loaded. <button type="button" onClick={() => bookingsQuery.refetch()} className="font-semibold underline">Try again</button></div>;
   }
 
   if (!bookings || bookings.length === 0) {
@@ -163,16 +175,21 @@ export default function AdminTripsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTrip, setEditingTrip] = useState<any>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [processingAction, setProcessingAction] = useState<"delete" | "publish" | null>(null);
+  const [processingAction, setProcessingAction] = useState<"delete" | "publish" | "edit" | null>(null);
   const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
+  const [generatedShareLink, setGeneratedShareLink] = useState<{ title: string; url: string } | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const tripsQuery = useQuery({
     queryKey: ["admin", "trips"],
     queryFn: async () => {
-      const res = await apiClient.get("/trips?adminView=true");
+      const res = await apiClient.get("/trips", { params: { adminView: true, limit: 200 } });
       return res.data;
     },
   });
+  const { data, isLoading } = tripsQuery;
+  useEffect(() => {
+    if (tripsQuery.isError) toast.error(getErrorMessage(tripsQuery.error, "Trips could not be loaded"), { id: "admin-trips-load-error" });
+  }, [tripsQuery.error, tripsQuery.isError]);
 
   const confirmAction = (title: string, description: string, actionLabel: string, actionFn: () => Promise<void>) => {
     toast(title, {
@@ -196,7 +213,7 @@ export default function AdminTripsPage() {
           toast.success("Trip deleted successfully");
           queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
         } catch (error) {
-          toast.error("Failed to delete trip");
+          showErrorToast(error, "Failed to delete trip");
         } finally {
           setProcessingId(null);
           setProcessingAction(null);
@@ -219,13 +236,40 @@ export default function AdminTripsPage() {
           toast.success(isPub ? "Trip unpublished" : "Trip published");
           queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
         } catch (error) {
-          toast.error("Failed to update status");
+          showErrorToast(error, "Failed to update trip status");
         } finally {
           setProcessingId(null);
           setProcessingAction(null);
         }
       }
     );
+  };
+
+  const handleCreateShareLink = async (trip: any) => {
+    try {
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { data } = await apiClient.post(`/trips/${trip.id}/share-link`, { expiresAt });
+      const url = `${window.location.origin}/trips/${trip.slug}?share=${encodeURIComponent(data.token)}`;
+      setGeneratedShareLink({ title: trip.title, url });
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success("Private booking link copied", { description: "The link expires in 30 days." });
+      } catch {
+        toast.warning("Private link created, but automatic copy was blocked", { description: "Copy it manually from the open dialog. The link expires in 30 days." });
+      }
+    } catch (error: unknown) {
+      showErrorToast(error, "Could not create the private link");
+    }
+  };
+
+  const copyGeneratedShareLink = async () => {
+    if (!generatedShareLink) return;
+    try {
+      await navigator.clipboard.writeText(generatedShareLink.url);
+      toast.success("Private booking link copied");
+    } catch (error) {
+      showErrorToast(error, "Automatic copy is unavailable", "Select the link and copy it manually.");
+    }
   };
 
   const openCreateModal = () => {
@@ -235,13 +279,13 @@ export default function AdminTripsPage() {
 
   const openEditModal = async (trip: any) => {
     setProcessingId(trip.id);
-    setProcessingAction("edit" as any);
+    setProcessingAction("edit");
     try {
       const res = await apiClient.get(`/trips/${trip.id}?adminView=true`);
       setEditingTrip(res.data);
       setIsModalOpen(true);
     } catch (error) {
-      toast.error("Failed to fetch full trip details");
+      showErrorToast(error, "Failed to fetch full trip details");
     } finally {
       setProcessingId(null);
       setProcessingAction(null);
@@ -254,6 +298,9 @@ export default function AdminTripsPage() {
 
   if (isLoading) {
     return <div className="p-8 text-gray-500">Loading trips...</div>;
+  }
+  if (tripsQuery.isError) {
+    return <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-800"><p className="font-bold">Trips could not be loaded.</p><button type="button" onClick={() => tripsQuery.refetch()} className="mt-3 text-sm font-semibold underline">Try again</button></div>;
   }
 
   const trips = data?.data || [];
@@ -280,6 +327,18 @@ export default function AdminTripsPage() {
         onOpenChange={setIsModalOpen}
         trip={editingTrip}
       />
+      <Dialog open={Boolean(generatedShareLink)} onOpenChange={(nextOpen) => !nextOpen && setGeneratedShareLink(null)}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Private booking link</DialogTitle>
+            <DialogDescription>{generatedShareLink?.title} · expires in 30 days. Creating another link will replace this one.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input readOnly value={generatedShareLink?.url || ""} onFocus={(event) => event.currentTarget.select()} />
+            <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setGeneratedShareLink(null)}>Close</Button><Button type="button" onClick={copyGeneratedShareLink} className="bg-[#781216] hover:bg-[#5f0e11]">Copy link</Button></div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex flex-col gap-4">
         {trips.length === 0 ? (
@@ -313,9 +372,10 @@ export default function AdminTripsPage() {
                   </div>
                   <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500 flex-wrap">
                     <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{trip.location}</span>
-                    <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{trip.startDate ? format(new Date(trip.startDate), "MMM d, yyyy") : "TBD"}</span>
-                    <span className="flex items-center gap-1"><Users className="w-3 h-3" />{trip.filledSpots ?? 0}/{trip.capacity} booked</span>
+                    <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{trip.slots?.[0]?.startDate ? format(new Date(trip.slots[0].startDate), "MMM d, yyyy") : "No departure"}</span>
+                    <span className="flex items-center gap-1"><Users className="w-3 h-3" />{(trip.slots || []).reduce((sum: number, slot: any) => sum + Number(slot.filledSpots || 0), 0)}/{(trip.slots || []).reduce((sum: number, slot: any) => sum + Number(slot.capacity || 0), 0)} booked</span>
                     <span className="flex items-center gap-1 font-semibold text-[#781216]"><IndianRupee className="w-3 h-3" />{parseInt(trip.price).toLocaleString("en-IN")}</span>
+                    {trip.circuit && <span className="text-[#8a6414]">From {trip.circuit.title}</span>}
                   </div>
                 </div>
 
@@ -327,6 +387,13 @@ export default function AdminTripsPage() {
                   >
                     {expandedTripId === trip.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                     Bookings
+                  </button>
+                  <button
+                    onClick={() => handleCreateShareLink(trip)}
+                    className="text-xs font-medium text-gray-500 hover:text-[#781216] transition-colors flex items-center justify-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-50 border border-gray-200"
+                  >
+                    <Link2 className="w-3.5 h-3.5" />
+                    Private link
                   </button>
                   <button
                     onClick={() => handleTogglePublish(trip)}
@@ -347,7 +414,7 @@ export default function AdminTripsPage() {
                     disabled={processingId === trip.id}
                     className="text-xs font-medium text-gray-500 hover:text-[#c8a96e] transition-colors flex items-center justify-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-50 border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {processingId === trip.id && processingAction === ("edit" as any) ? (
+                    {processingId === trip.id && processingAction === "edit" ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
                       <Edit2 className="w-3.5 h-3.5" />

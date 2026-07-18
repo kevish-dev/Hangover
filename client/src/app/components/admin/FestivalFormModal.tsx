@@ -216,11 +216,13 @@ export function FestivalFormModal({
           itinerary: Array.isArray(festival.itinerary) ? festival.itinerary.map((day: any) => ({
             day: day.day || `Day ${day.dayNumber || 1}`,
             title: day.title || "",
-            activities: typeof day.activities === 'string'
+            activities: Array.isArray(day.todos) && day.todos.length > 0
+              ? day.todos.join('\n')
+              : typeof day.activities === 'string'
               ? day.activities
               : Array.isArray(day.activities)
                 ? day.activities.join('\n')
-                : ""
+                : day.description || ""
           })) : [],
           faqs: festival.faqs?.length
             ? festival.faqs.map((f: any) => ({

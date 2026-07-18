@@ -1,5 +1,30 @@
 import * as ledgerService from "./ledger.service.js";
 
+export const getUnifiedLedger = async (req, res, next) => {
+  try {
+    res.status(200).json(await ledgerService.getUnifiedLedger(req.query));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const addManualEntry = async (req, res, next) => {
+  try {
+    res.status(201).json(await ledgerService.addManualLedgerEntry(req.body, req.user.id));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteManualEntry = async (req, res, next) => {
+  try {
+    await ledgerService.removeManualLedgerEntry(req.params.entryId);
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getBalanceSheet = async (req, res, next) => {
   try {
     const result = await ledgerService.getBookingBalanceSheet(req.params.bookingId);
