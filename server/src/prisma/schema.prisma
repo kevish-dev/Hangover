@@ -8,20 +8,22 @@ datasource db {
 }
 
 model User {
-  id                String       @id @default(uuid())
-  email             String       @unique
-  googleId          String       @unique
-  role              UserRole     @default(USER)
-  isActive          Boolean      @default(true)
-  lastLoginAt       DateTime?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  bookings          Booking[]
-  resolvedInquiries Inquiry[]    @relation("InquiryResolver")
-  inquiries         Inquiry[]
-  profile           UserProfile?
-  reviews           Review[]
-  mediaUploads      MediaAsset[] @relation("MediaAssetUploader")
+  id                  String       @id @default(uuid())
+  email               String       @unique
+  googleId            String       @unique
+  role                UserRole     @default(USER)
+  isActive            Boolean      @default(true)
+  lastLoginAt         DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  bookings            Booking[]
+  customTripsCreated  CustomTrip[] @relation("CustomTripCreator")
+  customTripsCustomer CustomTrip[] @relation("CustomTripCustomer")
+  resolvedInquiries   Inquiry[]    @relation("InquiryResolver")
+  inquiries           Inquiry[]
+  profile             UserProfile?
+  reviews             Review[]
+  mediaUploads        MediaAsset[] @relation("MediaAssetUploader")
 
   @@index([email])
   @@index([role])
@@ -141,6 +143,7 @@ model LandingFootprint {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
   @@index([isActive, sortOrder])
 }
 
@@ -155,6 +158,7 @@ model LandingJourneyMilestone {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
   @@index([isActive, sortOrder])
 }
 
@@ -193,7 +197,7 @@ model Festival {
   faqs                FAQ[]
   destination         Destination?  @relation(fields: [destinationId], references: [id])
   inquiries           Inquiry[]
-  itinerary           Json         @default("[]")
+  itinerary           Json          @default("[]")
   packages            Package[]
   slots               Slot[]
   tags                FestivalTag[] @relation("FestivalToFestivalTag")
@@ -280,10 +284,14 @@ model Booking {
   specialRequests    String?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
+  source             BookingSource     @default(CATALOG)
   packageId          String?
-  slotId             String
+  slotId             String?
+  customTripId       String?           @unique
+  customTripSnapshot Json?
   package            Package?          @relation(fields: [packageId], references: [id], onDelete: Restrict)
-  slot               Slot              @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  slot               Slot?             @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  customTrip         CustomTrip?       @relation(fields: [customTripId], references: [id], onDelete: Restrict)
   user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   payments           Payment[]
   paymentIntents     PaymentIntent[]
@@ -297,51 +305,99 @@ model Booking {
 
   @@index([packageId])
   @@index([slotId])
+  @@index([customTripId])
+  @@index([source])
   @@index([userId])
   @@index([status])
   @@index([paymentStatus])
   @@index([balanceDueDate])
 }
 
+model CustomTrip {
+  id                 String           @id @default(uuid())
+  reference          String           @unique
+  title              String
+  description        String?
+  customerName       String
+  customerEmail      String
+  customerPhone      String?
+  customerUserId     String?
+  createdById        String
+  bannerImages       String[]         @default([])
+  highlights         Json             @default("[]")
+  itinerary          Json             @default("[]")
+  startDate          DateTime         @db.Date
+  endDate            DateTime         @db.Date
+  durationDays       Int
+  travelerCount      Int
+  totalAmount        Decimal          @db.Decimal(10, 2)
+  tokenAmount        Decimal          @db.Decimal(10, 2)
+  currency           String           @default("INR")
+  balanceDueDate     DateTime?        @db.Date
+  validUntil         DateTime
+  pricingNotes       String?
+  internalNotes      String?
+  status             CustomTripStatus @default(DRAFT)
+  shareTokenHash     String?          @unique
+  sentAt             DateTime?
+  viewedAt           DateTime?
+  convertedAt        DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+  version            Int              @default(1)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  customerUser       User?            @relation("CustomTripCustomer", fields: [customerUserId], references: [id], onDelete: SetNull)
+  createdBy          User             @relation("CustomTripCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  booking            Booking?
+  reviews            Review[]
+
+  @@index([customerEmail])
+  @@index([customerUserId])
+  @@index([createdById])
+  @@index([status])
+  @@index([startDate])
+  @@index([createdAt])
+}
+
 model Traveler {
-  id          String    @id @default(uuid())
-  bookingId   String
-  fullName    String
-  gender      String?
-  dateOfBirth DateTime?
-  phone       String?
-  aadhaar     String?
+  id             String      @id @default(uuid())
+  bookingId      String
+  fullName       String
+  gender         String?
+  dateOfBirth    DateTime?
+  phone          String?
+  aadhaar        String?
   aadhaarAssetId String?     @unique
   aadhaarAsset   MediaAsset? @relation("TravelerGovernmentId", fields: [aadhaarAssetId], references: [id], onDelete: SetNull)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  booking        Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@index([bookingId])
 }
 
 model MediaAsset {
-  id            String            @id @default(uuid())
-  publicId      String            @unique
-  resourceType  MediaResourceType
-  deliveryType  MediaDeliveryType @default(PUBLIC)
-  format        String?
-  version       String?
-  bytes         Int?
-  width         Int?
-  height        Int?
-  folder        String?
-  uploadedById  String?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  uploadedBy    User?             @relation("MediaAssetUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
-  profileGovtId UserProfile?      @relation("ProfileGovernmentId")
-  travelerGovtId Traveler?        @relation("TravelerGovernmentId")
+  id             String            @id @default(uuid())
+  publicId       String            @unique
+  resourceType   MediaResourceType
+  deliveryType   MediaDeliveryType @default(PUBLIC)
+  format         String?
+  version        String?
+  bytes          Int?
+  width          Int?
+  height         Int?
+  folder         String?
+  uploadedById   String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  uploadedBy     User?             @relation("MediaAssetUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  profileGovtId  UserProfile?      @relation("ProfileGovernmentId")
+  travelerGovtId Traveler?         @relation("TravelerGovernmentId")
 
   @@index([uploadedById])
   @@index([deliveryType])
 }
-
 
 model FAQ {
   id         String    @id @default(uuid())
@@ -561,6 +617,20 @@ enum BookingStatus {
   COMPLETED
 }
 
+enum BookingSource {
+  CATALOG
+  CUSTOM
+}
+
+enum CustomTripStatus {
+  DRAFT
+  SENT
+  VIEWED
+  CONVERTED
+  EXPIRED
+  CANCELLED
+}
+
 enum PaymentStatus {
   PENDING
   PARTIALLY_PAID
@@ -612,24 +682,27 @@ enum RefundStatus {
 }
 
 model Review {
-  id          String    @id @default(uuid())
-  rating      Int
-  comment     String?
-  userId      String
-  tripId      String?
-  festivalId  String?
-  bookingId   String    @unique
-  isPublished Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trip        Trip?     @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  festival    Festival? @relation(fields: [festivalId], references: [id], onDelete: Cascade)
-  booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  id           String   @id @default(uuid())
+  rating       Int
+  comment      String?
+  userId       String
+  tripId       String?
+  festivalId   String?
+  customTripId String?
+  bookingId    String   @unique
+  isPublished  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trip       Trip?       @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  festival   Festival?   @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  customTrip CustomTrip? @relation(fields: [customTripId], references: [id], onDelete: Cascade)
+  booking    Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([tripId])
   @@index([festivalId])
+  @@index([customTripId])
   @@index([isPublished])
 }

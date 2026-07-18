@@ -8,6 +8,7 @@ import {
 } from "../../core/errors/errors.js";
 import crypto from "crypto";
 import { uploadSensitiveDocument, createAuthenticatedDeliveryUrl, deleteMediaAsset } from "../../core/services/upload.service.js";
+import { getBookingJourney } from "./booking-journey.js";
 
 const withSecureDocumentUrls = (booking) => {
   if (!booking) return booking;
@@ -272,14 +273,14 @@ export const cancelBooking = async (bookingId, userId, reason) => {
 
   import("../../core/services/email.service.js")
     .then(({ sendBookingCancelledRefundedEmail }) => {
-      const item = booking.slot?.trip || booking.slot?.festival;
+      const journey = getBookingJourney(booking);
       return sendBookingCancelledRefundedEmail(booking.user?.email, {
         name: booking.user?.profile?.fullName || "Traveler",
         bookingRef: booking.bookingReference,
-        tripTitle: item?.title || "your trip",
+        tripTitle: journey.title,
         packageName: booking.package?.title,
-        tripStartDate: booking.slot?.startDate,
-        tripEndDate: booking.slot?.endDate,
+        tripStartDate: journey.startDate,
+        tripEndDate: journey.endDate,
         travelersCount: booking.numberOfTravelers,
         refundAmount: 0,
         reason: reason || "Cancelled by traveler",
@@ -361,6 +362,7 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
       slot: { include: { trip: true, festival: true } },
       package: true,
       user: { include: { profile: true } },
+      customTrip: true,
       payments: {
         where: { status: "SUCCESS" }
       }
@@ -489,10 +491,10 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
   // Send Email (Fire and forget)
   import("../../core/services/email.service.js").then((emailService) => {
     if (emailService.sendBookingCancelledRefundedEmail) {
-      const item = booking.slot?.trip || booking.slot?.festival;
+      const journey = getBookingJourney(booking);
       emailService.sendBookingCancelledRefundedEmail(booking.user.email, {
         name: booking.user.profile?.fullName || "Traveler",
-        tripTitle: item?.title || "your trip",
+        tripTitle: journey.title,
         bookingRef: booking.bookingReference,
         refundAmount: validRefundAmount,
         totalPaid,
@@ -502,8 +504,8 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
         reason: reason || "Admin initiated cancellation",
         refundReference: refundsData.map(({ rzpRefund }) => rzpRefund.id).filter(Boolean).join(", "),
         cancelledAt: new Date(),
-        tripStartDate: booking.slot?.startDate,
-        tripEndDate: booking.slot?.endDate,
+        tripStartDate: journey.startDate,
+        tripEndDate: journey.endDate,
         packageName: booking.package?.title,
         travelersCount: booking.numberOfTravelers,
       }).catch(err => console.error("Failed to send cancellation email:", err));
@@ -519,6 +521,7 @@ export const finalizeBooking = async (bookingId) => {
     include: {
       user: { include: { profile: true } },
       slot: { include: { trip: true, festival: true } },
+      customTrip: true,
       package: true,
     }
   });
@@ -542,7 +545,8 @@ export const finalizeBooking = async (bookingId) => {
   });
 
   // 2. Send Review Email
-  const itemTitle = booking.slot.trip ? booking.slot.trip.title : booking.slot.festival?.title;
+  const journey = getBookingJourney(booking);
+  const itemTitle = journey.title;
   if (itemTitle && booking.user?.email) {
     const reviewLink = `${frontendUrl}/bookings/${booking.id}/review`;
     try {
@@ -551,10 +555,10 @@ export const finalizeBooking = async (bookingId) => {
         name: booking.user.profile?.fullName || "Traveler",
         tripTitle: itemTitle,
         bookingRef: booking.bookingReference,
-        itemLocation: booking.slot.trip?.location || booking.slot.festival?.location,
+        itemLocation: journey.location,
         packageName: booking.package?.title,
-        tripStartDate: booking.slot?.startDate,
-        tripEndDate: booking.slot?.endDate,
+        tripStartDate: journey.startDate,
+        tripEndDate: journey.endDate,
         reviewLink,
       });
     } catch (err) {

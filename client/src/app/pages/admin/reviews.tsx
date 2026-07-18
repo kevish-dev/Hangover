@@ -35,7 +35,7 @@ export default function AdminReviewsPage() {
   const filteredReviews = reviews.filter((r) => {
     const text = (r.comment || "").toLowerCase();
     const reviewerName = (r.user?.profile?.fullName || "").toLowerCase();
-    const tripName = (r.trip?.title || r.festival?.title || "").toLowerCase();
+    const tripName = (r.customTrip?.title || r.trip?.title || r.festival?.title || "").toLowerCase();
     const query = searchQuery.toLowerCase();
     
     return text.includes(query) || reviewerName.includes(query) || tripName.includes(query);
@@ -85,7 +85,7 @@ export default function AdminReviewsPage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-gray-900">{review.user?.profile?.fullName || "Anonymous"}</p>
-                  <p className="mt-0.5 truncate text-xs text-gray-500">{review.trip?.title || review.festival?.title || "Unknown"}</p>
+                  <p className="mt-0.5 truncate text-xs text-gray-500">{review.customTrip?.title || review.trip?.title || review.festival?.title || "Unknown"}</p>
                 </div>
                 <span className={`shrink-0 rounded px-2 py-1 text-[11px] font-medium tracking-wide ${review.isPublished ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
                   {review.isPublished ? "PUBLISHED" : "HIDDEN"}
@@ -155,7 +155,7 @@ export default function AdminReviewsPage() {
                       <span className="font-medium text-gray-900">{review.user?.profile?.fullName || "Anonymous"}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600">{review.trip?.title || review.festival?.title || "Unknown"}</span>
+                      <span className="text-sm text-gray-600">{review.customTrip?.title || review.trip?.title || review.festival?.title || "Unknown"}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center text-yellow-400">

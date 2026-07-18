@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon .",
-    "media:prune": "node src/utils/scripts/pruneMediaAssets.js"
+    "media:prune": "node src/utils/scripts/pruneMediaAssets.js",
+    "test:custom-trips": "node src/utils/scripts/smokeCustomTrips.js"
   },
   "keywords": [],
   "author": "",

@@ -19,6 +19,8 @@ import AdminFestivalsPage from "./pages/admin/festivals";
 import ReviewSubmitPage from "./pages/review-submit";
 import AdminReviewsPage from "./pages/admin/reviews";
 import AdminLandingPage from "./pages/admin/landing-page";
+import AdminCustomTripsPage from "./pages/admin/custom-trips";
+import CustomTripOfferPage from "./pages/custom-trip-offer";
 
 export const router = createBrowserRouter([
   {
@@ -35,6 +37,7 @@ export const router = createBrowserRouter([
       { path: "bookings/:bookingId/review", Component: ReviewSubmitPage },
       { path: "about", Component: AboutPage },
       { path: "profile", Component: ProfilePage },
+      { path: "custom-trip/:token", Component: CustomTripOfferPage },
     ],
   },
   {
@@ -43,6 +46,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: AdminDashboardRedirect },
       { path: "trips", Component: AdminTripsPage },
+      { path: "custom-trips", Component: AdminCustomTripsPage },
       { path: "festivals", Component: AdminFestivalsPage },
       { path: "destinations", Component: AdminDestinationsPage },
       { path: "bookings", Component: AdminBookingsPage },

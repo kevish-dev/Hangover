@@ -271,7 +271,9 @@ export default function AdminBookingsPage() {
         b.user?.profile?.fullName?.toLowerCase().includes(q) ||
         b.user?.email?.toLowerCase().includes(q) ||
         b.trip?.title?.toLowerCase().includes(q) ||
-        b.festival?.title?.toLowerCase().includes(q)
+        b.festival?.title?.toLowerCase().includes(q) ||
+        b.customTrip?.title?.toLowerCase().includes(q) ||
+        b.customTrip?.reference?.toLowerCase().includes(q)
       );
     }
 
@@ -364,7 +366,7 @@ export default function AdminBookingsPage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-mono text-xs font-semibold text-[#781216]">{b.bookingReference}</p>
-                  <h2 className="mt-1 break-words text-sm font-semibold text-gray-900">{b.trip?.title || b.festival?.title}</h2>
+                  <h2 className="mt-1 break-words text-sm font-semibold text-gray-900">{b.customTrip?.title || b.trip?.title || b.festival?.title}</h2>
                 </div>
                 <div onClick={(event) => event.stopPropagation()} className="shrink-0">
                   <ActionMenu
@@ -445,7 +447,7 @@ export default function AdminBookingsPage() {
                       {b.bookingReference}
                     </td>
                     <td className="px-6 py-4 text-gray-700 max-w-[200px] truncate">
-                      {b.trip?.title || b.festival?.title}
+                      {b.customTrip?.title || b.trip?.title || b.festival?.title}
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-gray-900 font-medium">{b.user?.profile?.fullName || "N/A"}</div>
@@ -628,14 +630,16 @@ export default function AdminBookingsPage() {
                   <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                     <div className="admin-booking-detail-grid grid grid-cols-3 gap-2 text-sm">
                       <span className="text-gray-500">Item:</span>
-                      <span className="col-span-2 font-medium text-gray-900">{selectedBooking.trip?.title || selectedBooking.festival?.title || "N/A"}</span>
+                      <span className="col-span-2 font-medium text-gray-900">{selectedBooking.customTrip?.title || selectedBooking.trip?.title || selectedBooking.festival?.title || "N/A"}</span>
                       
                       <span className="text-gray-500">Package:</span>
-                      <span className="col-span-2 text-gray-900">{selectedBooking.package?.title || "No Package"}</span>
+                      <span className="col-span-2 text-gray-900">{selectedBooking.customTrip ? "Private custom trip" : selectedBooking.package?.title || "No Package"}</span>
                       
                       <span className="text-gray-500">Slot:</span>
                       <span className="col-span-2 text-gray-900">
-                        {selectedBooking.slot 
+                        {selectedBooking.customTrip
+                          ? `${format(new Date(selectedBooking.customTrip.startDate), "PP")} - ${format(new Date(selectedBooking.customTrip.endDate), "PP")}`
+                          : selectedBooking.slot
                           ? `${format(new Date(selectedBooking.slot.startDate), "PP")} - ${format(new Date(selectedBooking.slot.endDate), "PP")}`
                           : "No Slot Selected"}
                       </span>

@@ -45,14 +45,15 @@ const formatCalendarDate = (value: string | null | undefined) => {
 };
 
 const getItemDetails = (payment: ApiPayment) => {
+  const customTrip = payment.booking.customTrip;
   const festival = payment.booking.festival || payment.booking.slot?.festival;
   const trip = payment.booking.trip || payment.booking.slot?.trip;
   const item = festival || trip;
 
   return {
-    kind: festival ? "Festival" : trip ? "Trip" : "Booking",
-    title: item?.title || "Booking item unavailable",
-    location: item?.location || "Location not provided",
+    kind: customTrip ? "Custom trip" : festival ? "Festival" : trip ? "Trip" : "Booking",
+    title: customTrip?.title || item?.title || "Booking item unavailable",
+    location: customTrip ? "Private itinerary" : item?.location || "Location not provided",
   };
 };
 
@@ -184,12 +185,14 @@ function PaymentDetailsModal({ payment, onClose }: { payment: ApiPayment; onClos
             <DetailRow label="Type">{item.kind}</DetailRow>
             <DetailRow label="Item">{item.title}</DetailRow>
             <DetailRow label="Location">{item.location}</DetailRow>
-            <DetailRow label="Package">{payment.booking.package?.title || "Standard option"}</DetailRow>
+            <DetailRow label="Package">{payment.booking.customTrip ? "Private custom trip" : payment.booking.package?.title || "Standard option"}</DetailRow>
             <DetailRow label="Slot">
-              {payment.booking.slot?.title || formatCalendarDate(payment.booking.slot?.startDate)}
+              {payment.booking.customTrip ? "Private dates" : payment.booking.slot?.title || formatCalendarDate(payment.booking.slot?.startDate)}
             </DetailRow>
             <DetailRow label="Travel dates">
-              {payment.booking.slot?.startDate
+              {payment.booking.customTrip
+                ? `${formatCalendarDate(payment.booking.customTrip.startDate)} – ${formatCalendarDate(payment.booking.customTrip.endDate)}`
+                : payment.booking.slot?.startDate
                 ? `${formatCalendarDate(payment.booking.slot.startDate)} – ${formatCalendarDate(payment.booking.slot.endDate)}`
                 : "Dates not provided"}
             </DetailRow>
@@ -479,7 +482,7 @@ export default function AdminPaymentsPage() {
                     <td className="max-w-[290px] px-5 py-4">
                       <div className="mb-1.5 flex flex-wrap items-center gap-2"><BookingKindBadge kind={item.kind} /><span className="font-mono text-[11px] font-semibold text-[#781216]">{payment.booking.bookingReference}</span></div>
                       <p className="break-words font-semibold text-gray-950">{item.title}</p>
-                      <p className="mt-1 truncate text-xs text-gray-500">{payment.booking.package?.title || "Standard option"} · {payment.booking.slot?.title || formatCalendarDate(payment.booking.slot?.startDate)}</p>
+                      <p className="mt-1 truncate text-xs text-gray-500">{payment.booking.customTrip ? "Private custom trip" : payment.booking.package?.title || "Standard option"} · {payment.booking.customTrip ? formatCalendarDate(payment.booking.customTrip.startDate) : payment.booking.slot?.title || formatCalendarDate(payment.booking.slot?.startDate)}</p>
                     </td>
                     <td className="max-w-[230px] px-5 py-4">
                       <p className="break-words font-semibold text-gray-900">{getCustomerName(payment)}</p>

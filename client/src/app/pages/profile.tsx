@@ -70,10 +70,12 @@ function StatusBadge({ status }: { status: string }) {
 
 function BookingCard({ booking }: { booking: ApiBooking }) {
   const [hovered, setHovered] = useState(false);
-  const item = booking.trip || booking.festival;
+  const item: any = booking.customTrip || booking.trip || booking.festival;
+  const isCustom = booking.source === "CUSTOM" || Boolean(booking.customTrip);
   const isFestival = !!booking.festival;
   const heroImage = item?.bannerImages?.[0] || "";
-  const state = item?.destination?.state || item?.location || "";
+  const state = isCustom ? "Private custom trip" : (item as any)?.destination?.state || (item as any)?.location || "";
+  const travelStart = booking.customTrip?.startDate || booking.slot?.startDate;
   const paid = parseFloat(booking.amountPaid || "0");
   const due = parseFloat(booking.amountDue || "0");
   const isFullyRefunded = booking.paymentStatus === "REFUNDED";
@@ -263,9 +265,9 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
           }}
         >
           {[
-            { icon: Calendar, text: `Travel ${formatTravelMonth(booking.slot?.startDate)}` },
+            { icon: Calendar, text: `Travel ${formatTravelMonth(travelStart)}` },
             { icon: Users, text: `${booking.numberOfTravelers} Traveler${booking.numberOfTravelers > 1 ? "s" : ""}` },
-            ...(item?.duration ? [{ icon: Clock, text: formatDuration(item.duration) }] : []),
+            ...((item as any)?.duration || booking.customTrip?.durationDays ? [{ icon: Clock, text: formatDuration((item as any)?.duration || booking.customTrip?.durationDays) }] : []),
           ].map(({ icon: Icon, text }, i) => (
             <div className="profile-booking-meta-item" key={i} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
               <Icon size={11} color="rgba(30,26,20,0.35)" strokeWidth={1.5} />
@@ -334,7 +336,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
                 </span>
               </div>
             )}
-            {isFullyRefunded && (
+            {isFullyRefunded && !isCustom && (
               <div>
                 <span style={{ color: "rgba(30,26,20,0.35)", fontSize: "0.55rem", fontWeight: 400, display: "block", letterSpacing: "0.06em", textTransform: "uppercase" }}>
                   Refunded
@@ -404,7 +406,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
                 <RotateCcw size={10} /> Book Again
               </Link>
             )}
-            <Link
+            {!isCustom ? <Link
               className="profile-booking-view-action"
               to={isFestival ? `/festivals/${item?.slug}` : `/trips/${item?.slug}`}
               style={{
@@ -420,7 +422,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
               }}
             >
               View {isFestival ? "Festival" : "Trip"} <ChevronRight size={12} />
-            </Link>
+            </Link> : <span style={{ color: "rgba(30,26,20,0.45)", fontSize: "0.72rem", fontWeight: 500 }}>Private itinerary</span>}
           </div>
         </div>
       </div>
