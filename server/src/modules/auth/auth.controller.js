@@ -23,16 +23,17 @@ export const googleAuthRedirect = (req, res) => {
 export const googleAuthCallback = async (req, res, next) => {
   try {
     const code = req.query.code || req.body.code;
-    
+
     if (!code) {
-      return res.status(400).json({ message: "Authorization code is required." });
+      return res
+        .status(400)
+        .json({ message: "Authorization code is required." });
     }
 
     const { user, tokens } = await authService.googleLogin(code);
-    
+
     setTokenCookies(res, tokens);
 
-    // Redirect back to frontend on successful authentication
     res.redirect(`${env.ORIGIN}`);
   } catch (error) {
     next(error);
@@ -53,7 +54,6 @@ export const refresh = async (req, res, next) => {
 
     res.status(200).json({ message: "Tokens refreshed successfully", user });
   } catch (error) {
-    // If refresh fails (e.g. invalid token), clear cookies so the client is properly logged out
     res.clearCookie("accessToken");
     res.clearCookie("refreshToken");
     next(error);
@@ -72,7 +72,6 @@ export const logout = async (req, res, next) => {
 
 export const getMe = async (req, res, next) => {
   try {
-    // req.user is attached by the authMiddleware
     res.status(200).json({ user: req.user });
   } catch (error) {
     next(error);

@@ -11,7 +11,7 @@ export const getInquiries = async (skip, take, filter = {}) => {
       orderBy: { createdAt: "desc" },
       skip,
       take,
-      include: { trip: true, user: true, resolvedBy: true }
+      include: { trip: true, festival: true, user: true, resolvedBy: true }
     }),
     prisma.inquiry.count({ where: filter })
   ]);
@@ -21,7 +21,7 @@ export const getInquiries = async (skip, take, filter = {}) => {
 export const getInquiryById = async (id) => {
   return prisma.inquiry.findUnique({
     where: { id },
-    include: { trip: true, user: true, resolvedBy: true }
+    include: { trip: true, festival: true, user: true, resolvedBy: true }
   });
 };
 

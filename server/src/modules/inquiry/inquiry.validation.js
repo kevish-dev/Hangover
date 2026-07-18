@@ -1,5 +1,18 @@
 import { z } from "zod";
-import { tripTypes } from "../crm/crm.validation.js";
+
+const tripTypes = [
+  "MOUNTAIN_TREK",
+  "BEACH_ESCAPE",
+  "DESERT_EXPEDITION",
+  "JUNGLE_WILDLIFE",
+  "HERITAGE_WALK",
+  "ROAD_TRIP",
+  "BACKPACKING_TOUR",
+  "PHOTOGRAPHY_TOUR",
+  "BONFIRE_RETREAT",
+  "INSTITUTE_COLLEGE_TRIP",
+  "CUSTOM_TRIP"
+];
 
 export const createInquirySchema = z.object({
   name: z.string().trim().min(2).max(160),

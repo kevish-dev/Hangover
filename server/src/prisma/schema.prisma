@@ -38,23 +38,23 @@ datasource db {
 // =====================================================================
 
 model User {
-  id                  String       @id @default(uuid())
-  email               String       @unique
-  googleId            String       @unique
-  role                UserRole     @default(USER)
-  isActive            Boolean      @default(true)
+  id                  String        @id @default(uuid())
+  email               String        @unique
+  googleId            String        @unique
+  role                UserRole      @default(USER)
+  isActive            Boolean       @default(true)
   lastLoginAt         DateTime?
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
   bookings            Booking[]
-  customTripsCreated  CustomTrip[] @relation("CustomTripCreator")
-  customTripsCustomer CustomTrip[] @relation("CustomTripCustomer")
-  circuitsCreated     Circuit[]    @relation("CircuitCreator")
-  resolvedInquiries   Inquiry[]    @relation("InquiryResolver")
+  customTripsCreated  CustomTrip[]  @relation("CustomTripCreator")
+  customTripsCustomer CustomTrip[]  @relation("CustomTripCustomer")
+  circuitsCreated     Circuit[]     @relation("CircuitCreator")
+  resolvedInquiries   Inquiry[]     @relation("InquiryResolver")
   inquiries           Inquiry[]
   profile             UserProfile?
   reviews             Review[]
-  mediaUploads        MediaAsset[] @relation("MediaAssetUploader")
+  mediaUploads        MediaAsset[]  @relation("MediaAssetUploader")
   ledgerEntries       LedgerEntry[] @relation("LedgerEntryCreator")
 
   @@index([email])
@@ -62,8 +62,8 @@ model User {
 }
 
 model UserProfile {
-  id                       String             @id @default(uuid())
-  userId                   String             @unique
+  id                       String      @id @default(uuid())
+  userId                   String      @unique
   fullName                 String?
   phone                    String?
   alternatePhone           String?
@@ -82,74 +82,71 @@ model UserProfile {
   medicalNotes             String?
   govtIdType               GovtIdType?
   govtIdNumber             String?
-  createdAt                DateTime           @default(now())
-  updatedAt                DateTime           @updatedAt
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
   govtIdImageUrl           String?
-  govtIdAssetId            String?            @unique
-  govtIdAsset              MediaAsset?        @relation("ProfileGovernmentId", fields: [govtIdAssetId], references: [id], onDelete: SetNull)
-  user                     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  govtIdAssetId            String?     @unique
+  govtIdAsset              MediaAsset? @relation("ProfileGovernmentId", fields: [govtIdAssetId], references: [id], onDelete: SetNull)
+  user                     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([govtIdNumber])
 }
 
-
 model Circuit {
-  id                  String        @id @default(uuid())
+  id                  String       @id @default(uuid())
   title               String
-  slug                String        @unique
+  slug                String       @unique
   tripType            TripType
   location            String
   destinationId       String?
-  destination         Destination?  @relation(fields: [destinationId], references: [id])
+  destination         Destination? @relation(fields: [destinationId], references: [id])
   overview            String
   bestTimeToVisit     String
   duration            Int
   bannerImages        String[]
   galleryImages       String[]
-  stayTransportImages Json          @default("[]")
-  highlights          Json          @default("[]")
+  stayTransportImages Json         @default("[]")
+  highlights          Json         @default("[]")
   inclusions          String[]
   exclusions          String[]
-  basePrice           Decimal       @db.Decimal(10, 2)
-  baseTokenAmount     Decimal       @db.Decimal(10, 2)
-  isActive            Boolean       @default(true)
+  basePrice           Decimal      @db.Decimal(10, 2)
+  baseTokenAmount     Decimal      @db.Decimal(10, 2)
+  isActive            Boolean      @default(true)
   internalNotes       String?
   createdById         String?
-  createdBy           User?         @relation("CircuitCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
+  createdBy           User?        @relation("CircuitCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
-  days                CircuitDay[]
-  packages            Package[]
-  faqs                FAQ[]
-  tags                TripTag[]     @relation("CircuitToTripTag")
-  addOns              AddOn[]
-  trips               Trip[]
+  days     CircuitDay[]
+  packages Package[]
+  faqs     FAQ[]
+  tags     TripTag[]    @relation("CircuitToTripTag")
+  addOns   AddOn[]
+  trips    Trip[]
 
   @@index([tripType])
   @@index([isActive])
   @@index([destinationId])
 }
 
-
 model CircuitDay {
-  id             String              @id @default(uuid())
+  id             String           @id @default(uuid())
   circuitId      String
-  circuit        Circuit             @relation(fields: [circuitId], references: [id], onDelete: Cascade)
+  circuit        Circuit          @relation(fields: [circuitId], references: [id], onDelete: Cascade)
   dayNumber      Int
   title          String
   description    String?
   stayLocation   String?
-  properties     Json                @default("[]") // [{name, type, notes, ...}]
-  visitingPlaces String[]            @default([])
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  properties     Json             @default("[]") // [{name, type, notes, ...}]
+  visitingPlaces String[]         @default([])
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
   tasks          CircuitDayTask[]
 
   @@unique([circuitId, dayNumber])
   @@index([circuitId])
 }
-
 
 model CircuitDayTask {
   id              String                  @id @default(uuid())
@@ -158,9 +155,9 @@ model CircuitDayTask {
   category        OperationalTaskCategory
   title           String
   description     String?
-  config          Json                    @default("{}") 
+  config          Json                    @default("{}")
   estimatedAmount Decimal?                @db.Decimal(10, 2)
-  dueOffsetDays   Int?                    
+  dueOffsetDays   Int?
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
 
@@ -199,16 +196,16 @@ model Trip {
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 
-  days                TripDay[]
-  bookings            Booking[]
-  faqs                FAQ[]
-  inquiries           Inquiry[]
-  packages            Package[]
-  slots               Slot[]
-  tripTags            TripTag[]    @relation("TripToTripTag")
-  reviews             Review[]
-  addOns              AddOn[]
-  ledgerEntries       LedgerEntry[]
+  days          TripDay[]
+  bookings      Booking[]
+  faqs          FAQ[]
+  inquiries     Inquiry[]
+  packages      Package[]
+  slots         Slot[]
+  tripTags      TripTag[]     @relation("TripToTripTag")
+  reviews       Review[]
+  addOns        AddOn[]
+  ledgerEntries LedgerEntry[]
 
   @@index([tripType])
   @@index([isActive])
@@ -305,7 +302,6 @@ model FestivalTag {
   festivals Festival[] @relation("FestivalToFestivalTag")
 }
 
-
 model Festival {
   id                  String        @id @default(uuid())
   title               String
@@ -339,6 +335,7 @@ model Festival {
   tags                FestivalTag[] @relation("FestivalToFestivalTag")
   reviews             Review[]
   ledgerEntries       LedgerEntry[]
+  addOns              AddOn[]
 
   @@index([isActive])
   @@index([isFeatured])
@@ -383,22 +380,21 @@ model Package {
 }
 
 model Slot {
-  id          String              @id @default(uuid())
-  tripId      String?
-  festivalId  String?
-  startDate   DateTime?
-  endDate     DateTime?
-  title       String?
-  priority    Int                 @default(0)
-  capacity    Int
-  filledSpots Int                 @default(0)
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-  bookings    Booking[]
-  festival    Festival?           @relation(fields: [festivalId], references: [id], onDelete: Cascade)
-  trip        Trip?               @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  id               String            @id @default(uuid())
+  tripId           String?
+  festivalId       String?
+  startDate        DateTime?
+  endDate          DateTime?
+  title            String?
+  priority         Int               @default(0)
+  capacity         Int
+  filledSpots      Int               @default(0)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  bookings         Booking[]
+  festival         Festival?         @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  trip             Trip?             @relation(fields: [tripId], references: [id], onDelete: Cascade)
   operationalTasks OperationalTask[]
-
 
   @@index([tripId])
   @@index([festivalId])
@@ -406,51 +402,49 @@ model Slot {
 }
 
 model Booking {
-  id                 String             @id @default(uuid())
-  bookingReference   String             @unique
+  id                 String            @id @default(uuid())
+  bookingReference   String            @unique
   userId             String
-  status             BookingStatus      @default(PENDING)
-  paymentStatus      PaymentStatus      @default(PENDING)
-  numberOfTravelers  Int                @default(1)
-  totalAmount        Decimal            @db.Decimal(10, 2)
-  tokenAmount        Decimal            @db.Decimal(10, 2)
-  amountPaid         Decimal            @default(0) @db.Decimal(10, 2)
-  amountDue          Decimal            @db.Decimal(10, 2)
+  status             BookingStatus     @default(PENDING)
+  paymentStatus      PaymentStatus     @default(PENDING)
+  numberOfTravelers  Int               @default(1)
+  totalAmount        Decimal           @db.Decimal(10, 2)
+  tokenAmount        Decimal           @db.Decimal(10, 2)
+  amountPaid         Decimal           @default(0) @db.Decimal(10, 2)
+  amountDue          Decimal           @db.Decimal(10, 2)
   initialPaymentType PaymentType
   balanceDueDate     DateTime?
   reservedAt         DateTime?
   confirmedAt        DateTime?
   cancelledAt        DateTime?
   completedAt        DateTime?
-  reviewRequestedAt  DateTime?          // set when the post-completion review prompt is triggered
+  reviewRequestedAt  DateTime? // set when the post-completion review prompt is triggered
   cancellationReason String?
   cancelledBy        String?
   specialRequests    String?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  source             BookingSource      @default(CATALOG)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  source             BookingSource     @default(CATALOG)
   packageId          String?
   slotId             String?
-  customTripId       String?            @unique
+  customTripId       String?           @unique
   customTripSnapshot Json?
-  package            Package?           @relation(fields: [packageId], references: [id], onDelete: Restrict)
-  slot               Slot?              @relation(fields: [slotId], references: [id], onDelete: Restrict)
-  customTrip         CustomTrip?        @relation(fields: [customTripId], references: [id], onDelete: Restrict)
-  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  package            Package?          @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  slot               Slot?             @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  customTrip         CustomTrip?       @relation(fields: [customTripId], references: [id], onDelete: Restrict)
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   payments           Payment[]
   paymentIntents     PaymentIntent[]
   reminders          PaymentReminder[]
   travelers          Traveler[]
-  trip               Trip?              @relation(fields: [tripId], references: [id], onDelete: Restrict)
+  trip               Trip?             @relation(fields: [tripId], references: [id], onDelete: Restrict)
   tripId             String?
-  festival           Festival?          @relation(fields: [festivalId], references: [id], onDelete: Restrict)
+  festival           Festival?         @relation(fields: [festivalId], references: [id], onDelete: Restrict)
   festivalId         String?
   review             Review?
 
-
-
-  addOns             BookingAddOn[]
-  ledgerEntries      LedgerEntry[]
+  addOns        BookingAddOn[]
+  ledgerEntries LedgerEntry[]
 
   @@index([packageId])
   @@index([slotId])
@@ -607,37 +601,32 @@ model Inquiry {
   @@index([createdAt])
 }
 
-
-
-
-
-
 model OperationalTask {
-  id                  String                  @id @default(uuid())
-  slotId              String
-  slot                Slot                    @relation(fields: [slotId], references: [id], onDelete: Cascade)
-  tripDayId           String?
-  tripDay             TripDay?                @relation(fields: [tripDayId], references: [id], onDelete: SetNull)
-  sourceTemplateId    String?                 // CircuitDayTask.id this was forked from, if any
-  category            OperationalTaskCategory
-  title               String
-  description         String?
-  config              Json                    @default("{}")
-  estimatedAmount     Decimal                 @default(0) @db.Decimal(10, 2)
-  amountArranged      Decimal                 @default(0) @db.Decimal(10, 2)
-  amountPaid          Decimal                 @default(0) @db.Decimal(10, 2)
-  dueAt               DateTime?
-  status              OperationalTaskStatus   @default(PENDING)
-  assigneeId          String?
-  completedAt         DateTime?
-  completedById       String?
-  lastReminderSentAt  DateTime?
-  reminderCount       Int                     @default(0)
-  createdAt           DateTime                @default(now())
-  updatedAt           DateTime                @updatedAt
+  id                 String                  @id @default(uuid())
+  slotId             String
+  slot               Slot                    @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  tripDayId          String?
+  tripDay            TripDay?                @relation(fields: [tripDayId], references: [id], onDelete: SetNull)
+  sourceTemplateId   String? // CircuitDayTask.id this was forked from, if any
+  category           OperationalTaskCategory
+  title              String
+  description        String?
+  config             Json                    @default("{}")
+  estimatedAmount    Decimal                 @default(0) @db.Decimal(10, 2)
+  amountArranged     Decimal                 @default(0) @db.Decimal(10, 2)
+  amountPaid         Decimal                 @default(0) @db.Decimal(10, 2)
+  dueAt              DateTime?
+  status             OperationalTaskStatus   @default(PENDING)
+  assigneeId         String?
+  completedAt        DateTime?
+  completedById      String?
+  lastReminderSentAt DateTime?
+  reminderCount      Int                     @default(0)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
 
-  reminders           OperationalTaskReminder[]
-  ledgerEntries       LedgerEntry[]
+  reminders     OperationalTaskReminder[]
+  ledgerEntries LedgerEntry[]
 
   @@index([slotId])
   @@index([tripDayId])
@@ -647,40 +636,40 @@ model OperationalTask {
 }
 
 model OperationalTaskReminder {
-  id                String            @id @default(uuid())
+  id                String          @id @default(uuid())
   operationalTaskId String
-  operationalTask   OperationalTask   @relation(fields: [operationalTaskId], references: [id], onDelete: Cascade)
-  channel           ReminderType      @default(AUTOMATIC)
+  operationalTask   OperationalTask @relation(fields: [operationalTaskId], references: [id], onDelete: Cascade)
+  channel           ReminderType    @default(AUTOMATIC)
   recipientEmail    String
   subject           String
-  status            ReminderStatus    @default(PENDING)
+  status            ReminderStatus  @default(PENDING)
   sentAt            DateTime?
   providerMessageId String?
   failureReason     String?
-  createdAt         DateTime          @default(now())
+  createdAt         DateTime        @default(now())
 
   @@index([operationalTaskId])
   @@index([status])
 }
 
 model AddOn {
-  id                        String         @id @default(uuid())
-  circuitId                 String?
-  circuit                   Circuit?       @relation(fields: [circuitId], references: [id], onDelete: Cascade)
-  tripId                    String?
-  trip                      Trip?          @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  festivalId                String?
-  festival                  Festival?      @relation(fields: [festivalId], references: [id], onDelete: Cascade)
-  title                     String
-  description               String?
-  imageUrl                  String?
-  price                     Decimal        @db.Decimal(10, 2)
-  maxQuantityPerBooking     Int?
-  purchaseCutoffOffsetDays  Int?           
-  isActive                  Boolean        @default(true)
-  createdAt                 DateTime       @default(now())
-  updatedAt                 DateTime       @updatedAt
-  purchases                 BookingAddOn[]
+  id                       String         @id @default(uuid())
+  circuitId                String?
+  circuit                  Circuit?       @relation(fields: [circuitId], references: [id], onDelete: Cascade)
+  tripId                   String?
+  trip                     Trip?          @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  festivalId               String?
+  festival                 Festival?      @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  title                    String
+  description              String?
+  imageUrl                 String?
+  price                    Decimal        @db.Decimal(10, 2)
+  maxQuantityPerBooking    Int?
+  purchaseCutoffOffsetDays Int?
+  isActive                 Boolean        @default(true)
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+  purchases                BookingAddOn[]
 
   @@index([circuitId])
   @@index([tripId])
@@ -827,32 +816,32 @@ model Refund {
 // delete manual rows (isAutoGenerated=false) from the ops dashboard.
 // =====================================================================
 model LedgerEntry {
-  id                String              @id @default(uuid())
+  id                String            @id @default(uuid())
   type              LedgerEntryType
   scope             LedgerScope
   tripId            String?
-  trip              Trip?               @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  trip              Trip?             @relation(fields: [tripId], references: [id], onDelete: SetNull)
   festivalId        String?
-  festival          Festival?           @relation(fields: [festivalId], references: [id], onDelete: SetNull)
+  festival          Festival?         @relation(fields: [festivalId], references: [id], onDelete: SetNull)
   bookingId         String?
-  booking           Booking?            @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  booking           Booking?          @relation(fields: [bookingId], references: [id], onDelete: SetNull)
   paymentId         String?
-  payment           Payment?            @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  payment           Payment?          @relation(fields: [paymentId], references: [id], onDelete: SetNull)
   operationalTaskId String?
-  operationalTask   OperationalTask?    @relation(fields: [operationalTaskId], references: [id], onDelete: SetNull)
+  operationalTask   OperationalTask?  @relation(fields: [operationalTaskId], references: [id], onDelete: SetNull)
   bookingAddOnId    String?
-  bookingAddOn      BookingAddOn?       @relation(fields: [bookingAddOnId], references: [id], onDelete: SetNull)
-  source            LedgerEntrySource   @default(MANUAL)
+  bookingAddOn      BookingAddOn?     @relation(fields: [bookingAddOnId], references: [id], onDelete: SetNull)
+  source            LedgerEntrySource @default(MANUAL)
   category          String
-  amount            Decimal             @db.Decimal(10, 2)
-  currency          String              @default("INR")
+  amount            Decimal           @db.Decimal(10, 2)
+  currency          String            @default("INR")
   description       String?
-  isAutoGenerated   Boolean             @default(false)
-  entryDate         DateTime            @default(now())
+  isAutoGenerated   Boolean           @default(false)
+  entryDate         DateTime          @default(now())
   createdById       String?
-  createdBy         User?               @relation("LedgerEntryCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  createdBy         User?             @relation("LedgerEntryCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
   @@index([tripId])
   @@index([festivalId])
@@ -863,23 +852,23 @@ model LedgerEntry {
 }
 
 model Review {
-  id           String      @id @default(uuid())
+  id           String   @id @default(uuid())
   rating       Int
   comment      String?
   userId       String
   tripId       String?
   festivalId   String?
   customTripId String?
-  bookingId    String      @unique
-  isPublished  Boolean     @default(true)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  bookingId    String   @unique
+  isPublished  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trip         Trip?       @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  festival     Festival?   @relation(fields: [festivalId], references: [id], onDelete: Cascade)
-  customTrip   CustomTrip? @relation(fields: [customTripId], references: [id], onDelete: Cascade)
-  booking      Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trip       Trip?       @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  festival   Festival?   @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  customTrip CustomTrip? @relation(fields: [customTripId], references: [id], onDelete: Cascade)
+  booking    Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([tripId])
@@ -887,8 +876,6 @@ model Review {
   @@index([customTripId])
   @@index([isPublished])
 }
-
-
 
 enum UserRole {
   USER
