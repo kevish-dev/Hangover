@@ -2,6 +2,7 @@ import * as tripRepo from "./trip.repository.js";
 import { uploadToCloudinary, deleteFromCloudinary, deleteTripAssets, createDirectImageUploadSignature, isExpectedPublicImageUrl } from "../../core/services/upload.service.js";
 import { ValidationError } from "../../core/errors/errors.js";
 import { randomUUID } from "crypto";
+import { prisma } from "../../prisma/client.js";
 
 const generateSlug = (title) => {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
@@ -11,7 +12,7 @@ export const getTrips = async (page = 1, limit = 10, isAdmin = false) => {
   const skip = (page - 1) * limit;
   const take = parseInt(limit, 10);
   
-  const where = isAdmin ? {} : { isPublished: true };
+  const where = isAdmin ? {} : { isPublished: true, isListed: true };
 
   const { trips, total } = await tripRepo.findAll(skip, take, where, isAdmin);
 
@@ -57,7 +58,27 @@ export const createTrip = async (data) => {
   if (data.price === undefined || data.price === null) data.price = 0;
   if (data.tokenAmount === undefined || data.tokenAmount === null) data.tokenAmount = 0;
 
-  return tripRepo.create(data);
+  const trip = await tripRepo.create(data);
+
+  if (data.circuitId) {
+    const circuit = await prisma.circuit.findUnique({
+      where: { id: data.circuitId },
+      include: { days: true }
+    });
+    
+    if (circuit && circuit.days.length > 0) {
+      const itineraryDays = circuit.days.map(day => ({
+        tripId: trip.id,
+        dayNumber: day.dayNumber,
+        title: day.title,
+        description: day.description,
+        todos: day.todos,
+      }));
+      await prisma.itineraryDay.createMany({ data: itineraryDays });
+    }
+  }
+
+  return trip;
 };
 
 export const updateTrip = async (id, data) => {

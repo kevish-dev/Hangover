@@ -9,6 +9,7 @@ import {
 import crypto from "crypto";
 import { uploadSensitiveDocument, createAuthenticatedDeliveryUrl, deleteMediaAsset } from "../../core/services/upload.service.js";
 import { getBookingJourney } from "./booking-journey.js";
+import * as operationsService from "../operations/operations.service.js";
 
 const withSecureDocumentUrls = (booking) => {
   if (!booking) return booking;
@@ -88,8 +89,8 @@ export const createBooking = async (userId, data) => {
   const slot = await prisma.slot.findUnique({ 
     where: { id: data.slotId },
     include: { 
-      trip: { include: { packages: true } }, 
-      festival: { include: { packages: true } } 
+      trip: { include: { packages: true, addOns: true } }, 
+      festival: { include: { packages: true, addOns: true } } 
     } 
   });
   if (!slot) {
@@ -152,7 +153,31 @@ export const createBooking = async (userId, data) => {
   const itemPrice = selectedPackage ? Number(selectedPackage.price) : Number(item.price);
   const itemToken = selectedPackage ? Number(selectedPackage.tokenAmount) : Number(item.tokenAmount);
 
-  const baseTotalAmount = itemPrice * numberOfTravelers;
+  let addOnsTotalCost = 0;
+  const bookingAddOnsData = [];
+
+  if (data.addOns && Array.isArray(data.addOns)) {
+    for (const addonReq of data.addOns) {
+      if (!addonReq.addOnId) continue;
+      const addOnModel = await prisma.addOn.findUnique({ where: { id: addonReq.addOnId } });
+      if (!addOnModel) continue;
+
+      const qty = addonReq.quantity || 1;
+      const price = Number(addOnModel.price);
+      const totalAddOnPrice = price * qty;
+      addOnsTotalCost += totalAddOnPrice;
+
+      bookingAddOnsData.push({
+        addOnId: addOnModel.id,
+        quantity: qty,
+        unitPrice: price,
+        totalPrice: totalAddOnPrice,
+        status: "PENDING",
+      });
+    }
+  }
+
+  const baseTotalAmount = (itemPrice * numberOfTravelers) + addOnsTotalCost;
   const totalAmount = toDecimal2(baseTotalAmount + (baseTotalAmount * 0.05));
 
   const baseTokenAmount = itemToken * numberOfTravelers;
@@ -248,7 +273,18 @@ export const createBooking = async (userId, data) => {
     bookingData.travelers = { create: travelersCreateData };
   }
 
-  return repo.createBooking(bookingData);
+  if (bookingAddOnsData.length > 0) {
+    bookingData.addOns = { create: bookingAddOnsData };
+  }
+
+  const booking = await repo.createBooking(bookingData);
+
+  // Auto-generate OperationalTasks from the circuit template (fire-and-forget in background)
+  operationsService.generateBookingOperations(booking, slot, data.addOns || []).catch(
+    (err) => console.error("[OpsGen] Failed to generate operations for booking", booking.id, err)
+  );
+
+  return booking;
 };
 
 export const cancelBooking = async (bookingId, userId, reason) => {
@@ -362,7 +398,6 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
       slot: { include: { trip: true, festival: true } },
       package: true,
       user: { include: { profile: true } },
-      customTrip: true,
       payments: {
         where: { status: "SUCCESS" }
       }
@@ -486,6 +521,17 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
         }
       });
     }
+
+    // Cancel / Refund Add-ons
+    await tx.bookingAddOn.updateMany({
+      where: { bookingId: booking.id, status: "PENDING" },
+      data: { status: "CANCELLED" },
+    });
+    
+    await tx.bookingAddOn.updateMany({
+      where: { bookingId: booking.id, status: "PAID" },
+      data: { status: newPaymentStatus === "REFUNDED" || newPaymentStatus === "PARTIALLY_REFUNDED" ? "REFUNDED" : "CANCELLED" },
+    });
   });
 
   // Send Email (Fire and forget)
@@ -521,7 +567,6 @@ export const finalizeBooking = async (bookingId) => {
     include: {
       user: { include: { profile: true } },
       slot: { include: { trip: true, festival: true } },
-      customTrip: true,
       package: true,
     }
   });

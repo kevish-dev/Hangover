@@ -13,7 +13,10 @@ export const getAllTripTags = async () => {
 export const getTripTagById = async (id) => {
   return prisma.tripTag.findUnique({
     where: { id },
-    include: { trips: { where: { isPublished: true } } }
+    include: { 
+      trips: { where: { isPublished: true, isListed: true } },
+      circuits: { where: { isActive: true } }
+    }
   });
 };
 

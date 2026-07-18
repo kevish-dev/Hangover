@@ -1,133 +1,104 @@
 import { z } from "zod";
 import { registry } from "../../core/openapi/openapi.js";
 
+const TAG = ["Itinerary"];
+const secureTag = { security: [{ cookieAuth: [] }] };
+
+// ── GET /itineraries/trip/:tripId ─────────────────────────────────────────
 registry.registerPath({
   method: "get",
-  path: "/itineraries",
-  summary: "Get all itineraries",
-  description: "Retrieves a paginated list of all standalone itineraries. Publicly accessible.",
-  tags: ["Itinerary"],
-  request: {
-    query: z.object({
-      page: z.string().optional().default("1"),
-      limit: z.string().optional().default("10"),
-    }),
-  },
+  path: "/itineraries/trip/{tripId}",
+  summary: "Get itinerary for a trip",
+  description: "Retrieve all itinerary days for a specific trip.",
+  tags: TAG,
+  request: { params: z.object({ tripId: z.string().uuid() }) },
   responses: {
-    200: {
-      description: "Paginated itineraries list",
-    },
+    200: { description: "List of itinerary days" },
   },
 });
 
+// ── GET /itineraries/festival/:festivalId ─────────────────────────────────
 registry.registerPath({
   method: "get",
-  path: "/itineraries/{id}",
-  summary: "Get itinerary by ID",
-  description: "Retrieves a single itinerary by ID, including its days and activities. Publicly accessible.",
-  tags: ["Itinerary"],
-  request: {
-    params: z.object({
-      id: z.string(),
-    }),
-  },
+  path: "/itineraries/festival/{festivalId}",
+  summary: "Get itinerary for a festival",
+  description: "Retrieve all itinerary days for a specific festival.",
+  tags: TAG,
+  request: { params: z.object({ festivalId: z.string().uuid() }) },
   responses: {
-    200: {
-      description: "Itinerary details",
-    },
-    404: {
-      description: "Itinerary not found",
-    },
+    200: { description: "List of itinerary days" },
   },
 });
 
+// ── POST /itineraries ─────────────────────────────────────────────────────
 registry.registerPath({
   method: "post",
   path: "/itineraries",
-  summary: "Create an itinerary",
-  description: "Creates a new standalone itinerary. Supports deeply nested payload for days and activities. Requires ADMIN role.",
-  tags: ["Itinerary"],
-  security: [{ cookieAuth: [] }],
+  summary: "Create itinerary days",
+  description: "Creates multiple itinerary days for a trip or festival. Replaces existing.",
+  tags: TAG,
+  ...secureTag,
   request: {
     body: {
       content: {
         "application/json": {
           schema: z.object({
-            title: z.string(),
-            description: z.string().optional(),
-            tripId: z.string().optional(),
-            days: z.object({
-              create: z.array(z.object({
-                dayNumber: z.number(),
-                title: z.string(),
-                description: z.string().optional(),
-                activities: z.object({
-                  create: z.array(z.object({
-                    title: z.string(),
-                    description: z.string().optional(),
-                    time: z.string().optional(),
-                    order: z.number()
-                  }))
-                }).optional()
-              }))
-            }).optional()
-          }).passthrough(),
+            tripId: z.string().uuid().optional(),
+            festivalId: z.string().uuid().optional(),
+            days: z.array(z.object({
+              dayNumber: z.number().int(),
+              title: z.string(),
+              description: z.string().optional(),
+              todos: z.array(z.string()).optional(),
+            })),
+          }),
         },
       },
     },
   },
   responses: {
-    201: {
-      description: "Itinerary created",
-    },
+    201: { description: "Itinerary created" },
   },
 });
 
+// ── PUT /itineraries/:id ──────────────────────────────────────────────────
 registry.registerPath({
   method: "put",
   path: "/itineraries/{id}",
-  summary: "Update an itinerary",
-  description: "Updates an existing itinerary root details. Requires ADMIN role.",
-  tags: ["Itinerary"],
-  security: [{ cookieAuth: [] }],
+  summary: "Update an itinerary day",
+  description: "Updates a single itinerary day.",
+  tags: TAG,
+  ...secureTag,
   request: {
-    params: z.object({
-      id: z.string(),
-    }),
+    params: z.object({ id: z.string().uuid() }),
     body: {
       content: {
         "application/json": {
           schema: z.object({
+            dayNumber: z.number().int().optional(),
             title: z.string().optional(),
             description: z.string().optional(),
-            tripId: z.string().optional(),
-          }).passthrough(),
+            todos: z.array(z.string()).optional(),
+          }),
         },
       },
     },
   },
   responses: {
-    200: {
-      description: "Itinerary updated",
-    },
+    200: { description: "Itinerary day updated" },
   },
 });
 
+// ── DELETE /itineraries/:id ───────────────────────────────────────────────
 registry.registerPath({
   method: "delete",
   path: "/itineraries/{id}",
-  summary: "Delete an itinerary",
-  description: "Deletes an existing itinerary. Requires ADMIN role.",
-  tags: ["Itinerary"],
-  security: [{ cookieAuth: [] }],
-  request: {
-    params: z.object({
-      id: z.string(),
-    }),
-  },
+  summary: "Delete an itinerary day",
+  description: "Deletes a single itinerary day.",
+  tags: TAG,
+  ...secureTag,
+  request: { params: z.object({ id: z.string().uuid() }) },
   responses: {
-    200: {
-      description: "Itinerary deleted",
-    },
+    204: { description: "Itinerary day deleted" },
   },
 });

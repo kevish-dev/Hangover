@@ -22,6 +22,9 @@ import AdminLandingPage from "./pages/admin/landing-page";
 import AdminCustomTripsPage from "./pages/admin/custom-trips";
 import CustomTripOfferPage from "./pages/custom-trip-offer";
 
+import AdminDestinationsPage from "./pages/admin/destinations";
+import AdminCircuitsPage from "./pages/admin/circuits";
+
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -45,16 +48,8 @@ export const router = createBrowserRouter([
     Component: AdminLayout,
     children: [
       { index: true, Component: AdminDashboardRedirect },
-      { path: "operations", Component: AdminOperationsPage },
-      { path: "trips", Component: AdminTripsPage },
-      { path: "custom-trips", Component: AdminCustomTripsPage },
-      { path: "festivals", Component: AdminFestivalsPage },
       { path: "destinations", Component: AdminDestinationsPage },
-      { path: "bookings", Component: AdminBookingsPage },
-      { path: "payments", Component: AdminPaymentsPage },
-      { path: "inquiries", Component: AdminInquiriesPage },
-      { path: "reviews", Component: AdminReviewsPage },
-      { path: "landing-page", Component: AdminLandingPage },
+      { path: "circuits", Component: AdminCircuitsPage },
     ],
   },
   {

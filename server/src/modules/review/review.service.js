@@ -14,7 +14,7 @@ export const createReview = async (userId, data) => {
 
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
-    include: { slot: true, customTrip: true, review: true }
+    include: { slot: true, review: true }
   });
 
   if (!booking) {
@@ -41,7 +41,6 @@ export const createReview = async (userId, data) => {
       bookingId,
       tripId: booking.tripId,
       festivalId: booking.festivalId,
-      customTripId: booking.customTripId,
     }
   });
 };
@@ -75,8 +74,7 @@ export const getAllReviews = async () => {
     include: {
       user: { include: { profile: { select: { fullName: true } } } },
       trip: { select: { title: true } },
-      festival: { select: { title: true } },
-      customTrip: { select: { title: true, reference: true } }
+      festival: { select: { title: true } }
     },
     orderBy: { createdAt: "desc" }
   });

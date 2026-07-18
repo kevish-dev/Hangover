@@ -2,8 +2,9 @@ import * as faqService from "./faq.service.js";
 
 export const getFaqs = async (req, res, next) => {
   try {
-    const { tripId } = req.params;
-    const faqs = await faqService.getFaqsByTripId(tripId);
+    const { tripId, festivalId } = req.params;
+    const parent = tripId ? { tripId } : festivalId ? { festivalId } : {};
+    const faqs = await faqService.getFaqsByParent(parent);
     res.status(200).json(faqs);
   } catch (error) {
     next(error);
@@ -24,8 +25,9 @@ export const getFaqById = async (req, res, next) => {
 
 export const createFaq = async (req, res, next) => {
   try {
-    const { tripId } = req.params;
-    const faq = await faqService.createFaq(tripId, req.body);
+    const { tripId, festivalId } = req.params;
+    const parent = tripId ? { tripId } : festivalId ? { festivalId } : {};
+    const faq = await faqService.createFaq(parent, req.body);
     res.status(201).json({ message: "FAQ created successfully", faq });
   } catch (error) {
     next(error);

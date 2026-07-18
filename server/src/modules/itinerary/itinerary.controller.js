@@ -1,49 +1,52 @@
 import * as itineraryService from "./itinerary.service.js";
+import { createItinerarySchema, updateItineraryDaySchema } from "./itinerary.validation.js";
 
-export const getItineraries = async (req, res, next) => {
+export const getTripItinerary = async (req, res, next) => {
   try {
-    const { page, limit } = req.query;
-    const result = await itineraryService.getItineraries(page, limit);
-    res.status(200).json(result);
+    const { tripId } = req.params;
+    const data = await itineraryService.getTripItinerary(tripId);
+    res.status(200).json({ success: true, data });
   } catch (error) {
     next(error);
   }
 };
 
-export const getItineraryById = async (req, res, next) => {
+export const getFestivalItinerary = async (req, res, next) => {
   try {
-    const itinerary = await itineraryService.getItineraryById(req.params.id);
-    res.status(200).json(itinerary);
+    const { festivalId } = req.params;
+    const data = await itineraryService.getFestivalItinerary(festivalId);
+    res.status(200).json({ success: true, data });
   } catch (error) {
-    if (error.message === "Itinerary not found") {
-      return res.status(404).json({ message: "Itinerary not found" });
-    }
     next(error);
   }
 };
 
 export const createItinerary = async (req, res, next) => {
   try {
-    const itinerary = await itineraryService.createItinerary(req.body);
-    res.status(201).json({ message: "Itinerary created successfully", itinerary });
+    const validatedData = createItinerarySchema.parse(req.body);
+    const data = await itineraryService.createItinerary(validatedData);
+    res.status(201).json({ success: true, data });
   } catch (error) {
     next(error);
   }
 };
 
-export const updateItinerary = async (req, res, next) => {
+export const updateItineraryDay = async (req, res, next) => {
   try {
-    const itinerary = await itineraryService.updateItinerary(req.params.id, req.body);
-    res.status(200).json({ message: "Itinerary updated successfully", itinerary });
+    const { id } = req.params;
+    const validatedData = updateItineraryDaySchema.parse(req.body);
+    const data = await itineraryService.updateItineraryDay(id, validatedData);
+    res.status(200).json({ success: true, data });
   } catch (error) {
     next(error);
   }
 };
 
-export const deleteItinerary = async (req, res, next) => {
+export const deleteItineraryDay = async (req, res, next) => {
   try {
-    await itineraryService.deleteItinerary(req.params.id);
-    res.status(200).json({ message: "Itinerary deleted successfully" });
+    const { id } = req.params;
+    await itineraryService.deleteItineraryDay(id);
+    res.status(204).send();
   } catch (error) {
     next(error);
   }

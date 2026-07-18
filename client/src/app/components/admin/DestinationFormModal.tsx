@@ -27,31 +27,20 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
     name: "",
     state: "",
     subheading: "",
-    tripIds: [] as string[],
-    festivalIds: [] as string[],
+    circuitIds: [] as string[],
     isPublished: false,
   });
 
-  const { data: tripsData } = useQuery({
-    queryKey: ["admin", "trips"],
+  const { data: circuitsData } = useQuery({
+    queryKey: ["admin", "circuits"],
     queryFn: async () => {
-      const res = await apiClient.get("/trips?limit=100&adminView=true");
-      return res.data;
-    },
-    enabled: open, // Only fetch trips when modal is open
-  });
-
-  const { data: festivalsData } = useQuery({
-    queryKey: ["admin", "festivals"],
-    queryFn: async () => {
-      const res = await apiClient.get("/festivals?limit=100&adminView=true");
+      const res = await apiClient.get("/circuits?adminView=true");
       return res.data;
     },
     enabled: open,
   });
 
-  const availableTrips = tripsData?.data || [];
-  const availableFestivals = festivalsData?.data || [];
+  const availableCircuits = circuitsData?.data || [];
 
   useEffect(() => {
     if (destination) {
@@ -59,8 +48,7 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
         name: destination.name || "",
         state: destination.state || "",
         subheading: destination.subheading || "",
-        tripIds: destination.trips?.map((t: any) => t.id) || [],
-        festivalIds: destination.festivals?.map((f: any) => f.id) || [],
+        circuitIds: destination.circuits?.map((c: any) => c.id) || [],
         isPublished: destination.isPublished || false,
       });
     } else {
@@ -68,8 +56,7 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
         name: "",
         state: "",
         subheading: "",
-        tripIds: [],
-        festivalIds: [],
+        circuitIds: [],
         isPublished: false,
       });
     }
@@ -80,24 +67,13 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleTripToggle = (tripId: string) => {
+  const handleCircuitToggle = (circuitId: string) => {
     setFormData(prev => {
-      const isSelected = prev.tripIds.includes(tripId);
+      const isSelected = prev.circuitIds.includes(circuitId);
       if (isSelected) {
-        return { ...prev, tripIds: prev.tripIds.filter(id => id !== tripId) };
+        return { ...prev, circuitIds: prev.circuitIds.filter(id => id !== circuitId) };
       } else {
-        return { ...prev, tripIds: [...prev.tripIds, tripId] };
-      }
-    });
-  };
-
-  const handleFestivalToggle = (festivalId: string) => {
-    setFormData(prev => {
-      const isSelected = prev.festivalIds.includes(festivalId);
-      if (isSelected) {
-        return { ...prev, festivalIds: prev.festivalIds.filter(id => id !== festivalId) };
-      } else {
-        return { ...prev, festivalIds: [...prev.festivalIds, festivalId] };
+        return { ...prev, circuitIds: [...prev.circuitIds, circuitId] };
       }
     });
   };
@@ -167,46 +143,21 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-2 block">Map Trips to this Destination</label>
+              <label className="text-sm font-medium mb-2 block">Map Circuits to this Destination</label>
               <div className="border border-gray-200 rounded-md p-3 max-h-48 overflow-y-auto bg-gray-50/50 space-y-2">
-                {availableTrips.length === 0 ? (
-                  <p className="text-sm text-gray-500 py-2">No trips available to map.</p>
+                {availableCircuits.length === 0 ? (
+                  <p className="text-sm text-gray-500 py-2">No circuits available to map.</p>
                 ) : (
-                  availableTrips.map((trip: any) => (
-                    <label key={trip.id} className="flex items-center space-x-3 p-2 hover:bg-white rounded cursor-pointer transition-colors border border-transparent hover:border-gray-200">
+                  availableCircuits.map((circuit: any) => (
+                    <label key={circuit.id} className="flex items-center space-x-3 p-2 hover:bg-white rounded cursor-pointer transition-colors border border-transparent hover:border-gray-200">
                       <input 
                         type="checkbox" 
-                        checked={formData.tripIds.includes(trip.id)}
-                        onChange={() => handleTripToggle(trip.id)}
+                        checked={formData.circuitIds.includes(circuit.id)}
+                        onChange={() => handleCircuitToggle(circuit.id)}
                         className="w-4 h-4 text-[#c8a96e] rounded border-gray-300 focus:ring-[#c8a96e]"
                       />
                       <div className="flex flex-col">
-                        <span className="text-sm font-medium text-gray-900">{trip.title}</span>
-                        <span className="text-xs text-gray-500">{trip.location}</span>
-                      </div>
-                    </label>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">Map Festivals to this Destination</label>
-              <div className="border border-gray-200 rounded-md p-3 max-h-48 overflow-y-auto bg-gray-50/50 space-y-2">
-                {availableFestivals.length === 0 ? (
-                  <p className="text-sm text-gray-500 py-2">No festivals available to map.</p>
-                ) : (
-                  availableFestivals.map((festival: any) => (
-                    <label key={festival.id} className="flex items-center space-x-3 p-2 hover:bg-white rounded cursor-pointer transition-colors border border-transparent hover:border-gray-200">
-                      <input 
-                        type="checkbox" 
-                        checked={formData.festivalIds.includes(festival.id)}
-                        onChange={() => handleFestivalToggle(festival.id)}
-                        className="w-4 h-4 text-[#c8a96e] rounded border-gray-300 focus:ring-[#c8a96e]"
-                      />
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-gray-900">{festival.title}</span>
-                        <span className="text-xs text-gray-500">{festival.location}</span>
+                        <span className="text-sm font-medium text-gray-900">{circuit.title}</span>
                       </div>
                     </label>
                   ))

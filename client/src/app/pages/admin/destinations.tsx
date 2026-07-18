@@ -129,7 +129,7 @@ export default function AdminDestinationsPage() {
 
                 <div className="mt-4 text-sm">
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-100 text-gray-700 font-medium">
-                    {destination.trips?.length || 0} {destination.trips?.length === 1 ? 'Trip' : 'Trips'} Linked
+                    {destination.circuits?.length || 0} {destination.circuits?.length === 1 ? 'Circuit' : 'Circuits'} Linked
                   </span>
                 </div>
                 

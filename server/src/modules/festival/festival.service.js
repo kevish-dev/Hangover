@@ -1,3 +1,4 @@
+import { prisma } from "../../prisma/client.js";
 import * as festivalRepo from "./festival.repository.js";
 import { uploadToCloudinary, uploadPublicVideo, deleteFromCloudinary, deleteFestivalAssets, createDirectImageUploadSignature, isExpectedPublicImageUrl } from "../../core/services/upload.service.js";
 import { ValidationError } from "../../core/errors/errors.js";
@@ -11,7 +12,7 @@ export const getFestivals = async (page = 1, limit = 10, isAdmin = false) => {
   const skip = (page - 1) * limit;
   const take = parseInt(limit, 10);
   
-  const where = isAdmin ? {} : { isPublished: true };
+  const where = isAdmin ? {} : { isPublished: true, isListed: true };
 
   const { festivals, total } = await festivalRepo.findAll(skip, take, where, isAdmin);
 
@@ -57,7 +58,27 @@ export const createFestival = async (data) => {
   if (data.price === undefined || data.price === null) data.price = 0;
   if (data.tokenAmount === undefined || data.tokenAmount === null) data.tokenAmount = 0;
 
-  return festivalRepo.create(data);
+  const festival = await festivalRepo.create(data);
+
+  if (data.circuitId) {
+    const circuit = await prisma.circuit.findUnique({
+      where: { id: data.circuitId },
+      include: { days: true }
+    });
+    
+    if (circuit && circuit.days.length > 0) {
+      const itineraryDays = circuit.days.map(day => ({
+        festivalId: festival.id,
+        dayNumber: day.dayNumber,
+        title: day.title,
+        description: day.description,
+        todos: day.todos,
+      }));
+      await prisma.itineraryDay.createMany({ data: itineraryDays });
+    }
+  }
+
+  return festival;
 };
 
 export const updateFestival = async (id, data) => {

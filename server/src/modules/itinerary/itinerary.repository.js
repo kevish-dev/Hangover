@@ -1,57 +1,52 @@
 import { prisma } from "../../prisma/client.js";
 
-export const findAll = async (skip, take) => {
-  const [itineraries, total] = await Promise.all([
-    prisma.itinerary.findMany({
-      skip,
-      take,
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.itinerary.count(),
-  ]);
-  return { itineraries, total };
+export const getByTripId = async (tripId) => {
+  return prisma.itineraryDay.findMany({
+    where: { tripId },
+    orderBy: { dayNumber: 'asc' },
+  });
 };
 
-export const findById = async (id) => {
-  return prisma.itinerary.findUnique({
+export const getByFestivalId = async (festivalId) => {
+  return prisma.itineraryDay.findMany({
+    where: { festivalId },
+    orderBy: { dayNumber: 'asc' },
+  });
+};
+
+export const getById = async (id) => {
+  return prisma.itineraryDay.findUnique({
     where: { id },
-    include: {
-      days: {
-        include: {
-          activities: {
-            orderBy: { order: "asc" },
-          }
-        },
-        orderBy: { dayNumber: "asc" },
-      },
-    },
   });
 };
 
-export const create = async (data) => {
-  // Data can include nested creation syntax for Prisma:
-  // { title: "...", days: { create: [ ... ] } }
-  return prisma.itinerary.create({
-    data,
-    include: {
-      days: {
-        include: { activities: true },
-      },
-    },
-  });
+export const createMany = async (data) => {
+  return prisma.$transaction(
+    data.map(day => prisma.itineraryDay.create({ data: day }))
+  );
 };
 
 export const update = async (id, data) => {
-  // Only updates root itinerary fields for simplicity.
-  // Nested updates require separate endpoints or deep update logic.
-  return prisma.itinerary.update({
+  return prisma.itineraryDay.update({
     where: { id },
     data,
   });
 };
 
 export const remove = async (id) => {
-  return prisma.itinerary.delete({
+  return prisma.itineraryDay.delete({
     where: { id },
+  });
+};
+
+export const removeByTripId = async (tripId) => {
+  return prisma.itineraryDay.deleteMany({
+    where: { tripId },
+  });
+};
+
+export const removeByFestivalId = async (festivalId) => {
+  return prisma.itineraryDay.deleteMany({
+    where: { festivalId },
   });
 };

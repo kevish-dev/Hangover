@@ -16,31 +16,16 @@ import {
   SidebarInset,
 } from "../../components/ui/sidebar";
 import {
-  Map,
-  MapPin,
-  CalendarCheck,
   LogOut,
-  CreditCard,
-  MessageSquare,
   Home,
-  Tent,
-  Star,
-  Images,
-  FilePlus2,
+  MapPin,
+  Map,
 } from "lucide-react";
 
 const navItems = [
   { title: "Home", url: "/", icon: Home },
-  { title: "Operations", url: "/dashboard/operations", icon: ClipboardCheck },
   { title: "Destinations", url: "/dashboard/destinations", icon: MapPin },
-  { title: "Trips", url: "/dashboard/trips", icon: Map },
-  { title: "Custom Trips", url: "/dashboard/custom-trips", icon: FilePlus2 },
-  { title: "Festivals", url: "/dashboard/festivals", icon: Tent },
-  { title: "Bookings", url: "/dashboard/bookings", icon: CalendarCheck },
-  { title: "Payments", url: "/dashboard/payments", icon: CreditCard },
-  { title: "Inquiries", url: "/dashboard/inquiries", icon: MessageSquare },
-  { title: "Reviews", url: "/dashboard/reviews", icon: Star },
-  { title: "Landing Page", url: "/dashboard/landing-page", icon: Images },
+  { title: "Circuits", url: "/dashboard/circuits", icon: Map },
 ];
 
 export default function AdminLayout() {

@@ -1,36 +1,44 @@
 import * as itineraryRepo from "./itinerary.repository.js";
+import { prisma } from "../../prisma/client.js";
 
-export const getItineraries = async (page = 1, limit = 10) => {
-  const skip = (page - 1) * limit;
-  const take = parseInt(limit, 10);
-  
-  const { itineraries, total } = await itineraryRepo.findAll(skip, take);
-  
-  return {
-    data: itineraries,
-    meta: {
-      total,
-      page: parseInt(page, 10),
-      limit: take,
-      totalPages: Math.ceil(total / take),
-    }
-  };
+export const getTripItinerary = async (tripId) => {
+  return itineraryRepo.getByTripId(tripId);
 };
 
-export const getItineraryById = async (id) => {
-  const itinerary = await itineraryRepo.findById(id);
-  if (!itinerary) throw new Error("Itinerary not found");
-  return itinerary;
+export const getFestivalItinerary = async (festivalId) => {
+  return itineraryRepo.getByFestivalId(festivalId);
 };
 
 export const createItinerary = async (data) => {
-  return itineraryRepo.create(data);
+  const { days, tripId, festivalId } = data;
+
+  if (tripId) {
+    const trip = await prisma.trip.findUnique({ where: { id: tripId } });
+    if (!trip) throw new Error("Trip not found");
+    await itineraryRepo.removeByTripId(tripId);
+  } else if (festivalId) {
+    const festival = await prisma.festival.findUnique({ where: { id: festivalId } });
+    if (!festival) throw new Error("Festival not found");
+    await itineraryRepo.removeByFestivalId(festivalId);
+  }
+
+  const payload = days.map(day => ({
+    ...day,
+    tripId: tripId || null,
+    festivalId: festivalId || null,
+  }));
+
+  return itineraryRepo.createMany(payload);
 };
 
-export const updateItinerary = async (id, data) => {
+export const updateItineraryDay = async (id, data) => {
+  const day = await itineraryRepo.getById(id);
+  if (!day) throw new Error("Itinerary day not found");
   return itineraryRepo.update(id, data);
 };
 
-export const deleteItinerary = async (id) => {
+export const deleteItineraryDay = async (id) => {
+  const day = await itineraryRepo.getById(id);
+  if (!day) throw new Error("Itinerary day not found");
   return itineraryRepo.remove(id);
 };
