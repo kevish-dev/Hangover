@@ -15,8 +15,8 @@ export const getUnifiedLedger = async (query = {}) => {
   const entries = await prisma.ledgerEntry.findMany({
     where,
     include: {
-      trip: { select: { id: true, title: true, slug: true } },
-      festival: { select: { id: true, title: true, slug: true } },
+      trip: { select: { id: true, title: true } },
+      festival: { select: { id: true, title: true } },
       booking: { select: { id: true, bookingReference: true } },
       createdBy: { select: { email: true, profile: { select: { fullName: true } } } },
     },
