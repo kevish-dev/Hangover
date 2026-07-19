@@ -166,7 +166,7 @@ function PaymentDetailsModal({ payment, onClose }: { payment: ApiPayment; onClos
         </div>
 
         <div className="grid gap-4 p-4 md:grid-cols-2 md:p-6">
-          <section className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+          <section className="rounded-xl border border-gray-100 bg-gray-50/50/70 p-4">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-800">
               <UserRound className="h-4 w-4 text-[#781216]" /> Customer & booking
             </h3>
@@ -178,7 +178,7 @@ function PaymentDetailsModal({ payment, onClose }: { payment: ApiPayment; onClos
             <DetailRow label="Payment status">{payment.booking.paymentStatus.replaceAll("_", " ")}</DetailRow>
           </section>
 
-          <section className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+          <section className="rounded-xl border border-gray-100 bg-gray-50/50/70 p-4">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-800">
               <MapPin className="h-4 w-4 text-[#781216]" /> Journey details
             </h3>
@@ -198,7 +198,7 @@ function PaymentDetailsModal({ payment, onClose }: { payment: ApiPayment; onClos
             </DetailRow>
           </section>
 
-          <section className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+          <section className="rounded-xl border border-gray-100 bg-gray-50/50/70 p-4">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-800">
               <WalletCards className="h-4 w-4 text-[#781216]" /> Payment breakdown
             </h3>
@@ -211,7 +211,7 @@ function PaymentDetailsModal({ payment, onClose }: { payment: ApiPayment; onClos
             <DetailRow label="Refunded">{formatCurrency(successfulRefundTotal)}</DetailRow>
           </section>
 
-          <section className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+          <section className="rounded-xl border border-gray-100 bg-gray-50/50/70 p-4">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-800">
               <ReceiptText className="h-4 w-4 text-[#781216]" /> Transaction record
             </h3>
@@ -355,10 +355,8 @@ export default function AdminPaymentsPage() {
     <div className="mx-auto max-w-[1500px] pb-12">
       <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
-          <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-[#a27d2e]">
-            <WalletCards className="h-4 w-4" /> Finance overview
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-950 md:text-3xl">Payments Dashboard</h1>
+          
+          <h1 className="text-2xl font-bold tracking-tight text-gray-950 md:text-3xl flex items-center gap-2"><WalletCards className="w-6 h-6 text-[#c8a96e]" /> Financial Overview</h1>
           <p className="mt-1 text-sm text-gray-500">Clear payment records for every trip and festival booking.</p>
         </div>
         <button
@@ -375,21 +373,21 @@ export default function AdminPaymentsPage() {
         {statCards.map((card) => {
           const Icon = card.icon;
           return (
-            <section key={card.label} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.1em] text-gray-500">{card.label}</p>
-                  <p className="mt-2 text-xl font-bold text-gray-950">{card.value}</p>
-                  <p className="mt-1 text-xs text-gray-500">{card.sublabel}</p>
-                </div>
-                <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${card.tone}`}><Icon className="h-5 w-5" /></span>
+            <section key={card.label} className="bg-white rounded-xl p-6 md:p-8 border border-gray-100 flex flex-col gap-4 hover:shadow-sm transition-shadow">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{card.label}</span>
+                <Icon className="w-5 h-5 text-gray-400" />
+              </div>
+              <div>
+                <div className="text-2xl md:text-3xl font-bold text-gray-950 mb-1">{card.value}</div>
+                <div className="text-xs text-gray-500 font-medium">{card.sublabel}</div>
               </div>
             </section>
           );
         })}
       </div>
 
-      <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+      <div className="mb-4 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="relative min-w-0 flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -397,7 +395,7 @@ export default function AdminPaymentsPage() {
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Search customer, booking, item, receipt or transaction ID..."
-              className="min-h-10 w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-3 text-base text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-[#c8a96e] focus:bg-white focus:ring-2 focus:ring-[#c8a96e]/20 md:text-sm"
+              className="min-h-10 w-full rounded-lg border border-gray-100 bg-gray-50/50 pl-9 pr-3 text-base text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-[#c8a96e] focus:bg-white focus:ring-2 focus:ring-[#c8a96e]/20 md:text-sm"
             />
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex">
@@ -454,10 +452,10 @@ export default function AdminPaymentsPage() {
         })}
       </div>
 
-      <div className="hidden overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm md:block">
+      <div className="hidden overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm md:block">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1120px] text-left text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50 text-xs font-bold uppercase tracking-[0.08em] text-gray-500">
+            <thead className="border-b border-gray-100 bg-gray-50/50 text-xs font-bold uppercase tracking-[0.08em] text-gray-500">
               <tr>
                 <th className="px-5 py-4">Transaction</th>
                 <th className="px-5 py-4">Booking & item</th>
@@ -468,13 +466,13 @@ export default function AdminPaymentsPage() {
                 <th className="px-5 py-4">Date</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-50">
               {payments.length === 0 ? (
                 <tr><td colSpan={7} className="px-6 py-14 text-center text-gray-500">No payments match your filters.</td></tr>
               ) : payments.map((payment) => {
                 const item = getItemDetails(payment);
                 return (
-                  <tr key={payment.id} onClick={() => setSelectedPayment(payment)} className="cursor-pointer align-top transition hover:bg-[#fcfaf5]">
+                  <tr key={payment.id} onClick={() => setSelectedPayment(payment)} className="cursor-pointer align-top transition hover:bg-gray-50/50">
                     <td className="px-5 py-4">
                       <p className="font-mono text-xs font-semibold text-gray-800" title={payment.id}>{payment.id.slice(0, 8)}…</p>
                       <p className="mt-1 text-[11px] text-gray-400">{payment.receiptNumber || "Receipt pending"}</p>

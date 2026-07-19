@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../lib/axios";
 import { TripFormModal } from "../../components/admin/TripFormModal";
@@ -20,6 +20,7 @@ import {
   UserCircle,
   CreditCard,
   Link2,
+  MoreVertical,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "../../components/ui/button";
@@ -28,17 +29,97 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "../../components/ui/input";
 import { getErrorMessage, showErrorToast } from "../../../lib/errors";
 
+
+function TripActionMenu({ trip, processingId, processingAction, onShare, onTogglePublish, onEdit, onDelete }: any) {
+  const [open, setOpen] = useState(false);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    if (open) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  return (
+    <div className="relative inline-block text-right" ref={menuRef}>
+      <button 
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors focus:outline-none"
+      >
+        <MoreVertical className="w-5 h-5" />
+      </button>
+      
+      {open && (
+        <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-100 shadow-xl rounded-xl overflow-hidden z-20 text-left">
+          <button 
+            onClick={(e) => { e.stopPropagation(); setOpen(false); onShare(trip); }}
+            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors border-b border-gray-50"
+          >
+            <Link2 className="w-4 h-4 text-gray-400" /> Private link
+          </button>
+          
+          <button 
+            onClick={(e) => { e.stopPropagation(); setOpen(false); onTogglePublish(trip); }}
+            disabled={processingId === trip.id}
+            className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center gap-2 transition-colors border-b border-gray-50 text-gray-700"
+          >
+            {processingId === trip.id && processingAction === "publish" ? (
+              <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+            ) : trip.isPublished ? (
+              <EyeOff className="w-4 h-4 text-orange-500" />
+            ) : (
+              <Eye className="w-4 h-4 text-green-500" />
+            )}
+            {trip.isPublished ? "Unpublish" : "Publish"}
+          </button>
+
+          <button 
+            onClick={(e) => { e.stopPropagation(); setOpen(false); onEdit(trip); }}
+            disabled={processingId === trip.id}
+            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors border-b border-gray-50"
+          >
+            {processingId === trip.id && processingAction === "edit" ? (
+              <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+            ) : (
+              <Edit2 className="w-4 h-4 text-[#c8a96e]" />
+            )}
+            Edit
+          </button>
+
+          <button 
+            onClick={(e) => { e.stopPropagation(); setOpen(false); onDelete(trip.id); }}
+            disabled={processingId === trip.id}
+            className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+          >
+            {processingId === trip.id && processingAction === "delete" ? (
+              <Loader2 className="w-4 h-4 animate-spin text-red-400" />
+            ) : (
+              <Trash2 className="w-4 h-4" />
+            )}
+            Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 // ── Booking status badge ──────────────────────────────────────────
 function BookingStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    PENDING: "bg-yellow-100 text-yellow-700",
-    RESERVED: "bg-blue-100 text-blue-700",
-    CONFIRMED: "bg-green-100 text-green-700",
-    CANCELLED: "bg-red-100 text-red-700",
-    COMPLETED: "bg-purple-100 text-purple-700",
+    PENDING: "bg-yellow-50 text-yellow-700 border border-yellow-200/60",
+    RESERVED: "bg-blue-50 text-blue-700 border border-blue-200/60",
+    CONFIRMED: "bg-green-50 text-green-700 border border-green-200/60",
+    CANCELLED: "bg-red-50 text-red-700 border border-red-200/60",
+    COMPLETED: "bg-purple-50 text-purple-700 border border-purple-200/60",
   };
   return (
-    <span className={`px-2 py-0.5 rounded text-xs font-semibold tracking-wide ${map[status] ?? "bg-gray-100 text-gray-600"}`}>
+    <span className={`px-2 py-0.5 rounded text-xs font-semibold tracking-wide ${map[status] ?? "bg-gray-50 text-gray-600 border border-gray-200/60"}`}>
       {status}
     </span>
   );
@@ -46,14 +127,14 @@ function BookingStatusBadge({ status }: { status: string }) {
 
 function PaymentStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    PAID: "bg-green-100 text-green-700",
-    PARTIALLY_PAID: "bg-blue-100 text-blue-700",
-    PENDING: "bg-yellow-100 text-yellow-700",
-    REFUNDED: "bg-purple-100 text-purple-700",
-    FAILED: "bg-red-100 text-red-700",
+    PAID: "bg-green-50 text-green-700 border border-green-200/60",
+    PARTIALLY_PAID: "bg-blue-50 text-blue-700 border border-blue-200/60",
+    PENDING: "bg-yellow-50 text-yellow-700 border border-yellow-200/60",
+    REFUNDED: "bg-purple-50 text-purple-700 border border-purple-200/60",
+    FAILED: "bg-red-50 text-red-700 border border-red-200/60",
   };
   return (
-    <span className={`px-2 py-0.5 rounded text-xs font-semibold tracking-wide ${map[status] ?? "bg-gray-100 text-gray-600"}`}>
+    <span className={`px-2 py-0.5 rounded text-xs font-semibold tracking-wide ${map[status] ?? "bg-gray-50 text-gray-600 border border-gray-200/60"}`}>
       {status?.replace("_", " ") || "UNKNOWN"}
     </span>
   );
@@ -342,12 +423,12 @@ export default function AdminTripsPage() {
 
       <div className="flex flex-col gap-4">
         {trips.length === 0 ? (
-          <div className="py-12 text-center bg-white border border-gray-200 border-dashed rounded-xl">
+          <div className="py-16 text-center bg-gray-50/50 rounded-2xl">
             <p className="text-gray-500">No trips found. Create your first trip above!</p>
           </div>
         ) : (
           trips.map((trip: any) => (
-            <div key={trip.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div key={trip.id} className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100 overflow-hidden">
               {/* ── Trip header row ── */}
               <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 md:gap-4 p-3 md:p-4">
                 {/* Thumbnail */}
@@ -380,59 +461,23 @@ export default function AdminTripsPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="grid grid-cols-2 md:flex md:items-center gap-2 md:gap-1 w-full md:w-auto md:shrink-0">
+                <div className="flex items-center gap-2 shrink-0 mt-3 md:mt-0">
                   <button
                     onClick={() => toggleBookings(trip.id)}
-                    className="flex items-center justify-center gap-1.5 text-xs font-medium text-gray-600 hover:text-[#781216] transition-colors px-3 py-2 rounded-lg hover:bg-gray-50 border border-gray-200"
+                    className="flex items-center justify-center gap-1.5 text-xs font-semibold text-gray-700 hover:text-[#781216] transition-colors px-4 py-2 rounded-lg hover:bg-gray-100"
                   >
-                    {expandedTripId === trip.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    {expandedTripId === trip.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     Bookings
                   </button>
-                  <button
-                    onClick={() => handleCreateShareLink(trip)}
-                    className="text-xs font-medium text-gray-500 hover:text-[#781216] transition-colors flex items-center justify-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-50 border border-gray-200"
-                  >
-                    <Link2 className="w-3.5 h-3.5" />
-                    Private link
-                  </button>
-                  <button
-                    onClick={() => handleTogglePublish(trip)}
-                    disabled={processingId === trip.id}
-                    className={`text-xs font-medium transition-colors flex items-center justify-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-50 border border-gray-200 ${trip.isPublished ? "text-gray-500 hover:text-orange-600" : "text-gray-500 hover:text-green-600"} disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {processingId === trip.id && processingAction === "publish" ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : trip.isPublished ? (
-                      <EyeOff className="w-3.5 h-3.5" />
-                    ) : (
-                      <Eye className="w-3.5 h-3.5" />
-                    )}
-                    {trip.isPublished ? "Unpublish" : "Publish"}
-                  </button>
-                  <button
-                    onClick={() => openEditModal(trip)}
-                    disabled={processingId === trip.id}
-                    className="text-xs font-medium text-gray-500 hover:text-[#c8a96e] transition-colors flex items-center justify-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-50 border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {processingId === trip.id && processingAction === "edit" ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Edit2 className="w-3.5 h-3.5" />
-                    )}
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(trip.id)}
-                    disabled={processingId === trip.id}
-                    className="text-xs font-medium text-gray-500 hover:text-red-600 transition-colors flex items-center justify-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-50 border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {processingId === trip.id && processingAction === "delete" ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-3.5 h-3.5" />
-                    )}
-                    Delete
-                  </button>
+                  <TripActionMenu 
+                    trip={trip} 
+                    processingId={processingId} 
+                    processingAction={processingAction} 
+                    onShare={handleCreateShareLink} 
+                    onTogglePublish={handleTogglePublish} 
+                    onEdit={openEditModal} 
+                    onDelete={handleDelete} 
+                  />
                 </div>
               </div>
 

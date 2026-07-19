@@ -53,60 +53,75 @@ export default function AdminReviewsPage() {
     <div className="max-w-7xl mx-auto pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-950 flex items-center gap-2">
             <MessageSquare className="w-6 h-6 text-[#c8a96e]" />
-            Reviews Dashboard
+            Review Management
           </h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Manage and moderate customer reviews across all trips and festivals.
+          <p className="mt-1 text-sm text-gray-500">
+            Monitor and curate guest experiences across all destinations.
           </p>
         </div>
 
-        <div className="relative w-full md:w-64">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <div className="relative w-full md:w-96">
+          <Search className="w-4 h-4 absolute left-0 top-1/2 -translate-y-1/2 text-gray-400" />
           <input 
             type="text"
             placeholder="Search reviews..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e] focus:border-transparent w-full"
+            className="w-full pl-8 pr-4 py-3 bg-transparent border-0 border-b border-gray-200 focus:ring-0 focus:border-[#c8a96e] text-base md:text-sm text-gray-900 placeholder-gray-400 transition-colors outline-none shadow-none"
           />
         </div>
       </div>
 
-      <div className="md:hidden space-y-3">
+      <div className="flex flex-col gap-6">
         {filteredReviews.length === 0 ? (
-          <div className="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-500">
-            No reviews found.
+          <div className="border border-gray-100 bg-white p-12 text-center text-sm text-gray-500">
+            No reviews found matching your criteria.
           </div>
         ) : (
           filteredReviews.map((review) => (
-            <article key={review.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-gray-900">{review.user?.profile?.fullName || "Anonymous"}</p>
-                  <p className="mt-0.5 truncate text-xs text-gray-500">{review.customTrip?.title || review.trip?.title || review.festival?.title || "Unknown"}</p>
+            <article key={review.id} className="bg-white border border-gray-100 p-6 md:p-8 flex flex-col gap-6 hover:shadow-md hover:border-gray-200 transition-all duration-300">
+              <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b border-gray-50 pb-4">
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] uppercase text-gray-400 tracking-widest font-bold">
+                    {format(new Date(review.createdAt), "MMM d, yyyy")}
+                  </span>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h3 className="text-base text-gray-950 font-semibold">{review.user?.profile?.fullName || "Anonymous"}</h3>
+                    <span className="bg-gray-50 border border-gray-100 text-gray-500 text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full">
+                      {review.customTrip?.title || review.trip?.title || review.festival?.title || "Unknown"}
+                    </span>
+                  </div>
                 </div>
-                <span className={`shrink-0 rounded px-2 py-1 text-[11px] font-medium tracking-wide ${review.isPublished ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
-                  {review.isPublished ? "PUBLISHED" : "HIDDEN"}
-                </span>
-              </div>
-              <div className="mt-3 flex items-center justify-between text-xs">
-                <div className="flex items-center font-semibold text-yellow-500">
-                  {review.rating}<Star className="ml-1 h-4 w-4 fill-current" />
+                
+                <div className="flex flex-row-reverse md:flex-row items-center justify-between md:justify-end gap-4 w-full md:w-auto">
+                  <div className="flex items-center gap-0.5 text-[#c8a96e]">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star key={i} className={`w-4 h-4 ${i < review.rating ? "fill-current" : "text-gray-200"}`} />
+                    ))}
+                  </div>
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+                    review.isPublished ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60" : "bg-gray-50 text-gray-500 border border-gray-200/60"
+                  }`}>
+                    {review.isPublished && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>}
+                    {!review.isPublished && <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>}
+                    {review.isPublished ? "Published" : "Hidden"}
+                  </span>
                 </div>
-                <span className="text-gray-500">{format(new Date(review.createdAt), "MMM d, yyyy")}</span>
               </div>
-              <p className="mt-3 whitespace-pre-wrap break-words rounded-lg bg-gray-50 p-3 text-sm leading-6 text-gray-700">
+              
+              <p className="text-sm md:text-base text-gray-700 max-w-4xl leading-relaxed whitespace-pre-wrap">
                 {review.comment || "No comment provided."}
               </p>
-              <div className="mt-3 flex justify-end gap-2 border-t border-gray-100 pt-3">
+              
+              <div className="flex justify-end gap-2 mt-2">
                 <button
                   onClick={() => toggleMutation.mutate(review.id)}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-600"
+                  className="p-2 text-gray-400 hover:text-gray-900 transition-colors duration-200 flex items-center justify-center rounded-full hover:bg-gray-50"
+                  title={review.isPublished ? "Hide Review" : "Publish Review"}
                 >
-                  {review.isPublished ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  {review.isPublished ? "Hide" : "Publish"}
+                  {review.isPublished ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
                 <button
                   onClick={() => {
@@ -114,88 +129,15 @@ export default function AdminReviewsPage() {
                       deleteMutation.mutate(review.id);
                     }
                   }}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-red-100 px-3 text-xs font-medium text-red-600"
+                  className="p-2 text-gray-400 hover:text-red-600 transition-colors duration-200 flex items-center justify-center rounded-full hover:bg-red-50"
+                  title="Delete"
                 >
-                  <Trash2 className="h-4 w-4" /> Delete
+                  <Trash2 className="w-5 h-5" />
                 </button>
               </div>
             </article>
           ))
         )}
-      </div>
-
-      <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Reviewer</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Trip/Festival</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Rating</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Comment</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredReviews.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                    No reviews found.
-                  </td>
-                </tr>
-              ) : (
-                filteredReviews.map((review) => (
-                  <tr key={review.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {format(new Date(review.createdAt), "MMM d, yyyy")}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="font-medium text-gray-900">{review.user?.profile?.fullName || "Anonymous"}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600">{review.customTrip?.title || review.trip?.title || review.festival?.title || "Unknown"}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center text-yellow-400">
-                        {review.rating} <Star className="w-4 h-4 ml-1 fill-current" />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 max-w-xs truncate text-sm text-gray-600" title={review.comment || ""}>
-                      {review.comment || "-"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2.5 py-1 rounded text-xs font-medium tracking-wider ${review.isPublished ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                        {review.isPublished ? 'PUBLISHED' : 'HIDDEN'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
-                      <button 
-                        onClick={() => toggleMutation.mutate(review.id)}
-                        className="p-2 text-gray-400 hover:text-[#c8a96e] hover:bg-[#c8a96e]/10 rounded-lg transition-colors inline-flex"
-                        title={review.isPublished ? "Hide Review" : "Publish Review"}
-                      >
-                        {review.isPublished ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                      <button 
-                        onClick={() => {
-                          if (window.confirm("Are you sure you want to permanently delete this review?")) {
-                            deleteMutation.mutate(review.id);
-                          }
-                        }}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors inline-flex"
-                        title="Delete Review"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
       </div>
     </div>
   );
