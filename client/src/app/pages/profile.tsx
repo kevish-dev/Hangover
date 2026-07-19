@@ -85,9 +85,8 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
   const isPartiallyRefunded = booking.paymentStatus === "PARTIALLY_REFUNDED";
   const isRefunded = isFullyRefunded || isPartiallyRefunded;
   const canPayBalance =
-    due > 0 &&
-    booking.status === "RESERVED" &&
-    booking.paymentStatus === "PARTIALLY_PAID";
+    (due > 0 && booking.status === "RESERVED" && booking.paymentStatus === "PARTIALLY_PAID") ||
+    (booking.status === "PENDING" && (booking.paymentStatus === "PENDING" || booking.paymentStatus === "FAILED"));
 
   // Sum up all successful or pending refunds across payments
   const totalRefunded = (booking.payments || []).reduce((sum, p) => {
@@ -401,7 +400,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
                 onMouseEnter={(e) => (e.currentTarget.style.background = "#9f7f2f")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "#b8943a")}
               >
-                <CreditCard size={10} /> Pay Balance
+                <CreditCard size={10} /> {booking.status === "PENDING" ? "Complete Booking" : "Pay Balance"}
               </Link>
             )}
             {/* Book Again — only shown for fully refunded trips */}

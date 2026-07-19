@@ -281,7 +281,7 @@ export default function AdminFestivalsPage() {
                     <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{fest.location}</span>
                     <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{fest.startDate ? format(new Date(fest.startDate), "MMM d, yyyy") : "TBD"}</span>
                     <span className="flex items-center gap-1"><Users className="w-3 h-3" />{fest.filledSpots ?? 0}/{fest.capacity} booked</span>
-                    <span className="flex items-center gap-1 font-semibold text-[#781216]"><IndianRupee className="w-3 h-3" />{parseInt(fest.price).toLocaleString("en-IN")}</span>
+                    <span className="flex items-center gap-1 font-semibold text-[#781216]"><IndianRupee className="w-3 h-3" />{parseInt(fest.packages?.[0]?.price || 0).toLocaleString("en-IN")}</span>
                   </div>
                 </div>
 

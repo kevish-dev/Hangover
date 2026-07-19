@@ -363,7 +363,8 @@ function FestivalCard({
 
   const name = festival.title;
   const location = festival.location;
-  const price = formatPrice(festival.price);
+  const festPrice = festival.packages?.[0]?.price || 0;
+  const price = formatPrice(festPrice);
   const image = festival.bannerImages?.[0] || "";
   const tagline = festival.overview
     ? festival.overview.substring(0, 90) + "…"
@@ -728,7 +729,7 @@ export default function FestivalsPage() {
         tagline: featuredFestival.overview
           ? featuredFestival.overview.substring(0, 100) + "…"
           : "",
-        price: formatPrice(featuredFestival.price),
+        price: formatPrice(featuredFestival.packages?.[0]?.price || 0),
         spotsLeft,
         dates: heroSlot
           ? (() => {
@@ -765,7 +766,7 @@ export default function FestivalsPage() {
     () =>
       PRICE_RANGES.filter((r) =>
         allFestivals.some((f) => {
-          const p = priceToNumber(f.price);
+          const p = priceToNumber(f.packages?.[0]?.price || 0);
           return p >= r.min && p <= r.max;
         }),
       ),
@@ -795,7 +796,7 @@ export default function FestivalsPage() {
       }
       if (filters.priceRange) {
         const range = PRICE_RANGES.find((r) => r.label === filters.priceRange);
-        const price = priceToNumber(f.price);
+        const price = priceToNumber(f.packages?.[0]?.price || 0);
         if (range && (price < range.min || price > range.max)) return false;
       }
       return true;
@@ -803,11 +804,11 @@ export default function FestivalsPage() {
 
     if (sort === "price_asc")
       list = [...list].sort(
-        (a, b) => priceToNumber(a.price) - priceToNumber(b.price),
+        (a, b) => priceToNumber(a.packages?.[0]?.price || 0) - priceToNumber(b.packages?.[0]?.price || 0),
       );
     if (sort === "price_desc")
       list = [...list].sort(
-        (a, b) => priceToNumber(b.price) - priceToNumber(a.price),
+        (a, b) => priceToNumber(b.packages?.[0]?.price || 0) - priceToNumber(a.packages?.[0]?.price || 0),
       );
     return list;
   }, [allFestivals, search, filters, sort]);

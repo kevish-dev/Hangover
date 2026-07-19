@@ -1082,8 +1082,8 @@ export default function BookingPage() {
   const tripDestination = trip.location;
 
   const activePackage = trip.packages?.find((p: any) => p.id === selectedPackageId);
-  const basePrice = activePackage ? Number(activePackage.price) : Number(trip.price || 0);
-  const baseToken = activePackage ? Number(activePackage.tokenAmount) : Number(trip.tokenAmount || 0);
+  const basePrice = activePackage ? Number(activePackage.price) : Number(trip.packages?.[0]?.price || 0);
+  const baseToken = activePackage ? Number(activePackage.tokenAmount) : Number(trip.packages?.[0]?.tokenAmount || 0);
 
   const availableAddOns = (trip.addOns || []).filter((addOn: any) => {
     if (!addOn.isActive) return false;

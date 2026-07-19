@@ -374,7 +374,7 @@ export default function AdminTripsPage() {
                     <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{trip.location}</span>
                     <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{trip.slots?.[0]?.startDate ? format(new Date(trip.slots[0].startDate), "MMM d, yyyy") : "No departure"}</span>
                     <span className="flex items-center gap-1"><Users className="w-3 h-3" />{(trip.slots || []).reduce((sum: number, slot: any) => sum + Number(slot.filledSpots || 0), 0)}/{(trip.slots || []).reduce((sum: number, slot: any) => sum + Number(slot.capacity || 0), 0)} booked</span>
-                    <span className="flex items-center gap-1 font-semibold text-[#781216]"><IndianRupee className="w-3 h-3" />{parseInt(trip.price).toLocaleString("en-IN")}</span>
+                    <span className="flex items-center gap-1 font-semibold text-[#781216]"><IndianRupee className="w-3 h-3" />{parseInt(trip.packages?.[0]?.price || 0).toLocaleString("en-IN")}</span>
                     {trip.circuit && <span className="text-[#8a6414]">From {trip.circuit.title}</span>}
                   </div>
                 </div>

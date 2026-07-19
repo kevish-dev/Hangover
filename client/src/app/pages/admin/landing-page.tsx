@@ -120,7 +120,7 @@ export default function AdminLandingPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="font-medium text-sm text-gray-900 truncate">{trip.title}</p>
-                  <p className="text-xs text-gray-500 truncate">{trip.location} · {formatPrice(trip.price)}</p>
+                  <p className="text-xs text-gray-500 truncate">{trip.location} · {formatPrice(trip.packages?.[0]?.price || 0)}</p>
                 </div>
                 <div className="flex w-full md:w-auto items-center justify-end gap-1 shrink-0">
                   <button type="button" onClick={() => moveTrip(index, -1)} disabled={index === 0} className="p-1.5 text-gray-500 hover:text-[#781216] disabled:opacity-30" aria-label={`Move ${trip.title} up`}><ArrowUp className="w-4 h-4" /></button>
@@ -150,7 +150,7 @@ export default function AdminLandingPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm text-gray-900 truncate">{trip.title}</p>
-                    <p className="text-xs text-gray-500 flex items-center gap-1 truncate"><MapPin className="w-3 h-3 shrink-0" />{trip.location} · {formatPrice(trip.price)}</p>
+                    <p className="text-xs text-gray-500 flex items-center gap-1 truncate"><MapPin className="w-3 h-3 shrink-0" />{trip.location} · {formatPrice(trip.packages?.[0]?.price || 0)}</p>
                   </div>
                 </button>
               );

@@ -172,6 +172,7 @@ export function TripFormModal({
   >([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [canSubmit, setCanSubmit] = useState(false);
   const queryClient = useQueryClient();
 
   const isEdit = !!trip;
@@ -279,6 +280,9 @@ export function TripFormModal({
         replaceSlots(form.getValues("slots"));
         replaceInclusions(form.getValues("inclusions"));
         replaceExclusions(form.getValues("exclusions"));
+        replaceTripTags(form.getValues("tripTags"));
+        replacePackages(form.getValues("packages"));
+        replaceFaqs(form.getValues("faqs"));
         form.clearErrors();
 
         // Initialize Highlight items
@@ -342,6 +346,9 @@ export function TripFormModal({
         replaceSlots(form.getValues("slots"));
         replaceInclusions(form.getValues("inclusions"));
         replaceExclusions(form.getValues("exclusions"));
+        replaceTripTags(form.getValues("tripTags"));
+        replacePackages(form.getValues("packages"));
+        replaceFaqs(form.getValues("faqs"));
         setHighlightItems((Array.isArray(sourceCircuit.highlights) ? sourceCircuit.highlights : []).map((item: any) => ({
           id: Math.random().toString(),
           text: item.text || "",
@@ -381,6 +388,9 @@ export function TripFormModal({
         replaceSlots(form.getValues("slots"));
         replaceInclusions(form.getValues("inclusions"));
         replaceExclusions(form.getValues("exclusions"));
+        replaceTripTags([]);
+        replacePackages([{ title: "Standard", price: 0, tokenAmount: 0 }]);
+        replaceFaqs([]);
         form.clearErrors();
         setStayItems([]);
         setHighlightItems([]);
@@ -413,6 +423,7 @@ export function TripFormModal({
     fields: tripTagFields,
     append: addTripTag,
     remove: removeTripTag,
+    replace: replaceTripTags,
   } = useFieldArray({
     control: form.control,
     name: "tripTags",
@@ -421,6 +432,7 @@ export function TripFormModal({
     fields: packageFields,
     append: appendPackage,
     remove: removePackage,
+    replace: replacePackages,
   } = useFieldArray({
     name: "packages",
     control: form.control,
@@ -439,6 +451,7 @@ export function TripFormModal({
     append: addFaq,
     remove: removeFaq,
     move: moveFaq,
+    replace: replaceFaqs,
   } = useFieldArray({
     control: form.control,
     name: "faqs",
@@ -572,28 +585,7 @@ export function TripFormModal({
     }
   };
 
-  const deleteExistingGalleryImage = async (url: string) => {
-    if (!trip?.id) return;
-    if (
-      !window.confirm(
-        "Are you sure you want to permanently delete this gallery image?",
-      )
-    )
-      return;
 
-    try {
-      await apiClient.delete(`/trips/${trip.id}/gallery-images`, {
-        data: { imageUrl: url },
-      });
-      toast.success("Gallery image deleted successfully");
-      trip.galleryImages = trip.galleryImages.filter(
-        (img: string) => img !== url,
-      );
-      queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
-    } catch (error: unknown) {
-      showErrorToast(error, "Failed to delete image");
-    }
-  };
 
   // Human-readable labels for trip form fields
   const FIELD_LABELS: Record<string, string> = {
@@ -690,7 +682,14 @@ export function TripFormModal({
     else if (step === 4) fieldsToValidate = ["itinerary"];
 
     if (await validateStep()) {
-      setStep((s) => Math.min(STEPS.length - 1, s + 1));
+      setStep((s) => {
+        const next = Math.min(STEPS.length - 1, s + 1);
+        if (next === STEPS.length - 1) {
+          setCanSubmit(false);
+          setTimeout(() => setCanSubmit(true), 500);
+        }
+        return next;
+      });
     } else {
       const errors = fieldsToValidate.reduce<Record<string, unknown>>(
         (stepErrors, field) => {
@@ -743,14 +742,8 @@ export function TripFormModal({
     let coreTripSaved = false;
     let createdNewTrip = false;
     try {
-      // Derive price/tokenAmount from cheapest package for DB compatibility
-      const sortedPkgs = [...data.packages].sort((a, b) => Number(a.price) - Number(b.price));
-      const lowestPkg = sortedPkgs[0];
-
       const payload = {
         ...data,
-        price: Number(lowestPkg.price),
-        tokenAmount: Number(lowestPkg.tokenAmount),
         slots: data.slots.map(s => ({
             ...s,
             startDate: s.startDate ? new Date(s.startDate).toISOString() : null,
@@ -770,6 +763,9 @@ export function TripFormModal({
         faqs: data.faqs?.filter(
           (f) => f.question.trim() !== "" && f.answer.trim() !== "",
         ),
+        ...(!isEdit && sourceCircuit?.bannerImages && sourceCircuit.bannerImages.length > 0 
+            ? { bannerImages: sourceCircuit.bannerImages } 
+            : {}),
       };
 
       if (isEdit) {
@@ -1763,7 +1759,7 @@ export function TripFormModal({
               key="submit-btn"
               type="submit"
               form="trip-form"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !canSubmit}
               className="bg-[#781216] hover:bg-[#9a1a1f] text-white flex items-center gap-2 px-4 sm:px-8 shadow-md"
             >
               {isSubmitting ? (

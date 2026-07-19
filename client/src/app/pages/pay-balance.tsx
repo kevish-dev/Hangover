@@ -258,13 +258,16 @@ export default function PayBalancePage() {
   const amountPaid = Number(booking?.amountPaid || 0);
   const amountDue = Number(booking?.amountDue || 0);
   const paymentProgress = totalAmount > 0 ? Math.min(100, Math.max(0, (amountPaid / totalAmount) * 100)) : 0;
-  const isEligible = booking?.status === "RESERVED" && booking?.paymentStatus === "PARTIALLY_PAID" && amountDue > 0;
+  const isInitialPayment = booking?.status === "PENDING" && (booking?.paymentStatus === "PENDING" || booking?.paymentStatus === "FAILED");
+  const initialPaymentAmount = booking?.initialPaymentType === "TOKEN" ? Number(booking?.tokenAmount || 0) : totalAmount;
+  const isEligible = (booking?.status === "RESERVED" && booking?.paymentStatus === "PARTIALLY_PAID" && amountDue > 0) || isInitialPayment;
   const isPaid = booking?.status === "CONFIRMED" || booking?.paymentStatus === "PAID";
   const isRefunded = booking?.paymentStatus === "REFUNDED" || booking?.paymentStatus === "PARTIALLY_REFUNDED";
   const isCancelled = booking?.status === "CANCELLED";
-  const statusLabel = isEligible ? "Spot Reserved" : isPaid ? "Booking Confirmed" : isRefunded ? "Refunded" : isCancelled ? "Booking Cancelled" : String(booking?.status || "Payment Unavailable").replace(/_/g, " ");
-  const heroEyebrow = isEligible ? "/ Secure Balance Payment" : isPaid ? "/ Payment Complete" : "/ Booking Payment Status";
-  const heroTitle = isEligible ? <>Complete the journey<br /><em style={{ color: "#c8a96e", fontStyle: "italic" }}>you already chose.</em></> : isPaid ? <>Your journey is<br /><em style={{ color: "#c8a96e", fontStyle: "italic" }}>fully confirmed.</em></> : <>Review your<br /><em style={{ color: "#c8a96e", fontStyle: "italic" }}>booking status.</em></>;
+  const displayAmount = isPaid || isCancelled || isRefunded ? amountPaid : (isInitialPayment ? initialPaymentAmount : amountDue);
+  const statusLabel = isEligible ? (isInitialPayment ? "Payment Pending" : "Spot Reserved") : isPaid ? "Booking Confirmed" : isRefunded ? "Refunded" : isCancelled ? "Booking Cancelled" : String(booking?.status || "Payment Unavailable").replace(/_/g, " ");
+  const heroEyebrow = isEligible ? (isInitialPayment ? "/ Secure Booking Payment" : "/ Secure Balance Payment") : isPaid ? "/ Payment Complete" : "/ Booking Payment Status";
+  const heroTitle = isEligible ? (isInitialPayment ? <>Secure your journey<br /><em style={{ color: "#c8a96e", fontStyle: "italic" }}>complete your booking.</em></> : <>Complete the journey<br /><em style={{ color: "#c8a96e", fontStyle: "italic" }}>you already chose.</em></>) : isPaid ? <>Your journey is<br /><em style={{ color: "#c8a96e", fontStyle: "italic" }}>fully confirmed.</em></> : <>Review your<br /><em style={{ color: "#c8a96e", fontStyle: "italic" }}>booking status.</em></>;
   const successfulPayments = useMemo(
     () => (booking?.payments || []).filter((payment: any) => payment.status === "SUCCESS").sort((a: any, b: any) => new Date(a.paidAt || a.createdAt).getTime() - new Date(b.paidAt || b.createdAt).getTime()),
     [booking?.payments],
@@ -309,7 +312,13 @@ export default function PayBalancePage() {
         throw new Error("Secure checkout did not load. Please refresh the page and try again.");
       }
 
-      const initiateResponse = await apiClient.post("/payments/balance/initiate", { bookingId: booking.id });
+      const isInitial = booking.status === "PENDING";
+      const endpoint = isInitial ? "/payments/initiate" : "/payments/balance/initiate";
+      const payload = isInitial 
+        ? { bookingId: booking.id, type: booking.initialPaymentType || "FULL" }
+        : { bookingId: booking.id };
+
+      const initiateResponse = await apiClient.post(endpoint, payload);
       const { razorpayOrderId, razorpayKeyId, amount, currency } = initiateResponse.data;
 
       const options = {
@@ -317,7 +326,7 @@ export default function PayBalancePage() {
         amount,
         currency,
         name: "Hangover Trails",
-        description: `${item?.title || "Trip"} — Balance Payment`,
+        description: `${item?.title || "Trip"} — ${isInitial ? "Booking Payment" : "Balance Payment"}`,
         order_id: razorpayOrderId,
         prefill: {
           name: booking.user?.profile?.fullName || user.name || "",
@@ -441,9 +450,9 @@ export default function PayBalancePage() {
         <motion.aside initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.08 }} className="order-1 lg:order-2 lg:sticky lg:top-24" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ borderRadius: 18, background: "#fff", boxShadow: "0 20px 60px rgba(30,26,20,0.12)", border: "1px solid rgba(30,26,20,0.07)", overflow: "hidden" }}>
             <div style={{ background: isEligible ? "#781216" : "#1e1a14", padding: "25px 26px 23px", color: "#fff" }}>
-              <p style={{ margin: "0 0 7px", color: "rgba(255,255,255,0.6)", fontSize: "0.58rem", fontWeight: 500, letterSpacing: "0.16em", textTransform: "uppercase" }}>{isEligible ? "Balance due now" : isPaid ? "Payment completed" : "Booking payment status"}</p>
-              <p style={{ margin: 0, fontSize: "clamp(2rem,5vw,2.65rem)", fontWeight: 500, letterSpacing: "-0.04em", lineHeight: 1.05 }}>{formatCurrency(isPaid || isCancelled || isRefunded ? amountPaid : amountDue)}</p>
-              {isEligible && booking.balanceDueDate && <p style={{ margin: "9px 0 0", color: "rgba(255,255,255,0.57)", fontSize: "0.62rem" }}>Requested by {formatDate(booking.balanceDueDate)}</p>}
+              <p style={{ margin: "0 0 7px", color: "rgba(255,255,255,0.6)", fontSize: "0.58rem", fontWeight: 500, letterSpacing: "0.16em", textTransform: "uppercase" }}>{isEligible ? (isInitialPayment ? "Payment due now" : "Balance due now") : isPaid ? "Payment completed" : "Booking payment status"}</p>
+              <p style={{ margin: 0, fontSize: "clamp(2rem,5vw,2.65rem)", fontWeight: 500, letterSpacing: "-0.04em", lineHeight: 1.05 }}>{formatCurrency(displayAmount)}</p>
+              {isEligible && booking.balanceDueDate && !isInitialPayment && <p style={{ margin: "9px 0 0", color: "rgba(255,255,255,0.57)", fontSize: "0.62rem" }}>Requested by {formatDate(booking.balanceDueDate)}</p>}
             </div>
             <div style={{ padding: "25px 26px 27px" }}>
               <div style={{ marginBottom: 22 }}>
@@ -460,7 +469,7 @@ export default function PayBalancePage() {
 
               {isEligible ? (
                 <button type="button" onClick={handlePayBalance} disabled={processing} aria-busy={processing} style={{ width: "100%", minHeight: 54, border: "none", borderRadius: 9, background: processing ? "rgba(120,18,22,0.66)" : "#781216", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, fontFamily: "'Poppins', sans-serif", fontSize: "0.77rem", fontWeight: 600, letterSpacing: "0.04em", cursor: processing ? "wait" : "pointer", boxShadow: "0 10px 25px rgba(120,18,22,0.2)", transition: "transform 0.2s ease, background 0.2s ease" }}>
-                  {processing ? <><Loader2 size={17} className="animate-spin" /> Opening secure checkout…</> : <>Pay {formatCurrency(amountDue)} <ArrowRight size={16} /></>}
+                  {processing ? <><Loader2 size={17} className="animate-spin" /> Opening secure checkout…</> : <>Pay {formatCurrency(displayAmount)} <ArrowRight size={16} /></>}
                 </button>
               ) : (
                 <div style={{ padding: "15px", borderRadius: 9, background: amountDue <= 0 ? "rgba(34,139,34,0.07)" : "rgba(184,148,58,0.08)", border: `1px solid ${amountDue <= 0 ? "rgba(34,139,34,0.16)" : "rgba(184,148,58,0.2)"}` }}>

@@ -63,6 +63,7 @@ export const create = async ({ days, packages, addOns, tagIds, ...rootData }) =>
       },
       packages: { create: packages },
       addOns: { create: addOns },
+      faqs: faqs ? { create: faqs.map((faq, index) => ({ question: faq.question, answer: faq.answer, order: faq.order ?? index })) } : undefined,
       tags: tagIds?.length ? { connect: tagIds.map((id) => ({ id })) } : undefined,
     },
     include: CIRCUIT_FULL_INCLUDE,
@@ -72,7 +73,7 @@ export const create = async ({ days, packages, addOns, tagIds, ...rootData }) =>
 // ── Update root fields only ───────────────────────────────────────────────
 export const update = async (
   id,
-  { tagIds, days, packages, addOns, ...data },
+  { tagIds, days, packages, addOns, faqs, ...data },
 ) => {
   return prisma.$transaction(async (tx) => {
     await tx.circuit.update({
@@ -149,6 +150,32 @@ export const update = async (
           await tx.addOn.update({ where: { id: item.id }, data: values });
         } else {
           await tx.addOn.create({ data: { ...values, circuitId: id } });
+        }
+      }
+    }
+
+    if (faqs !== undefined) {
+      const existing = await tx.fAQ.findMany({ where: { circuitId: id } });
+      const incomingIds = faqs.map((item) => item.id).filter(Boolean);
+      const removedIds = existing
+        .filter((item) => !incomingIds.includes(item.id))
+        .map((item) => item.id);
+      
+      if (removedIds.length) {
+        await tx.fAQ.deleteMany({ where: { id: { in: removedIds } } });
+      }
+
+      for (let i = 0; i < faqs.length; i++) {
+        const item = faqs[i];
+        const values = {
+          question: item.question,
+          answer: item.answer,
+          order: item.order ?? i,
+        };
+        if (item.id) {
+          await tx.fAQ.update({ where: { id: item.id }, data: values });
+        } else {
+          await tx.fAQ.create({ data: { ...values, circuitId: id } });
         }
       }
     }

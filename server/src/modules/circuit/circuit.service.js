@@ -52,11 +52,14 @@ export const getCircuitById = async (id) => {
   return circuit;
 };
 
-export const getCircuitBySlug = async (slug) => {
-  const circuit = await repo.findBySlug(slug);
-  if (!circuit) throw notFound();
-  return circuit;
-};
+import { randomUUID } from "crypto";
+import { 
+  createDirectImageUploadSignature, 
+  uploadToCloudinary, 
+  deleteFromCloudinary, 
+  isExpectedPublicImageUrl 
+} from "../../core/services/upload.service.js";
+import { ValidationError } from "../../core/errors/errors.js";
 
 export const createCircuit = async (data, adminId) => {
   const parsed = createCircuitSchema.parse(data);
@@ -70,8 +73,80 @@ export const updateCircuit = async (id, data) => {
 };
 
 export const deleteCircuit = async (id) => {
-  await getCircuitById(id);
+  const circuit = await getCircuitById(id);
+  const contentUrls = [
+    ...(circuit.bannerImages || []),
+    ...(Array.isArray(circuit.highlights) ? circuit.highlights.map((item) => item?.imageUrl) : []),
+    ...(Array.isArray(circuit.stayTransportImages) ? circuit.stayTransportImages.map((item) => item?.imageUrl) : []),
+  ].filter(Boolean);
+  await Promise.allSettled(contentUrls.map((url) => deleteFromCloudinary(url)));
   return repo.remove(id);
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Circuit Media
+// ═══════════════════════════════════════════════════════════════════════════
+export const createUploadSignature = async () => {
+  return createDirectImageUploadSignature(`uploads/circuits/media`);
+};
+
+export const createBannerUploadSignature = async (circuitId) => {
+  await getCircuitById(circuitId);
+  return createDirectImageUploadSignature(`uploads/circuits/${circuitId}/bannerimages`);
+};
+
+export const uploadBannerImages = async (circuitId, imageBuffers) => {
+  await getCircuitById(circuitId);
+  const folder = `uploads/circuits/${circuitId}/bannerimages`;
+  const uploadPromises = imageBuffers.map(buffer => 
+    uploadToCloudinary(buffer, { folder, publicId: randomUUID(), optimize: true })
+  );
+  const imageUrls = await Promise.all(uploadPromises);
+  const circuit = await getCircuitById(circuitId);
+  return repo.update(circuitId, { bannerImages: [...(circuit.bannerImages || []), ...imageUrls] });
+};
+
+export const attachBannerImages = async (circuitId, imageUrls) => {
+  if (!Array.isArray(imageUrls) || imageUrls.length === 0 || imageUrls.length > 10) {
+    throw new ValidationError("Provide between 1 and 10 banner image URLs.");
+  }
+  const folder = `uploads/circuits/${circuitId}/bannerimages`;
+  if (!imageUrls.every((url) => typeof url === "string" && isExpectedPublicImageUrl(url, folder))) {
+    throw new ValidationError("One or more banner URLs are invalid.");
+  }
+  const circuit = await getCircuitById(circuitId);
+  return repo.update(circuitId, { bannerImages: [...(circuit.bannerImages || []), ...imageUrls] });
+};
+
+export const deleteBannerImage = async (circuitId, imageUrl) => {
+  const circuit = await getCircuitById(circuitId);
+  const existingBanners = circuit.bannerImages || [];
+  if (!existingBanners.includes(imageUrl)) throw new Error("Image not found in circuit");
+  await deleteFromCloudinary(imageUrl);
+  const newBanners = existingBanners.filter(url => url !== imageUrl);
+  return repo.update(circuitId, { bannerImages: newBanners });
+};
+
+export const syncHighlights = async (circuitId, payloadStr, files) => {
+  const circuit = await repo.findById(circuitId);
+  if (!circuit) throw new Error("Circuit not found");
+
+  const payload = JSON.parse(payloadStr); 
+  const folder = `uploads/circuits/${circuitId}/highlights`;
+  
+  const uploadPromises = payload.map(async (item) => {
+    if (item.type === "EXISTING") {
+      return { text: item.text, imageUrl: item.url };
+    } else if (item.type === "NEW") {
+      const file = files[item.fileIndex];
+      if (!file) throw new Error("Missing file for new highlight image");
+      const imageUrl = await uploadToCloudinary(file.buffer, { folder, publicId: randomUUID(), optimize: true });
+      return { text: item.text, imageUrl };
+    }
+  });
+
+  const updatedHighlights = await Promise.all(uploadPromises);
+  return repo.update(circuitId, { highlights: updatedHighlights });
 };
 
 // ═══════════════════════════════════════════════════════════════════════════

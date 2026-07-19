@@ -78,11 +78,8 @@ export const createTrip = async (data) => {
       duration: circuit.duration,
       bestTimeToVisit: circuit.bestTimeToVisit,
       overview: circuit.overview,
-      galleryImages: circuit.galleryImages,
       inclusions: circuit.inclusions,
       exclusions: circuit.exclusions,
-      price: Number(circuit.basePrice),
-      tokenAmount: Number(circuit.baseTokenAmount),
       tripType: circuit.tripType,
       destinationId: circuit.destinationId,
       highlights: circuit.highlights,
@@ -137,10 +134,6 @@ export const createTrip = async (data) => {
   }
   if (!createData.duration) createData.duration = 1;
 
-  // price and tokenAmount are required Decimal columns — ensure they're set
-  if (createData.price === undefined || createData.price === null) createData.price = 0;
-  if (createData.tokenAmount === undefined || createData.tokenAmount === null) createData.tokenAmount = 0;
-
   return tripRepo.create(createData);
 };
 
@@ -179,7 +172,6 @@ export const deleteTrip = async (id) => {
   const trip = await getTripById(id, true);
   const contentUrls = [
     ...(trip.bannerImages || []),
-    ...(trip.galleryImages || []),
     ...(Array.isArray(trip.highlights) ? trip.highlights.map((item) => item?.imageUrl) : []),
     ...(Array.isArray(trip.stayTransportImages) ? trip.stayTransportImages.map((item) => item?.imageUrl) : []),
   ].filter(Boolean);
@@ -202,14 +194,6 @@ export const deleteBannerImage = async (tripId, imageUrl) => {
   // Update Database
   const newBanners = existingBanners.filter(url => url !== imageUrl);
   return tripRepo.update(tripId, { bannerImages: newBanners });
-};
-
-export const deleteGalleryImage = async (tripId, imageUrl) => {
-  const trip = await getTripById(tripId, true);
-  const galleryImages = trip.galleryImages || [];
-  if (!galleryImages.includes(imageUrl)) throw new Error("Image not found in trip");
-  await deleteFromCloudinary(imageUrl);
-  return tripRepo.update(tripId, { galleryImages: galleryImages.filter((url) => url !== imageUrl) });
 };
 
 export const uploadBannerImages = async (tripId, imageBuffers) => {

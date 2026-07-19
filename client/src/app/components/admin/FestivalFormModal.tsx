@@ -99,12 +99,14 @@ const STEPS = [
 
 interface FestivalFormModalProps {
   festival?: any;
+  sourceCircuit?: any;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function FestivalFormModal({
   festival,
+  sourceCircuit,
   open,
   onOpenChange,
 }: FestivalFormModalProps) {
@@ -239,6 +241,9 @@ export function FestivalFormModal({
         replaceSlots(form.getValues("slots"));
         replaceInclusions(form.getValues("inclusions"));
         replaceExclusions(form.getValues("exclusions"));
+        replaceTags(form.getValues("tags"));
+        replacePackages(form.getValues("packages"));
+        replaceFaqs(form.getValues("faqs"));
         form.clearErrors();
 
         // Initialize Highlight items
@@ -258,6 +263,86 @@ export function FestivalFormModal({
 
         // Initialize Stay items
         let parsedStay = festival.stayTransportImages || [];
+        if (typeof parsedStay === "string") {
+          try { parsedStay = JSON.parse(parsedStay); } catch(e) { parsedStay = []; }
+        }
+        setStayItems(
+          Array.isArray(parsedStay) ? parsedStay.map((item: any) => ({
+            id: Math.random().toString(),
+            text: item.text || "",
+            type: "EXISTING",
+            url: item.imageUrl,
+            preview: item.imageUrl,
+          })) : []
+        );
+      } else if (sourceCircuit) {
+        form.reset({
+          title: sourceCircuit.title || "",
+          location: sourceCircuit.location || "",
+          duration: sourceCircuit.duration || 1,
+          bestTimeToVisit: sourceCircuit.bestTimeToVisit || "",
+          slots: [{ startDate: "", endDate: "", capacity: 12 }],
+          overview: sourceCircuit.overview || "",
+          inclusions: Array.isArray(sourceCircuit.inclusions) && sourceCircuit.inclusions.length > 0
+            ? sourceCircuit.inclusions.map((i: any) => ({ value: typeof i === 'string' ? i : (i.value || "") }))
+            : typeof sourceCircuit.inclusions === 'string' && sourceCircuit.inclusions.trim().startsWith('[')
+              ? JSON.parse(sourceCircuit.inclusions).map((i: any) => ({ value: typeof i === 'string' ? i : (i.value || "") }))
+              : [{ value: "" }],
+          exclusions: Array.isArray(sourceCircuit.exclusions) && sourceCircuit.exclusions.length > 0
+            ? sourceCircuit.exclusions.map((e: any) => ({ value: typeof e === 'string' ? e : (e.value || "") }))
+            : typeof sourceCircuit.exclusions === 'string' && sourceCircuit.exclusions.trim().startsWith('[')
+              ? JSON.parse(sourceCircuit.exclusions).map((e: any) => ({ value: typeof e === 'string' ? e : (e.value || "") }))
+              : [{ value: "" }],
+          tags: sourceCircuit.tags?.length
+            ? sourceCircuit.tags.map((t: any) => ({ value: t.tag }))
+            : [{ value: "" }],
+          packages: sourceCircuit.packages?.length
+            ? sourceCircuit.packages.map((p: any) => ({
+                id: p.id,
+                title: p.title,
+                price: Number(p.price),
+                tokenAmount: Number(p.tokenAmount),
+              }))
+            : [{ title: "Standard", price: 0, tokenAmount: 0 }],
+          itinerary: Array.isArray(sourceCircuit.days) ? sourceCircuit.days.map((day: any) => ({
+            day: `Day ${day.dayNumber || 1}`,
+            title: day.title || "",
+            activities: Array.isArray(day.todos) && day.todos.length > 0
+              ? day.todos.join('\\n')
+              : day.description || ""
+          })) : [],
+          faqs: sourceCircuit.faqs?.length
+            ? sourceCircuit.faqs.map((f: any) => ({
+                question: f.question,
+                answer: f.answer,
+              }))
+            : [],
+          isPublished: false,
+          isFeatured: false,
+        });
+        replaceSlots(form.getValues("slots"));
+        replaceInclusions(form.getValues("inclusions"));
+        replaceExclusions(form.getValues("exclusions"));
+        replaceTags(form.getValues("tags"));
+        replacePackages(form.getValues("packages"));
+        replaceFaqs(form.getValues("faqs"));
+        form.clearErrors();
+
+        let parsedHighlights = sourceCircuit.highlights || [];
+        if (typeof parsedHighlights === "string") {
+          try { parsedHighlights = JSON.parse(parsedHighlights); } catch(e) { parsedHighlights = []; }
+        }
+        setHighlightItems(
+          Array.isArray(parsedHighlights) ? parsedHighlights.map((item: any) => ({
+            id: Math.random().toString(),
+            text: item.text || "",
+            type: "EXISTING",
+            url: item.imageUrl,
+            preview: item.imageUrl,
+          })) : []
+        );
+
+        let parsedStay = sourceCircuit.stayTransportImages || [];
         if (typeof parsedStay === "string") {
           try { parsedStay = JSON.parse(parsedStay); } catch(e) { parsedStay = []; }
         }
@@ -290,6 +375,9 @@ export function FestivalFormModal({
         replaceSlots(form.getValues("slots"));
         replaceInclusions(form.getValues("inclusions"));
         replaceExclusions(form.getValues("exclusions"));
+        replaceTags([]);
+        replacePackages([{ title: "Standard", price: 0, tokenAmount: 0 }]);
+        replaceFaqs([]);
         form.clearErrors();
         setStayItems([]);
         setHighlightItems([]);
@@ -300,7 +388,7 @@ export function FestivalFormModal({
       setVideoFile(null);
       setVideoPreview(null);
     }
-  }, [festival, open, form]);
+  }, [festival, sourceCircuit, open, form]);
 
   const {
     fields: inclusionFields,
@@ -324,6 +412,7 @@ export function FestivalFormModal({
     fields: tagFields,
     append: addTag,
     remove: removeTag,
+    replace: replaceTags,
   } = useFieldArray({
     control: form.control,
     name: "tags",
@@ -332,6 +421,7 @@ export function FestivalFormModal({
     fields: packageFields,
     append: appendPackage,
     remove: removePackage,
+    replace: replacePackages,
   } = useFieldArray({
     name: "packages",
     control: form.control,
@@ -352,6 +442,7 @@ export function FestivalFormModal({
     append: addFaq,
     remove: removeFaq,
     move: moveFaq,
+    replace: replaceFaqs,
   } = useFieldArray({
     control: form.control,
     name: "faqs",
@@ -660,14 +751,8 @@ export function FestivalFormModal({
 
     setIsSubmitting(true);
     try {
-      // Derive price/tokenAmount from cheapest package for DB compatibility
-      const sortedPkgs = [...data.packages].sort((a, b) => Number(a.price) - Number(b.price));
-      const lowestPkg = sortedPkgs[0];
-
       const payload = {
         ...data,
-        price: Number(lowestPkg.price),
-        tokenAmount: Number(lowestPkg.tokenAmount),
         slots: data.slots.map((s: any) => ({
             ...s,
             startDate: s.startDate ? new Date(s.startDate).toISOString() : null,
@@ -687,6 +772,9 @@ export function FestivalFormModal({
         faqs: data.faqs?.filter(
           (f) => f.question.trim() !== "" && f.answer.trim() !== "",
         ),
+        ...(!isEdit && sourceCircuit?.bannerImages && sourceCircuit.bannerImages.length > 0 
+            ? { bannerImages: sourceCircuit.bannerImages } 
+            : {}),
       };
 
       let festivalId = festival?.id;
@@ -806,12 +894,14 @@ export function FestivalFormModal({
         <div className="px-4 pt-5 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b">
           <DialogHeader>
             <DialogTitle className="text-xl sm:text-2xl font-bold pr-6">
-              {isEdit ? "Edit Festival" : "Create New Festival"}
+              {isEdit ? "Edit Festival" : sourceCircuit ? "Create festival from circuit" : "Create New Festival"}
             </DialogTitle>
             <DialogDescription>
               {isEdit
                 ? "Modify the details of your festival below."
-                : "Follow the steps to configure all details for the new festival."}
+                : sourceCircuit
+                  ? `Forked from ${sourceCircuit.title}. Add specific dates and festival details.`
+                  : "Follow the steps to configure all details for the new festival."}
             </DialogDescription>
           </DialogHeader>
 

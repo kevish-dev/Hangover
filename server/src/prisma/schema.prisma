@@ -93,7 +93,6 @@ model UserProfile {
 model Circuit {
   id                  String       @id @default(uuid())
   title               String
-  slug                String       @unique
   tripType            TripType
   location            String
   destinationId       String?
@@ -102,13 +101,10 @@ model Circuit {
   bestTimeToVisit     String
   duration            Int
   bannerImages        String[]
-  galleryImages       String[]
   stayTransportImages Json         @default("[]")
   highlights          Json         @default("[]")
   inclusions          String[]
   exclusions          String[]
-  basePrice           Decimal      @db.Decimal(10, 2)
-  baseTokenAmount     Decimal      @db.Decimal(10, 2)
   isActive                Boolean      @default(true)
   operationsReminderDays  Int          @default(3)  // days before dueAt to send admin alert
   internalNotes           String?
@@ -168,17 +164,13 @@ model Trip {
   circuitId           String?
   circuit             Circuit?     @relation(fields: [circuitId], references: [id], onDelete: SetNull)
   title               String
-  slug                String       @unique
   location            String
   bannerImages        String[]
   duration            Int
   bestTimeToVisit     String
   overview            String
-  galleryImages       String[]
   inclusions          String[]
   exclusions          String[]
-  price               Decimal      @db.Decimal(10, 2)
-  tokenAmount         Decimal      @db.Decimal(10, 2)
   tripType            TripType
   isActive            Boolean      @default(true)
   isFeatured          Boolean      @default(false)
@@ -306,7 +298,6 @@ model FestivalTag {
 model Festival {
   id                  String         @id @default(uuid())
   title               String
-  slug                String         @unique
   location            String
   bannerImages        String[]
   videoUrl            String?
@@ -314,12 +305,9 @@ model Festival {
   bestTimeToVisit     String
   overview            String
   highlights          Json           @default("[]")
-  galleryImages       String[]
   inclusions          String[]
   exclusions          String[]
   stayTransportImages Json           @default("[]")
-  price               Decimal        @db.Decimal(10, 2)
-  tokenAmount         Decimal        @db.Decimal(10, 2)
   isActive            Boolean        @default(true)
   isFeatured          Boolean        @default(false)
   isPublished         Boolean        @default(false)

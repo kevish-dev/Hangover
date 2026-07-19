@@ -416,14 +416,15 @@ function FilterSidebar({
 function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
   const [hovered, setHovered] = useState(false);
   const heroImage = trip.bannerImages?.[0] || trip.highlights?.[0]?.imageUrl || "";
-  const priceNum = priceToNumber(trip.price);
+  const tripPrice = trip.packages?.[0]?.price || 0;
+  const priceNum = priceToNumber(tripPrice);
   const spots = Array.isArray(trip.slots)
     ? trip.slots.reduce((total, slot) => total + spotsLeft(Number(slot.capacity || 0), Number(slot.filledSpots || 0)), 0)
     : spotsLeft(trip.capacity, trip.filledSpots);
   const tags = trip.tripTags?.map((t) => t.tag) || [];
   const typeLabel = formatTripType(trip.tripType);
   const durationStr = formatDuration(trip.duration);
-  const priceStr = formatPrice(trip.price);
+  const priceStr = formatPrice(tripPrice);
 
   return (
     <motion.div
@@ -730,7 +731,8 @@ function getPopularityScore(trip: ApiTrip): number {
 }
 
 function getSortablePrice(trip: ApiTrip): number | null {
-  const price = Number.parseFloat(String(trip.price));
+  const tripPrice = trip.packages?.[0]?.price || 0;
+  const price = Number.parseFloat(String(tripPrice));
   return Number.isFinite(price) ? price : null;
 }
 
@@ -850,7 +852,7 @@ export default function TripsPage() {
 
   const availablePriceRanges = useMemo(() => {
     return PRICE_RANGES.filter(r => trips.some(t => {
-      const price = priceToNumber(t.price);
+      const price = priceToNumber(t.packages?.[0]?.price || 0);
       return price >= r.min && price <= r.max;
     }));
   }, [trips]);
@@ -884,7 +886,7 @@ export default function TripsPage() {
       // Price
       if (filters.priceRange) {
         const range = PRICE_RANGES.find((r) => r.label === filters.priceRange);
-        const price = priceToNumber(t.price);
+        const price = priceToNumber(t.packages?.[0]?.price || 0);
         if (range && (price < range.min || price > range.max)) return false;
       }
 

@@ -120,19 +120,7 @@ export const deleteBanner = async (req, res, next) => {
   }
 };
 
-export const deleteGalleryImage = async (req, res, next) => {
-  try {
-    const { imageUrl } = req.body;
-    if (!imageUrl) return res.status(400).json({ message: "imageUrl is required" });
-    const trip = await tripService.deleteGalleryImage(req.params.id, imageUrl);
-    res.status(200).json({ message: "Gallery image deleted successfully", trip });
-  } catch (error) {
-    if (error.message === "Image not found in trip") {
-      return res.status(404).json({ message: error.message });
-    }
-    next(error);
-  }
-};
+
 
 export const syncHighlights = async (req, res, next) => {
   try {

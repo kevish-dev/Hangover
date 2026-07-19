@@ -145,13 +145,18 @@ export const createBooking = async (userId, data) => {
   let selectedPackage = null;
   if (data.packageId) {
     selectedPackage = item.packages?.find(p => p.id === data.packageId);
-    if (!selectedPackage) {
-      throw new ValidationError("Selected package not found for this item.");
-    }
+  }
+  
+  if (!selectedPackage && item.packages && item.packages.length > 0) {
+    selectedPackage = item.packages[0];
   }
 
-  const itemPrice = selectedPackage ? Number(selectedPackage.price) : Number(item.price);
-  const itemToken = selectedPackage ? Number(selectedPackage.tokenAmount) : Number(item.tokenAmount);
+  if (!selectedPackage) {
+    throw new ValidationError("A package must be selected for this booking.");
+  }
+
+  const itemPrice = Number(selectedPackage.price);
+  const itemToken = Number(selectedPackage.tokenAmount);
 
   let addOnsTotalCost = 0;
   const bookingAddOnsData = [];

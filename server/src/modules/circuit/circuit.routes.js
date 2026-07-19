@@ -7,11 +7,20 @@ const router = Router();
 
 // ── Public read routes ────────────────────────────────────────────────────
 router.get("/", circuitController.getCircuits);
-router.get("/slug/:slug", circuitController.getCircuitBySlug);
 router.get("/:id", circuitController.getCircuitById);
+
+import { imageUploadMiddleware } from "../../core/services/upload.service.js";
 
 // ── All routes below require admin ─────────────────────────────────────────
 router.use(requireAuth, requireAdmin);
+
+// ── Circuit Media ─────────────────────────────────────────────────────────
+router.post("/upload-signature", circuitController.createUploadSignature);
+router.post("/:id/banner-images", imageUploadMiddleware.array("banners", 10), circuitController.uploadBanners);
+router.post("/:id/banner-upload-signature", circuitController.createBannerUploadSignature);
+router.post("/:id/banner-images/attach", circuitController.attachBannerImages);
+router.delete("/:id/banner-images", circuitController.deleteBanner);
+router.post("/:id/highlights", imageUploadMiddleware.array("images", 15), circuitController.syncHighlights);
 
 // ── Circuit CRUD ──────────────────────────────────────────────────────────
 router.post("/", circuitController.createCircuit);

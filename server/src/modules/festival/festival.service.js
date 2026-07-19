@@ -54,9 +54,7 @@ export const createFestival = async (data) => {
   }
   if (!data.duration) data.duration = 1;
 
-  // price and tokenAmount are required Decimal columns — ensure they're set
-  if (data.price === undefined || data.price === null) data.price = 0;
-  if (data.tokenAmount === undefined || data.tokenAmount === null) data.tokenAmount = 0;
+
 
   const festival = await festivalRepo.create(data);
 
@@ -97,7 +95,6 @@ export const deleteFestival = async (id) => {
   const festival = await getFestivalById(id, true);
   const imageUrls = [
     ...(festival.bannerImages || []),
-    ...(festival.galleryImages || []),
     ...(Array.isArray(festival.highlights) ? festival.highlights.map((item) => item?.imageUrl) : []),
     ...(Array.isArray(festival.stayTransportImages) ? festival.stayTransportImages.map((item) => item?.imageUrl) : []),
   ].filter(Boolean);

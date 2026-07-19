@@ -22,14 +22,7 @@ export const getCircuitById = async (req, res, next) => {
   }
 };
 
-export const getCircuitBySlug = async (req, res, next) => {
-  try {
-    const circuit = await circuitService.getCircuitBySlug(req.params.slug);
-    res.status(200).json(circuit);
-  } catch (error) {
-    next(error);
-  }
-};
+
 
 export const createCircuit = async (req, res, next) => {
   try {
@@ -53,6 +46,77 @@ export const deleteCircuit = async (req, res, next) => {
   try {
     await circuitService.deleteCircuit(req.params.id);
     res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Circuit Media
+// ═══════════════════════════════════════════════════════════════════════════
+export const createUploadSignature = async (req, res, next) => {
+  try {
+    const result = await circuitService.createUploadSignature();
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const uploadBanners = async (req, res, next) => {
+  try {
+    const files = req.files;
+    if (!files || files.length === 0) {
+      return res.status(400).json({ message: "No images provided" });
+    }
+    const buffers = files.map(file => file.buffer);
+    const circuit = await circuitService.uploadBannerImages(req.params.id, buffers);
+    res.status(200).json({ message: "Banner images uploaded successfully", circuit });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createBannerUploadSignature = async (req, res, next) => {
+  try {
+    const result = await circuitService.createBannerUploadSignature(req.params.id);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const attachBannerImages = async (req, res, next) => {
+  try {
+    const circuit = await circuitService.attachBannerImages(req.params.id, req.body?.imageUrls);
+    res.status(200).json({ message: "Banner images attached successfully", circuit });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteBanner = async (req, res, next) => {
+  try {
+    const { imageUrl } = req.body;
+    if (!imageUrl) {
+      return res.status(400).json({ message: "imageUrl is required" });
+    }
+    const circuit = await circuitService.deleteBannerImage(req.params.id, imageUrl);
+    res.status(200).json({ message: "Banner image deleted successfully", circuit });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const syncHighlights = async (req, res, next) => {
+  try {
+    const { payload } = req.body;
+    if (!payload) {
+      return res.status(400).json({ message: "Payload missing" });
+    }
+    const files = req.files || [];
+    const circuit = await circuitService.syncHighlights(req.params.id, payload, files);
+    res.status(200).json({ message: "Highlights updated", circuit });
   } catch (error) {
     next(error);
   }

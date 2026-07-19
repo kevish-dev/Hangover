@@ -73,8 +73,9 @@ export interface ApiFestival {
   inclusions: string[];
   exclusions: string[];
   stayTransportImages: ApiStayTransportItem[] | null;
-  price: string; // Decimal comes as string from Prisma
-  tokenAmount: string;
+  price?: string; // Decimal comes as string from Prisma
+  tokenAmount?: string;
+  packages?: any[];
   isActive: boolean;
   isPublished: boolean;
   isFeatured: boolean;

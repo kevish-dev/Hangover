@@ -349,7 +349,7 @@ function RelatedCard({ trip }: { trip: ApiTrip }) {
               letterSpacing: "-0.01em",
             }}
           >
-            {formatPrice(trip.price)}
+            {formatPrice(trip.packages?.[0]?.price || 0)}
           </span>
         </div>
       </div>
@@ -1201,7 +1201,8 @@ export default function TripDetail() {
   const heroImage = trip.bannerImages?.[0] || "";
   const allImages = trip.bannerImages || [];
   const typeLabel = trip.tripType ? formatTripType(trip.tripType) : "Festival";
-  const priceStr = formatPrice(trip.price);
+  const tripPrice = trip.packages?.[0]?.price || 0;
+  const priceStr = formatPrice(tripPrice);
   const durationStr = formatDuration(trip.duration);
   const slots = Array.isArray(trip.slots) ? trip.slots : [];
   const spots = slots.length > 0

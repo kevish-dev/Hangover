@@ -70,9 +70,6 @@ const addOnSchema = z.object({
 // ── CREATE Circuit ─────────────────────────────────────────────────────────
 export const createCircuitSchema = z.object({
   title: z.string().trim().min(2).max(300),
-  slug: z.string().trim().min(2).max(300).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
-    message: "Slug must be lowercase with hyphens only",
-  }),
   tripType: z.enum(TRIP_TYPES),
   location: z.string().trim().min(1).max(300),
   destinationId: z.string().uuid().optional(),
@@ -80,15 +77,12 @@ export const createCircuitSchema = z.object({
   bestTimeToVisit: z.string().trim().min(1).max(500),
   duration: z.number().int().positive(),
   bannerImages: z.array(z.string().url()).default([]),
-  galleryImages: z.array(z.string().url()).default([]),
   // [{imageUrl, caption, type}] – stay/transport gallery
   stayTransportImages: z.array(z.record(z.unknown())).default([]),
   // [{icon, text}] – highlights bullet list
-  highlights: z.array(z.record(z.unknown())).default([]),
+  highlights: z.array(z.object({ text: z.string(), imageUrl: z.string().url() })).default([]),
   inclusions: z.array(z.string().trim()).default([]),
   exclusions: z.array(z.string().trim()).default([]),
-  basePrice: z.number().positive(),
-  baseTokenAmount: z.number().nonnegative(),
   isActive: z.boolean().default(true),
   operationsReminderDays: z.number().int().nonnegative().default(3),
   internalNotes: z.string().trim().max(5000).optional(),
@@ -98,6 +92,12 @@ export const createCircuitSchema = z.object({
   addOns: z.array(addOnSchema).default([]),
   // tagIds – existing TripTag IDs to connect
   tagIds: z.array(z.string().uuid()).default([]),
+  faqs: z.array(z.object({
+    id: z.string().uuid().optional(),
+    question: z.string().trim().min(1),
+    answer: z.string().trim().min(1),
+    order: z.number().int().optional(),
+  })).default([]),
 });
 
 // ── UPDATE Circuit (root fields only – days/tasks via sub-routes) ─────────

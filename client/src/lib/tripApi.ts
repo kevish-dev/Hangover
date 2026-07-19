@@ -64,8 +64,6 @@ export interface ApiTrip {
   inclusions: string[];
   exclusions: string[];
   stayTransportImages: ApiStayTransportItem[] | null;
-  price: string; // Decimal comes as string from Prisma
-  tokenAmount: string;
   capacity: number;
   filledSpots: number;
   startDate: string;

@@ -3,7 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../lib/axios";
 import { CircuitFormModal } from "../../components/admin/CircuitFormModal";
 import { TripFormModal } from "../../components/admin/TripFormModal";
-import { Map, Plus, Edit2, Trash2, Navigation, Eye, EyeOff, Rocket, Loader2, ClipboardList, CalendarDays } from "lucide-react";
+import { FestivalFormModal } from "../../components/admin/FestivalFormModal";
+import { Map, Plus, Edit2, Trash2, Navigation, Eye, EyeOff, Rocket, Loader2, ClipboardList, CalendarDays, Tent } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { toast } from "sonner";
 import { getErrorMessage, showErrorToast } from "../../../lib/errors";
@@ -14,6 +15,7 @@ export default function AdminCircuitsPage() {
   const [editingCircuit, setEditingCircuit] = useState<any>(null);
   const [sourceCircuit, setSourceCircuit] = useState<any>(null);
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
+  const [isFestivalModalOpen, setIsFestivalModalOpen] = useState(false);
   const [loadingCircuitId, setLoadingCircuitId] = useState<string | null>(null);
 
   const circuitsQuery = useQuery({
@@ -103,6 +105,15 @@ export default function AdminCircuitsPage() {
     }
   };
 
+  const openFestivalFromCircuit = async (circuit: any) => {
+    try {
+      setSourceCircuit(await loadFullCircuit(circuit.id));
+      setIsFestivalModalOpen(true);
+    } catch (error) {
+      showErrorToast(error, "Could not prepare a festival from this circuit");
+    }
+  };
+
   if (isLoading) {
     return <div className="p-8 text-gray-500">Loading circuits...</div>;
   }
@@ -139,6 +150,11 @@ export default function AdminCircuitsPage() {
         onOpenChange={setIsTripModalOpen}
         sourceCircuit={sourceCircuit}
       />
+      <FestivalFormModal
+        open={isFestivalModalOpen}
+        onOpenChange={setIsFestivalModalOpen}
+        sourceCircuit={sourceCircuit}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
         {circuits.length === 0 ? (
@@ -169,7 +185,7 @@ export default function AdminCircuitsPage() {
                     {circuit.duration} Days
                   </span>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-100 text-gray-700 font-medium">
-                    ₹{circuit.basePrice}
+                    ₹{circuit.packages?.[0]?.price || 0}
                   </span>
                 </div>
 
@@ -178,15 +194,26 @@ export default function AdminCircuitsPage() {
                   <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" />{circuit._count?.trips || 0} created trips</span>
                 </div>
 
-                <Button
-                  type="button"
-                  onClick={() => openTripFromCircuit(circuit)}
-                  disabled={!circuit.isActive || loadingCircuitId === circuit.id}
-                  className="mt-5 w-full bg-[#781216] text-white hover:bg-[#5f0e11]"
-                >
-                  {loadingCircuitId === circuit.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rocket className="mr-2 h-4 w-4" />}
-                  Create trip from circuit
-                </Button>
+                <div className="mt-5 grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => openTripFromCircuit(circuit)}
+                    disabled={!circuit.isActive || loadingCircuitId === circuit.id}
+                    className="w-full bg-[#781216] text-white hover:bg-[#5f0e11] px-2 text-xs h-9"
+                  >
+                    {loadingCircuitId === circuit.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Rocket className="mr-1.5 h-3.5 w-3.5" />}
+                    Create trip
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => openFestivalFromCircuit(circuit)}
+                    disabled={!circuit.isActive || loadingCircuitId === circuit.id}
+                    className="w-full bg-[#c8a96e] text-white hover:bg-[#b8943a] px-2 text-xs h-9"
+                  >
+                    {loadingCircuitId === circuit.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Tent className="mr-1.5 h-3.5 w-3.5" />}
+                    Create festival
+                  </Button>
+                </div>
                 
                 <div className="mt-auto pt-4 flex flex-wrap items-center justify-start md:justify-end gap-3 md:gap-2 border-t border-gray-100 mt-6">
                   <button 
