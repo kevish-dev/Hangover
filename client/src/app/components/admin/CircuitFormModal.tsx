@@ -81,7 +81,7 @@ const circuitSchema = z.object({
   tripType: z.enum(TRIP_TYPES),
   location: z.string().min(1, "Location is required"),
   destinationId: z.string().optional(),
-  overview: z.string().min(1, "Overview is required"),
+  overview: z.string().optional(),
   bestTimeToVisit: z.string().min(1, "Best time is required"),
   duration: z.coerce.number().int().positive(),
   operationsReminderDays: z.coerce.number().int().nonnegative(),
@@ -90,8 +90,8 @@ const circuitSchema = z.object({
   bannerImages: z.array(z.object({ value: z.string().url("Enter a valid URL") })),
   stayTransportImages: z.array(z.object({ text: z.string().optional(), imageUrl: z.string().url("Enter a valid URL") })),
   highlights: z.array(z.object({ text: z.string().min(1, "Required"), imageUrl: z.string().url("Enter a valid URL") })),
-  inclusions: z.array(z.object({ value: z.string().min(1) })).min(1),
-  exclusions: z.array(z.object({ value: z.string().min(1) })).min(1),
+  inclusions: z.array(z.object({ value: z.string().optional() })).optional(),
+  exclusions: z.array(z.object({ value: z.string().optional() })).optional(),
   tagIds: z.array(z.string()),
   packages: z.array(z.object({
     id: z.string().uuid().optional(),
@@ -111,8 +111,8 @@ const circuitSchema = z.object({
   })),
   faqs: z.array(z.object({
     id: z.string().optional(),
-    question: z.string().min(1, "Question is required"),
-    answer: z.string().min(1, "Answer is required"),
+    question: z.string().optional(),
+    answer: z.string().optional(),
   })),
   days: z.array(z.object({
     id: z.string().uuid().optional(),
@@ -366,9 +366,10 @@ export function CircuitFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!w-[calc(100%-0.75rem)] sm:!w-full sm:max-w-5xl !max-h-[calc(100dvh-0.75rem)] flex flex-col overflow-hidden p-0">
+      <DialogContent className="!w-[calc(100%-0.75rem)] !max-h-[calc(100dvh-0.75rem)] sm:max-w-[800px] overflow-y-auto p-0 border-0 shadow-xl md:!w-full md:!max-h-[90vh] bg-white rounded-xl">
         <div className="border-b px-4 py-4 sm:px-6">
-          <DialogHeader>
+          <div className="p-6 sm:p-8">
+          <DialogHeader className="mb-6 border-b border-gray-100 pb-4">
             <DialogTitle>{circuit ? "Edit circuit template" : "Create circuit template"}</DialogTitle>
           </DialogHeader>
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
@@ -393,15 +394,15 @@ export function CircuitFormModal({
                   This is the reusable baseline. Dates belong to trips, not circuits.
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div><Label>Title *</Label><Input {...form.register("title")} placeholder="Tawang Explorer" /><ErrorText message={form.formState.errors.title?.message} /></div>
-                  <div><Label>Trip type *</Label><select {...form.register("tripType")} className={inputClass}>{TRIP_TYPES.map((value) => <option key={value} value={value}>{formatTripType(value)}</option>)}</select></div>
-                  <div><Label>Location *</Label><Input {...form.register("location")} placeholder="Arunachal Pradesh" /><ErrorText message={form.formState.errors.location?.message} /></div>
-                  <div><Label>Destination</Label><select {...form.register("destinationId")} className={inputClass}><option value="">No linked destination</option>{destinations.map((item: any) => <option key={item.id} value={item.id}>{item.name}, {item.state}</option>)}</select></div>
-                  <div><Label>Best time to visit *</Label><Input {...form.register("bestTimeToVisit")} placeholder="March to June" /></div>
-                  <div><Label>Duration (days) *</Label><Input type="number" min={1} {...form.register("duration")} /></div>
-                  <div><Label>Operations reminder lead (days)</Label><Input type="number" min={0} {...form.register("operationsReminderDays")} /></div>
+                  <div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Title *</Label><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" {...form.register("title")} placeholder="Tawang Explorer" /><ErrorText message={form.formState.errors.title?.message} /></div>
+                  <div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Trip type *</Label><select {...form.register("tripType")} className={inputClass}>{TRIP_TYPES.map((value) => <option key={value} value={value}>{formatTripType(value)}</option>)}</select></div>
+                  <div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Location *</Label><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" {...form.register("location")} placeholder="Arunachal Pradesh" /><ErrorText message={form.formState.errors.location?.message} /></div>
+                  <div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Destination</Label><select {...form.register("destinationId")} className={inputClass}><option value="">No linked destination</option>{destinations.map((item: any) => <option key={item.id} value={item.id}>{item.name}, {item.state}</option>)}</select></div>
+                  <div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Best time to visit *</Label><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" {...form.register("bestTimeToVisit")} placeholder="March to June" /><ErrorText message={form.formState.errors.bestTimeToVisit?.message} /></div>
+                  <div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Duration (days) *</Label><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" type="number" min={1} {...form.register("duration")} /><ErrorText message={form.formState.errors.duration?.message} /></div>
+                  <div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Operations reminder lead (days)</Label><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" type="number" min={0} {...form.register("operationsReminderDays")} /><ErrorText message={form.formState.errors.operationsReminderDays?.message} /></div>
                 </div>
-                <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" {...form.register("isActive")} className="h-4 w-4 accent-[#781216]" />Circuit is active</label>
+                <label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block"><input type="checkbox" {...form.register("isActive")} className="h-4 w-4 accent-[#781216]" />Circuit is active</label>
               </div>
             )}
 
@@ -409,7 +410,7 @@ export function CircuitFormModal({
               <div className="space-y-7">
                 <section>
                   <div className="mb-3 flex items-center justify-between"><div><h3 className="font-semibold">Packages</h3><p className="text-xs text-gray-500">These are copied to every trip created from this circuit.</p></div><Button type="button" variant="outline" size="sm" onClick={() => packages.append({ title: "", price: 1, tokenAmount: 0 })}><Plus className="mr-1 h-4 w-4" />Package</Button></div>
-                  <div className="space-y-3">{packages.fields.map((field, index) => <div key={field.id} className="grid gap-3 rounded-xl border bg-gray-50 p-4 md:grid-cols-[1fr_180px_180px_auto]"><div><Label>Name</Label><Input {...form.register(`packages.${index}.title`)} /><ErrorText message={form.formState.errors.packages?.[index]?.title?.message} /></div><div><Label>Price</Label><Input type="number" min={0.01} step="0.01" {...form.register(`packages.${index}.price`)} /><ErrorText message={form.formState.errors.packages?.[index]?.price?.message} /></div><div><Label>Booking amount</Label><Input type="number" min={0} step="0.01" {...form.register(`packages.${index}.tokenAmount`)} /><ErrorText message={form.formState.errors.packages?.[index]?.tokenAmount?.message} /></div><Button type="button" variant="ghost" size="icon" disabled={packages.fields.length === 1} onClick={() => packages.remove(index)} className="self-end text-red-600"><Trash2 className="h-4 w-4" /></Button></div>)}</div>
+                  <div className="space-y-3">{packages.fields.map((field, index) => <div key={field.id} className="grid gap-3 rounded-xl border bg-gray-50 p-4 md:grid-cols-[1fr_180px_180px_auto]"><div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Name</Label><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" {...form.register(`packages.${index}.title`)} /><ErrorText message={form.formState.errors.packages?.[index]?.title?.message} /></div><div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Price</Label><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" type="number" min={0.01} step="0.01" {...form.register(`packages.${index}.price`)} /><ErrorText message={form.formState.errors.packages?.[index]?.price?.message} /></div><div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Booking amount</Label><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" type="number" min={0} step="0.01" {...form.register(`packages.${index}.tokenAmount`)} /><ErrorText message={form.formState.errors.packages?.[index]?.tokenAmount?.message} /></div><Button type="button" variant="ghost" size="icon" disabled={packages.fields.length === 1} onClick={() => packages.remove(index)} className="self-end text-red-600"><Trash2 className="h-4 w-4" /></Button></div>)}</div>
                 </section>
                 <section>
                   <div className="mb-3 flex items-center justify-between"><div><h3 className="font-semibold">Optional add-ons</h3><p className="text-xs text-gray-500">Travelers can add these while booking, before the cutoff.</p></div><Button type="button" variant="outline" size="sm" onClick={() => addOns.append({ title: "", description: "", imageUrl: "", price: 1, maxQuantityPerBooking: 1, purchaseCutoffOffsetDays: 3, isActive: true })}><Plus className="mr-1 h-4 w-4" />Add-on</Button></div>
@@ -418,10 +419,10 @@ export function CircuitFormModal({
                     return (
                       <div key={field.id} className="rounded-xl border bg-gray-50 p-4">
                         <div className="grid gap-3 md:grid-cols-3">
-                          <div><Label>Title</Label><Input {...form.register(`addOns.${index}.title`)} /><ErrorText message={form.formState.errors.addOns?.[index]?.title?.message} /></div>
-                          <div><Label>Price</Label><Input type="number" min={0.01} step="0.01" {...form.register(`addOns.${index}.price`)} /><ErrorText message={form.formState.errors.addOns?.[index]?.price?.message} /></div>
+                          <div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Title</Label><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" {...form.register(`addOns.${index}.title`)} /><ErrorText message={form.formState.errors.addOns?.[index]?.title?.message} /></div>
+                          <div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Price</Label><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" type="number" min={0.01} step="0.01" {...form.register(`addOns.${index}.price`)} /><ErrorText message={form.formState.errors.addOns?.[index]?.price?.message} /></div>
                           <div>
-                            <Label>Image</Label>
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Image</Label>
                             <div className="flex gap-2">
                               {currentUrl ? (
                                 <div className="relative group shrink-0">
@@ -429,7 +430,7 @@ export function CircuitFormModal({
                                   <button type="button" onClick={() => form.setValue(`addOns.${index}.imageUrl`, "", { shouldDirty: true, shouldValidate: true })} className="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center h-4 w-4 rounded-full bg-red-500 text-white shadow"><X className="h-3 w-3" /></button>
                                 </div>
                               ) : null}
-                              <label className="flex h-10 flex-1 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-gray-100">
+                              <label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
                                 <ImagePlus className="h-4 w-4" />
                                 <span>Upload</span>
                                 <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
@@ -446,10 +447,10 @@ export function CircuitFormModal({
                             </div>
                             <ErrorText message={form.formState.errors.addOns?.[index]?.imageUrl?.message} />
                           </div>
-                          <div className="md:col-span-3"><Label>Description</Label><Textarea rows={2} {...form.register(`addOns.${index}.description`)} /></div>
-                          <div><Label>Maximum quantity</Label><Input type="number" min={1} step={1} {...form.register(`addOns.${index}.maxQuantityPerBooking`)} /><ErrorText message={form.formState.errors.addOns?.[index]?.maxQuantityPerBooking?.message} /></div>
-                          <div><Label>Cutoff before departure (days)</Label><Input type="number" min={0} step={1} {...form.register(`addOns.${index}.purchaseCutoffOffsetDays`)} /><ErrorText message={form.formState.errors.addOns?.[index]?.purchaseCutoffOffsetDays?.message} /></div>
-                          <div className="flex items-end justify-between"><label className="mb-2 flex items-center gap-2 text-sm"><input type="checkbox" {...form.register(`addOns.${index}.isActive`)} />Active</label><Button type="button" variant="ghost" size="icon" onClick={() => addOns.remove(index)} className="text-red-600"><Trash2 className="h-4 w-4" /></Button></div>
+                          <div className="md:col-span-3"><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Description</Label><Textarea className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm resize-y disabled:cursor-not-allowed disabled:opacity-50" rows={2} {...form.register(`addOns.${index}.description`)} /></div>
+                          <div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Maximum quantity</Label><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" type="number" min={1} step={1} {...form.register(`addOns.${index}.maxQuantityPerBooking`)} /><ErrorText message={form.formState.errors.addOns?.[index]?.maxQuantityPerBooking?.message} /></div>
+                          <div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Cutoff before departure (days)</Label><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" type="number" min={0} step={1} {...form.register(`addOns.${index}.purchaseCutoffOffsetDays`)} /><ErrorText message={form.formState.errors.addOns?.[index]?.purchaseCutoffOffsetDays?.message} /></div>
+                          <div className="flex items-end justify-between"><label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block"><input type="checkbox" {...form.register(`addOns.${index}.isActive`)} />Active</label><Button type="button" variant="ghost" size="icon" onClick={() => addOns.remove(index)} className="text-red-600"><Trash2 className="h-4 w-4" /></Button></div>
                         </div>
                       </div>
                     )
@@ -460,20 +461,20 @@ export function CircuitFormModal({
 
             {step === 2 && (
               <div className="space-y-6">
-                <div><Label>Overview *</Label><Textarea rows={6} {...form.register("overview")} /><ErrorText message={form.formState.errors.overview?.message} /></div>
+                <div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Overview *</Label><Textarea className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm resize-y disabled:cursor-not-allowed disabled:opacity-50" rows={6} {...form.register("overview")} /><ErrorText message={form.formState.errors.overview?.message} /></div>
                 <div className="grid gap-6 md:grid-cols-2">
-                  <section><div className="mb-2 flex items-center justify-between"><Label>Inclusions</Label><Button type="button" variant="ghost" size="sm" onClick={() => inclusions.append({ value: "" })}><Plus className="h-4 w-4" /></Button></div><div className="space-y-2">{inclusions.fields.map((field, index) => <div key={field.id} className="flex gap-2"><Input {...form.register(`inclusions.${index}.value`)} /><Button type="button" variant="ghost" size="icon" onClick={() => inclusions.remove(index)} className="text-red-600"><Trash2 className="h-4 w-4" /></Button></div>)}</div></section>
-                  <section><div className="mb-2 flex items-center justify-between"><Label>Exclusions</Label><Button type="button" variant="ghost" size="sm" onClick={() => exclusions.append({ value: "" })}><Plus className="h-4 w-4" /></Button></div><div className="space-y-2">{exclusions.fields.map((field, index) => <div key={field.id} className="flex gap-2"><Input {...form.register(`exclusions.${index}.value`)} /><Button type="button" variant="ghost" size="icon" onClick={() => exclusions.remove(index)} className="text-red-600"><Trash2 className="h-4 w-4" /></Button></div>)}</div></section>
+                  <section><div className="mb-2 flex items-center justify-between"><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Inclusions</Label><Button type="button" variant="ghost" size="sm" onClick={() => inclusions.append({ value: "" })}><Plus className="h-4 w-4" /></Button></div><div className="space-y-2">{inclusions.fields.map((field, index) => <div key={field.id} className="flex gap-2"><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" {...form.register(`inclusions.${index}.value`)} /><Button type="button" variant="ghost" size="icon" onClick={() => inclusions.remove(index)} className="text-red-600"><Trash2 className="h-4 w-4" /></Button></div>)}</div></section>
+                  <section><div className="mb-2 flex items-center justify-between"><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Exclusions</Label><Button type="button" variant="ghost" size="sm" onClick={() => exclusions.append({ value: "" })}><Plus className="h-4 w-4" /></Button></div><div className="space-y-2">{exclusions.fields.map((field, index) => <div key={field.id} className="flex gap-2"><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" {...form.register(`exclusions.${index}.value`)} /><Button type="button" variant="ghost" size="icon" onClick={() => exclusions.remove(index)} className="text-red-600"><Trash2 className="h-4 w-4" /></Button></div>)}</div></section>
                 </div>
-                {availableTags.length > 0 && <section><Label>Tags</Label><div className="mt-2 flex flex-wrap gap-2">{availableTags.map((tag: any) => { const active = (selectedTags || []).includes(tag.id); return <button key={tag.id} type="button" onClick={() => form.setValue("tagIds", active ? (selectedTags || []).filter((id) => id !== tag.id) : [...(selectedTags || []), tag.id], { shouldDirty: true })} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? "border-[#781216] bg-[#781216] text-white" : "border-gray-200 bg-white text-gray-600"}`}>{tag.tag}</button>; })}</div></section>}
+                {availableTags.length > 0 && <section><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Tags</Label><div className="mt-2 flex flex-wrap gap-2">{availableTags.map((tag: any) => { const active = (selectedTags || []).includes(tag.id); return <button key={tag.id} type="button" onClick={() => form.setValue("tagIds", active ? (selectedTags || []).filter((id) => id !== tag.id) : [...(selectedTags || []), tag.id], { shouldDirty: true })} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? "border-[#781216] bg-[#781216] text-white" : "border-gray-200 bg-white text-gray-600"}`}>{tag.tag}</button>; })}</div></section>}
                 <div>
-                  <Label>Internal Notes</Label>
+                  <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Internal Notes</Label>
                   <Textarea {...form.register("internalNotes")} placeholder="Any private notes..." rows={3} className={inputClass} />
                 </div>
 
                 <div className="space-y-3 pt-4 border-t">
                   <div className="flex items-center justify-between">
-                    <Label className="text-base font-medium">FAQs</Label>
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-base font-medium">FAQs</Label>
                     <Button type="button" variant="outline" size="sm" onClick={() => appendFaq({ question: "", answer: "" })}>
                       <Plus className="h-4 w-4 mr-2" /> Add FAQ
                     </Button>
@@ -484,12 +485,12 @@ export function CircuitFormModal({
                         <Trash className="h-4 w-4 text-red-500" />
                       </Button>
                       <div>
-                        <Label>Question</Label>
+                        <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Question</Label>
                         <Input {...form.register(`faqs.${index}.question` as const)} placeholder="e.g. What is the cancellation policy?" className={inputClass} />
                         <ErrorText message={form.formState.errors.faqs?.[index]?.question?.message} />
                       </div>
                       <div>
-                        <Label>Answer</Label>
+                        <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Answer</Label>
                         <Textarea {...form.register(`faqs.${index}.answer` as const)} placeholder="Enter the answer..." rows={2} className={inputClass} />
                         <ErrorText message={form.formState.errors.faqs?.[index]?.answer?.message} />
                       </div>
@@ -527,8 +528,8 @@ export function CircuitFormModal({
                             </div>
                           )}
                           <div className="flex-1">
-                            <Input {...form.register(`bannerImages.${index}.value`)} className="hidden" />
-                            <label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-gray-100">
+                            <Input {...form.register(`bannerImages.${index}.value`)} className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" />
+                            <label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
                               <ImagePlus className="h-4 w-4" />
                               <span>Upload New Image</span>
                               <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
@@ -555,7 +556,7 @@ export function CircuitFormModal({
 
                 <div className="space-y-3 pt-6 border-t">
                   <div className="flex items-center justify-between">
-                    <Label className="text-base font-medium">Stay & Transport Images</Label>
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-base font-medium">Stay & Transport Images</Label>
                     <Button type="button" variant="outline" size="sm" onClick={() => {
                       const current = form.getValues("stayTransportImages") || [];
                       form.setValue("stayTransportImages", [...current, { text: "", imageUrl: "" }]);
@@ -586,7 +587,7 @@ export function CircuitFormModal({
                 <div className="space-y-3 pt-6 border-t">
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label className="text-base font-medium">Highlights</Label>
+                      <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-base font-medium">Highlights</Label>
                       <p className="text-xs text-gray-500">Key highlights and their associated icons/images.</p>
                     </div>
                     <Button type="button" variant="outline" size="sm" onClick={() => highlights.append({ text: "", imageUrl: "" })}>
@@ -609,8 +610,8 @@ export function CircuitFormModal({
                             </div>
                           )}
                           <div className="w-32 shrink-0">
-                            <Input {...form.register(`highlights.${index}.imageUrl`)} className="hidden" />
-                            <label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-xs hover:bg-gray-100">
+                            <Input {...form.register(`highlights.${index}.imageUrl`)} className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" />
+                            <label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
                               <ImagePlus className="h-4 w-4" />
                               <span>Upload</span>
                               <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
@@ -627,7 +628,7 @@ export function CircuitFormModal({
                             <ErrorText message={form.formState.errors.highlights?.[index]?.imageUrl?.message} />
                           </div>
                           <div className="flex-1">
-                            <Input {...form.register(`highlights.${index}.text`)} placeholder="Highlight description" />
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" {...form.register(`highlights.${index}.text`)} placeholder="Highlight description" />
                             <ErrorText message={form.formState.errors.highlights?.[index]?.text?.message} />
                           </div>
                           <Button type="button" variant="ghost" size="icon" onClick={() => highlights.remove(index)} className="text-red-600">
@@ -647,11 +648,11 @@ export function CircuitFormModal({
                 {days.fields.map((field, dayIndex) => {
                   const day = watchedDays?.[dayIndex] || {};
                   return <section key={field.id} className="rounded-2xl border bg-white p-4 shadow-sm sm:p-5">
-                    <div className="grid gap-3 md:grid-cols-[110px_1fr_auto]"><div><Label>Day</Label><Input type="number" min={1} step={1} {...form.register(`days.${dayIndex}.dayNumber`)} /><ErrorText message={form.formState.errors.days?.[dayIndex]?.dayNumber?.message} /></div><div><Label>Title</Label><Input {...form.register(`days.${dayIndex}.title`)} /><ErrorText message={form.formState.errors.days?.[dayIndex]?.title?.message} /></div><Button type="button" variant="ghost" size="icon" disabled={days.fields.length === 1} onClick={() => days.remove(dayIndex)} className="self-end text-red-600"><Trash2 className="h-4 w-4" /></Button></div>
-                    <div className="mt-3"><Label>Description</Label><Textarea rows={3} {...form.register(`days.${dayIndex}.description`)} /></div>
-                    <div className="mt-4"><div className="mb-2 flex items-center justify-between"><Label>Traveler-facing checklist</Label><Button type="button" variant="ghost" size="sm" onClick={() => setDayItems(dayIndex, "todos", [...(day.todos || []), { value: "" }])}><Plus className="mr-1 h-4 w-4" />Item</Button></div>{(day.todos || []).map((_: any, todoIndex: number) => <div key={todoIndex} className="mb-2 flex gap-2"><Input {...form.register(`days.${dayIndex}.todos.${todoIndex}.value`)} /><Button type="button" variant="ghost" size="icon" onClick={() => setDayItems(dayIndex, "todos", (day.todos || []).filter((_: any, index: number) => index !== todoIndex))}><Trash2 className="h-4 w-4" /></Button></div>)}</div>
-                    <div className="mt-5 rounded-xl border border-[#eadcb9] bg-[#fcf8ef] p-3 sm:p-4"><div className="mb-3 flex items-center justify-between"><div className="flex items-center gap-2"><ClipboardList className="h-4 w-4 text-[#8a6414]" /><Label>Operational task templates</Label></div><Button type="button" variant="outline" size="sm" onClick={() => setDayItems(dayIndex, "tasks", [...(day.tasks || []), { category: "GENERAL", title: "", description: "", estimatedAmount: undefined, dueOffsetDays: undefined }])}><Plus className="mr-1 h-4 w-4" />Task</Button></div>
-                      {(day.tasks || []).length === 0 ? <p className="text-xs text-gray-500">No operational work configured for this day.</p> : (day.tasks || []).map((_: any, taskIndex: number) => <div key={taskIndex} className="mb-3 grid gap-2 rounded-lg border bg-white p-3 md:grid-cols-2"><div><Label>Category</Label><select {...form.register(`days.${dayIndex}.tasks.${taskIndex}.category`)} className={inputClass}>{TASK_CATEGORIES.map((value) => <option key={value}>{value.replaceAll("_", " ")}</option>)}</select></div><div><Label>Task title</Label><Input {...form.register(`days.${dayIndex}.tasks.${taskIndex}.title`)} /><ErrorText message={form.formState.errors.days?.[dayIndex]?.tasks?.[taskIndex]?.title?.message} /></div><div className="md:col-span-2"><Label>Description</Label><Input {...form.register(`days.${dayIndex}.tasks.${taskIndex}.description`)} /></div><div><Label>Estimated amount</Label><Input type="number" min={0.01} step="0.01" {...form.register(`days.${dayIndex}.tasks.${taskIndex}.estimatedAmount`)} /><ErrorText message={form.formState.errors.days?.[dayIndex]?.tasks?.[taskIndex]?.estimatedAmount?.message} /></div><div className="flex items-end gap-2"><div className="flex-1"><Label>Due before departure (days)</Label><Input type="number" min={0} step={1} {...form.register(`days.${dayIndex}.tasks.${taskIndex}.dueOffsetDays`)} /><ErrorText message={form.formState.errors.days?.[dayIndex]?.tasks?.[taskIndex]?.dueOffsetDays?.message} /></div><Button type="button" variant="ghost" size="icon" onClick={() => setDayItems(dayIndex, "tasks", (day.tasks || []).filter((_: any, index: number) => index !== taskIndex))} className="text-red-600"><Trash2 className="h-4 w-4" /></Button></div></div>)}
+                    <div className="grid gap-3 md:grid-cols-[110px_1fr_auto]"><div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Day</Label><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" type="number" min={1} step={1} {...form.register(`days.${dayIndex}.dayNumber`)} /><ErrorText message={form.formState.errors.days?.[dayIndex]?.dayNumber?.message} /></div><div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Title</Label><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" {...form.register(`days.${dayIndex}.title`)} /><ErrorText message={form.formState.errors.days?.[dayIndex]?.title?.message} /></div><Button type="button" variant="ghost" size="icon" disabled={days.fields.length === 1} onClick={() => days.remove(dayIndex)} className="self-end text-red-600"><Trash2 className="h-4 w-4" /></Button></div>
+                    <div className="mt-3"><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Description</Label><Textarea className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm resize-y disabled:cursor-not-allowed disabled:opacity-50" rows={3} {...form.register(`days.${dayIndex}.description`)} /></div>
+                    <div className="mt-4"><div className="mb-2 flex items-center justify-between"><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Traveler-facing checklist</Label><Button type="button" variant="ghost" size="sm" onClick={() => setDayItems(dayIndex, "todos", [...(day.todos || []), { value: "" }])}><Plus className="mr-1 h-4 w-4" />Item</Button></div>{(day.todos || []).map((_: any, todoIndex: number) => <div key={todoIndex} className="mb-2 flex gap-2"><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" {...form.register(`days.${dayIndex}.todos.${todoIndex}.value`)} /><Button type="button" variant="ghost" size="icon" onClick={() => setDayItems(dayIndex, "todos", (day.todos || []).filter((_: any, index: number) => index !== todoIndex))}><Trash2 className="h-4 w-4" /></Button></div>)}</div>
+                    <div className="mt-5 rounded-xl border border-[#eadcb9] bg-[#fcf8ef] p-3 sm:p-4"><div className="mb-3 flex items-center justify-between"><div className="flex items-center gap-2"><ClipboardList className="h-4 w-4 text-[#8a6414]" /><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Operational task templates</Label></div><Button type="button" variant="outline" size="sm" onClick={() => setDayItems(dayIndex, "tasks", [...(day.tasks || []), { category: "GENERAL", title: "", description: "", estimatedAmount: undefined, dueOffsetDays: undefined }])}><Plus className="mr-1 h-4 w-4" />Task</Button></div>
+                      {(day.tasks || []).length === 0 ? <p className="text-xs text-gray-500">No operational work configured for this day.</p> : (day.tasks || []).map((_: any, taskIndex: number) => <div key={taskIndex} className="mb-3 grid gap-2 rounded-lg border bg-white p-3 md:grid-cols-2"><div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Category</Label><select {...form.register(`days.${dayIndex}.tasks.${taskIndex}.category`)} className={inputClass}>{TASK_CATEGORIES.map((value) => <option key={value}>{value.replaceAll("_", " ")}</option>)}</select></div><div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Task title</Label><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" {...form.register(`days.${dayIndex}.tasks.${taskIndex}.title`)} /><ErrorText message={form.formState.errors.days?.[dayIndex]?.tasks?.[taskIndex]?.title?.message} /></div><div className="md:col-span-2"><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Description</Label><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" {...form.register(`days.${dayIndex}.tasks.${taskIndex}.description`)} /></div><div><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Estimated amount</Label><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" type="number" min={0.01} step="0.01" {...form.register(`days.${dayIndex}.tasks.${taskIndex}.estimatedAmount`)} /><ErrorText message={form.formState.errors.days?.[dayIndex]?.tasks?.[taskIndex]?.estimatedAmount?.message} /></div><div className="flex items-end gap-2"><div className="flex-1"><Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Due before departure (days)</Label><Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50" type="number" min={0} step={1} {...form.register(`days.${dayIndex}.tasks.${taskIndex}.dueOffsetDays`)} /><ErrorText message={form.formState.errors.days?.[dayIndex]?.tasks?.[taskIndex]?.dueOffsetDays?.message} /></div><Button type="button" variant="ghost" size="icon" onClick={() => setDayItems(dayIndex, "tasks", (day.tasks || []).filter((_: any, index: number) => index !== taskIndex))} className="text-red-600"><Trash2 className="h-4 w-4" /></Button></div></div>)}
                     </div>
                   </section>;
                 })}
@@ -664,6 +665,7 @@ export function CircuitFormModal({
             {step < STEPS.length - 1 ? <Button type="button" onClick={next} className="bg-[#781216] hover:bg-[#5f0e11]">Continue<ArrowRight className="ml-2 h-4 w-4" /></Button> : <Button type="submit" disabled={isSubmitting || !canSubmit} className="bg-[#781216] hover:bg-[#5f0e11]">{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{circuit ? "Save template" : "Create template"}</Button>}
           </div>
         </form>
+        </div>
       </DialogContent>
     </Dialog>
   );

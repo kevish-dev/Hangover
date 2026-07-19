@@ -63,19 +63,15 @@ const tripSchema = z.object({
     });
   }),
 
-  overview: z.string().min(10, "Overview must be detailed"),
-  inclusions: z
-    .array(z.object({ value: z.string().min(1, "Inclusion is required") }))
-    .min(1, "At least one inclusion is required"),
-  exclusions: z
-    .array(z.object({ value: z.string().min(1, "Exclusion is required") }))
-    .min(1, "At least one exclusion is required"),
+  overview: z.string().optional(),
+  inclusions: z.array(z.object({ value: z.string().optional() })).optional(),
+  exclusions: z.array(z.object({ value: z.string().optional() })).optional(),
   tripTags: z.array(z.object({ value: z.string().min(1) })).optional(),
   faqs: z
     .array(
       z.object({
-        question: z.string().min(1, "Required"),
-        answer: z.string().min(1, "Required"),
+        question: z.string().optional(),
+        answer: z.string().optional(),
       }),
     )
     .optional(),
@@ -705,7 +701,7 @@ export function TripFormModal({
           <div>
             <p className="font-semibold mb-1">Please fix the following before continuing:</p>
             <ul className="list-disc list-inside space-y-0.5 text-sm">
-              {missing.map((m, i) => <li key={i}>{m}</li>)}
+              {missing.map((m, i) => <li key={i}>{m.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</li>)}
             </ul>
           </div>,
           { position: "bottom-right", duration: 5000 }
@@ -725,7 +721,7 @@ export function TripFormModal({
         <div>
           <p className="font-semibold mb-1">Please fix the following before submitting:</p>
           <ul className="list-disc list-inside space-y-0.5 text-sm">
-            {missing.map((m, i) => <li key={i}>{m}</li>)}
+            {missing.map((m, i) => <li key={i}>{m.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</li>)}
           </ul>
         </div>,
         { position: "bottom-right", duration: 5000 }
@@ -898,9 +894,10 @@ export function TripFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!w-[calc(100%-0.75rem)] !max-h-[calc(100dvh-0.75rem)] md:!w-full md:!max-h-[90vh] sm:max-w-[700px] flex flex-col p-0 overflow-hidden">
+      <DialogContent className="!w-[calc(100%-0.75rem)] !max-h-[calc(100dvh-0.75rem)] sm:max-w-[800px] overflow-y-auto p-0 border-0 shadow-xl md:!w-full md:!max-h-[90vh] bg-white rounded-xl">
         <div className="px-4 pt-5 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b">
-          <DialogHeader>
+          <div className="p-6 sm:p-8">
+          <DialogHeader className="mb-6 border-b border-gray-100 pb-4">
             <DialogTitle className="text-xl sm:text-2xl font-bold pr-6">
               {isEdit ? "Edit Trip" : sourceCircuit ? "Create trip from circuit" : "Create New Trip"}
             </DialogTitle>
@@ -955,8 +952,8 @@ export function TripFormModal({
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2 space-y-2">
-                  <Label>Trip Title <span className="text-red-500">*</span></Label>
-                  <Input
+                  <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Trip Title <span className="text-red-500">*</span></Label>
+                  <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                     {...form.register("title")}
                     placeholder="e.g. Kedarkantha Winter Trek"
                   />
@@ -967,8 +964,8 @@ export function TripFormModal({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Location <span className="text-red-500">*</span></Label>
-                  <Input
+                  <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Location <span className="text-red-500">*</span></Label>
+                  <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                     {...form.register("location")}
                     placeholder="e.g. Uttarakhand, India"
                   />
@@ -979,7 +976,7 @@ export function TripFormModal({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Trip Type <span className="text-red-500">*</span></Label>
+                  <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Trip Type <span className="text-red-500">*</span></Label>
                   <select
                     {...form.register("tripType")}
                     className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
@@ -997,8 +994,8 @@ export function TripFormModal({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Best Time to Visit <span className="text-red-500">*</span></Label>
-                  <Input
+                  <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Best Time to Visit <span className="text-red-500">*</span></Label>
+                  <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                     {...form.register("bestTimeToVisit")}
                     placeholder="e.g. Dec to March"
                   />
@@ -1010,7 +1007,7 @@ export function TripFormModal({
                 </div>
 
                 {/* Pricing Packages Section */}
-                <div className="md:col-span-2 space-y-3 border-2 border-[#c8a96e]/30 bg-amber-50/30 p-3 sm:p-4 rounded-md">
+                <div className="md:col-span-2 space-y-3 border-2 border-[#b59410]/30 bg-gray-50/30 p-3 sm:p-4 rounded-md">
                   <div className="flex justify-between items-center">
                     <div>
                       <h3 className="font-semibold text-gray-900">Pricing Packages <span className="text-red-500">*</span></h3>
@@ -1018,13 +1015,13 @@ export function TripFormModal({
                     </div>
                   </div>
                   {form.formState.errors.packages?.root?.message && (
-                    <p className="text-sm text-red-500">{form.formState.errors.packages.root.message}</p>
+                    <p className="text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 bg-red-50 p-2 rounded-md border border-red-100">⚠️ {}</p>
                   )}
                   {packageFields.map((field, index) => (
                     <div key={field.id} className="flex flex-col md:flex-row gap-3 md:gap-4 items-stretch md:items-start relative p-3 border rounded-md">
                       <div className="flex-1 space-y-2">
-                        <Label>Title</Label>
-                        <Input
+                        <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Title</Label>
+                        <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                           placeholder="e.g. VIP Package"
                           {...form.register(`packages.${index}.title` as const)}
                         />
@@ -1035,8 +1032,8 @@ export function TripFormModal({
                         )}
                       </div>
                       <div className="flex-1 space-y-2">
-                        <Label>Price (₹) <span className="text-red-500">*</span></Label>
-                        <Input
+                        <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Price (₹) <span className="text-red-500">*</span></Label>
+                        <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                           type="number"
                           {...form.register(`packages.${index}.price` as const)}
                         />
@@ -1047,8 +1044,8 @@ export function TripFormModal({
                         )}
                       </div>
                       <div className="flex-1 space-y-2">
-                        <Label>Booking Amount (₹) <span className="text-red-500">*</span></Label>
-                        <Input
+                        <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Booking Amount (₹) <span className="text-red-500">*</span></Label>
+                        <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                           type="number"
                           {...form.register(`packages.${index}.tokenAmount` as const)}
                         />
@@ -1086,9 +1083,9 @@ export function TripFormModal({
                       type="checkbox"
                       id="isPublished"
                       {...form.register("isPublished")}
-                      className="w-4 h-4 text-[#c8a96e] rounded border-gray-300 focus:ring-[#c8a96e]"
+                      className="w-4 h-4 text-[#b59410] rounded border-gray-300 focus:ring-[#b59410]"
                     />
-                    <Label htmlFor="isPublished" className="mb-0 cursor-pointer">
+                    <Label htmlFor="isPublished" className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block mb-0 cursor-pointer">
                       Publish this trip (visible to public)
                     </Label>
                   </div>
@@ -1097,9 +1094,9 @@ export function TripFormModal({
                       type="checkbox"
                       id="isFeatured"
                       {...form.register("isFeatured")}
-                      className="w-4 h-4 text-[#c8a96e] rounded border-gray-300 focus:ring-[#c8a96e]"
+                      className="w-4 h-4 text-[#b59410] rounded border-gray-300 focus:ring-[#b59410]"
                     />
-                    <Label htmlFor="isFeatured" className="mb-0 cursor-pointer">
+                    <Label htmlFor="isFeatured" className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block mb-0 cursor-pointer">
                       Feature this trip (highlight on homepage)
                     </Label>
                   </div>
@@ -1108,9 +1105,9 @@ export function TripFormModal({
                       type="checkbox"
                       id="isListed"
                       {...form.register("isListed")}
-                      className="w-4 h-4 text-[#c8a96e] rounded border-gray-300 focus:ring-[#c8a96e]"
+                      className="w-4 h-4 text-[#b59410] rounded border-gray-300 focus:ring-[#b59410]"
                     />
-                    <Label htmlFor="isListed" className="mb-0 cursor-pointer">
+                    <Label htmlFor="isListed" className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block mb-0 cursor-pointer">
                       List in the public catalog
                     </Label>
                   </div>
@@ -1119,9 +1116,9 @@ export function TripFormModal({
                       type="checkbox"
                       id="isActive"
                       {...form.register("isActive")}
-                      className="w-4 h-4 text-[#c8a96e] rounded border-gray-300 focus:ring-[#c8a96e]"
+                      className="w-4 h-4 text-[#b59410] rounded border-gray-300 focus:ring-[#b59410]"
                     />
-                    <Label htmlFor="isActive" className="mb-0 cursor-pointer">
+                    <Label htmlFor="isActive" className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block mb-0 cursor-pointer">
                       Accept bookings
                     </Label>
                   </div>
@@ -1134,7 +1131,7 @@ export function TripFormModal({
               <div className="space-y-6">
                 <div>
                   <div className="mb-2">
-                    <Label>Slots (Dates & Capacity) <span className="text-red-500">*</span></Label>
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Slots (Dates & Capacity) <span className="text-red-500">*</span></Label>
                   </div>
                   {form.formState.errors.slots?.root && (
                     <p className="text-sm text-red-500 mb-2">
@@ -1147,8 +1144,8 @@ export function TripFormModal({
                         <div className="flex-1 space-y-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label>Start Date <span className="text-red-500">*</span></Label>
-                              <Input
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Start Date <span className="text-red-500">*</span></Label>
+                              <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                                 type="datetime-local"
                                 {...form.register(`slots.${index}.startDate`)}
                               />
@@ -1159,8 +1156,8 @@ export function TripFormModal({
                               )}
                             </div>
                             <div className="space-y-2">
-                              <Label>End Date <span className="text-red-500">*</span></Label>
-                              <Input
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">End Date <span className="text-red-500">*</span></Label>
+                              <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                                 type="datetime-local"
                                 {...form.register(`slots.${index}.endDate`)}
                               />
@@ -1171,23 +1168,23 @@ export function TripFormModal({
                               )}
                             </div>
                             <div className="space-y-2">
-                              <Label>Title (e.g. Diwali Weekend)</Label>
-                              <Input
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Title (e.g. Diwali Weekend)</Label>
+                              <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                                 placeholder="Optional"
                                 {...form.register(`slots.${index}.title`)}
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label>Priority (1 is highest)</Label>
-                              <Input
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Priority (1 is highest)</Label>
+                              <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                                 type="number"
                                 placeholder="0"
                                 {...form.register(`slots.${index}.priority`)}
                               />
                             </div>
                             <div className="space-y-2 md:col-span-2">
-                              <Label>Capacity for this Slot <span className="text-red-500">*</span></Label>
-                              <Input
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Capacity for this Slot <span className="text-red-500">*</span></Label>
+                              <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                                 type="number"
                                 {...form.register(`slots.${index}.capacity`)}
                               />
@@ -1230,12 +1227,11 @@ export function TripFormModal({
             <div className={step === 2 ? "block" : "hidden"}>
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <Label>Overview <span className="text-red-500">*</span></Label>
-                  <Textarea
-                    {...form.register("overview")}
+                  <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Overview <span className="text-red-500">*</span></Label>
+                  <Textarea {...form.register("overview")}
                     rows={4}
                     placeholder="Describe the trip..."
-                    className="resize-none"
+                    className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm resize-y disabled:cursor-not-allowed disabled:opacity-50"
                   />
                   {form.formState.errors.overview && (
                     <p className="text-sm text-red-500">
@@ -1247,7 +1243,7 @@ export function TripFormModal({
                 {/* HIGHLIGHTS */}
                 <div className="space-y-4 pt-2">
                   <div>
-                    <Label className="text-base font-semibold">
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-base font-semibold">
                       Highlights
                     </Label>
                   </div>
@@ -1279,10 +1275,10 @@ export function TripFormModal({
                           />
                         </div>
                         <div className="flex-1 space-y-2">
-                          <Label className="text-xs text-gray-500 uppercase font-semibold">
+                          <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-xs text-gray-500 uppercase font-semibold">
                             Highlight Description
                           </Label>
-                          <Input
+                          <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                             value={item.text}
                             onChange={(e) =>
                               updateHighlightItemText(index, e.target.value)
@@ -1315,13 +1311,13 @@ export function TripFormModal({
                 {/* INCLUSIONS */}
                 <div className="space-y-3 p-4 border rounded-lg bg-green-50/30 border-green-100">
                   <div>
-                    <Label className="text-base font-semibold text-green-800">
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-base font-semibold text-green-800">
                       Inclusions <span className="text-red-500">*</span>
                     </Label>
                   </div>
                   {inclusionFields.map((field, index) => (
                     <div key={field.id} className="flex items-center gap-2">
-                      <Input
+                      <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                         {...form.register(`inclusions.${index}.value`)}
                         placeholder={`Inclusion ${index + 1}`}
                       />
@@ -1356,13 +1352,13 @@ export function TripFormModal({
                 {/* EXCLUSIONS */}
                 <div className="space-y-3 p-4 border rounded-lg bg-red-50/30 border-red-100">
                   <div>
-                    <Label className="text-base font-semibold text-red-800">
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-base font-semibold text-red-800">
                       Exclusions <span className="text-red-500">*</span>
                     </Label>
                   </div>
                   {exclusionFields.map((field, index) => (
                     <div key={field.id} className="flex items-center gap-2">
-                      <Input
+                      <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                         {...form.register(`exclusions.${index}.value`)}
                         placeholder={`Exclusion ${index + 1}`}
                       />
@@ -1422,7 +1418,7 @@ export function TripFormModal({
                         className="p-4 border rounded-lg bg-white shadow-sm flex flex-col gap-3 group relative"
                       >
                         <div className="flex justify-between items-center">
-                          <Label className="text-xs text-gray-500 uppercase tracking-wider font-semibold">
+                          <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-xs text-gray-500 uppercase tracking-wider font-semibold">
                             Question {index + 1}
                           </Label>
                           <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
@@ -1464,10 +1460,9 @@ export function TripFormModal({
                           </div>
                         </div>
                         <div>
-                          <Input
-                            {...form.register(`faqs.${index}.question`)}
+                          <Input {...form.register(`faqs.${index}.question`)}
                             placeholder="e.g. What is the fitness level required?"
-                            className="font-medium"
+                            className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                           />
                           {form.formState.errors.faqs?.[index]?.question && (
                             <p className="text-xs text-red-500 mt-1">
@@ -1479,11 +1474,10 @@ export function TripFormModal({
                           )}
                         </div>
                         <div>
-                          <Textarea
-                            {...form.register(`faqs.${index}.answer`)}
+                          <Textarea {...form.register(`faqs.${index}.answer`)}
                             placeholder="Provide a detailed answer..."
                             rows={2}
-                            className="resize-none"
+                            className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm resize-y disabled:cursor-not-allowed disabled:opacity-50"
                           />
                           {form.formState.errors.faqs?.[index]?.answer && (
                             <p className="text-xs text-red-500 mt-1">
@@ -1506,7 +1500,7 @@ export function TripFormModal({
                 {/* TRIP TAGS */}
                 <div className="space-y-3 p-4 mt-6 border rounded-lg bg-blue-50/30 border-blue-100">
                   <div>
-                    <Label className="text-base font-semibold text-blue-800">
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-base font-semibold text-blue-800">
                       Trip Tags
                     </Label>
                   </div>
@@ -1517,10 +1511,9 @@ export function TripFormModal({
                   <div className="space-y-3">
                     {tripTagFields.map((field, index) => (
                       <div key={field.id} className="flex items-center gap-2">
-                        <Input
-                          {...form.register(`tripTags.${index}.value`)}
+                        <Input {...form.register(`tripTags.${index}.value`)}
                           placeholder={`Tag ${index + 1}`}
-                          className="bg-white"
+                          className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                         />
                         <Button
                           type="button"
@@ -1597,10 +1590,10 @@ export function TripFormModal({
                           />
                         </div>
                         <div className="flex-1 space-y-2">
-                          <Label className="text-xs text-gray-500 uppercase font-semibold">
+                          <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-xs text-gray-500 uppercase font-semibold">
                             Description
                           </Label>
-                          <Input
+                          <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                             value={item.text}
                             onChange={(e) =>
                               updateStayItemText(index, e.target.value)
@@ -1667,7 +1660,7 @@ export function TripFormModal({
                 )}
                 <div className="p-4 sm:p-8 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 flex flex-col items-center justify-center text-center">
                   <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 mb-4">
-                    <UploadCloud className="w-8 h-8 text-[#c8a96e]" />
+                    <UploadCloud className="w-8 h-8 text-[#b59410]" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-1">
                     {isEdit
@@ -1678,9 +1671,7 @@ export function TripFormModal({
                     High-quality images that will be shown at the top of the
                     trip page. Recommended size: 1920x1080.
                   </p>
-                  <Label
-                    htmlFor="image-upload"
-                    className="cursor-pointer bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2.5 rounded-lg font-medium transition-colors shadow-sm inline-flex items-center gap-2"
+                  <Label htmlFor="image-upload" className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block cursor-pointer bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2.5 rounded-lg font-medium transition-colors shadow-sm inline-flex items-center gap-2"
                   >
                     <ImageIcon className="w-4 h-4" />
                     Select Images
@@ -1750,7 +1741,7 @@ export function TripFormModal({
               key="continue-btn"
               type="button"
               onClick={nextStep}
-              className="bg-[#c8a96e] hover:bg-[#b8943a] text-white flex items-center gap-2"
+              className="bg-[#b59410] hover:bg-[#8a710c] text-white flex items-center gap-2"
             >
               Continue <ArrowRight className="w-4 h-4" />
             </Button>
@@ -1774,6 +1765,7 @@ export function TripFormModal({
                   : "Save Trip"}
             </Button>
           )}
+        </div>
         </div>
       </DialogContent>
     </Dialog>

@@ -49,13 +49,9 @@ const festivalSchema = z.object({
     })
   ).min(1, "At least one slot is required"),
 
-  overview: z.string().min(10, "Overview must be detailed"),
-  inclusions: z
-    .array(z.object({ value: z.string().min(1, "Inclusion is required") }))
-    .min(1, "At least one inclusion is required"),
-  exclusions: z
-    .array(z.object({ value: z.string().min(1, "Exclusion is required") }))
-    .min(1, "At least one exclusion is required"),
+  overview: z.string().optional(),
+  inclusions: z.array(z.object({ value: z.string().optional() })).optional(),
+  exclusions: z.array(z.object({ value: z.string().optional() })).optional(),
   tags: z.array(z.object({ value: z.string().min(1) })).optional(),
   packages: z.array(
     z.object({
@@ -68,8 +64,8 @@ const festivalSchema = z.object({
   faqs: z
     .array(
       z.object({
-        question: z.string().min(1, "Required"),
-        answer: z.string().min(1, "Required"),
+        question: z.string().optional(),
+        answer: z.string().optional(),
       }),
     )
     .optional(),
@@ -718,7 +714,7 @@ export function FestivalFormModal({
           <div>
             <p className="font-semibold mb-1">Please fix the following before continuing:</p>
             <ul className="list-disc list-inside space-y-0.5 text-sm">
-              {missing.map((m, i) => <li key={i}>{m}</li>)}
+              {missing.map((m, i) => <li key={i}>{m.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</li>)}
             </ul>
           </div>,
           { position: "bottom-right", duration: 5000 }
@@ -737,7 +733,7 @@ export function FestivalFormModal({
         <div>
           <p className="font-semibold mb-1">Please fix the following before submitting:</p>
           <ul className="list-disc list-inside space-y-0.5 text-sm">
-            {missing.map((m, i) => <li key={i}>{m}</li>)}
+            {missing.map((m, i) => <li key={i}>{m.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</li>)}
           </ul>
         </div>,
         { position: "bottom-right", duration: 5000 }
@@ -890,9 +886,10 @@ export function FestivalFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!w-[calc(100%-0.75rem)] !max-h-[calc(100dvh-0.75rem)] md:!w-full md:!max-h-[90vh] sm:max-w-[700px] flex flex-col p-0 overflow-hidden">
+      <DialogContent className="!w-[calc(100%-0.75rem)] !max-h-[calc(100dvh-0.75rem)] sm:max-w-[800px] overflow-y-auto p-0 border-0 shadow-xl md:!w-full md:!max-h-[90vh] bg-white rounded-xl">
         <div className="px-4 pt-5 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b">
-          <DialogHeader>
+          <div className="p-6 sm:p-8">
+          <DialogHeader className="mb-6 border-b border-gray-100 pb-4">
             <DialogTitle className="text-xl sm:text-2xl font-bold pr-6">
               {isEdit ? "Edit Festival" : sourceCircuit ? "Create festival from circuit" : "Create New Festival"}
             </DialogTitle>
@@ -942,8 +939,8 @@ export function FestivalFormModal({
             <div className={step === 0 ? "block" : "hidden"}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2 space-y-2">
-                  <Label>Festival Title <span className="text-red-500">*</span></Label>
-                  <Input
+                  <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Festival Title <span className="text-red-500">*</span></Label>
+                  <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                     {...form.register("title")}
                     placeholder="e.g. Tomorrowland Winter"
                   />
@@ -954,8 +951,8 @@ export function FestivalFormModal({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Location <span className="text-red-500">*</span></Label>
-                  <Input
+                  <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Location <span className="text-red-500">*</span></Label>
+                  <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                     {...form.register("location")}
                     placeholder="e.g. Alpe d'Huez, France"
                   />
@@ -966,8 +963,8 @@ export function FestivalFormModal({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Best Time to Visit <span className="text-red-500">*</span></Label>
-                  <Input
+                  <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Best Time to Visit <span className="text-red-500">*</span></Label>
+                  <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                     {...form.register("bestTimeToVisit")}
                     placeholder="e.g. Dec to March"
                   />
@@ -979,7 +976,7 @@ export function FestivalFormModal({
                 </div>
 
                 {/* Pricing Packages Section */}
-                <div className="md:col-span-2 space-y-3 border-2 border-[#c8a96e]/30 bg-amber-50/30 p-3 sm:p-4 rounded-md">
+                <div className="md:col-span-2 space-y-3 border-2 border-[#b59410]/30 bg-gray-50/30 p-3 sm:p-4 rounded-md">
                   <div className="flex justify-between items-center">
                     <div>
                       <h3 className="font-semibold text-gray-900">Pricing Packages <span className="text-red-500">*</span></h3>
@@ -987,13 +984,13 @@ export function FestivalFormModal({
                     </div>
                   </div>
                   {form.formState.errors.packages?.root?.message && (
-                    <p className="text-sm text-red-500">{form.formState.errors.packages.root.message}</p>
+                    <p className="text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 bg-red-50 p-2 rounded-md border border-red-100">⚠️ {}</p>
                   )}
                   {packageFields.map((field, index) => (
                     <div key={field.id} className="flex flex-col md:flex-row gap-3 md:gap-4 items-stretch md:items-start relative p-3 border rounded-md">
                       <div className="flex-1 space-y-2">
-                        <Label>Title</Label>
-                        <Input
+                        <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Title</Label>
+                        <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                           placeholder="e.g. VIP Package"
                           {...form.register(`packages.${index}.title` as const)}
                         />
@@ -1004,8 +1001,8 @@ export function FestivalFormModal({
                         )}
                       </div>
                       <div className="flex-1 space-y-2">
-                        <Label>Price (₹) <span className="text-red-500">*</span></Label>
-                        <Input
+                        <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Price (₹) <span className="text-red-500">*</span></Label>
+                        <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                           type="number"
                           {...form.register(`packages.${index}.price` as const)}
                         />
@@ -1016,8 +1013,8 @@ export function FestivalFormModal({
                         )}
                       </div>
                       <div className="flex-1 space-y-2">
-                        <Label>Booking Amount (₹) <span className="text-red-500">*</span></Label>
-                        <Input
+                        <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Booking Amount (₹) <span className="text-red-500">*</span></Label>
+                        <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                           type="number"
                           {...form.register(`packages.${index}.tokenAmount` as const)}
                         />
@@ -1056,9 +1053,9 @@ export function FestivalFormModal({
                       type="checkbox"
                       id="isPublished"
                       {...form.register("isPublished")}
-                      className="w-4 h-4 text-[#c8a96e] rounded border-gray-300 focus:ring-[#c8a96e]"
+                      className="w-4 h-4 text-[#b59410] rounded border-gray-300 focus:ring-[#b59410]"
                     />
-                    <Label htmlFor="isPublished" className="mb-0 cursor-pointer">
+                    <Label htmlFor="isPublished" className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block mb-0 cursor-pointer">
                       Publish this festival (visible to public)
                     </Label>
                   </div>
@@ -1067,9 +1064,9 @@ export function FestivalFormModal({
                       type="checkbox"
                       id="isFeatured"
                       {...form.register("isFeatured")}
-                      className="w-4 h-4 text-[#c8a96e] rounded border-gray-300 focus:ring-[#c8a96e]"
+                      className="w-4 h-4 text-[#b59410] rounded border-gray-300 focus:ring-[#b59410]"
                     />
-                    <Label htmlFor="isFeatured" className="mb-0 cursor-pointer">
+                    <Label htmlFor="isFeatured" className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block mb-0 cursor-pointer">
                       Feature this festival (highlight on homepage)
                     </Label>
                   </div>
@@ -1082,7 +1079,7 @@ export function FestivalFormModal({
               <div className="space-y-6">
                 <div>
                   <div className="mb-2">
-                    <Label>Slots (Dates & Capacity) <span className="text-red-500">*</span></Label>
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Slots (Dates & Capacity) <span className="text-red-500">*</span></Label>
                   </div>
                   {form.formState.errors.slots?.root && (
                     <p className="text-sm text-red-500 mb-2">
@@ -1095,8 +1092,8 @@ export function FestivalFormModal({
                         <div className="flex-1 space-y-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label>Start Date <span className="text-red-500">*</span></Label>
-                              <Input
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Start Date <span className="text-red-500">*</span></Label>
+                              <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                                 type="datetime-local"
                                 {...form.register(`slots.${index}.startDate`)}
                               />
@@ -1107,8 +1104,8 @@ export function FestivalFormModal({
                               )}
                             </div>
                             <div className="space-y-2">
-                              <Label>End Date <span className="text-red-500">*</span></Label>
-                              <Input
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">End Date <span className="text-red-500">*</span></Label>
+                              <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                                 type="datetime-local"
                                 {...form.register(`slots.${index}.endDate`)}
                               />
@@ -1119,23 +1116,23 @@ export function FestivalFormModal({
                               )}
                             </div>
                             <div className="space-y-2">
-                              <Label>Title (e.g. Diwali Weekend)</Label>
-                              <Input
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Title (e.g. Diwali Weekend)</Label>
+                              <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                                 placeholder="Optional"
                                 {...form.register(`slots.${index}.title`)}
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label>Priority (1 is highest)</Label>
-                              <Input
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Priority (1 is highest)</Label>
+                              <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                                 type="number"
                                 placeholder="0"
                                 {...form.register(`slots.${index}.priority`)}
                               />
                             </div>
                             <div className="space-y-2 md:col-span-2">
-                              <Label>Capacity for this Slot <span className="text-red-500">*</span></Label>
-                              <Input
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Capacity for this Slot <span className="text-red-500">*</span></Label>
+                              <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                                 type="number"
                                 {...form.register(`slots.${index}.capacity`)}
                               />
@@ -1178,12 +1175,11 @@ export function FestivalFormModal({
             <div className={step === 2 ? "block" : "hidden"}>
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <Label>Overview <span className="text-red-500">*</span></Label>
-                  <Textarea
-                    {...form.register("overview")}
+                  <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Overview <span className="text-red-500">*</span></Label>
+                  <Textarea {...form.register("overview")}
                     rows={4}
                     placeholder="Describe the festival..."
-                    className="resize-none"
+                    className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm resize-y disabled:cursor-not-allowed disabled:opacity-50"
                   />
                   {form.formState.errors.overview && (
                     <p className="text-sm text-red-500">
@@ -1195,7 +1191,7 @@ export function FestivalFormModal({
                 {/* HIGHLIGHTS */}
                 <div className="space-y-4 pt-2">
                   <div>
-                    <Label className="text-base font-semibold">
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-base font-semibold">
                       Highlights
                     </Label>
                   </div>
@@ -1227,10 +1223,10 @@ export function FestivalFormModal({
                           />
                         </div>
                         <div className="flex-1 space-y-2">
-                          <Label className="text-xs text-gray-500 uppercase font-semibold">
+                          <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-xs text-gray-500 uppercase font-semibold">
                             Highlight Description
                           </Label>
-                          <Input
+                          <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                             value={item.text}
                             onChange={(e) =>
                               updateHighlightItemText(index, e.target.value)
@@ -1263,13 +1259,13 @@ export function FestivalFormModal({
                 {/* INCLUSIONS */}
                 <div className="space-y-3 p-4 border rounded-lg bg-green-50/30 border-green-100">
                   <div>
-                    <Label className="text-base font-semibold text-green-800">
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-base font-semibold text-green-800">
                       Inclusions <span className="text-red-500">*</span>
                     </Label>
                   </div>
                   {inclusionFields.map((field, index) => (
                     <div key={field.id} className="flex items-center gap-2">
-                      <Input
+                      <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                         {...form.register(`inclusions.${index}.value`)}
                         placeholder={`Inclusion ${index + 1}`}
                       />
@@ -1304,13 +1300,13 @@ export function FestivalFormModal({
                 {/* EXCLUSIONS */}
                 <div className="space-y-3 p-4 border rounded-lg bg-red-50/30 border-red-100">
                   <div>
-                    <Label className="text-base font-semibold text-red-800">
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-base font-semibold text-red-800">
                       Exclusions <span className="text-red-500">*</span>
                     </Label>
                   </div>
                   {exclusionFields.map((field, index) => (
                     <div key={field.id} className="flex items-center gap-2">
-                      <Input
+                      <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                         {...form.register(`exclusions.${index}.value`)}
                         placeholder={`Exclusion ${index + 1}`}
                       />
@@ -1370,7 +1366,7 @@ export function FestivalFormModal({
                         className="p-4 border rounded-lg bg-white shadow-sm flex flex-col gap-3 group relative"
                       >
                         <div className="flex justify-between items-center">
-                          <Label className="text-xs text-gray-500 uppercase tracking-wider font-semibold">
+                          <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-xs text-gray-500 uppercase tracking-wider font-semibold">
                             Question {index + 1}
                           </Label>
                           <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
@@ -1412,10 +1408,9 @@ export function FestivalFormModal({
                           </div>
                         </div>
                         <div>
-                          <Input
-                            {...form.register(`faqs.${index}.question`)}
+                          <Input {...form.register(`faqs.${index}.question`)}
                             placeholder="e.g. Is there age restriction?"
-                            className="font-medium"
+                            className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                           />
                           {form.formState.errors.faqs?.[index]?.question && (
                             <p className="text-xs text-red-500 mt-1">
@@ -1427,11 +1422,10 @@ export function FestivalFormModal({
                           )}
                         </div>
                         <div>
-                          <Textarea
-                            {...form.register(`faqs.${index}.answer`)}
+                          <Textarea {...form.register(`faqs.${index}.answer`)}
                             placeholder="Provide a detailed answer..."
                             rows={2}
-                            className="resize-none"
+                            className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm resize-y disabled:cursor-not-allowed disabled:opacity-50"
                           />
                           {form.formState.errors.faqs?.[index]?.answer && (
                             <p className="text-xs text-red-500 mt-1">
@@ -1454,7 +1448,7 @@ export function FestivalFormModal({
                 {/* FESTIVAL TAGS */}
                 <div className="space-y-3 p-4 mt-6 border rounded-lg bg-blue-50/30 border-blue-100">
                   <div>
-                    <Label className="text-base font-semibold text-blue-800">
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-base font-semibold text-blue-800">
                       Festival Tags
                     </Label>
                   </div>
@@ -1464,10 +1458,9 @@ export function FestivalFormModal({
                   <div className="space-y-3">
                     {tagFields.map((field, index) => (
                       <div key={field.id} className="flex items-center gap-2">
-                        <Input
-                          {...form.register(`tags.${index}.value`)}
+                        <Input {...form.register(`tags.${index}.value`)}
                           placeholder={`Tag ${index + 1}`}
-                          className="bg-white"
+                          className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                         />
                         <Button
                           type="button"
@@ -1544,10 +1537,10 @@ export function FestivalFormModal({
                           />
                         </div>
                         <div className="flex-1 space-y-2">
-                          <Label className="text-xs text-gray-500 uppercase font-semibold">
+                          <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-xs text-gray-500 uppercase font-semibold">
                             Description
                           </Label>
-                          <Input
+                          <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                             value={item.text}
                             onChange={(e) =>
                               updateStayItemText(index, e.target.value)
@@ -1614,7 +1607,7 @@ export function FestivalFormModal({
                 )}
                 <div className="p-4 sm:p-8 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 flex flex-col items-center justify-center text-center">
                   <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 mb-4">
-                    <UploadCloud className="w-8 h-8 text-[#c8a96e]" />
+                    <UploadCloud className="w-8 h-8 text-[#b59410]" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-1">
                     {isEdit
@@ -1625,9 +1618,7 @@ export function FestivalFormModal({
                     High-quality images that will be shown at the top of the
                     festival page. Recommended size: 1920x1080.
                   </p>
-                  <Label
-                    htmlFor="image-upload"
-                    className="cursor-pointer bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2.5 rounded-lg font-medium transition-colors shadow-sm inline-flex items-center gap-2"
+                  <Label htmlFor="image-upload" className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block cursor-pointer bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2.5 rounded-lg font-medium transition-colors shadow-sm inline-flex items-center gap-2"
                   >
                     <ImageIcon className="w-4 h-4" />
                     Select Images
@@ -1700,7 +1691,7 @@ export function FestivalFormModal({
                 
                 <div className="p-4 sm:p-8 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 flex flex-col items-center justify-center text-center">
                   <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 mb-4">
-                    <UploadCloud className="w-8 h-8 text-[#c8a96e]" />
+                    <UploadCloud className="w-8 h-8 text-[#b59410]" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-1">
                     Upload Hero Video
@@ -1708,9 +1699,7 @@ export function FestivalFormModal({
                   <p className="text-sm text-gray-500 mb-6 max-w-sm">
                     A video that will play in the background of the festival hero section. Recommended short, lightweight video.
                   </p>
-                  <Label
-                    htmlFor="video-upload"
-                    className="cursor-pointer bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2.5 rounded-lg font-medium transition-colors shadow-sm inline-flex items-center gap-2"
+                  <Label htmlFor="video-upload" className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block cursor-pointer bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2.5 rounded-lg font-medium transition-colors shadow-sm inline-flex items-center gap-2"
                   >
                     <UploadCloud className="w-4 h-4" />
                     Select Video
@@ -1765,7 +1754,7 @@ export function FestivalFormModal({
               key="continue-btn"
               type="button"
               onClick={nextStep}
-              className="bg-[#c8a96e] hover:bg-[#b8943a] text-white flex items-center gap-2"
+              className="bg-[#b59410] hover:bg-[#8a710c] text-white flex items-center gap-2"
             >
               Continue <ArrowRight className="w-4 h-4" />
             </Button>
@@ -1789,6 +1778,7 @@ export function FestivalFormModal({
                   : "Save Festival"}
             </Button>
           )}
+        </div>
         </div>
       </DialogContent>
     </Dialog>
