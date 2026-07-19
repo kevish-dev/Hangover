@@ -6,6 +6,7 @@ import { motion } from "motion/react";
 import { MapPin, Mail, Phone, Instagram, ArrowRight, Send, CheckCircle } from "lucide-react";
 import { apiClient } from "../../lib/axios";
 import { toast } from "sonner";
+import { showErrorToast } from "../../lib/errors";
 
 const TRIP_TYPES = [
   "Mountain Trek",
@@ -25,15 +26,30 @@ const TRIP_TYPES = [
 const NAV_COLS = [
   {
     heading: "Explore",
-    links: ["Signature Destinations", "Types of Trips", "Featured Festivals", "Hidden Gems"],
+    links: [
+      { label: "Signature Destinations", url: "#" },
+      { label: "Types of Trips", url: "#" },
+      { label: "Featured Festivals", url: "#" },
+      { label: "Hidden Gems", url: "#" }
+    ],
   },
   {
     heading: "Company",
-    links: ["Our Story", "Our Journey", "Travel Blog", "Careers"],
+    links: [
+      { label: "Our Story", url: "#" },
+      { label: "Our Journey", url: "#" },
+      { label: "Travel Blog", url: "#" },
+      { label: "Careers", url: "#" }
+    ],
   },
   {
     heading: "Connect",
-    links: ["Instagram", "WhatsApp Us", "Email Us", "Community"],
+    links: [
+      { label: "Instagram", url: "https://www.instagram.com/hangovertrails/" },
+      { label: "WhatsApp Us", url: "https://wa.me/918415929069" },
+      { label: "Email Us", url: "mailto:experience@hangovertrails.com" },
+      { label: "Community", url: "#" }
+    ],
   },
 ];
 
@@ -41,30 +57,58 @@ export function SiteFooter() {
   const [form, setForm] = useState({ name: "", email: "", phone: "", trip: "", message: "" });
   const [submitted, setSubmitted] = useState(false);
   const [focused, setFocused] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.email || !form.message) return;
-
-    let mappedTripType: string | undefined;
-    if (form.trip) {
-      if (form.trip === "Jungle & Wildlife") mappedTripType = "JUNGLE_WILDLIFE";
-      else if (form.trip === "Institute / College Trip") mappedTripType = "INSTITUTE_COLLEGE_TRIP";
-      else if (form.trip === "Cultural Festival") mappedTripType = undefined; // Not in backend enum
-      else mappedTripType = form.trip.toUpperCase().replace(/\s+/g, '_');
+    const formElement = e.currentTarget as HTMLFormElement;
+    const values = {
+      ...form,
+      name: form.name.trim(),
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+      message: form.message.trim(),
+    };
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneDigits = values.phone.replace(/\D/g, "");
+    const issue = values.name.length < 2
+      ? { field: "name", message: "Enter your full name." }
+      : !emailPattern.test(values.email)
+        ? { field: "email", message: "Enter a valid email address." }
+        : values.phone && phoneDigits.length < 7
+          ? { field: "phone", message: "Enter a valid phone number or leave it blank." }
+          : values.message.length < 10
+            ? { field: "message", message: "Tell us a little more about the trip you want." }
+            : null;
+    if (issue) {
+      toast.error("Please check the inquiry form", { description: issue.message });
+      (formElement.elements.namedItem(issue.field) as HTMLElement | null)?.focus();
+      return;
     }
 
+    let mappedTripType: string | undefined;
+    if (values.trip) {
+      if (values.trip === "Jungle & Wildlife") mappedTripType = "JUNGLE_WILDLIFE";
+      else if (values.trip === "Institute / College Trip") mappedTripType = "INSTITUTE_COLLEGE_TRIP";
+      else if (values.trip === "Cultural Festival") mappedTripType = undefined; // Not in backend enum
+      else mappedTripType = values.trip.toUpperCase().replace(/\s+/g, '_');
+    }
+
+    setIsSubmitting(true);
     try {
       await apiClient.post("/inquiries", {
-        name: form.name,
-        email: form.email,
-        phone: form.phone,
+        name: values.name,
+        email: values.email,
+        phone: values.phone || undefined,
         tripType: mappedTripType,
-        message: form.message
+        message: values.message,
       });
       setSubmitted(true);
-    } catch (error) {
-      toast.error("Failed to send inquiry. Please try again.");
+      toast.success("Inquiry sent successfully", { description: "Our team will reach out within 24 hours." });
+    } catch (error: unknown) {
+      showErrorToast(error, "Failed to send inquiry. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -264,7 +308,7 @@ export function SiteFooter() {
                   </button>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                <form noValidate onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
                   <div>
                     <p style={{ color: "#f2ede4", fontSize: "1.05rem", fontWeight: 400, letterSpacing: "-0.01em", margin: "0 0 4px" }}>
                       Tell us about your dream trip
@@ -280,6 +324,7 @@ export function SiteFooter() {
                       <label style={labelStyle}>Full Name *</label>
                       <input
                         type="text"
+                        name="name"
                         placeholder="Arjun Sharma"
                         value={form.name}
                         required
@@ -293,6 +338,7 @@ export function SiteFooter() {
                       <label style={labelStyle}>Email *</label>
                       <input
                         type="email"
+                        name="email"
                         placeholder="arjun@email.com"
                         value={form.email}
                         required
@@ -310,6 +356,7 @@ export function SiteFooter() {
                       <label style={labelStyle}>Phone</label>
                       <input
                         type="tel"
+                        name="phone"
                         placeholder="+91 84159 29069"
                         value={form.phone}
                         onChange={(e) => setForm({ ...form, phone: e.target.value })}
@@ -321,6 +368,7 @@ export function SiteFooter() {
                     <div>
                       <label style={labelStyle}>Trip Type</label>
                       <select
+                        name="trip"
                         value={form.trip}
                         onChange={(e) => setForm({ ...form, trip: e.target.value })}
                         onFocus={() => setFocused("trip")}
@@ -340,6 +388,7 @@ export function SiteFooter() {
                     <label style={labelStyle}>Your Message *</label>
                     <textarea
                       placeholder="Tell us where you want to go, when, how many people, and anything else we should know…"
+                      name="message"
                       value={form.message}
                       required
                       onChange={(e) => setForm({ ...form, message: e.target.value })}
@@ -353,6 +402,7 @@ export function SiteFooter() {
                   {/* Submit */}
                   <button
                     type="submit"
+                    disabled={isSubmitting}
                     style={{
                       background: "#b8943a",
                       border: "none",
@@ -364,7 +414,8 @@ export function SiteFooter() {
                       fontWeight: 600,
                       letterSpacing: "0.14em",
                       textTransform: "uppercase",
-                      cursor: "pointer",
+                      cursor: isSubmitting ? "wait" : "pointer",
+                      opacity: isSubmitting ? 0.7 : 1,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -377,7 +428,7 @@ export function SiteFooter() {
                     onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
                     onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
                   >
-                    Plan My Trip <Send size={13} />
+                    {isSubmitting ? "Sending…" : "Plan My Trip"} <Send size={13} />
                   </button>
 
                   <p style={{ color: "rgba(242,237,228,0.25)", fontSize: "0.62rem", textAlign: "center", fontWeight: 300, letterSpacing: "0.06em", margin: 0 }}>
@@ -411,8 +462,12 @@ export function SiteFooter() {
                 Community-led travel for the curious, the bold, and the ones who believe the best stories happen off the beaten path.
               </p>
               <div style={{ display: "flex", gap: "10px" }}>
-                {[Instagram, Mail, Phone].map((Icon, i) => (
-                  <button key={i} style={{
+                {[
+                  { Icon: Instagram, href: "https://www.instagram.com/hangovertrails/" },
+                  { Icon: Mail, href: "mailto:experience@hangovertrails.com" },
+                  { Icon: Phone, href: "tel:+918415929069" }
+                ].map(({ Icon, href }, i) => (
+                  <a key={i} href={href} target={href.startsWith("http") ? "_blank" : undefined} rel={href.startsWith("http") ? "noopener noreferrer" : undefined} style={{
                     width: "34px", height: "34px",
                     border: "1px solid rgba(242,237,228,0.12)",
                     borderRadius: "50%",
@@ -420,12 +475,13 @@ export function SiteFooter() {
                     display: "flex", alignItems: "center", justifyContent: "center",
                     cursor: "pointer",
                     transition: "border-color 0.25s ease, background 0.25s ease",
+                    textDecoration: "none",
                   }}
                     onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(184,148,58,0.5)"; e.currentTarget.style.background = "rgba(184,148,58,0.08)"; }}
                     onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(242,237,228,0.12)"; e.currentTarget.style.background = "transparent"; }}
                   >
                     <Icon size={13} color="rgba(242,237,228,0.5)" strokeWidth={1.5} />
-                  </button>
+                  </a>
                 ))}
               </div>
             </div>
@@ -438,20 +494,22 @@ export function SiteFooter() {
                 </p>
                 <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "11px" }}>
                   {col.links.map((link) => (
-                    <li key={link}>
-                      <button style={{
+                    <li key={link.label}>
+                      <a href={link.url} target={link.url.startsWith("http") ? "_blank" : undefined} rel={link.url.startsWith("http") ? "noopener noreferrer" : undefined} style={{
                         background: "none", border: "none", padding: 0,
                         color: "rgba(242,237,228,0.45)",
                         fontSize: "0.8rem", fontWeight: 300, fontFamily: "'Poppins', sans-serif",
                         cursor: "pointer", letterSpacing: "0.02em",
                         transition: "color 0.2s ease",
                         textAlign: "left",
+                        textDecoration: "none",
+                        display: "inline-block",
                       }}
                         onMouseEnter={(e) => (e.currentTarget.style.color = "#f2ede4")}
                         onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(242,237,228,0.45)")}
                       >
-                        {link}
-                      </button>
+                        {link.label}
+                      </a>
                     </li>
                   ))}
                 </ul>
