@@ -26,15 +26,30 @@ const TRIP_TYPES = [
 const NAV_COLS = [
   {
     heading: "Explore",
-    links: ["Signature Destinations", "Types of Trips", "Featured Festivals", "Hidden Gems"],
+    links: [
+      { label: "Signature Destinations", url: "#" },
+      { label: "Types of Trips", url: "#" },
+      { label: "Featured Festivals", url: "#" },
+      { label: "Hidden Gems", url: "#" }
+    ],
   },
   {
     heading: "Company",
-    links: ["Our Story", "Our Journey", "Travel Blog", "Careers"],
+    links: [
+      { label: "Our Story", url: "#" },
+      { label: "Our Journey", url: "#" },
+      { label: "Travel Blog", url: "#" },
+      { label: "Careers", url: "#" }
+    ],
   },
   {
     heading: "Connect",
-    links: ["Instagram", "WhatsApp Us", "Email Us", "Community"],
+    links: [
+      { label: "Instagram", url: "https://www.instagram.com/hangovertrails/" },
+      { label: "WhatsApp Us", url: "https://wa.me/918415929069" },
+      { label: "Email Us", url: "mailto:experience@hangovertrails.com" },
+      { label: "Community", url: "#" }
+    ],
   },
 ];
 
@@ -447,8 +462,12 @@ export function SiteFooter() {
                 Community-led travel for the curious, the bold, and the ones who believe the best stories happen off the beaten path.
               </p>
               <div style={{ display: "flex", gap: "10px" }}>
-                {[Instagram, Mail, Phone].map((Icon, i) => (
-                  <button key={i} style={{
+                {[
+                  { Icon: Instagram, href: "https://www.instagram.com/hangovertrails/" },
+                  { Icon: Mail, href: "mailto:experience@hangovertrails.com" },
+                  { Icon: Phone, href: "tel:+918415929069" }
+                ].map(({ Icon, href }, i) => (
+                  <a key={i} href={href} target={href.startsWith("http") ? "_blank" : undefined} rel={href.startsWith("http") ? "noopener noreferrer" : undefined} style={{
                     width: "34px", height: "34px",
                     border: "1px solid rgba(242,237,228,0.12)",
                     borderRadius: "50%",
@@ -456,12 +475,13 @@ export function SiteFooter() {
                     display: "flex", alignItems: "center", justifyContent: "center",
                     cursor: "pointer",
                     transition: "border-color 0.25s ease, background 0.25s ease",
+                    textDecoration: "none",
                   }}
                     onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(184,148,58,0.5)"; e.currentTarget.style.background = "rgba(184,148,58,0.08)"; }}
                     onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(242,237,228,0.12)"; e.currentTarget.style.background = "transparent"; }}
                   >
                     <Icon size={13} color="rgba(242,237,228,0.5)" strokeWidth={1.5} />
-                  </button>
+                  </a>
                 ))}
               </div>
             </div>
@@ -474,20 +494,22 @@ export function SiteFooter() {
                 </p>
                 <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "11px" }}>
                   {col.links.map((link) => (
-                    <li key={link}>
-                      <button style={{
+                    <li key={link.label}>
+                      <a href={link.url} target={link.url.startsWith("http") ? "_blank" : undefined} rel={link.url.startsWith("http") ? "noopener noreferrer" : undefined} style={{
                         background: "none", border: "none", padding: 0,
                         color: "rgba(242,237,228,0.45)",
                         fontSize: "0.8rem", fontWeight: 300, fontFamily: "'Poppins', sans-serif",
                         cursor: "pointer", letterSpacing: "0.02em",
                         transition: "color 0.2s ease",
                         textAlign: "left",
+                        textDecoration: "none",
+                        display: "inline-block",
                       }}
                         onMouseEnter={(e) => (e.currentTarget.style.color = "#f2ede4")}
                         onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(242,237,228,0.45)")}
                       >
-                        {link}
-                      </button>
+                        {link.label}
+                      </a>
                     </li>
                   ))}
                 </ul>
