@@ -117,6 +117,17 @@ export const create = async (data) => {
             : typeof day.activities === "string"
               ? day.activities.split("\n").map((item) => item.trim()).filter(Boolean)
               : [],
+        tasks: {
+          create: Array.isArray(day.tasks) ? day.tasks.map(task => ({
+            category: task.category,
+            title: task.title,
+            description: task.description || null,
+            config: task.config || {},
+            unitPrice: task.unitPrice ?? null,
+            quantityNeeded: task.quantityNeeded ?? null,
+            dueOffsetDays: task.dueOffsetDays ?? null,
+          })) : []
+        },
       })),
     };
   }
@@ -272,6 +283,17 @@ export const update = async (id, data) => {
             : typeof day.activities === "string"
               ? day.activities.split("\n").map((item) => item.trim()).filter(Boolean)
               : [],
+        tasks: {
+          create: Array.isArray(day.tasks) ? day.tasks.map(task => ({
+            category: task.category,
+            title: task.title,
+            description: task.description || null,
+            config: task.config || {},
+            unitPrice: task.unitPrice ?? null,
+            quantityNeeded: task.quantityNeeded ?? null,
+            dueOffsetDays: task.dueOffsetDays ?? null,
+          })) : []
+        },
       })),
     };
   }

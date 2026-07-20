@@ -38,10 +38,44 @@ export const generateBookingOperations = async (booking, slot, chosenAddOns = []
             title: task.title,
             description: task.description,
             config: task.config ?? {},
+            unitPrice: task.unitPrice ?? null,
+            quantityNeeded: task.quantityNeeded ?? null,
             dueAt,
           });
         }
       }
+    }
+  }
+
+  // Also check for tasks directly on the Trip or Festival's Itinerary Days
+  const itineraryDays = await prisma.itineraryDay.findMany({
+    where: {
+      OR: [
+        { tripId: isTrip && slot.trip ? slot.trip.id : undefined },
+        { festivalId: !isTrip && slot.festival ? slot.festival.id : undefined }
+      ].filter(Boolean)
+    },
+    include: { tasks: true }
+  });
+
+  for (const day of itineraryDays) {
+    for (const task of day.tasks) {
+      const dueAt = task.dueOffsetDays != null && slot.startDate
+        ? new Date(new Date(slot.startDate).getTime() - task.dueOffsetDays * 86400000)
+        : null;
+
+      opsToCreate.push({
+        bookingId: booking.id,
+        itineraryDayId: day.id,
+        sourceTemplateId: task.id,
+        category: task.category,
+        title: task.title,
+        description: task.description,
+        config: task.config ?? {},
+        unitPrice: task.unitPrice ?? null,
+        quantityNeeded: task.quantityNeeded ?? null,
+        dueAt,
+      });
     }
   }
 

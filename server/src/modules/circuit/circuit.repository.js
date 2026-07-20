@@ -235,7 +235,8 @@ export const update = async (
             title: task.title,
             description: task.description || null,
             config: task.config || {},
-            estimatedAmount: task.estimatedAmount ?? null,
+            unitPrice: task.unitPrice ?? null,
+            quantityNeeded: task.quantityNeeded ?? null,
             dueOffsetDays: task.dueOffsetDays ?? null,
           };
           if (task.id) {

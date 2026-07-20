@@ -150,7 +150,8 @@ model CircuitDayTask {
   title           String
   description     String?
   config          Json                    @default("{}")
-  estimatedAmount Decimal?                @db.Decimal(10, 2)
+  unitPrice       Decimal?                @db.Decimal(10, 2)
+  quantityNeeded  Int?
   dueOffsetDays   Int?
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
@@ -222,11 +223,30 @@ model ItineraryDay {
   updatedAt   DateTime  @updatedAt
 
   operationalTasks OperationalTask[]
+  tasks            ItineraryDayTask[]
 
   @@unique([tripId, dayNumber])
   @@unique([festivalId, dayNumber])
   @@index([tripId])
   @@index([festivalId])
+}
+
+model ItineraryDayTask {
+  id              String                  @id @default(uuid())
+  itineraryDayId  String
+  itineraryDay    ItineraryDay            @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+  category        OperationalTaskCategory
+  title           String
+  description     String?
+  config          Json                    @default("{}")
+  unitPrice       Decimal?                @db.Decimal(10, 2)
+  quantityNeeded  Int?
+  dueOffsetDays   Int?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@index([itineraryDayId])
+  @@index([category])
 }
 
 model LandingReason {

@@ -22,11 +22,25 @@ export const createItinerary = async (data) => {
     await itineraryRepo.removeByFestivalId(festivalId);
   }
 
-  const payload = days.map(day => ({
-    ...day,
-    tripId: tripId || null,
-    festivalId: festivalId || null,
-  }));
+  const payload = days.map(day => {
+    const { tasks, ...restDay } = day;
+    return {
+      ...restDay,
+      tripId: tripId || null,
+      festivalId: festivalId || null,
+      tasks: tasks && Array.isArray(tasks) ? {
+        create: tasks.map(task => ({
+          category: task.category,
+          title: task.title,
+          description: task.description || null,
+          config: task.config || {},
+          unitPrice: task.unitPrice ?? null,
+          quantityNeeded: task.quantityNeeded ?? null,
+          dueOffsetDays: task.dueOffsetDays ?? null,
+        }))
+      } : undefined,
+    };
+  });
 
   return itineraryRepo.createMany(payload);
 };

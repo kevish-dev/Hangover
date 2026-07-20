@@ -33,7 +33,8 @@ const circuitDayTaskSchema = z.object({
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().max(2000).optional(),
   config: z.record(z.unknown()).default({}),
-  estimatedAmount: z.number().positive().optional(),
+  unitPrice: z.number().positive().optional(),
+  quantityNeeded: z.number().int().positive().optional(),
   dueOffsetDays: z.number().int().optional(),
 });
 

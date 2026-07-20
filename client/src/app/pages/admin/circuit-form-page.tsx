@@ -92,7 +92,8 @@ const taskSchema = z.object({
   category: z.string().min(1),
   title: z.string().min(1, "Task title is required"),
   description: z.string().optional(),
-  estimatedAmount: optionalPositiveNumber,
+  unitPrice: optionalPositiveNumber,
+  quantityNeeded: optionalNonnegativeInteger,
   dueOffsetDays: optionalNonnegativeInteger,
 });
 
@@ -302,8 +303,10 @@ const toFormValues = (circuit: any): CircuitFormValues => ({
       category: task.category,
       title: task.title,
       description: task.description || "",
-      estimatedAmount:
-        task.estimatedAmount == null ? undefined : Number(task.estimatedAmount),
+      unitPrice:
+        task.unitPrice == null ? undefined : Number(task.unitPrice),
+      quantityNeeded:
+        task.quantityNeeded == null ? undefined : Number(task.quantityNeeded),
       dueOffsetDays: task.dueOffsetDays ?? undefined,
     })),
   })),
@@ -2030,7 +2033,8 @@ export default function CircuitFormPage() {
                                   category: "GENERAL",
                                   title: "",
                                   description: "",
-                                  estimatedAmount: undefined,
+                                  unitPrice: undefined,
+                                  quantityNeeded: undefined,
                                   dueOffsetDays: undefined,
                                 },
                               ])
@@ -2096,7 +2100,7 @@ export default function CircuitFormPage() {
                               </div>
                               <div>
                                 <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
-                                  Estimated amount
+                                  Unit Price
                                 </Label>
                                 <Input
                                   className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
@@ -2104,13 +2108,34 @@ export default function CircuitFormPage() {
                                   min={0.01}
                                   step="0.01"
                                   {...form.register(
-                                    `days.${dayIndex}.tasks.${taskIndex}.estimatedAmount`,
+                                    `days.${dayIndex}.tasks.${taskIndex}.unitPrice`,
                                   )}
                                 />
                                 <ErrorText
                                   message={
                                     form.formState.errors.days?.[dayIndex]
-                                      ?.tasks?.[taskIndex]?.estimatedAmount
+                                      ?.tasks?.[taskIndex]?.unitPrice
+                                      ?.message
+                                  }
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
+                                  Qty Needed
+                                </Label>
+                                <Input
+                                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                  type="number"
+                                  min={1}
+                                  step={1}
+                                  {...form.register(
+                                    `days.${dayIndex}.tasks.${taskIndex}.quantityNeeded`,
+                                  )}
+                                />
+                                <ErrorText
+                                  message={
+                                    form.formState.errors.days?.[dayIndex]
+                                      ?.tasks?.[taskIndex]?.quantityNeeded
                                       ?.message
                                   }
                                 />

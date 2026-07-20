@@ -24,6 +24,7 @@ import {
   ArrowUp,
   ArrowDown,
   Trash,
+  ClipboardList,
 } from "lucide-react";
 import { apiClient } from "../../../lib/axios";
 import { useQueryClient } from "@tanstack/react-query";
@@ -90,14 +91,25 @@ const tripSchema = z.object({
   isFeatured: z.boolean().default(false),
   isActive: z.boolean().default(true),
   isListed: z.boolean().default(true),
-  itinerary: z.array(
-    z.object({
-      day: z.string().min(1, "Day is required"),
-      title: z.string().min(1, "Title is required"),
-      description: z.string().optional(),
-      todos: z.preprocess((val) => typeof val === 'string' ? val.split('\n').filter(Boolean) : val, z.array(z.string())).optional(),
-    })
-  ).optional(),
+    itinerary: z.array(
+      z.object({
+        day: z.string().min(1, "Day is required"),
+        title: z.string().min(1, "Title is required"),
+        description: z.string().optional(),
+        todos: z.preprocess((val) => typeof val === 'string' ? val.split('\n').filter(Boolean) : val, z.array(z.string())).optional(),
+        tasks: z.array(
+          z.object({
+            id: z.string().uuid().optional(),
+            category: z.string().min(1),
+            title: z.string().min(1, "Task title is required"),
+            description: z.string().optional(),
+            unitPrice: z.coerce.number().positive().optional(),
+            quantityNeeded: z.coerce.number().int().nonnegative().optional(),
+            dueOffsetDays: z.coerce.number().int().nonnegative().optional(),
+          })
+        ).optional().default([]),
+      })
+    ).optional(),
   }
 );
 
@@ -117,12 +129,24 @@ const TRIP_TYPES = [
   "CUSTOM_TRIP",
 ];
 
+const TASK_CATEGORIES = [
+  "HOTEL",
+  "TRANSPORT",
+  "PERMIT",
+  "VENDOR",
+  "ACTIVITY",
+  "DOCUMENTATION",
+  "PAYMENT_COLLECTION",
+  "GENERAL",
+];
+
 const STEPS = [
   "Basics",
   "Logistics",
   "Content",
   "FAQs & Tags",
   "Itinerary",
+  "Operations",
   "Stay & Transport",
   "Media",
 ];
@@ -447,6 +471,11 @@ export function TripFormModal({
     control: form.control,
     name: "faqs",
   });
+  
+  const { fields: itineraryFields } = useFieldArray({
+    control: form.control,
+    name: "itinerary",
+  });
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -632,7 +661,8 @@ export function TripFormModal({
     }
     if (step === 3) fieldsToValidate = ["faqs", "tripTags"];
     if (step === 4) fieldsToValidate = ["itinerary"];
-    if (step === 5) return true; // Stay & Transport has local state, basic validation can be skipped or added if needed
+    if (step === 5) fieldsToValidate = ["itinerary"]; // Operations validates the tasks inside itinerary
+    if (step === 6) return true; // Stay & Transport has local state, basic validation can be skipped or added if needed
 
     const isValid = await form.trigger(fieldsToValidate);
 
@@ -648,7 +678,7 @@ export function TripFormModal({
       }
     }
 
-    if (step === 5) {
+    if (step === 6) {
       const invalid = stayItems.some(
         (i) => i.text.trim() === "" || (!i.preview && !i.url),
       );
@@ -671,6 +701,7 @@ export function TripFormModal({
     else if (step === 2) fieldsToValidate = ["overview", "inclusions", "exclusions"];
     else if (step === 3) fieldsToValidate = ["faqs", "tripTags"];
     else if (step === 4) fieldsToValidate = ["itinerary"];
+    else if (step === 5) fieldsToValidate = ["itinerary"]; // Operations validates the tasks inside itinerary
 
     if (await validateStep()) {
       setStep((s) => {
@@ -1540,8 +1571,166 @@ export function TripFormModal({
               <ItineraryStep control={form.control} register={form.register} errors={form.formState.errors} />
             </div>
 
-            {/* STEP 5: STAY & TRANSPORT */}
+            {/* STEP 5: OPERATIONS */}
             <div className={step === 5 ? "block" : "hidden"}>
+              <div className="space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold text-lg text-gray-900">Operations & Tasks</h3>
+                    <p className="text-sm text-gray-500">
+                      Internal operational tasks and templates to be materialized on departure.
+                    </p>
+                  </div>
+                </div>
+                {itineraryFields.map((field, dayIndex) => {
+                  const day = form.getValues(`itinerary.${dayIndex}`);
+                  return (
+                    <section
+                      key={field.id}
+                      className="rounded-xl border border-[#eadcb9] bg-[#fcf8ef] p-4 sm:p-5"
+                    >
+                      <div className="mb-3 flex items-center justify-between border-b border-[#e1cf9d] pb-3">
+                        <div className="flex items-center gap-2">
+                          <ClipboardList className="h-5 w-5 text-[#8a6414]" />
+                          <h4 className="font-semibold text-[#8a6414]">
+                            {day?.day || `Day ${dayIndex + 1}`}{" "}
+                            {day?.title ? `- ${day?.title}` : ""}
+                          </h4>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const currentTasks = form.getValues(`itinerary.${dayIndex}.tasks`) || [];
+                            form.setValue(`itinerary.${dayIndex}.tasks`, [
+                              ...currentTasks,
+                              {
+                                category: "GENERAL",
+                                title: "",
+                                description: "",
+                                unitPrice: undefined,
+                                quantityNeeded: undefined,
+                                dueOffsetDays: undefined,
+                              },
+                            ]);
+                          }}
+                        >
+                          <Plus className="mr-1 h-4 w-4" /> Add Task
+                        </Button>
+                      </div>
+                      {!(day?.tasks?.length) ? (
+                        <p className="text-sm text-gray-500 italic">
+                          No operational work configured for this day.
+                        </p>
+                      ) : (
+                        day.tasks.map((_: any, taskIndex: number) => (
+                          <div
+                            key={taskIndex}
+                            className="mb-3 grid gap-2 rounded-lg border bg-white p-3 md:grid-cols-2 shadow-sm"
+                          >
+                            <div className="flex justify-end md:col-span-2">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const currentTasks = form.getValues(`itinerary.${dayIndex}.tasks`);
+                                  currentTasks.splice(taskIndex, 1);
+                                  form.setValue(`itinerary.${dayIndex}.tasks`, currentTasks);
+                                }}
+                                className="h-6 px-2 text-red-500 hover:bg-red-50 hover:text-red-600"
+                              >
+                                <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove Task
+                              </Button>
+                            </div>
+                            <div>
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
+                                Category
+                              </Label>
+                              <select
+                                {...form.register(`itinerary.${dayIndex}.tasks.${taskIndex}.category`)}
+                                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {TASK_CATEGORIES.map((value) => (
+                                  <option key={value} value={value}>
+                                    {value.replaceAll("_", " ")}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
+                                Task title
+                              </Label>
+                              <Input
+                                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                {...form.register(`itinerary.${dayIndex}.tasks.${taskIndex}.title`)}
+                              />
+                              {form.formState.errors.itinerary?.[dayIndex]?.tasks?.[taskIndex]?.title && (
+                                <p className="mt-1 text-xs text-red-600">
+                                  {form.formState.errors.itinerary[dayIndex]?.tasks?.[taskIndex]?.title?.message}
+                                </p>
+                              )}
+                            </div>
+                            <div className="md:col-span-2">
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
+                                Description
+                              </Label>
+                              <Input
+                                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                {...form.register(`itinerary.${dayIndex}.tasks.${taskIndex}.description`)}
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
+                                Unit Price
+                              </Label>
+                              <Input
+                                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                type="number"
+                                min={0.01}
+                                step="0.01"
+                                {...form.register(`itinerary.${dayIndex}.tasks.${taskIndex}.unitPrice`)}
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
+                                Qty Needed
+                              </Label>
+                              <Input
+                                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                type="number"
+                                min={1}
+                                step={1}
+                                {...form.register(`itinerary.${dayIndex}.tasks.${taskIndex}.quantityNeeded`)}
+                              />
+                            </div>
+                            <div className="flex items-end gap-2">
+                              <div className="flex-1">
+                                <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
+                                  Due before departure (days)
+                                </Label>
+                                <Input
+                                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                  type="number"
+                                  min={0}
+                                  step={1}
+                                  {...form.register(`itinerary.${dayIndex}.tasks.${taskIndex}.dueOffsetDays`)}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </section>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* STEP 6: STAY & TRANSPORT */}
+            <div className={step === 6 ? "block" : "hidden"}>
               <div className="space-y-4">
                 <div className="border-b pb-3">
                   <div>
@@ -1619,8 +1808,8 @@ export function TripFormModal({
               </div>
             </div>
 
-            {/* STEP 6: MEDIA (BANNER IMAGES) */}
-            <div className={step === 6 ? "block" : "hidden"}>
+            {/* STEP 7: MEDIA (BANNER IMAGES) */}
+            <div className={step === 7 ? "block" : "hidden"}>
               <div className="space-y-4">
                 {((isEdit && trip?.bannerImages?.length > 0) || (!isEdit && sourceCircuit?.bannerImages?.length > 0)) && (
                   <div className="mb-6">
