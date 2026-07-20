@@ -556,9 +556,9 @@ model OperationalTask {
   title              String
   description        String?
   config             Json                    @default("{}")
-  estimatedAmount    Decimal                 @default(0) @db.Decimal(10, 2)
-  amountArranged     Decimal                 @default(0) @db.Decimal(10, 2)
-  amountPaid         Decimal                 @default(0) @db.Decimal(10, 2)
+  unitPrice          Decimal?                @db.Decimal(10, 2)
+  quantityNeeded     Int?
+  quantityAcquired   Int?
   dueAt              DateTime?
   status             OperationalTaskStatus   @default(PENDING)
   assigneeId         String?

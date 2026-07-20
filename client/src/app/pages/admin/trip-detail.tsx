@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../lib/axios";
 import { format } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import {
   ArrowLeft,
   Map,
@@ -267,20 +268,24 @@ function BookingsTab({ tripId }: { tripId: string }) {
               className="pl-9 pr-4 py-2 w-full border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/40"
             />
           </div>
-          <select
+          <Select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/40 bg-white"
+            onValueChange={setStatusFilter}
           >
-            <option value="ALL">All Status</option>
-            <option value="CONFIRMED">Confirmed</option>
-            <option value="RESERVED">Reserved</option>
-            <option value="PENDING">Pending</option>
-            <option value="CANCELLED">Cancelled</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="PAID">Paid</option>
-            <option value="PARTIALLY_PAID">Partially Paid</option>
-          </select>
+            <SelectTrigger className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 bg-white h-auto w-[180px]">
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Status</SelectItem>
+              <SelectItem value="CONFIRMED">Confirmed</SelectItem>
+              <SelectItem value="RESERVED">Reserved</SelectItem>
+              <SelectItem value="PENDING">Pending</SelectItem>
+              <SelectItem value="CANCELLED">Cancelled</SelectItem>
+              <SelectItem value="COMPLETED">Completed</SelectItem>
+              <SelectItem value="PAID">Paid</SelectItem>
+              <SelectItem value="PARTIALLY_PAID">Partially Paid</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Booking list */}
@@ -400,7 +405,8 @@ function OperationsTab({ tripId }: { tripId: string }) {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [newRow, setNewRow] = useState<any>({
     bookingId: "", title: "", category: "GENERAL", status: "PENDING",
-    estimatedAmount: "", dueAt: format(new Date(), "yyyy-MM-dd"),
+    unitPrice: "", quantityNeeded: "", quantityAcquired: "",
+    dueAt: format(new Date(), "yyyy-MM-dd"),
   });
 
   const { data: bookings = [] } = useQuery({
@@ -445,7 +451,7 @@ function OperationsTab({ tripId }: { tripId: string }) {
     onSuccess: async () => {
       toast.success("Task created");
       await queryClient.invalidateQueries({ queryKey: ["admin", "trip-ops", tripId] });
-      setNewRow({ bookingId: "", title: "", category: "GENERAL", status: "PENDING", estimatedAmount: "", dueAt: format(new Date(), "yyyy-MM-dd") });
+      setNewRow({ bookingId: "", title: "", category: "GENERAL", status: "PENDING", unitPrice: "", quantityNeeded: "", quantityAcquired: "", dueAt: format(new Date(), "yyyy-MM-dd") });
     },
     onError: (err: any) => toast.error(err?.response?.data?.message || "Failed to create task"),
   });
@@ -459,14 +465,17 @@ function OperationsTab({ tripId }: { tripId: string }) {
   const handleNewRowSubmit = () => {
     if (!newRow.bookingId) return toast.error("Select a booking first");
     if (!newRow.title.trim()) return toast.error("Title is required");
-    createMutation.mutate({
+    const payload: any = {
       bookingId: newRow.bookingId,
       title: newRow.title,
       category: newRow.category,
       status: newRow.status,
-      estimatedAmount: Number(newRow.estimatedAmount) || 0,
       dueAt: newRow.dueAt ? new Date(newRow.dueAt).toISOString() : null,
-    });
+    };
+    if (newRow.unitPrice !== "") payload.unitPrice = Number(newRow.unitPrice);
+    if (newRow.quantityNeeded !== "") payload.quantityNeeded = Number(newRow.quantityNeeded);
+    if (newRow.quantityAcquired !== "") payload.quantityAcquired = Number(newRow.quantityAcquired);
+    createMutation.mutate(payload);
   };
 
   const filtered = tasks.filter((t: any) => {
@@ -521,16 +530,24 @@ function OperationsTab({ tripId }: { tripId: string }) {
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 pr-4 py-2 w-full border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/40" />
         </div>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none bg-white">
-          <option value="">All Statuses</option>
-          {STATUSES_OPS.map((s) => <option key={s}>{s.replace(/_/g, " ")}</option>)}
-        </select>
-        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none bg-white">
-          <option value="">All Categories</option>
-          {CATEGORIES.map((c) => <option key={c}>{c.replace(/_/g, " ")}</option>)}
-        </select>
+        <Select value={statusFilter || "all"} onValueChange={(val) => setStatusFilter(val === "all" ? "" : val)}>
+          <SelectTrigger className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 bg-white h-auto">
+            <SelectValue placeholder="All Statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            {STATUSES_OPS.map((s) => <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={categoryFilter || "all"} onValueChange={(val) => setCategoryFilter(val === "all" ? "" : val)}>
+          <SelectTrigger className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 bg-white h-auto">
+            <SelectValue placeholder="All Categories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c.replace(/_/g, " ")}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Excel Grid */}
@@ -544,9 +561,10 @@ function OperationsTab({ tripId }: { tripId: string }) {
                 <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-36">Category</th>
                 <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300">Title</th>
                 <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-32">Due Date</th>
-                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-28 text-right">Est. ₹</th>
-                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-28 text-right">Arranged ₹</th>
-                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-28 text-right">Paid ₹</th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-24 text-right">Unit Price</th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-24 text-right">Qty Need</th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-24 text-right">Qty Acq</th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-28 text-right">Total ₹</th>
                 <th className="px-2 py-2.5 text-gray-600 w-10"></th>
               </tr>
             </thead>
@@ -562,18 +580,28 @@ function OperationsTab({ tripId }: { tripId: string }) {
                     </div>
                   </td>
                   <td className="border-r border-gray-200 p-0">
-                    <select defaultValue={task.status}
-                      onChange={(e) => handleCellChange(task, "status", e.target.value)}
-                      className={`w-full min-h-10 px-2 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 font-bold text-[11px] tracking-wide ${STATUS_COLORS[task.status] || "text-gray-600"}`}>
-                      {STATUSES_OPS.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    <Select defaultValue={task.status}
+                      onValueChange={(val) => handleCellChange(task, "status", val)}
+                    >
+                      <SelectTrigger className={`h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 font-bold text-[11px] tracking-wide ${STATUS_COLORS[task.status] || "text-gray-600"}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUSES_OPS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </td>
                   <td className="border-r border-gray-200 p-0">
-                    <select defaultValue={task.category}
-                      onChange={(e) => handleCellChange(task, "category", e.target.value)}
-                      className="w-full min-h-10 px-2 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 text-xs text-gray-600">
-                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                    <Select defaultValue={task.category}
+                      onValueChange={(val) => handleCellChange(task, "category", val)}
+                    >
+                      <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 text-xs text-gray-600">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </td>
                   <td className="border-r border-gray-200 p-0">
                     <input type="text" defaultValue={task.title}
@@ -586,19 +614,26 @@ function OperationsTab({ tripId }: { tripId: string }) {
                       className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 text-xs text-gray-600" />
                   </td>
                   <td className="border-r border-gray-200 p-0">
-                    <input type="number" step="0.01" defaultValue={task.estimatedAmount}
-                      onBlur={(e) => handleCellChange(task, "estimatedAmount", e.target.value)}
-                      className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-gray-500 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400" />
+                    <input type="number" step="0.01" defaultValue={task.unitPrice ?? ""}
+                      onBlur={(e) => handleCellChange(task, "unitPrice", e.target.value)}
+                      className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-gray-700 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400" />
                   </td>
                   <td className="border-r border-gray-200 p-0">
-                    <input type="number" step="0.01" defaultValue={task.amountArranged}
-                      onBlur={(e) => handleCellChange(task, "amountArranged", e.target.value)}
-                      className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono font-semibold text-blue-600 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400" />
+                    <input type="number" defaultValue={task.quantityNeeded ?? ""}
+                      onBlur={(e) => handleCellChange(task, "quantityNeeded", e.target.value)}
+                      className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-gray-700 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400" />
                   </td>
                   <td className="border-r border-gray-200 p-0">
-                    <input type="number" step="0.01" defaultValue={task.amountPaid}
-                      onBlur={(e) => handleCellChange(task, "amountPaid", e.target.value)}
-                      className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono font-semibold text-emerald-600 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400" />
+                    <input type="number" defaultValue={task.quantityAcquired ?? ""}
+                      onBlur={(e) => handleCellChange(task, "quantityAcquired", e.target.value)}
+                      className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-blue-600 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400" />
+                  </td>
+                  <td className="border-r border-gray-200 p-0 bg-gray-50/50">
+                    <div className="w-full min-h-10 px-3 flex items-center justify-end text-gray-600 font-mono text-sm">
+                      {task.unitPrice && task.quantityNeeded
+                        ? (Number(task.unitPrice) * Number(task.quantityNeeded)).toFixed(2)
+                        : "—"}
+                    </div>
                   </td>
                   <td className="p-0 text-center">
                     <button onClick={() => { if (window.confirm("Delete this task?")) deleteMutation.mutate(task.id); }}
@@ -613,23 +648,34 @@ function OperationsTab({ tripId }: { tripId: string }) {
               {/* New row */}
               <tr className="bg-indigo-50/40 border-t-2 border-indigo-200">
                 <td className="border-r border-gray-200 p-0">
-                  <select value={newRow.bookingId} onChange={(e) => setNewRow({...newRow, bookingId: e.target.value})}
-                    className="w-full min-h-10 px-2 bg-transparent outline-none focus:bg-indigo-100 text-xs font-mono font-bold text-[#781216]">
-                    <option value="">Select booking...</option>
-                    {bookings.map((b: any) => <option key={b.id} value={b.id}>{b.bookingReference}</option>)}
-                  </select>
+                  <Select value={newRow.bookingId} onValueChange={(val) => setNewRow({...newRow, bookingId: val})}>
+                    <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-indigo-100 text-xs font-mono font-bold text-[#781216]">
+                      <SelectValue placeholder="Select booking..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bookings.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.bookingReference}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </td>
                 <td className="border-r border-gray-200 p-0">
-                  <select value={newRow.status} onChange={(e) => setNewRow({...newRow, status: e.target.value})}
-                    className="w-full min-h-10 px-2 bg-transparent outline-none focus:bg-indigo-100 text-[11px] font-bold text-gray-500">
-                    {STATUSES_OPS.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                  <Select value={newRow.status} onValueChange={(val) => setNewRow({...newRow, status: val})}>
+                    <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-indigo-100 text-[11px] font-bold text-gray-500">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUSES_OPS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </td>
                 <td className="border-r border-gray-200 p-0">
-                  <select value={newRow.category} onChange={(e) => setNewRow({...newRow, category: e.target.value})}
-                    className="w-full min-h-10 px-2 bg-transparent outline-none focus:bg-indigo-100 text-xs">
-                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  <Select value={newRow.category} onValueChange={(val) => setNewRow({...newRow, category: val})}>
+                    <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-indigo-100 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </td>
                 <td className="border-r border-gray-200 p-0">
                   <input type="text" value={newRow.title} placeholder="New task title..."
@@ -642,16 +688,29 @@ function OperationsTab({ tripId }: { tripId: string }) {
                     className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-indigo-100 text-xs" />
                 </td>
                 <td className="border-r border-gray-200 p-0">
-                  <input type="number" step="0.01" value={newRow.estimatedAmount} placeholder="0"
-                    onChange={(e) => setNewRow({...newRow, estimatedAmount: e.target.value})}
-                    onKeyDown={(e) => e.key === "Enter" && handleNewRowSubmit()}
+                  <input type="number" step="0.01" value={newRow.unitPrice}
+                    onChange={(e) => setNewRow({...newRow, unitPrice: e.target.value})}
+                    placeholder="₹"
                     className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono focus:bg-indigo-100" />
                 </td>
-                <td className="border-r border-gray-200 p-0 bg-gray-50/50">
-                  <div className="w-full min-h-10 px-3 flex items-center justify-end text-gray-300 text-xs italic">auto</div>
+                <td className="border-r border-gray-200 p-0">
+                  <input type="number" value={newRow.quantityNeeded}
+                    onChange={(e) => setNewRow({...newRow, quantityNeeded: e.target.value})}
+                    placeholder="0"
+                    className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono focus:bg-indigo-100" />
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <input type="number" value={newRow.quantityAcquired}
+                    onChange={(e) => setNewRow({...newRow, quantityAcquired: e.target.value})}
+                    placeholder="0"
+                    className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-blue-600 focus:bg-indigo-100" />
                 </td>
                 <td className="border-r border-gray-200 p-0 bg-gray-50/50">
-                  <div className="w-full min-h-10 px-3 flex items-center justify-end text-gray-300 text-xs italic">auto</div>
+                  <div className="w-full min-h-10 px-3 flex items-center justify-end text-gray-500 font-mono text-sm">
+                    {newRow.unitPrice && newRow.quantityNeeded
+                      ? (Number(newRow.unitPrice) * Number(newRow.quantityNeeded)).toFixed(2)
+                      : "—"}
+                  </div>
                 </td>
                 <td className="p-0 text-center">
                   <button onClick={handleNewRowSubmit} disabled={createMutation.isPending}
@@ -769,12 +828,16 @@ function LedgerTab({ tripId }: { tripId: string }) {
             value={search} onChange={(e) => setSearch(e.target.value)}
             className="pl-9 pr-4 py-2 w-full border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/40" />
         </div>
-        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none bg-white">
-          <option value="">All Types</option>
-          <option>INCOME</option>
-          <option>EXPENSE</option>
-        </select>
+        <Select value={typeFilter || "all"} onValueChange={(val) => setTypeFilter(val === "all" ? "" : val)}>
+          <SelectTrigger className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 bg-white h-auto w-[150px]">
+            <SelectValue placeholder="All Types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="INCOME">INCOME</SelectItem>
+            <SelectItem value="EXPENSE">EXPENSE</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Excel grid */}
@@ -808,21 +871,29 @@ function LedgerTab({ tripId }: { tripId: string }) {
                         <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">AUTO</span>
                       </div>
                     ) : (
-                      <select defaultValue={entry.type} onChange={(e) => handleCellChange(entry, "type", e.target.value)}
-                        className={`w-full min-h-10 px-2 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 font-bold text-[11px] ${entry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`}>
-                        <option value="INCOME">INCOME</option>
-                        <option value="EXPENSE">EXPENSE</option>
-                      </select>
+                      <Select defaultValue={entry.type} onValueChange={(val) => handleCellChange(entry, "type", val)}>
+                        <SelectTrigger className={`h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 font-bold text-[11px] ${entry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="INCOME">INCOME</SelectItem>
+                          <SelectItem value="EXPENSE">EXPENSE</SelectItem>
+                        </SelectContent>
+                      </Select>
                     )}
                   </td>
                   <td className="border-r border-gray-200 p-0">
                     {entry.isAutoGenerated ? (
                       <div className="min-h-10 px-3 flex items-center text-gray-700 font-medium text-xs">{entry.category}</div>
                     ) : (
-                      <select defaultValue={entry.category} onChange={(e) => handleCellChange(entry, "category", e.target.value)}
-                        className="w-full min-h-10 px-2 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 text-xs">
-                        {LEDGER_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
+                      <Select defaultValue={entry.category} onValueChange={(val) => handleCellChange(entry, "category", val)}>
+                        <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LEDGER_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                     )}
                   </td>
                   <td className="border-r border-gray-200 p-0">
@@ -861,17 +932,25 @@ function LedgerTab({ tripId }: { tripId: string }) {
                     className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-emerald-100 text-xs" />
                 </td>
                 <td className="border-r border-gray-200 p-0">
-                  <select value={newEntry.type} onChange={(e) => setNewEntry({...newEntry, type: e.target.value})}
-                    className={`w-full min-h-10 px-2 bg-transparent outline-none focus:bg-emerald-100 font-bold text-[11px] ${newEntry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`}>
-                    <option value="INCOME">INCOME</option>
-                    <option value="EXPENSE">EXPENSE</option>
-                  </select>
+                  <Select value={newEntry.type} onValueChange={(val) => setNewEntry({...newEntry, type: val})}>
+                    <SelectTrigger className={`h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-emerald-100 font-bold text-[11px] ${newEntry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="INCOME">INCOME</SelectItem>
+                      <SelectItem value="EXPENSE">EXPENSE</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </td>
                 <td className="border-r border-gray-200 p-0">
-                  <select value={newEntry.category} onChange={(e) => setNewEntry({...newEntry, category: e.target.value})}
-                    className="w-full min-h-10 px-2 bg-transparent outline-none focus:bg-emerald-100 text-xs">
-                    {LEDGER_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  <Select value={newEntry.category} onValueChange={(val) => setNewEntry({...newEntry, category: val})}>
+                    <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-emerald-100 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LEDGER_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </td>
                 <td className="border-r border-gray-200 p-0">
                   <input type="text" value={newEntry.description} placeholder="Description (optional)"

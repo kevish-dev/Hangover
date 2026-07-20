@@ -6,6 +6,13 @@ import { toast } from "sonner";
 import { apiClient } from "../../../lib/axios";
 import { Input } from "../../components/ui/input";
 import { getErrorMessage, showErrorToast } from "../../../lib/errors";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
 
 type Task = {
   id: string;
@@ -13,9 +20,9 @@ type Task = {
   description?: string | null;
   category: string;
   status: string;
-  estimatedAmount: string | number;
-  amountArranged: string | number;
-  amountPaid: string | number;
+  unitPrice?: number | null;
+  quantityNeeded?: number | null;
+  quantityAcquired?: number | null;
   dueAt?: string | null;
   completedAt?: string | null;
   booking: {
@@ -39,8 +46,8 @@ export default function AdminOperationsPage() {
   const query = useQuery({
     queryKey: ["admin", "operations"],
     queryFn: async () => {
-      const res = await apiClient.get<{ tasks: Task[] }>("/operations");
-      return res.data?.tasks || [];
+      const res = await apiClient.get<Task[]>("/operations");
+      return res.data || [];
     },
   });
 
@@ -70,7 +77,9 @@ export default function AdminOperationsPage() {
         title: "",
         category: "GENERAL",
         status: "PENDING",
-        estimatedAmount: 0,
+        unitPrice: "",
+        quantityNeeded: "",
+        quantityAcquired: "",
         dueAt: format(new Date(), "yyyy-MM-dd"),
       });
     },
@@ -93,7 +102,9 @@ export default function AdminOperationsPage() {
     title: "",
     category: "GENERAL",
     status: "PENDING",
-    estimatedAmount: 0,
+    unitPrice: "",
+    quantityNeeded: "",
+    quantityAcquired: "",
     dueAt: format(new Date(), "yyyy-MM-dd"),
   });
 
@@ -112,22 +123,27 @@ export default function AdminOperationsPage() {
     if (!newRow.bookingId) return toast.error("Booking reference is required");
     if (!newRow.title.trim()) return toast.error("Title is required");
     
-    createMutation.mutate({
+    const payload: any = {
       bookingId: newRow.bookingId,
       title: newRow.title,
       category: newRow.category,
       status: newRow.status,
-      estimatedAmount: Number(newRow.estimatedAmount) || 0,
       dueAt: newRow.dueAt ? new Date(newRow.dueAt).toISOString() : null,
-    });
+    };
+
+    if (newRow.unitPrice !== "") payload.unitPrice = Number(newRow.unitPrice);
+    if (newRow.quantityNeeded !== "") payload.quantityNeeded = Number(newRow.quantityNeeded);
+    if (newRow.quantityAcquired !== "") payload.quantityAcquired = Number(newRow.quantityAcquired);
+
+    createMutation.mutate(payload);
   };
 
   const allTasks = query.data || [];
   
   const filtered = useMemo(() => {
     return allTasks.filter((task) => {
-      if (status && task.status !== status) return false;
-      if (category && task.category !== category) return false;
+      if (status && status !== "all" && task.status !== status) return false;
+      if (category && category !== "all" && task.category !== category) return false;
       const needle = search.trim().toLowerCase();
       if (!needle) return true;
       return [
@@ -167,14 +183,28 @@ export default function AdminOperationsPage() {
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search title or booking..." className="pl-10" />
         </div>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className="flex h-10 rounded-md border border-input bg-background px-3 text-sm">
-          <option value="">All statuses</option>
-          {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select value={category} onChange={(e) => setCategory(e.target.value)} className="flex h-10 rounded-md border border-input bg-background px-3 text-sm">
-          <option value="">All categories</option>
-          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
+        <Select value={status} onValueChange={setStatus}>
+          <SelectTrigger className="h-10 rounded-md border-input bg-background shadow-none">
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>{s}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={category} onValueChange={setCategory}>
+          <SelectTrigger className="h-10 rounded-md border-input bg-background shadow-none">
+            <SelectValue placeholder="All categories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All categories</SelectItem>
+            {CATEGORIES.map((c) => (
+              <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col">
@@ -187,9 +217,9 @@ export default function AdminOperationsPage() {
                 <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-40">Category</th>
                 <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300">Title</th>
                 <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-32">Due Date</th>
-                <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-32 text-right">Est. Cost</th>
-                <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-32 text-right">Arranged</th>
-                <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-32 text-right">Paid</th>
+                <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-24 text-right">Unit Price</th>
+                <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-24 text-right">Qty Need</th>
+                <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-24 text-right">Qty Acq</th>
                 <th className="px-2 py-2 font-semibold text-gray-600 w-10 text-center"></th>
               </tr>
             </thead>
@@ -202,22 +232,30 @@ export default function AdminOperationsPage() {
                     </div>
                   </td>
                   <td className="border-r border-gray-200 p-0">
-                    <select 
+                    <Select 
                       defaultValue={task.status}
-                      onChange={(e) => handleCellChange(task, "status", e.target.value)}
-                      className={`w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 font-semibold text-[10px] tracking-wide ${task.status === 'DONE' ? 'text-emerald-700' : task.status === 'CANCELLED' ? 'text-red-700' : 'text-blue-700'}`}
+                      onValueChange={(val) => handleCellChange(task, "status", val)}
                     >
-                      {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                      <SelectTrigger className={`h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 font-semibold text-[10px] tracking-wide ${task.status === 'DONE' ? 'text-emerald-700' : task.status === 'CANCELLED' ? 'text-red-700' : 'text-blue-700'}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </td>
                   <td className="border-r border-gray-200 p-0">
-                    <select 
+                    <Select 
                       defaultValue={task.category}
-                      onChange={(e) => handleCellChange(task, "category", e.target.value)}
-                      className="w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 text-xs"
+                      onValueChange={(val) => handleCellChange(task, "category", val)}
                     >
-                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                      <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </td>
                   <td className="border-r border-gray-200 p-0">
                     <input 
@@ -239,27 +277,25 @@ export default function AdminOperationsPage() {
                     <input 
                       type="number"
                       step="0.01"
-                      defaultValue={task.estimatedAmount}
-                      onBlur={(e) => handleCellChange(task, "estimatedAmount", e.target.value)}
-                      className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-gray-500 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500"
+                      defaultValue={task.unitPrice ?? ""}
+                      onBlur={(e) => handleCellChange(task, "unitPrice", e.target.value)}
+                      className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-gray-700 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500"
                     />
                   </td>
                   <td className="border-r border-gray-200 p-0">
                     <input 
                       type="number"
-                      step="0.01"
-                      defaultValue={task.amountArranged}
-                      onBlur={(e) => handleCellChange(task, "amountArranged", e.target.value)}
-                      className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-blue-600 font-semibold focus:bg-blue-50 focus:ring-1 focus:ring-blue-500"
+                      defaultValue={task.quantityNeeded ?? ""}
+                      onBlur={(e) => handleCellChange(task, "quantityNeeded", e.target.value)}
+                      className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-gray-700 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500"
                     />
                   </td>
                   <td className="border-r border-gray-200 p-0">
                     <input 
                       type="number"
-                      step="0.01"
-                      defaultValue={task.amountPaid}
-                      onBlur={(e) => handleCellChange(task, "amountPaid", e.target.value)}
-                      className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-emerald-600 font-semibold focus:bg-blue-50 focus:ring-1 focus:ring-blue-500"
+                      defaultValue={task.quantityAcquired ?? ""}
+                      onBlur={(e) => handleCellChange(task, "quantityAcquired", e.target.value)}
+                      className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-blue-600 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500"
                     />
                   </td>
                   <td className="p-0 text-center align-middle">
@@ -277,32 +313,43 @@ export default function AdminOperationsPage() {
               {/* Add New Row */}
               <tr className="bg-indigo-50/30 border-t-2 border-indigo-200">
                 <td className="border-r border-gray-200 p-0">
-                  <select 
+                  <Select 
                     value={newRow.bookingId}
-                    onChange={(e) => setNewRow({...newRow, bookingId: e.target.value})}
-                    className="w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-indigo-100 focus:ring-1 focus:ring-indigo-500 text-xs font-mono font-medium"
+                    onValueChange={(val) => setNewRow({...newRow, bookingId: val})}
                   >
-                    <option value="">Select Booking...</option>
-                    {bookings.map((b: any) => <option key={b.id} value={b.id}>{b.bookingReference}</option>)}
-                  </select>
+                    <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-indigo-100 focus:ring-1 focus:ring-indigo-500 text-xs font-mono font-medium">
+                      <SelectValue placeholder="Select Booking..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bookings.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.bookingReference}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </td>
                 <td className="border-r border-gray-200 p-0">
-                  <select 
+                  <Select 
                     value={newRow.status}
-                    onChange={(e) => setNewRow({...newRow, status: e.target.value})}
-                    className="w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-indigo-100 focus:ring-1 focus:ring-indigo-500 font-semibold text-[10px] tracking-wide text-gray-500"
+                    onValueChange={(val) => setNewRow({...newRow, status: val})}
                   >
-                    {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                    <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-indigo-100 focus:ring-1 focus:ring-indigo-500 font-semibold text-[10px] tracking-wide text-gray-500">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </td>
                 <td className="border-r border-gray-200 p-0">
-                  <select 
+                  <Select 
                     value={newRow.category}
-                    onChange={(e) => setNewRow({...newRow, category: e.target.value})}
-                    className="w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-indigo-100 focus:ring-1 focus:ring-indigo-500 text-xs"
+                    onValueChange={(val) => setNewRow({...newRow, category: val})}
                   >
-                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                    <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-indigo-100 focus:ring-1 focus:ring-indigo-500 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </td>
                 <td className="border-r border-gray-200 p-0">
                   <input 
@@ -326,17 +373,36 @@ export default function AdminOperationsPage() {
                   <input 
                     type="number"
                     step="0.01"
-                    value={newRow.estimatedAmount}
-                    onChange={(e) => setNewRow({...newRow, estimatedAmount: e.target.value})}
-                    onKeyDown={(e) => e.key === 'Enter' && handleNewRowSubmit()}
+                    value={newRow.unitPrice}
+                    onChange={(e) => setNewRow({...newRow, unitPrice: e.target.value})}
+                    placeholder="₹"
                     className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono focus:bg-indigo-100 focus:ring-1 focus:ring-indigo-500"
                   />
                 </td>
-                <td className="border-r border-gray-200 p-0 bg-gray-50/50">
-                  <div className="w-full h-full min-h-10 px-3 flex items-center justify-end text-gray-400 text-xs italic">Auto</div>
+                <td className="border-r border-gray-200 p-0">
+                  <input 
+                    type="number"
+                    value={newRow.quantityNeeded}
+                    onChange={(e) => setNewRow({...newRow, quantityNeeded: e.target.value})}
+                    placeholder="0"
+                    className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono focus:bg-indigo-100 focus:ring-1 focus:ring-indigo-500"
+                  />
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <input 
+                    type="number"
+                    value={newRow.quantityAcquired}
+                    onChange={(e) => setNewRow({...newRow, quantityAcquired: e.target.value})}
+                    placeholder="0"
+                    className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-blue-600 focus:bg-indigo-100 focus:ring-1 focus:ring-indigo-500"
+                  />
                 </td>
                 <td className="border-r border-gray-200 p-0 bg-gray-50/50">
-                  <div className="w-full h-full min-h-10 px-3 flex items-center justify-end text-gray-400 text-xs italic">Auto</div>
+                  <div className="w-full h-full min-h-10 px-3 flex items-center justify-end text-gray-500 font-mono text-sm">
+                    {newRow.unitPrice && newRow.quantityNeeded
+                      ? (Number(newRow.unitPrice) * Number(newRow.quantityNeeded)).toFixed(2)
+                      : "—"}
+                  </div>
                 </td>
                 <td className="p-0 text-center align-middle">
                   <button 

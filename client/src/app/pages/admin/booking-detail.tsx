@@ -3,6 +3,7 @@ import { apiClient } from "../../../lib/axios";
 import { CalendarCheck, IndianRupee, Loader2, ArrowLeft, User, MapPin, Mail, Phone, Image as ImageIcon, AlertCircle, Plus, Trash2, ClipboardCheck } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { toast } from "sonner";
 import { useNavigate, useParams } from "react-router";
 
@@ -63,8 +64,10 @@ function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
         title: "",
         category: "GENERAL",
         status: "PENDING",
-        estimatedAmount: 0,
         dueAt: format(new Date(), "yyyy-MM-dd"),
+        unitPrice: "",
+        quantityNeeded: "",
+        quantityAcquired: "",
       });
     },
   });
@@ -83,8 +86,10 @@ function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
     title: "",
     category: "GENERAL",
     status: "PENDING",
-    estimatedAmount: 0,
     dueAt: format(new Date(), "yyyy-MM-dd"),
+    unitPrice: "",
+    quantityNeeded: "",
+    quantityAcquired: "",
   });
 
   const handleCellChange = (task: any, field: string, value: any) => {
@@ -95,13 +100,16 @@ function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
 
   const handleNewRowSubmit = () => {
     if (!newRow.title.trim()) return toast.error("Title is required");
-    createMutation.mutate({
+    const payload: any = {
       title: newRow.title,
       category: newRow.category,
       status: newRow.status,
-      estimatedAmount: Number(newRow.estimatedAmount) || 0,
       dueAt: newRow.dueAt ? new Date(newRow.dueAt).toISOString() : null,
-    });
+    };
+    if (newRow.unitPrice !== "") payload.unitPrice = Number(newRow.unitPrice);
+    if (newRow.quantityNeeded !== "") payload.quantityNeeded = Number(newRow.quantityNeeded);
+    if (newRow.quantityAcquired !== "") payload.quantityAcquired = Number(newRow.quantityAcquired);
+    createMutation.mutate(payload);
   };
 
   const tasks = query.data || [];
@@ -124,9 +132,10 @@ function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
                   <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-40">Category</th>
                   <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300">Title</th>
                   <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-32">Due Date</th>
-                  <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-28 text-right">Est. Cost</th>
-                  <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-28 text-right">Arranged</th>
-                  <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-28 text-right">Paid</th>
+                  <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-24 text-right">Unit Price</th>
+                  <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-24 text-right">Qty Need</th>
+                  <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-24 text-right">Qty Acq</th>
+
                   <th className="px-2 py-2 font-semibold text-gray-600 w-10 text-center"></th>
                 </tr>
               </thead>
@@ -134,22 +143,30 @@ function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
                 {tasks.map((task) => (
                   <tr key={task.id} className="group hover:bg-blue-50/30">
                     <td className="border-r border-gray-200 p-0">
-                      <select 
+                      <Select 
                         defaultValue={task.status}
-                        onChange={(e) => handleCellChange(task, "status", e.target.value)}
-                        className={`w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 font-semibold text-[10px] tracking-wide ${task.status === 'DONE' ? 'text-emerald-700' : task.status === 'CANCELLED' ? 'text-red-700' : 'text-blue-700'}`}
+                        onValueChange={(val) => handleCellChange(task, "status", val)}
                       >
-                        {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
+                        <SelectTrigger className={`h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 font-semibold text-[10px] tracking-wide ${task.status === 'DONE' ? 'text-emerald-700' : task.status === 'CANCELLED' ? 'text-red-700' : 'text-blue-700'}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                     </td>
                     <td className="border-r border-gray-200 p-0">
-                      <select 
+                      <Select 
                         defaultValue={task.category}
-                        onChange={(e) => handleCellChange(task, "category", e.target.value)}
-                        className="w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 text-xs"
+                        onValueChange={(val) => handleCellChange(task, "category", val)}
                       >
-                        {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
+                        <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                     </td>
                     <td className="border-r border-gray-200 p-0">
                       <input 
@@ -168,32 +185,21 @@ function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
                       />
                     </td>
                     <td className="border-r border-gray-200 p-0">
-                      <input 
-                        type="number"
-                        step="0.01"
-                        defaultValue={task.estimatedAmount}
-                        onBlur={(e) => handleCellChange(task, "estimatedAmount", e.target.value)}
-                        className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-gray-500 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500"
-                      />
+                      <input type="number" step="0.01" defaultValue={task.unitPrice ?? ""}
+                        onBlur={(e) => handleCellChange(task, "unitPrice", e.target.value)}
+                        className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-gray-700 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500" />
                     </td>
                     <td className="border-r border-gray-200 p-0">
-                      <input 
-                        type="number"
-                        step="0.01"
-                        defaultValue={task.amountArranged}
-                        onBlur={(e) => handleCellChange(task, "amountArranged", e.target.value)}
-                        className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-blue-600 font-semibold focus:bg-blue-50 focus:ring-1 focus:ring-blue-500"
-                      />
+                      <input type="number" defaultValue={task.quantityNeeded ?? ""}
+                        onBlur={(e) => handleCellChange(task, "quantityNeeded", e.target.value)}
+                        className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-gray-700 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500" />
                     </td>
                     <td className="border-r border-gray-200 p-0">
-                      <input 
-                        type="number"
-                        step="0.01"
-                        defaultValue={task.amountPaid}
-                        onBlur={(e) => handleCellChange(task, "amountPaid", e.target.value)}
-                        className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-emerald-600 font-semibold focus:bg-blue-50 focus:ring-1 focus:ring-blue-500"
-                      />
+                      <input type="number" defaultValue={task.quantityAcquired ?? ""}
+                        onBlur={(e) => handleCellChange(task, "quantityAcquired", e.target.value)}
+                        className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-blue-600 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500" />
                     </td>
+
                     <td className="p-0 text-center align-middle">
                       <button 
                         onClick={() => deleteMutation.mutate(task.id)}
@@ -207,22 +213,30 @@ function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
                 
                 <tr className="bg-indigo-50/30 border-t-2 border-indigo-200">
                   <td className="border-r border-gray-200 p-0">
-                    <select 
+                    <Select 
                       value={newRow.status}
-                      onChange={(e) => setNewRow({...newRow, status: e.target.value})}
-                      className="w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-indigo-100 focus:ring-1 focus:ring-indigo-500 font-semibold text-[10px] tracking-wide text-gray-500"
+                      onValueChange={(val) => setNewRow({...newRow, status: val})}
                     >
-                      {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                      <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-indigo-100 focus:ring-1 focus:ring-indigo-500 font-semibold text-[10px] tracking-wide text-gray-500">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </td>
                   <td className="border-r border-gray-200 p-0">
-                    <select 
+                    <Select 
                       value={newRow.category}
-                      onChange={(e) => setNewRow({...newRow, category: e.target.value})}
-                      className="w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-indigo-100 focus:ring-1 focus:ring-indigo-500 text-xs"
+                      onValueChange={(val) => setNewRow({...newRow, category: val})}
                     >
-                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                      <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-indigo-100 focus:ring-1 focus:ring-indigo-500 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </td>
                   <td className="border-r border-gray-200 p-0">
                     <input 
@@ -243,20 +257,26 @@ function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
                     />
                   </td>
                   <td className="border-r border-gray-200 p-0">
-                    <input 
-                      type="number"
-                      step="0.01"
-                      value={newRow.estimatedAmount}
-                      onChange={(e) => setNewRow({...newRow, estimatedAmount: e.target.value})}
-                      onKeyDown={(e) => e.key === 'Enter' && handleNewRowSubmit()}
-                      className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono focus:bg-indigo-100 focus:ring-1 focus:ring-indigo-500"
-                    />
+                    <input type="number" step="0.01" value={newRow.unitPrice}
+                      onChange={(e) => setNewRow({...newRow, unitPrice: e.target.value})}
+                      placeholder="₹" className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono focus:bg-indigo-100 focus:ring-1 focus:ring-indigo-500" />
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    <input type="number" value={newRow.quantityNeeded}
+                      onChange={(e) => setNewRow({...newRow, quantityNeeded: e.target.value})}
+                      placeholder="0" className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono focus:bg-indigo-100 focus:ring-1 focus:ring-indigo-500" />
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    <input type="number" value={newRow.quantityAcquired}
+                      onChange={(e) => setNewRow({...newRow, quantityAcquired: e.target.value})}
+                      placeholder="0" className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-blue-600 focus:bg-indigo-100 focus:ring-1 focus:ring-indigo-500" />
                   </td>
                   <td className="border-r border-gray-200 p-0 bg-gray-50/50">
-                    <div className="w-full h-full min-h-10 px-3 flex items-center justify-end text-gray-400 text-xs italic">Auto</div>
-                  </td>
-                  <td className="border-r border-gray-200 p-0 bg-gray-50/50">
-                    <div className="w-full h-full min-h-10 px-3 flex items-center justify-end text-gray-400 text-xs italic">Auto</div>
+                    <div className="w-full h-full min-h-10 px-3 flex items-center justify-end text-gray-500 font-mono text-sm">
+                      {newRow.unitPrice && newRow.quantityNeeded
+                        ? (Number(newRow.unitPrice) * Number(newRow.quantityNeeded)).toFixed(2)
+                        : "—"}
+                    </div>
                   </td>
                   <td className="p-0 text-center align-middle">
                     <button 
