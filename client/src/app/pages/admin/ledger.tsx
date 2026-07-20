@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ArrowDownRight, ArrowUpRight, BookOpen, Loader2, Plus, Search, Trash2, WalletCards, X } from "lucide-react";
+import { BookOpen, Loader2, Plus, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "../../../lib/axios";
 import { Button } from "../../components/ui/button";
@@ -27,36 +27,65 @@ type Entry = {
 
 type Ledger = {
   entries: Entry[];
-  summary: { tripIncome: number; tripExpense: number; otherIncome: number; otherExpense: number; totalIncome: number; totalExpense: number; netBalance: number };
+  summary: {
+    tripIncome: number;
+    tripExpense: number;
+    otherIncome: number;
+    otherExpense: number;
+    totalIncome: number;
+    totalExpense: number;
+    netBalance: number;
+  };
 };
 
-const money = (value: unknown) => `₹${Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const money = (value: unknown) =>
+  `₹${Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-function Metric({ label, value, detail, income }: { label: string; value: number; detail: string; income: boolean }) {
-  const Icon = income ? ArrowUpRight : ArrowDownRight;
-  return <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"><div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl ${income ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}><Icon className="h-5 w-5" /></div><p className="text-2xl font-bold text-gray-950">{money(value)}</p><p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-gray-600">{label}</p><p className="mt-2 text-xs text-gray-500">{detail}</p></div>;
-}
-
-function EntryDialog({ trips, onClose }: { trips: any[]; onClose: () => void }) {
+function EntryDialog({
+  trips,
+  onClose,
+}: {
+  trips: any[];
+  onClose: () => void;
+}) {
   const queryClient = useQueryClient();
-  const [values, setValues] = useState({ type: "INCOME", scope: "OTHER", tripId: "", category: "", amount: "", description: "", entryDate: format(new Date(), "yyyy-MM-dd") });
+  const [values, setValues] = useState({
+    type: "INCOME",
+    scope: "OTHER",
+    tripId: "",
+    category: "",
+    amount: "",
+    description: "",
+    entryDate: format(new Date(), "yyyy-MM-dd"),
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const mutation = useMutation({
-    mutationFn: (payload: Record<string, unknown>) => apiClient.post("/ledgers/entries", payload),
-    onSuccess: async () => { toast.success("Manual ledger entry added"); await queryClient.invalidateQueries({ queryKey: ["admin", "ledger"] }); onClose(); },
-    onError: (error: unknown) => showErrorToast(error, "Could not add the ledger entry"),
+    mutationFn: (payload: Record<string, unknown>) =>
+      apiClient.post("/ledgers/entries", payload),
+    onSuccess: async () => {
+      toast.success("Manual ledger entry added");
+      await queryClient.invalidateQueries({ queryKey: ["admin", "ledger"] });
+      onClose();
+    },
+    onError: (error: unknown) =>
+      showErrorToast(error, "Could not add the ledger entry"),
   });
   const submit = () => {
     const nextErrors: Record<string, string> = {};
     const amount = Number(values.amount);
     const parsedDate = new Date(`${values.entryDate}T12:00:00`);
     if (!values.category.trim()) nextErrors.category = "Category is required.";
-    if (!Number.isFinite(amount) || amount <= 0) nextErrors.amount = "Amount must be greater than zero.";
-    if (!values.entryDate || Number.isNaN(parsedDate.getTime())) nextErrors.entryDate = "Choose a valid entry date.";
-    if (values.scope === "TRIP" && !values.tripId) nextErrors.tripId = "Choose the trip for this entry.";
+    if (!Number.isFinite(amount) || amount <= 0)
+      nextErrors.amount = "Amount must be greater than zero.";
+    if (!values.entryDate || Number.isNaN(parsedDate.getTime()))
+      nextErrors.entryDate = "Choose a valid entry date.";
+    if (values.scope === "TRIP" && !values.tripId)
+      nextErrors.tripId = "Choose the trip for this entry.";
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
-      toast.error("Please fix the highlighted ledger fields.", { description: Object.values(nextErrors)[0] });
+      toast.error("Please fix the highlighted ledger fields.", {
+        description: Object.values(nextErrors)[0],
+      });
       return;
     }
     mutation.mutate({
@@ -68,8 +97,169 @@ function EntryDialog({ trips, onClose }: { trips: any[]; onClose: () => void }) 
       entryDate: parsedDate.toISOString(),
     });
   };
-  const fieldError = (name: string) => errors[name] ? <p className="mt-1 text-xs text-red-600">{errors[name]}</p> : null;
-  return <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 sm:items-center sm:p-4" onClick={onClose}><div role="dialog" aria-modal="true" className="w-full max-w-xl rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl" onClick={(event) => event.stopPropagation()}><div className="flex items-center justify-between border-b px-5 py-4"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#781216]">Manual adjustment</p><h2 className="mt-1 text-xl font-bold">Add ledger entry</h2></div><button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100"><X className="h-5 w-5" /></button></div><div className="space-y-4 p-5"><div className="grid gap-4 sm:grid-cols-2"><div><Label>Type</Label><select className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={values.type} onChange={(event) => setValues({ ...values, type: event.target.value })}><option>INCOME</option><option>EXPENSE</option></select></div><div><Label>Scope</Label><select className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={values.scope} onChange={(event) => { setValues({ ...values, scope: event.target.value, tripId: "" }); setErrors((current) => ({ ...current, tripId: "" })); }}><option value="OTHER">Non-trip</option><option value="TRIP">Trip</option></select></div></div>{values.scope === "TRIP" && <div><Label>Trip *</Label><select aria-invalid={Boolean(errors.tripId)} className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={values.tripId} onChange={(event) => { setValues({ ...values, tripId: event.target.value }); setErrors((current) => ({ ...current, tripId: "" })); }}><option value="">Select trip</option>{trips.map((trip) => <option key={trip.id} value={trip.id}>{trip.title}</option>)}</select>{fieldError("tripId")}</div>}<div className="grid gap-4 sm:grid-cols-2"><div><Label>Category *</Label><Input aria-invalid={Boolean(errors.category)} className="mt-1" value={values.category} onChange={(event) => { setValues({ ...values, category: event.target.value }); setErrors((current) => ({ ...current, category: "" })); }} placeholder="Sponsorship, vendor, marketing…" />{fieldError("category")}</div><div><Label>Amount *</Label><Input aria-invalid={Boolean(errors.amount)} className="mt-1" type="number" min={0.01} step="0.01" value={values.amount} onChange={(event) => { setValues({ ...values, amount: event.target.value }); setErrors((current) => ({ ...current, amount: "" })); }} />{fieldError("amount")}</div></div><div><Label>Entry date *</Label><Input aria-invalid={Boolean(errors.entryDate)} className="mt-1" type="date" value={values.entryDate} onChange={(event) => { setValues({ ...values, entryDate: event.target.value }); setErrors((current) => ({ ...current, entryDate: "" })); }} />{fieldError("entryDate")}</div><div><Label>Description</Label><Textarea className="mt-1" rows={3} value={values.description} onChange={(event) => setValues({ ...values, description: event.target.value })} /></div></div><div className="flex justify-end gap-2 border-t px-5 py-3"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="button" disabled={mutation.isPending} onClick={submit} className="bg-[#781216] hover:bg-[#5f0e11]">{mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add entry</Button></div></div></div>;
+  const fieldError = (name: string) =>
+    errors[name] ? (
+      <p className="mt-1 text-xs text-red-600">{errors[name]}</p>
+    ) : null;
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="w-full max-w-xl rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b px-5 py-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#781216]">
+              Manual adjustment
+            </p>
+            <h2 className="mt-1 text-xl font-bold">Add ledger entry</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="space-y-4 p-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label>Type</Label>
+              <select
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={values.type}
+                onChange={(event) =>
+                  setValues({ ...values, type: event.target.value })
+                }
+              >
+                <option>INCOME</option>
+                <option>EXPENSE</option>
+              </select>
+            </div>
+            <div>
+              <Label>Scope</Label>
+              <select
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={values.scope}
+                onChange={(event) => {
+                  setValues({
+                    ...values,
+                    scope: event.target.value,
+                    tripId: "",
+                  });
+                  setErrors((current) => ({ ...current, tripId: "" }));
+                }}
+              >
+                <option value="OTHER">Non-trip</option>
+                <option value="TRIP">Trip</option>
+              </select>
+            </div>
+          </div>
+          {values.scope === "TRIP" && (
+            <div>
+              <Label>Trip *</Label>
+              <select
+                aria-invalid={Boolean(errors.tripId)}
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={values.tripId}
+                onChange={(event) => {
+                  setValues({ ...values, tripId: event.target.value });
+                  setErrors((current) => ({ ...current, tripId: "" }));
+                }}
+              >
+                <option value="">Select trip</option>
+                {trips.map((trip) => (
+                  <option key={trip.id} value={trip.id}>
+                    {trip.title}
+                  </option>
+                ))}
+              </select>
+              {fieldError("tripId")}
+            </div>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label>Category *</Label>
+              <Input
+                aria-invalid={Boolean(errors.category)}
+                className="mt-1"
+                value={values.category}
+                onChange={(event) => {
+                  setValues({ ...values, category: event.target.value });
+                  setErrors((current) => ({ ...current, category: "" }));
+                }}
+                placeholder="Sponsorship, vendor, marketing…"
+              />
+              {fieldError("category")}
+            </div>
+            <div>
+              <Label>Amount *</Label>
+              <Input
+                aria-invalid={Boolean(errors.amount)}
+                className="mt-1"
+                type="number"
+                min={0.01}
+                step="0.01"
+                value={values.amount}
+                onChange={(event) => {
+                  setValues({ ...values, amount: event.target.value });
+                  setErrors((current) => ({ ...current, amount: "" }));
+                }}
+              />
+              {fieldError("amount")}
+            </div>
+          </div>
+          <div>
+            <Label>Entry date *</Label>
+            <Input
+              aria-invalid={Boolean(errors.entryDate)}
+              className="mt-1"
+              type="date"
+              value={values.entryDate}
+              onChange={(event) => {
+                setValues({ ...values, entryDate: event.target.value });
+                setErrors((current) => ({ ...current, entryDate: "" }));
+              }}
+            />
+            {fieldError("entryDate")}
+          </div>
+          <div>
+            <Label>Description</Label>
+            <Textarea
+              className="mt-1"
+              rows={3}
+              value={values.description}
+              onChange={(event) =>
+                setValues({ ...values, description: event.target.value })
+              }
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 border-t px-5 py-3">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            disabled={mutation.isPending}
+            onClick={submit}
+            className="bg-[#781216] hover:bg-[#5f0e11]"
+          >
+            {mutation.isPending && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
+            Add entry
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function AdminLedgerPage() {
@@ -78,21 +268,275 @@ export default function AdminLedgerPage() {
   const [search, setSearch] = useState("");
   const [type, setType] = useState("");
   const [scope, setScope] = useState("");
-  const ledgerQuery = useQuery({ queryKey: ["admin", "ledger"], queryFn: async () => (await apiClient.get<Ledger>("/ledgers", { params: { limit: 2000 } })).data });
-  const tripsQuery = useQuery({ queryKey: ["admin", "trips", "ledger-options"], queryFn: async () => (await apiClient.get("/trips", { params: { adminView: true, limit: 500 } })).data.data });
-  const deleteMutation = useMutation({ mutationFn: (id: string) => apiClient.delete(`/ledgers/entries/${id}`), onSuccess: async () => { toast.success("Ledger entry deleted"); await queryClient.invalidateQueries({ queryKey: ["admin", "ledger"] }); }, onError: (error: unknown) => showErrorToast(error, "Could not delete the entry") });
+  const ledgerQuery = useQuery({
+    queryKey: ["admin", "ledger"],
+    queryFn: async () =>
+      (await apiClient.get<Ledger>("/ledgers", { params: { limit: 2000 } }))
+        .data,
+  });
+  const tripsQuery = useQuery({
+    queryKey: ["admin", "trips", "ledger-options"],
+    queryFn: async () =>
+      (
+        await apiClient.get("/trips", {
+          params: { adminView: true, limit: 500 },
+        })
+      ).data.data,
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/ledgers/entries/${id}`),
+    onSuccess: async () => {
+      toast.success("Ledger entry deleted");
+      await queryClient.invalidateQueries({ queryKey: ["admin", "ledger"] });
+    },
+    onError: (error: unknown) =>
+      showErrorToast(error, "Could not delete the entry"),
+  });
   useEffect(() => {
-    if (ledgerQuery.isError) toast.error(getErrorMessage(ledgerQuery.error, "The unified ledger could not be loaded"), { id: "ledger-load-error" });
-    if (tripsQuery.isError) toast.error(getErrorMessage(tripsQuery.error, "Trip options could not be loaded"), { id: "ledger-trips-load-error" });
-  }, [ledgerQuery.error, ledgerQuery.isError, tripsQuery.error, tripsQuery.isError]);
+    if (ledgerQuery.isError)
+      toast.error(
+        getErrorMessage(
+          ledgerQuery.error,
+          "The unified ledger could not be loaded",
+        ),
+        { id: "ledger-load-error" },
+      );
+    if (tripsQuery.isError)
+      toast.error(
+        getErrorMessage(tripsQuery.error, "Trip options could not be loaded"),
+        { id: "ledger-trips-load-error" },
+      );
+  }, [
+    ledgerQuery.error,
+    ledgerQuery.isError,
+    tripsQuery.error,
+    tripsQuery.isError,
+  ]);
   const ledger = ledgerQuery.data;
-  const entries = useMemo(() => (ledger?.entries || []).filter((entry) => {
-    if (type && entry.type !== type) return false;
-    if (scope && entry.scope !== scope) return false;
-    const needle = search.trim().toLowerCase();
-    return !needle || [entry.category, entry.description, entry.trip?.title, entry.festival?.title, entry.booking?.bookingReference, entry.source].filter(Boolean).join(" ").toLowerCase().includes(needle);
-  }), [ledger?.entries, scope, search, type]);
-  if (ledgerQuery.isLoading) return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#781216]" /></div>;
-  if (ledgerQuery.isError || !ledger) return <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800"><p className="font-bold">The unified ledger could not be loaded.</p><button type="button" onClick={() => ledgerQuery.refetch()} className="mt-3 text-sm font-semibold underline">Try again</button></div>;
-  return <div className="mx-auto max-w-[1500px] space-y-5 pb-12"><header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-[#781216]">Unified finance</p><h1 className="mt-1 text-2xl font-bold text-gray-950 sm:text-3xl">Balance sheet</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">Payments, refunds, operational costs, add-ons, and manual adjustments in one ledger. Automatic entries remain linked to their source.</p></div><Button onClick={() => setDialog(true)} className="bg-[#781216] hover:bg-[#5f0e11]"><Plus className="mr-2 h-4 w-4" />Manual entry</Button></header><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Trip income" value={ledger.summary.tripIncome} detail="Payments tied to trips, bookings, and festivals" income /><Metric label="Other income" value={ledger.summary.otherIncome} detail="Sponsorships and non-trip revenue" income /><Metric label="Trip expenses" value={ledger.summary.tripExpense} detail="Operational and trip-linked costs" income={false} /><Metric label="Other expenses" value={ledger.summary.otherExpense} detail="Non-trip business expenses" income={false} /></div><div className={`rounded-2xl border p-5 ${ledger.summary.netBalance >= 0 ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><WalletCards className={`h-6 w-6 ${ledger.summary.netBalance >= 0 ? "text-emerald-700" : "text-red-700"}`} /><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-600">Net balance</p><p className={`text-2xl font-bold ${ledger.summary.netBalance >= 0 ? "text-emerald-800" : "text-red-800"}`}>{money(ledger.summary.netBalance)}</p></div></div><p className="text-sm text-gray-600">{money(ledger.summary.totalIncome)} income − {money(ledger.summary.totalExpense)} expense</p></div></div><div className="grid gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_180px_180px]"><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Category, trip, booking, or description" className="pl-10" /></div><select value={type} onChange={(event) => setType(event.target.value)} className="flex h-10 rounded-md border border-input bg-background px-3 text-sm"><option value="">All types</option><option>INCOME</option><option>EXPENSE</option></select><select value={scope} onChange={(event) => setScope(event.target.value)} className="flex h-10 rounded-md border border-input bg-background px-3 text-sm"><option value="">All scopes</option><option value="TRIP">Trip</option><option value="BOOKING">Booking</option><option value="FESTIVAL">Festival</option><option value="OTHER">Other</option></select></div><section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"><div className="flex items-center justify-between border-b px-4 py-3 sm:px-5"><div><h2 className="flex items-center gap-2 font-bold"><BookOpen className="h-4 w-4 text-[#781216]" />Ledger entries</h2><p className="text-xs text-gray-500">{entries.length} entry(s)</p></div></div>{entries.length === 0 ? <div className="p-12 text-center text-sm text-gray-500">No entries match these filters.</div> : <div className="divide-y divide-gray-100">{entries.map((entry) => { const context = entry.trip?.title || entry.festival?.title || entry.booking?.bookingReference || "Non-trip"; return <div key={entry.id} className="grid gap-3 px-4 py-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_180px_150px_130px_auto] lg:items-center"><div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-gray-950">{entry.category}</p><span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${entry.type === "INCOME" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{entry.type}</span>{entry.isAutoGenerated && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">AUTO</span>}</div><p className="mt-1 text-xs text-gray-500">{entry.description || entry.source.replaceAll("_", " ")}</p></div><div><p className="text-sm font-semibold text-gray-800">{context}</p><p className="text-[10px] uppercase tracking-wider text-gray-400">{entry.scope}</p></div><div><p className="text-sm text-gray-700">{format(new Date(entry.entryDate), "dd MMM yyyy")}</p><p className="text-[10px] uppercase tracking-wider text-gray-400">{entry.source.replaceAll("_", " ")}</p></div><p className={`font-bold lg:text-right ${entry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`}>{entry.type === "INCOME" ? "+" : "−"}{money(entry.amount)}</p><div>{!entry.isAutoGenerated && <button type="button" aria-label="Delete manual entry" disabled={deleteMutation.isPending} onClick={() => window.confirm("Delete this manual ledger entry?") && deleteMutation.mutate(entry.id)} className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>}</div></div>; })}</div>}</section>{dialog && <EntryDialog trips={tripsQuery.data || []} onClose={() => setDialog(false)} />}</div>;
+  const entries = useMemo(
+    () =>
+      (ledger?.entries || []).filter((entry) => {
+        if (type && entry.type !== type) return false;
+        if (scope && entry.scope !== scope) return false;
+        const needle = search.trim().toLowerCase();
+        return (
+          !needle ||
+          [
+            entry.category,
+            entry.description,
+            entry.trip?.title,
+            entry.festival?.title,
+            entry.booking?.bookingReference,
+            entry.source,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase()
+            .includes(needle)
+        );
+      }),
+    [ledger?.entries, scope, search, type],
+  );
+  if (ledgerQuery.isLoading)
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-[#781216]" />
+      </div>
+    );
+  if (ledgerQuery.isError || !ledger)
+    return (
+      <div
+        role="alert"
+        className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800"
+      >
+        <p className="font-bold">The unified ledger could not be loaded.</p>
+        <button
+          type="button"
+          onClick={() => ledgerQuery.refetch()}
+          className="mt-3 text-sm font-semibold underline"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  return (
+    <div className="mx-auto max-w-[1500px] space-y-5 pb-12">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#781216]">
+            Unified finance
+          </p>
+          <h1 className="mt-1 text-2xl font-bold text-gray-950 sm:text-3xl">
+            Balance sheet
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
+            Payments, refunds, operational costs, add-ons, and manual
+            adjustments in one ledger. Automatic entries remain linked to their
+            source.
+          </p>
+        </div>
+        <Button
+          onClick={() => setDialog(true)}
+          className="bg-[#781216] hover:bg-[#5f0e11]"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Manual entry
+        </Button>
+      </header>
+      <div className="grid gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_180px_180px]">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Category, trip, booking, or description"
+            className="pl-10"
+          />
+        </div>
+        <select
+          value={type}
+          onChange={(event) => setType(event.target.value)}
+          className="flex h-10 rounded-md border border-input bg-background px-3 text-sm"
+        >
+          <option value="">All types</option>
+          <option>INCOME</option>
+          <option>EXPENSE</option>
+        </select>
+        <select
+          value={scope}
+          onChange={(event) => setScope(event.target.value)}
+          className="flex h-10 rounded-md border border-input bg-background px-3 text-sm"
+        >
+          <option value="">All scopes</option>
+          <option value="TRIP">Trip</option>
+          <option value="BOOKING">Booking</option>
+          <option value="FESTIVAL">Festival</option>
+          <option value="OTHER">Other</option>
+        </select>
+      </div>
+      <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b px-4 py-3 sm:px-5">
+          <div>
+            <h2 className="flex items-center gap-2 font-bold">
+              <BookOpen className="h-4 w-4 text-[#781216]" />
+              Ledger entries
+            </h2>
+            <p className="text-xs text-gray-500">{entries.length} entry(s)</p>
+          </div>
+        </div>
+        {entries.length === 0 ? (
+          <div className="p-12 text-center text-sm text-gray-500">
+            No entries match these filters.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
+                <tr>
+                  <th className="px-4 py-3 font-semibold border-r border-gray-200">
+                    Date
+                  </th>
+                  <th className="px-4 py-3 font-semibold border-r border-gray-200">
+                    Category
+                  </th>
+                  <th className="px-4 py-3 font-semibold border-r border-gray-200">
+                    Description
+                  </th>
+                  <th className="px-4 py-3 font-semibold border-r border-gray-200">
+                    Context
+                  </th>
+                  <th className="px-4 py-3 font-semibold border-r border-gray-200">
+                    Type / Source
+                  </th>
+                  <th className="px-4 py-3 font-semibold border-r border-gray-200 text-right">
+                    Amount
+                  </th>
+                  <th className="px-4 py-3 font-semibold text-center w-12"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {entries.map((entry) => {
+                  const context =
+                    entry.trip?.title ||
+                    entry.festival?.title ||
+                    entry.booking?.bookingReference ||
+                    "Non-trip";
+                  return (
+                    <tr key={entry.id} className="hover:bg-gray-50 group">
+                      <td className="px-4 py-2 border-r border-gray-200 text-gray-700">
+                        {format(new Date(entry.entryDate), "dd MMM yyyy")}
+                      </td>
+                      <td className="px-4 py-2 border-r border-gray-200 font-medium text-gray-900">
+                        {entry.category}
+                      </td>
+                      <td
+                        className="px-4 py-2 border-r border-gray-200 text-gray-600 max-w-[200px] truncate"
+                        title={
+                          entry.description || entry.source.replaceAll("_", " ")
+                        }
+                      >
+                        {entry.description || entry.source.replaceAll("_", " ")}
+                      </td>
+                      <td className="px-4 py-2 border-r border-gray-200">
+                        <div className="text-gray-900">{context}</div>
+                        <div className="text-[10px] uppercase text-gray-500">
+                          {entry.scope}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 border-r border-gray-200">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${entry.type === "INCOME" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}
+                          >
+                            {entry.type}
+                          </span>
+                          {entry.isAutoGenerated && (
+                            <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">
+                              AUTO
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] uppercase text-gray-500 mt-1">
+                          {entry.source.replaceAll("_", " ")}
+                        </div>
+                      </td>
+                      <td
+                        className={`px-4 py-2 border-r border-gray-200 text-right font-medium ${entry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`}
+                      >
+                        {entry.type === "INCOME" ? "+" : "−"}
+                        {money(entry.amount)}
+                      </td>
+                      <td className="px-2 py-2 text-center">
+                        {!entry.isAutoGenerated && (
+                          <button
+                            type="button"
+                            aria-label="Delete manual entry"
+                            disabled={deleteMutation.isPending}
+                            onClick={() =>
+                              window.confirm(
+                                "Delete this manual ledger entry?",
+                              ) && deleteMutation.mutate(entry.id)
+                            }
+                            className="inline-flex h-7 w-7 items-center justify-center rounded text-gray-400 opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 transition-opacity"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+      {dialog && (
+        <EntryDialog
+          trips={tripsQuery.data || []}
+          onClose={() => setDialog(false)}
+        />
+      )}
+    </div>
+  );
 }

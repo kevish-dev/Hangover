@@ -51,7 +51,7 @@ export const findBySlug = async (slug) => {
 };
 
 // ── Create (full nested write) ────────────────────────────────────────────
-export const create = async ({ days, packages, addOns, tagIds, ...rootData }) => {
+export const create = async ({ days, packages, addOns, tagIds, faqs, ...rootData }) => {
   return prisma.circuit.create({
     data: {
       ...rootData,

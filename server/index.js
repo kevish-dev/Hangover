@@ -22,6 +22,7 @@ import landingTripTypeRoutes from "./src/modules/landing-trip-type/landing-trip-
 import landingContentRoutes from "./src/modules/landing-content/landing-content.routes.js";
 import ledgerRoutes from "./src/modules/ledger/ledger.routes.js";
 import operationsRoutes from "./src/modules/operations/operations.routes.js";
+import invoiceRoutes from "./src/modules/invoice/invoice.routes.js";
 import { errorHandler } from "./src/core/errors/errorHandler.js";
 import { prisma } from "./src/prisma/client.js";
 import { startOperationsWorker } from "./src/workers/operations.worker.js";
@@ -64,6 +65,7 @@ app.use("/api/v1/landing-trip-types", landingTripTypeRoutes);
 app.use("/api/v1/landing-content", landingContentRoutes);
 app.use("/api/v1/ledgers", ledgerRoutes);
 app.use("/api/v1/operations", operationsRoutes);
+app.use("/api/v1/invoices", invoiceRoutes);
 
 app.get("/openapi.json", (req, res) => {
   res.json(generateOpenApiDocument());

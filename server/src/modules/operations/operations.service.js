@@ -186,3 +186,56 @@ export const updateOperationalTask = async (taskId, input) => {
     return tx.operationalTask.findUnique({ where: { id: taskId }, include: TASK_INCLUDE });
   });
 };
+
+export const createOperationalTask = async (bookingId, data) => {
+  const allowed = [
+    "title",
+    "description",
+    "category",
+    "estimatedAmount",
+    "dueAt",
+  ];
+  const payload = Object.fromEntries(
+    allowed.filter((key) => data[key] !== undefined).map((key) => [key, data[key]]),
+  );
+
+  if (!payload.title || !payload.category) {
+    const error = new Error("Title and category are required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (payload.estimatedAmount !== undefined) {
+    payload.estimatedAmount = Number(payload.estimatedAmount);
+  }
+
+  if (payload.dueAt) {
+    payload.dueAt = new Date(payload.dueAt);
+  }
+
+  return prisma.operationalTask.create({
+    data: {
+      ...payload,
+      booking: { connect: { id: bookingId } },
+    },
+    include: TASK_INCLUDE,
+  });
+};
+
+export const deleteOperationalTask = async (taskId) => {
+  return prisma.$transaction(async (tx) => {
+    const task = await tx.operationalTask.findUnique({ where: { id: taskId } });
+    if (!task) {
+      const error = new Error("Operational task not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // Delete auto-generated ledger entries
+    await tx.ledgerEntry.deleteMany({
+      where: { operationalTaskId: taskId, source: "OPERATIONAL_TASK" },
+    });
+
+    return tx.operationalTask.delete({ where: { id: taskId } });
+  });
+};

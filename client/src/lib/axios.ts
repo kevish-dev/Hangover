@@ -1,6 +1,7 @@
 import axios from "axios";
 
-export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
+export const API_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 
 export const apiClient = axios.create({
   baseURL: API_URL,
@@ -11,7 +12,10 @@ export const apiClient = axios.create({
 });
 
 let isRefreshing = false;
-let failedQueue: { resolve: (value?: unknown) => void; reject: (reason?: any) => void }[] = [];
+let failedQueue: {
+  resolve: (value?: unknown) => void;
+  reject: (reason?: any) => void;
+}[] = [];
 
 const processQueue = (error: any) => {
   failedQueue.forEach((prom) => {
@@ -49,16 +53,20 @@ apiClient.interceptors.response.use(
 
       try {
         // Call the refresh endpoint (this will automatically send and receive httpOnly cookies)
-        await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true });
-        
+        await axios.post(
+          `${API_URL}/auth/refresh`,
+          {},
+          { withCredentials: true },
+        );
+
         processQueue(null);
-        
+
         // Retry the original request now that the token is refreshed
         return apiClient(originalRequest);
       } catch (err) {
         processQueue(err);
-        // If refresh fails, the user is truly unauthenticated. 
-        // You might want to handle a global logout here, but rejecting the promise 
+        // If refresh fails, the user is truly unauthenticated.
+        // You might want to handle a global logout here, but rejecting the promise
         // will let the caller (like AuthContext) handle it.
         return Promise.reject(err);
       } finally {
@@ -67,5 +75,5 @@ apiClient.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );

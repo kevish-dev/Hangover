@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router";
 import { apiClient } from "../../../lib/axios";
 import { TripFormModal } from "../../components/admin/TripFormModal";
 import { formatTripType } from "../../../lib/tripApi";
@@ -15,12 +16,15 @@ import {
   Eye,
   EyeOff,
   Loader2,
-  ChevronDown,
-  ChevronUp,
   UserCircle,
-  CreditCard,
   Link2,
   MoreVertical,
+  ChevronRight,
+  Search,
+  Filter,
+  BarChart2,
+  Activity,
+  X,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "../../components/ui/button";
@@ -46,54 +50,55 @@ function TripActionMenu({ trip, processingId, processingAction, onShare, onToggl
 
   return (
     <div className="relative inline-block text-right" ref={menuRef}>
-      <button 
+      <button
         onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
         className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors focus:outline-none"
+        aria-label="Trip actions"
       >
         <MoreVertical className="w-5 h-5" />
       </button>
-      
+
       {open && (
-        <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-100 shadow-xl rounded-xl overflow-hidden z-20 text-left">
-          <button 
+        <div className="absolute right-0 mt-1 w-52 bg-white border border-gray-100 shadow-2xl rounded-2xl overflow-hidden z-20 text-left">
+          <button
             onClick={(e) => { e.stopPropagation(); setOpen(false); onShare(trip); }}
-            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors border-b border-gray-50"
+            className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors border-b border-gray-50"
           >
             <Link2 className="w-4 h-4 text-gray-400" /> Private link
           </button>
-          
-          <button 
+
+          <button
             onClick={(e) => { e.stopPropagation(); setOpen(false); onTogglePublish(trip); }}
             disabled={processingId === trip.id}
-            className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center gap-2 transition-colors border-b border-gray-50 text-gray-700"
+            className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-3 transition-colors border-b border-gray-50 text-gray-700"
           >
             {processingId === trip.id && processingAction === "publish" ? (
               <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
             ) : trip.isPublished ? (
-              <EyeOff className="w-4 h-4 text-orange-500" />
+              <EyeOff className="w-4 h-4 text-amber-500" />
             ) : (
-              <Eye className="w-4 h-4 text-green-500" />
+              <Eye className="w-4 h-4 text-emerald-500" />
             )}
             {trip.isPublished ? "Unpublish" : "Publish"}
           </button>
 
-          <button 
+          <button
             onClick={(e) => { e.stopPropagation(); setOpen(false); onEdit(trip); }}
             disabled={processingId === trip.id}
-            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors border-b border-gray-50"
+            className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors border-b border-gray-50"
           >
             {processingId === trip.id && processingAction === "edit" ? (
               <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
             ) : (
               <Edit2 className="w-4 h-4 text-[#c8a96e]" />
             )}
-            Edit
+            Edit Trip
           </button>
 
-          <button 
+          <button
             onClick={(e) => { e.stopPropagation(); setOpen(false); onDelete(trip.id); }}
             disabled={processingId === trip.id}
-            className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+            className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors"
           >
             {processingId === trip.id && processingAction === "delete" ? (
               <Loader2 className="w-4 h-4 animate-spin text-red-400" />
@@ -109,156 +114,17 @@ function TripActionMenu({ trip, processingId, processingAction, onShare, onToggl
 }
 
 
-// ── Booking status badge ──────────────────────────────────────────
-function BookingStatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    PENDING: "bg-yellow-50 text-yellow-700 border border-yellow-200/60",
-    RESERVED: "bg-blue-50 text-blue-700 border border-blue-200/60",
-    CONFIRMED: "bg-green-50 text-green-700 border border-green-200/60",
-    CANCELLED: "bg-red-50 text-red-700 border border-red-200/60",
-    COMPLETED: "bg-purple-50 text-purple-700 border border-purple-200/60",
-  };
-  return (
-    <span className={`px-2 py-0.5 rounded text-xs font-semibold tracking-wide ${map[status] ?? "bg-gray-50 text-gray-600 border border-gray-200/60"}`}>
-      {status}
-    </span>
-  );
-}
-
-function PaymentStatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    PAID: "bg-green-50 text-green-700 border border-green-200/60",
-    PARTIALLY_PAID: "bg-blue-50 text-blue-700 border border-blue-200/60",
-    PENDING: "bg-yellow-50 text-yellow-700 border border-yellow-200/60",
-    REFUNDED: "bg-purple-50 text-purple-700 border border-purple-200/60",
-    FAILED: "bg-red-50 text-red-700 border border-red-200/60",
-  };
-  return (
-    <span className={`px-2 py-0.5 rounded text-xs font-semibold tracking-wide ${map[status] ?? "bg-gray-50 text-gray-600 border border-gray-200/60"}`}>
-      {status?.replace("_", " ") || "UNKNOWN"}
-    </span>
-  );
-}
-
-// ── Trip bookings drawer ──────────────────────────────────────────
-function TripBookingsDrawer({ tripId }: { tripId: string }) {
-  const queryClient = useQueryClient();
-
-  const bookingsQuery = useQuery({
-    queryKey: ["admin", "bookings", "trip", tripId],
-    queryFn: async () => {
-      const res = await apiClient.get(`/bookings/trip/${tripId}`);
-      return res.data as any[];
-    },
-  });
-  const { data: bookings, isLoading } = bookingsQuery;
-  useEffect(() => {
-    if (bookingsQuery.isError) toast.error(getErrorMessage(bookingsQuery.error, "Bookings could not be loaded"), { id: `trip-bookings-error-${tripId}` });
-  }, [bookingsQuery.error, bookingsQuery.isError, tripId]);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-6 gap-2 text-gray-400 text-sm">
-        <Loader2 className="w-4 h-4 animate-spin" /> Loading bookings…
-      </div>
-    );
-  }
-
-  if (bookingsQuery.isError) {
-    return <div role="alert" className="px-5 py-6 text-center text-sm text-red-700">Bookings could not be loaded. <button type="button" onClick={() => bookingsQuery.refetch()} className="font-semibold underline">Try again</button></div>;
-  }
-
-  if (!bookings || bookings.length === 0) {
-    return (
-      <div className="py-6 text-center text-gray-400 text-sm">
-        No bookings yet for this trip.
-      </div>
-    );
-  }
-
-  return (
-    <div className="divide-y divide-gray-100">
-      {bookings.map((b: any) => (
-        <div key={b.id} className="px-3 py-4 md:px-5 hover:bg-gray-50 transition-colors">
-          <div className="flex items-start justify-between gap-3 flex-wrap">
-            {/* User info */}
-            <div className="flex items-center gap-2.5 min-w-0">
-              <UserCircle className="w-8 h-8 text-gray-300 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {b.user?.profile?.fullName || "Unknown"}
-                </p>
-                <p className="text-xs text-gray-500 truncate">{b.user?.email}</p>
-              </div>
-            </div>
-
-            {/* Booking ref + statuses */}
-            <div className="flex w-full md:w-auto flex-col items-start md:items-end gap-1.5 md:shrink-0">
-              <span className="font-mono text-xs text-gray-500">{b.bookingReference}</span>
-              <div className="flex items-center gap-1.5">
-                <BookingStatusBadge status={b.status} />
-                <PaymentStatusBadge status={b.paymentStatus} />
-              </div>
-            </div>
-          </div>
-
-          {/* Financial summary */}
-          <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-3 text-xs">
-            <div className="bg-gray-50 rounded-lg px-3 py-2">
-              <p className="text-gray-400 mb-0.5">Travelers</p>
-              <p className="font-semibold text-gray-800">{b.numberOfTravelers}</p>
-            </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2">
-              <p className="text-gray-400 mb-0.5">Total</p>
-              <p className="font-semibold text-gray-800 flex items-center gap-0.5">
-                <IndianRupee className="w-3 h-3" />
-                {Number(b.totalAmount).toLocaleString("en-IN")}
-              </p>
-            </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2">
-              <p className="text-gray-400 mb-0.5">Paid</p>
-              <p className="font-semibold text-green-700 flex items-center gap-0.5">
-                <IndianRupee className="w-3 h-3" />
-                {Number(b.amountPaid ?? 0).toLocaleString("en-IN")}
-              </p>
-            </div>
-          </div>
-
-          {/* Payments */}
-          {b.payments && b.payments.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {b.payments.map((p: any) => (
-                <div key={p.id} className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 rounded-full px-2.5 py-1">
-                  <CreditCard className="w-3 h-3 text-gray-400" />
-                  <span className="font-medium text-gray-700">{p.type}</span>
-                  <span className="text-gray-400">·</span>
-                  <span className={p.status === "SUCCESS" ? "text-green-600 font-medium" : "text-gray-500"}>{p.status}</span>
-                  <span className="text-gray-600 flex items-center gap-0.5">
-                    <IndianRupee className="w-2.5 h-2.5" />{Number(p.amount).toLocaleString("en-IN")}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <p className="mt-2 text-xs text-gray-400">
-            Booked {format(new Date(b.createdAt), "MMM d, yyyy · HH:mm")}
-          </p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ── Main page ─────────────────────────────────────────────────────
 export default function AdminTripsPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTrip, setEditingTrip] = useState<any>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [processingAction, setProcessingAction] = useState<"delete" | "publish" | "edit" | null>(null);
-  const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
   const [generatedShareLink, setGeneratedShareLink] = useState<{ title: string; url: string } | null>(null);
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("ALL");
 
   const tripsQuery = useQuery({
     queryKey: ["admin", "trips"],
@@ -373,29 +239,46 @@ export default function AdminTripsPage() {
     }
   };
 
-  const toggleBookings = (tripId: string) => {
-    setExpandedTripId((prev) => (prev === tripId ? null : tripId));
-  };
-
   if (isLoading) {
-    return <div className="p-8 text-gray-500">Loading trips...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-[#c8a96e]" />
+      </div>
+    );
   }
   if (tripsQuery.isError) {
-    return <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-800"><p className="font-bold">Trips could not be loaded.</p><button type="button" onClick={() => tripsQuery.refetch()} className="mt-3 text-sm font-semibold underline">Try again</button></div>;
+    return <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800"><p className="font-bold">Trips could not be loaded.</p><button type="button" onClick={() => tripsQuery.refetch()} className="mt-3 text-sm font-semibold underline">Try again</button></div>;
   }
 
-  const trips = data?.data || [];
+  const allTrips = data?.data || [];
+
+  // Filter trips
+  const trips = allTrips.filter((t: any) => {
+    if (typeFilter !== "ALL" && t.tripType !== typeFilter) return false;
+    if (!search.trim()) return true;
+    return t.title?.toLowerCase().includes(search.toLowerCase()) ||
+      t.location?.toLowerCase().includes(search.toLowerCase()) ||
+      t.circuit?.title?.toLowerCase().includes(search.toLowerCase());
+  });
+
+  const tripTypes = [...new Set(allTrips.map((t: any) => t.tripType).filter(Boolean))] as string[];
+
+  // Summary stats
+  const totalBookings = allTrips.reduce((s: number, t: any) =>
+    s + (t.slots || []).reduce((ss: number, sl: any) => ss + Number(sl.filledSpots || 0), 0), 0);
+  const publishedCount = allTrips.filter((t: any) => t.isPublished).length;
 
   return (
     <div className="w-full">
-      <div className="flex flex-col items-stretch md:flex-row md:items-center justify-between mb-6 md:mb-8 gap-4">
-        <div className="min-w-0">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+        <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Map className="w-6 h-6 text-[#c8a96e]" />
             Trip Management
           </h1>
           <p className="text-gray-500 text-sm mt-1">
-            Manage your trips, itineraries, and media all in one place.
+            {allTrips.length} trips · {publishedCount} published · {totalBookings} total bookings
           </p>
         </div>
         <Button onClick={openCreateModal} className="w-full md:w-auto bg-[#c8a96e] hover:bg-[#b8943a] text-white flex items-center justify-center gap-2">
@@ -421,77 +304,139 @@ export default function AdminTripsPage() {
         </DialogContent>
       </Dialog>
 
-      <div className="flex flex-col gap-4">
+      {/* Search + Filter bar */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-5 bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search trips by name, location..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 pr-4 py-2 w-full border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/40"
+          />
+        </div>
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/40 bg-white"
+        >
+          <option value="ALL">All Types</option>
+          {tripTypes.map((t) => (
+            <option key={t} value={t}>{formatTripType(t)}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Trip list */}
+      <div className="flex flex-col gap-3">
         {trips.length === 0 ? (
-          <div className="py-16 text-center bg-gray-50/50 rounded-2xl">
-            <p className="text-gray-500">No trips found. Create your first trip above!</p>
+          <div className="py-20 text-center bg-white rounded-2xl border border-gray-100">
+            <Map className="w-12 h-12 text-gray-200 mx-auto mb-4" />
+            <p className="text-gray-500 font-medium">No trips found</p>
+            <p className="text-gray-400 text-sm mt-1">Try adjusting your search, or create a new trip.</p>
           </div>
         ) : (
-          trips.map((trip: any) => (
-            <div key={trip.id} className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100 overflow-hidden">
-              {/* ── Trip header row ── */}
-              <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 md:gap-4 p-3 md:p-4">
-                {/* Thumbnail */}
-                <div className="w-full h-32 md:w-20 md:h-16 rounded-lg overflow-hidden bg-gray-100 shrink-0">
-                  {trip.bannerImages?.length > 0 ? (
-                    <img src={trip.bannerImages[0]} alt={trip.title} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs">No img</div>
-                  )}
-                </div>
+          trips.map((trip: any) => {
+            const totalCapacity = (trip.slots || []).reduce((s: number, sl: any) => s + Number(sl.capacity || 0), 0);
+            const totalFilled = (trip.slots || []).reduce((s: number, sl: any) => s + Number(sl.filledSpots || 0), 0);
+            const fillRate = totalCapacity > 0 ? Math.round(totalFilled / totalCapacity * 100) : 0;
+            const nextSlot = trip.slots?.find((sl: any) => new Date(sl.startDate) > new Date());
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-bold text-gray-900 leading-tight truncate">{trip.title}</h3>
-                    <span className="px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-600 uppercase tracking-wide shrink-0">
-                      {trip.tripType ? formatTripType(trip.tripType) : "UNKNOWN"}
-                    </span>
+            return (
+              <div
+                key={trip.id}
+                className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 border border-gray-100 cursor-pointer group"
+                onClick={() => navigate(`/dashboard/trips/${trip.id}`)}
+              >
+                <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 p-4">
+                  {/* Thumbnail */}
+                  <div className="w-full h-36 md:w-24 md:h-18 rounded-xl overflow-hidden bg-gray-100 shrink-0 relative">
+                    {trip.bannerImages?.length > 0 ? (
+                      <img src={trip.bannerImages[0]} alt={trip.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-300">
+                        <Map className="w-8 h-8" />
+                      </div>
+                    )}
                     {!trip.isPublished && (
-                      <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-700 uppercase tracking-wide shrink-0">Draft</span>
+                      <div className="absolute top-1.5 left-1.5">
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-600 text-white uppercase tracking-wider shadow">Draft</span>
+                      </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500 flex-wrap">
-                    <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{trip.location}</span>
-                    <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{trip.slots?.[0]?.startDate ? format(new Date(trip.slots[0].startDate), "MMM d, yyyy") : "No departure"}</span>
-                    <span className="flex items-center gap-1"><Users className="w-3 h-3" />{(trip.slots || []).reduce((sum: number, slot: any) => sum + Number(slot.filledSpots || 0), 0)}/{(trip.slots || []).reduce((sum: number, slot: any) => sum + Number(slot.capacity || 0), 0)} booked</span>
-                    <span className="flex items-center gap-1 font-semibold text-[#781216]"><IndianRupee className="w-3 h-3" />{parseInt(trip.packages?.[0]?.price || 0).toLocaleString("en-IN")}</span>
-                    {trip.circuit && <span className="text-[#8a6414]">From {trip.circuit.title}</span>}
-                  </div>
-                </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-2 shrink-0 mt-3 md:mt-0">
-                  <button
-                    onClick={() => toggleBookings(trip.id)}
-                    className="flex items-center justify-center gap-1.5 text-xs font-semibold text-gray-700 hover:text-[#781216] transition-colors px-4 py-2 rounded-lg hover:bg-gray-100"
-                  >
-                    {expandedTripId === trip.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    Bookings
-                  </button>
-                  <TripActionMenu 
-                    trip={trip} 
-                    processingId={processingId} 
-                    processingAction={processingAction} 
-                    onShare={handleCreateShareLink} 
-                    onTogglePublish={handleTogglePublish} 
-                    onEdit={openEditModal} 
-                    onDelete={handleDelete} 
-                  />
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 uppercase tracking-wider">
+                            {trip.tripType ? formatTripType(trip.tripType) : "UNKNOWN"}
+                          </span>
+                          {trip.circuit && (
+                            <span className="text-[10px] font-bold text-[#8a6414] bg-[#fcf0d6] px-2 py-0.5 rounded">{trip.circuit.title}</span>
+                          )}
+                        </div>
+                        <h3 className="font-bold text-gray-900 text-base leading-tight group-hover:text-[#781216] transition-colors truncate">{trip.title}</h3>
+
+                        <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500 flex-wrap">
+                          {trip.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{trip.location}</span>}
+                          {nextSlot?.startDate && (
+                            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />
+                              {format(new Date(nextSlot.startDate), "MMM d, yyyy")}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            <Users className="w-3 h-3" />
+                            {totalFilled}/{totalCapacity} booked
+                          </span>
+                          {trip.packages?.[0]?.price && (
+                            <span className="flex items-center gap-1 font-semibold text-[#781216]">
+                              <IndianRupee className="w-3 h-3" />{parseInt(trip.packages[0].price).toLocaleString("en-IN")}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Fill rate bar */}
+                        {totalCapacity > 0 && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden max-w-[120px]">
+                              <div
+                                className={`h-full rounded-full transition-all ${fillRate >= 80 ? "bg-emerald-500" : fillRate >= 50 ? "bg-[#c8a96e]" : "bg-red-400"}`}
+                                style={{ width: `${fillRate}%` }}
+                              />
+                            </div>
+                            <span className={`text-[10px] font-bold ${fillRate >= 80 ? "text-emerald-600" : fillRate >= 50 ? "text-[#8a6414]" : "text-red-500"}`}>
+                              {fillRate}% full
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions + navigate */}
+                  <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <div className="hidden md:flex items-center gap-1.5 text-xs font-semibold text-[#781216] group-hover:gap-2 transition-all px-3 py-2 rounded-xl bg-red-50 pointer-events-none">
+                      <BarChart2 className="w-4 h-4" />
+                      <span>View Details</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </div>
+                    <TripActionMenu
+                      trip={trip}
+                      processingId={processingId}
+                      processingAction={processingAction}
+                      onShare={handleCreateShareLink}
+                      onTogglePublish={handleTogglePublish}
+                      onEdit={openEditModal}
+                      onDelete={handleDelete}
+                    />
+                  </div>
                 </div>
               </div>
-
-              {/* ── Bookings drawer ── */}
-              {expandedTripId === trip.id && (
-                <div className="border-t border-gray-100">
-                  <div className="px-3 md:px-5 py-3 bg-gray-50 flex items-center justify-between">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Bookings for this trip</p>
-                  </div>
-                  <TripBookingsDrawer tripId={trip.id} />
-                </div>
-              )}
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

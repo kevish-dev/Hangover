@@ -4,9 +4,6 @@ import { ValidationError } from "../../core/errors/errors.js";
 import { createHash, randomBytes, randomUUID } from "crypto";
 import { prisma } from "../../prisma/client.js";
 
-const generateSlug = (title) => {
-  return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
-};
 
 export const getTrips = async (page = 1, limit = 10, isAdmin = false) => {
   const skip = (page - 1) * limit;
@@ -27,17 +24,16 @@ export const getTrips = async (page = 1, limit = 10, isAdmin = false) => {
   };
 };
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 
 const hashShareToken = (token) => createHash("sha256").update(token).digest("hex");
 
 export const getTripById = async (id, isAdmin = false, shareToken = null) => {
-  const idField = UUID_RE.test(id) ? 'id' : 'slug';
   const where = isAdmin
-    ? { [idField]: id }
+    ? { id }
     : shareToken
       ? {
-          [idField]: id,
+          id,
           OR: [
             { isPublished: true },
             {
@@ -49,7 +45,7 @@ export const getTripById = async (id, isAdmin = false, shareToken = null) => {
             },
           ],
         }
-      : { [idField]: id, isPublished: true };
+      : { id, isPublished: true };
   const trip = await tripRepo.findById(where, isAdmin);
   if (!trip) throw new Error("Trip not found");
   return trip;
@@ -103,20 +99,23 @@ export const createTrip = async (data) => {
       itinerary: circuit.days.map((day) => ({
         dayNumber: day.dayNumber,
         title: day.title,
-        description: day.description,
-        todos: day.todos,
+        description: day.description ?? (Array.isArray(day.activities) ? day.activities.join('\n') : day.activities) ?? null,
+        todos: Array.isArray(day.todos)
+          ? day.todos
+          : Array.isArray(day.activities)
+          ? day.activities
+          : typeof day.activities === 'string'
+          ? day.activities.split('\n').map((item) => item.trim()).filter(Boolean)
+          : [],
       })),
       ...createData,
     };
   }
 
   if (!createData.title) throw new ValidationError("Trip title is required.");
-  if (!createData.slug) {
-    createData.slug = generateSlug(createData.title) + "-" + Date.now();
-  }
   if (!createData.stayTransportImages) createData.stayTransportImages = [];
   if (!createData.bannerImages) createData.bannerImages = [];
-  if (!createData.galleryImages) createData.galleryImages = [];
+  delete createData.galleryImages;
 
   if (createData.slots && createData.slots.length > 0) {
     for (const slot of createData.slots) {
@@ -148,7 +147,7 @@ export const createShareLink = async (id, expiresAt) => {
     shareTokenHash: hashShareToken(token),
     shareTokenExpiresAt: parsedExpiry,
   });
-  return { token, slug: trip.slug, expiresAt: trip.shareTokenExpiresAt };
+  return { token, expiresAt: trip.shareTokenExpiresAt };
 };
 
 export const revokeShareLink = async (id) => {
@@ -165,6 +164,7 @@ export const updateTrip = async (id, data) => {
       data.duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     }
   }
+  delete data.galleryImages;
   return tripRepo.update(id, data);
 };
 

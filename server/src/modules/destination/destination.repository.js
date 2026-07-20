@@ -1,7 +1,7 @@
 import { prisma } from "../../prisma/client.js";
 
 export const findAll = async (skip, take, where = {}, isAdmin = false) => {
-  const circuitInclude = isAdmin ? true : { where: { isPublished: true } };
+  const circuitInclude = isAdmin ? true : { where: { isActive: true } };
   
   const [destinations, total] = await Promise.all([
     prisma.destination.findMany({
@@ -20,7 +20,7 @@ export const findAll = async (skip, take, where = {}, isAdmin = false) => {
 
 export const findById = async (whereObj, isAdmin = false) => {
   const filter = typeof whereObj === 'string' ? { id: whereObj } : whereObj;
-  const circuitInclude = isAdmin ? true : { where: { isPublished: true } };
+  const circuitInclude = isAdmin ? true : { where: { isActive: true } };
   
   return prisma.destination.findFirst({
     where: filter,

@@ -59,15 +59,15 @@ export const findById = async (whereObj, isAdmin = false) => {
 };
 
 export const create = async (data) => {
-  const { tripTags, faqs, packages, slots, itinerary, addOns, ...rest } = data;
+  const { tripTags, faqs, packages, slots, itinerary, addOns, circuitId, destinationId, ...rest } = data;
   const payload = { ...rest };
+  
+  if (circuitId) payload.circuit = { connect: { id: circuitId } };
+  if (destinationId) payload.destination = { connect: { id: destinationId } };
   
   if (tripTags && Array.isArray(tripTags)) {
     payload.tripTags = {
-      connectOrCreate: tripTags.map(tag => ({
-        where: { tag },
-        create: { tag }
-      }))
+      connect: tripTags.map(tag => ({ tag }))
     };
   }
 
@@ -109,12 +109,14 @@ export const create = async (data) => {
       create: itinerary.map((day, index) => ({
         dayNumber: Number(day.dayNumber ?? String(day.day || "").match(/\d+/)?.[0] ?? index + 1),
         title: day.title,
-        description: day.description ?? day.activities ?? null,
+        description: day.description ?? (typeof day.activities === "string" ? day.activities : null),
         todos: Array.isArray(day.todos)
           ? day.todos
-          : typeof day.activities === "string"
-            ? day.activities.split("\n").map((item) => item.trim()).filter(Boolean)
-            : [],
+          : Array.isArray(day.activities)
+            ? day.activities
+            : typeof day.activities === "string"
+              ? day.activities.split("\n").map((item) => item.trim()).filter(Boolean)
+              : [],
       })),
     };
   }
@@ -141,8 +143,11 @@ export const create = async (data) => {
 };
 
 export const update = async (id, data) => {
-  const { tripTags, faqs, packages, slots, itinerary, addOns, ...rest } = data;
+  const { tripTags, faqs, packages, slots, itinerary, addOns, circuitId, destinationId, ...rest } = data;
   const payload = { ...rest };
+  
+  if (circuitId !== undefined) payload.circuit = circuitId ? { connect: { id: circuitId } } : { disconnect: true };
+  if (destinationId !== undefined) payload.destination = destinationId ? { connect: { id: destinationId } } : { disconnect: true };
   
   if (tripTags && Array.isArray(tripTags)) {
     // 1. Clear existing tags
@@ -259,12 +264,14 @@ export const update = async (id, data) => {
       create: itinerary.map((day, index) => ({
         dayNumber: Number(day.dayNumber ?? String(day.day || "").match(/\d+/)?.[0] ?? index + 1),
         title: day.title,
-        description: day.description ?? day.activities ?? null,
+        description: day.description ?? (typeof day.activities === "string" ? day.activities : null),
         todos: Array.isArray(day.todos)
           ? day.todos
-          : typeof day.activities === "string"
-            ? day.activities.split("\n").map((item) => item.trim()).filter(Boolean)
-            : [],
+          : Array.isArray(day.activities)
+            ? day.activities
+            : typeof day.activities === "string"
+              ? day.activities.split("\n").map((item) => item.trim()).filter(Boolean)
+              : [],
       })),
     };
   }

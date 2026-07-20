@@ -62,8 +62,14 @@ import {
 import { ValidationError } from "../../core/errors/errors.js";
 
 export const createCircuit = async (data, adminId) => {
-  const parsed = createCircuitSchema.parse(data);
-  return repo.create({ ...parsed, createdById: adminId });
+  console.log("CREATE CIRCUIT PAYLOAD:", JSON.stringify(data, null, 2));
+  try {
+    const parsed = createCircuitSchema.parse(data);
+    return await repo.create({ ...parsed, createdById: adminId });
+  } catch(e) {
+    console.error("ERROR IN CREATE:", e);
+    throw e;
+  }
 };
 
 export const updateCircuit = async (id, data) => {

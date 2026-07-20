@@ -66,7 +66,7 @@ const tripSchema = z.object({
   overview: z.string().optional(),
   inclusions: z.array(z.object({ value: z.string().optional() })).optional(),
   exclusions: z.array(z.object({ value: z.string().optional() })).optional(),
-  tripTags: z.array(z.object({ value: z.string().min(1) })).optional(),
+  tripTags: z.array(z.object({ value: z.string().optional() })).optional(),
   faqs: z
     .array(
       z.object({
@@ -94,7 +94,7 @@ const tripSchema = z.object({
     z.object({
       day: z.string().min(1, "Day is required"),
       title: z.string().min(1, "Title is required"),
-      activities: z.string().min(1, "Activities are required")
+      activities: z.preprocess((val) => typeof val === 'string' ? val.split('\n').filter(Boolean) : val, z.array(z.string().min(1))).optional(),
     })
   ).optional(),
   }
@@ -237,9 +237,7 @@ export function TripFormModal({
             : typeof trip.exclusions === 'string' && trip.exclusions.trim().startsWith('[')
               ? JSON.parse(trip.exclusions).map((e: any) => ({ value: typeof e === 'string' ? e : (e.value || "") }))
               : [{ value: "" }],
-          tripTags: trip.tripTags?.length
-            ? trip.tripTags.map((t: any) => ({ value: t.tag }))
-            : [{ value: "" }],
+          tripTags: [],
           faqs: trip.faqs?.length
             ? trip.faqs.map((f: any) => ({
                 question: f.question,
@@ -255,15 +253,15 @@ export function TripFormModal({
               }))
             : [{ title: "Standard", price: 0, tokenAmount: 0 }],
           itinerary: Array.isArray(trip.itinerary) ? trip.itinerary.map((day: any) => ({
-            day: day.day || `Day ${day.dayNumber || 1}`,
+            day: day.day || "",
             title: day.title || "",
-            activities: Array.isArray(day.todos) && day.todos.length > 0
-              ? day.todos.join('\n')
-              : typeof day.activities === 'string'
-              ? day.activities
-              : Array.isArray(day.activities)
-                ? day.activities.join('\n')
-                : day.description || ""
+            activities: Array.isArray(day.todos) 
+              ? day.todos 
+              : Array.isArray(day.activities) 
+                ? day.activities 
+                : typeof day.activities === 'string' 
+                  ? day.activities.split('\n')
+                  : [day.description || ""].filter(Boolean),
           })) : [],
           isPublished: trip.isPublished || false,
           isFeatured: trip.isFeatured || false,
@@ -332,7 +330,9 @@ export function TripFormModal({
           itinerary: (sourceCircuit.days || []).map((day: any) => ({
             day: `Day ${day.dayNumber}`,
             title: day.title,
-            activities: (day.todos || []).join("\n") || day.description || "Planned activities",
+            activities: Array.isArray(day.todos) && day.todos.length > 0 
+              ? day.todos 
+              : [day.description || "Planned activities"].filter(Boolean),
           })),
           isPublished: false,
           isFeatured: false,
@@ -1627,13 +1627,13 @@ export function TripFormModal({
             {/* STEP 6: MEDIA (BANNER IMAGES) */}
             <div className={step === 6 ? "block" : "hidden"}>
               <div className="space-y-4">
-                {isEdit && trip?.bannerImages?.length > 0 && (
+                {((isEdit && trip?.bannerImages?.length > 0) || (!isEdit && sourceCircuit?.bannerImages?.length > 0)) && (
                   <div className="mb-6">
                     <h4 className="font-medium mb-3 text-sm text-gray-500">
-                      Current Banner Images
+                      {isEdit ? "Current Banner Images" : "Inherited Banner Images (from template)"}
                     </h4>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {trip.bannerImages.map((url: string, i: number) => (
+                      {(isEdit ? trip.bannerImages : sourceCircuit.bannerImages).map((url: string, i: number) => (
                         <div
                           key={url}
                           className="relative group rounded-lg overflow-hidden border border-gray-200 aspect-video bg-gray-100"
@@ -1643,16 +1643,18 @@ export function TripFormModal({
                             alt={`Existing ${i}`}
                             className="w-full h-full object-cover"
                           />
-                          <div className="absolute inset-0 bg-black/30 opacity-100 md:bg-black/40 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <button
-                              type="button"
-                              onClick={() => deleteExistingImage(url)}
-                              className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
-                              title="Delete Image"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
+                          {isEdit && (
+                            <div className="absolute inset-0 bg-black/30 opacity-100 md:bg-black/40 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <button
+                                type="button"
+                                onClick={() => deleteExistingImage(url)}
+                                className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
+                                title="Delete Image"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

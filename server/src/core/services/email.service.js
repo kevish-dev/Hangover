@@ -1066,3 +1066,57 @@ export const sendOperationsReminderEmail = async (options = {}) => {
   });
 };
 
+/**
+ * Send a custom invoice email.
+ */
+export const sendCustomInvoiceEmail = async (options = {}) => {
+  const {
+    to,
+    customerName,
+    title,
+    description,
+    items,
+    amount,
+    currency = "INR",
+    dueDate,
+  } = options;
+
+  const invoiceRows = [
+    { label: "Billed to", value: customerName, emphasis: true },
+    { label: "Invoice Title", value: title },
+    { label: "Description", value: description },
+    { label: "Date", value: formatDate(dueDate || new Date()) },
+  ];
+
+  const amountRows = items && items.length > 0
+    ? items.map(item => ({ label: item.description, value: formatCurrency(item.price, currency) }))
+    : [];
+
+  const summaryRows = [
+    ...amountRows,
+    { label: "Total Amount Paid", value: formatCurrency(amount, currency), strong: true, accent: true },
+  ];
+
+  const intro = `Please find your payment receipt details below.`;
+  const emailTitle = `Payment Receipt: ${title}`;
+
+  return sendTemplate({
+    to,
+    subject: `Payment Receipt: ${title}`,
+    text: renderPlainText({
+      title: emailTitle,
+      intro,
+      sections: [plainSection("Receipt Details", invoiceRows), plainSection("Amount Summary", summaryRows)],
+    }),
+    preheader: `Receipt for ${formatCurrency(amount, currency)} is ready.`,
+    eyebrow: "Payment Receipt",
+    title: emailTitle,
+    intro,
+    bodyHtml: [
+      renderDetails("Receipt Details", invoiceRows),
+      renderAmounts("Amount Summary", summaryRows),
+      renderNotice("This invoice has been marked as paid. Thank you for your payment!"),
+    ].join(""),
+    footerNote: "If you have any questions about this receipt, reply to this email.",
+  });
+};

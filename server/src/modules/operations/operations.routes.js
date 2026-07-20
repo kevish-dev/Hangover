@@ -8,6 +8,8 @@ router.use(requireAuth);
 
 router.get("/", requireAdmin, operationsController.listOperationalTasks);
 router.get("/bookings/:bookingId", requireAdmin, operationsController.getBookingOperations);
+router.post("/bookings/:bookingId", requireAdmin, operationsController.createOperationalTask);
 router.patch("/:taskId", requireAdmin, operationsController.updateOperationalTask);
+router.delete("/:taskId", requireAdmin, operationsController.deleteOperationalTask);
 
 export default router;

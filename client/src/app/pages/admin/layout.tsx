@@ -27,6 +27,7 @@ import {
   CreditCard,
   Star,
   LayoutDashboard,
+  Receipt,
 } from "lucide-react";
 
 const navItems = [
@@ -38,6 +39,7 @@ const navItems = [
   { title: "Operations", url: "/dashboard/operations", icon: ClipboardCheck },
   { title: "Balance sheet", url: "/dashboard/ledger", icon: BookOpen },
   { title: "Payments", url: "/dashboard/payments", icon: CreditCard },
+  { title: "Invoices", url: "/dashboard/invoices", icon: Receipt },
   { title: "Reviews", url: "/dashboard/reviews", icon: Star },
   { title: "Public site", url: "/", icon: Home },
 ];

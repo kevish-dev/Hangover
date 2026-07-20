@@ -1052,3 +1052,32 @@ enum LedgerEntrySource {
   VENDOR_PAYMENT
   MANUAL
 }
+
+// =====================================================================
+// CUSTOM INVOICES
+// =====================================================================
+model CustomInvoice {
+  id              String        @id @default(uuid())
+  customerName    String
+  customerEmail   String
+  customerPhone   String?
+  title           String
+  description     String?
+  items           Json          @default("[]")
+  amount          Decimal       @db.Decimal(10, 2)
+  currency        String        @default("INR")
+  dueDate         DateTime?
+  status          InvoiceStatus @default(SENT)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([status])
+  @@index([customerEmail])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  CANCELLED
+}

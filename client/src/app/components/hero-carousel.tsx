@@ -256,7 +256,7 @@ export function HeroCarousel() {
           <img
             src={mediaImageUrl(slide.bannerImages, { width: 1920, fit: "fit" })}
             alt={slide.title}
-            fetchPriority="high"
+            fetchpriority="high"
             decoding="async"
             className="w-full h-full object-cover"
           />

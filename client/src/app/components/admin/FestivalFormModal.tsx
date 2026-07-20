@@ -41,13 +41,23 @@ const festivalSchema = z.object({
   slots: z.array(
     z.object({
       id: z.string().optional(),
-      startDate: z.string().optional(),
-      endDate: z.string().optional(),
+      startDate: z.string().min(1, "Start date is required"),
+      endDate: z.string().min(1, "End date is required"),
       title: z.string().optional(),
       priority: z.coerce.number().optional(),
       capacity: z.coerce.number().min(1, "Capacity must be at least 1"),
     })
-  ).min(1, "At least one slot is required"),
+  ).min(1, "At least one slot is required").superRefine((slots, context) => {
+    slots.forEach((slot, index) => {
+      if (slot.startDate && slot.endDate && new Date(slot.endDate) <= new Date(slot.startDate)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "End date must be after the start date",
+          path: [index, "endDate"],
+        });
+      }
+    });
+  }),
 
   overview: z.string().optional(),
   inclusions: z.array(z.object({ value: z.string().optional() })).optional(),

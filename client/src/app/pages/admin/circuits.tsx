@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router";
 import { apiClient } from "../../../lib/axios";
-import { CircuitFormModal } from "../../components/admin/CircuitFormModal";
 import { TripFormModal } from "../../components/admin/TripFormModal";
 import { FestivalFormModal } from "../../components/admin/FestivalFormModal";
 import { Map, Plus, Edit2, Trash2, Navigation, Eye, EyeOff, Rocket, Loader2, ClipboardList, CalendarDays, Tent } from "lucide-react";
@@ -11,8 +11,7 @@ import { getErrorMessage, showErrorToast } from "../../../lib/errors";
 
 export default function AdminCircuitsPage() {
   const queryClient = useQueryClient();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCircuit, setEditingCircuit] = useState<any>(null);
+  const navigate = useNavigate();
   const [sourceCircuit, setSourceCircuit] = useState<any>(null);
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
   const [isFestivalModalOpen, setIsFestivalModalOpen] = useState(false);
@@ -74,8 +73,7 @@ export default function AdminCircuitsPage() {
   };
 
   const openCreateModal = () => {
-    setEditingCircuit(null);
-    setIsModalOpen(true);
+    navigate("/dashboard/circuits/new");
   };
 
   const loadFullCircuit = async (circuitId: string) => {
@@ -88,12 +86,7 @@ export default function AdminCircuitsPage() {
   };
 
   const openEditModal = async (circuit: any) => {
-    try {
-      setEditingCircuit(await loadFullCircuit(circuit.id));
-      setIsModalOpen(true);
-    } catch (error) {
-      showErrorToast(error, "Could not load the circuit template");
-    }
+    navigate(`/dashboard/circuits/${circuit.id}`);
   };
 
   const openTripFromCircuit = async (circuit: any) => {
@@ -140,11 +133,6 @@ export default function AdminCircuitsPage() {
         </Button>
       </div>
 
-      <CircuitFormModal 
-        open={isModalOpen} 
-        onOpenChange={setIsModalOpen} 
-        circuit={editingCircuit} 
-      />
       <TripFormModal
         open={isTripModalOpen}
         onOpenChange={setIsTripModalOpen}

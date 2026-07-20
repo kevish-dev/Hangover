@@ -29,3 +29,20 @@ export const getBookingOperations = async (req, res, next) => {
     next(error);
   }
 };
+
+export const createOperationalTask = async (req, res, next) => {
+  try {
+    res.status(201).json(await operationsService.createOperationalTask(req.params.bookingId, req.body));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteOperationalTask = async (req, res, next) => {
+  try {
+    await operationsService.deleteOperationalTask(req.params.taskId);
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+};
