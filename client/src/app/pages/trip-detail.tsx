@@ -195,7 +195,7 @@ function RelatedCard({ trip }: { trip: ApiTrip }) {
 
   return (
     <Link
-      to={`/trips/${trip.slug}`}
+      to={`/trips/${trip.id}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -1542,7 +1542,7 @@ function TripDetailContent({
   if (selectedSlotId) bookingParams.set("slotId", selectedSlotId);
   const shareToken = new URLSearchParams(window.location.search).get("share");
   if (shareToken) bookingParams.set("share", shareToken);
-  const bookingPath = `/book/${trip.slug}${bookingParams.size ? `?${bookingParams.toString()}` : ""}`;
+  const bookingPath = `/book/${trip.id}${bookingParams.size ? `?${bookingParams.toString()}` : ""}`;
 
   const prevHero = () =>
     setHeroIndex((i) => (i - 1 + safeAllImages.length) % safeAllImages.length);

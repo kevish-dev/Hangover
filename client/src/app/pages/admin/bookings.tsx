@@ -1,11 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../lib/axios";
-import { CalendarCheck, IndianRupee, Loader2, Bell, X, User, MapPin, Mail, Phone, Image as ImageIcon, MoreVertical, Search, ArrowUpDown, Filter, AlertCircle } from "lucide-react";
+import { CalendarCheck, IndianRupee, Loader2, Bell, X, User, MapPin, Mail, Phone, Image as ImageIcon, MoreVertical, Search, ArrowUpDown, Filter, AlertCircle, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { finalizeBooking } from "../../../lib/bookingApi";
 import { useMutation } from "@tanstack/react-query";
+import CreateBookingModal from "../../components/admin/CreateBookingModal";
 
 function BookingStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -194,6 +195,7 @@ export default function AdminBookingsPage() {
   const queryClient = useQueryClient();
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
@@ -310,8 +312,14 @@ export default function AdminBookingsPage() {
           </p>
         </div>
 
-        {/* Toolbar */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full md:w-auto">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full md:w-auto">
+            <button 
+              onClick={() => setShowCreateModal(true)}
+              className="px-4 py-2 bg-[#c8a96e] hover:bg-[#b09561] text-white rounded-full text-base md:text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Create Booking
+            </button>
           <div className="relative w-full md:w-auto">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input 
@@ -700,6 +708,16 @@ export default function AdminBookingsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {showCreateModal && (
+        <CreateBookingModal 
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => {
+            setShowCreateModal(false);
+            queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
+          }}
+        />
       )}
       <style>{`
         @media (max-width: 767px) {

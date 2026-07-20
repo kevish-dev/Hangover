@@ -85,7 +85,8 @@ const festivalSchema = z.object({
     z.object({
       day: z.string().min(1, "Day is required"),
       title: z.string().min(1, "Title is required"),
-      activities: z.string().min(1, "Activities are required")
+      description: z.string().optional(),
+      todos: z.preprocess((val) => typeof val === 'string' ? val.split('\n').filter(Boolean) : val, z.array(z.string())).optional(),
     })
   ).optional(),
   }
@@ -222,15 +223,10 @@ export function FestivalFormModal({
               }))
             : [{ title: "Standard", price: 0, tokenAmount: 0 }],
           itinerary: Array.isArray(festival.itinerary) ? festival.itinerary.map((day: any) => ({
-            day: day.day || `Day ${day.dayNumber || 1}`,
+            day: day.day || `Day ${day.dayNumber}`,
             title: day.title || "",
-            activities: Array.isArray(day.todos) && day.todos.length > 0
-              ? day.todos.join('\n')
-              : typeof day.activities === 'string'
-              ? day.activities
-              : Array.isArray(day.activities)
-                ? day.activities.join('\n')
-                : day.description || ""
+            description: day.description || "",
+            todos: Array.isArray(day.todos) ? day.todos : [],
           })) : [],
           faqs: festival.faqs?.length
             ? festival.faqs.map((f: any) => ({
@@ -311,11 +307,10 @@ export function FestivalFormModal({
               }))
             : [{ title: "Standard", price: 0, tokenAmount: 0 }],
           itinerary: Array.isArray(sourceCircuit.days) ? sourceCircuit.days.map((day: any) => ({
-            day: `Day ${day.dayNumber || 1}`,
-            title: day.title || "",
-            activities: Array.isArray(day.todos) && day.todos.length > 0
-              ? day.todos.join('\\n')
-              : day.description || ""
+            day: `Day ${day.dayNumber}`,
+            title: day.title,
+            description: day.description || "",
+            todos: Array.isArray(day.todos) ? day.todos : [],
           })) : [],
           faqs: sourceCircuit.faqs?.length
             ? sourceCircuit.faqs.map((f: any) => ({

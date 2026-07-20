@@ -593,7 +593,7 @@ function FestivalCard({
             </p>
           </div>
           <Link
-            to={`/festivals/${festival.slug}`}
+            to={`/festivals/${festival.id}`}
             style={{
               background: hovered ? "#C8A96E" : "transparent",
               border: `1.5px solid ${hovered ? "#C8A96E" : "rgba(30,26,20,0.14)"}`,
@@ -740,7 +740,7 @@ export default function FestivalsPage() {
           : "Dates TBA",
         image: featuredFestival.bannerImages?.[0] || "",
         videoUrl: featuredFestival.videoUrl || null,
-        tripSlug: featuredFestival.slug,
+        tripSlug: featuredFestival.id,
       }
     : null;
 

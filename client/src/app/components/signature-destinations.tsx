@@ -139,7 +139,7 @@ export function SignatureDestinations() {
                 <button
                   key={trip.id}
                   type="button"
-                  onClick={() => navigate(`/trips/${trip.slug}`)}
+                  onClick={() => navigate(`/trips/${trip.id}`)}
                   style={{
                     width: "100%",
                     border: "none",

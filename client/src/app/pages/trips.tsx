@@ -498,7 +498,7 @@ function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
               {isNotAvailable(priceStr) ? <NA /> : priceStr}
             </span>
           </div>
-          <Link className="trip-card-link" to={(trip as any).isFestival ? `/festivals/${trip.slug}` : `/trips/${trip.slug}`} style={{ background: hovered ? "#C8A96E" : "transparent", border: `1.5px solid ${hovered ? "#C8A96E" : "rgba(30,26,20,0.15)"}`, color: hovered ? "#1e1a14" : "rgba(30,26,20,0.6)", borderRadius: "4px", padding: "7px 16px", fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Poppins', sans-serif", transition: "all 0.25s ease", display: "flex", alignItems: "center", gap: "5px", textDecoration: "none" }}>
+          <Link className="trip-card-link" to={(trip as any).isFestival ? `/festivals/${trip.id}` : `/trips/${trip.id}`} style={{ background: hovered ? "#C8A96E" : "transparent", border: `1.5px solid ${hovered ? "#C8A96E" : "rgba(30,26,20,0.15)"}`, color: hovered ? "#1e1a14" : "rgba(30,26,20,0.6)", borderRadius: "4px", padding: "7px 16px", fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Poppins', sans-serif", transition: "all 0.25s ease", display: "flex", alignItems: "center", gap: "5px", textDecoration: "none" }}>
             View {(trip as any).isFestival ? "Festival" : "Trip"} <ArrowRight size={11} />
           </Link>
         </div>

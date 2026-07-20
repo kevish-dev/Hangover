@@ -382,7 +382,7 @@ export function HeroCarousel() {
 
               {/* Explore CTA */}
               <button
-                onClick={() => navigate(`/trips/${slide.slug}`)}
+                onClick={() => navigate(`/trips/${slide.id}`)}
                 className="group active:scale-95 transition-all duration-300 mt-8"
                 style={{
                   background: "#C8A96E",

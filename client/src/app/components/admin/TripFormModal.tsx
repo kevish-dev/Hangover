@@ -94,7 +94,8 @@ const tripSchema = z.object({
     z.object({
       day: z.string().min(1, "Day is required"),
       title: z.string().min(1, "Title is required"),
-      activities: z.preprocess((val) => typeof val === 'string' ? val.split('\n').filter(Boolean) : val, z.array(z.string().min(1))).optional(),
+      description: z.string().optional(),
+      todos: z.preprocess((val) => typeof val === 'string' ? val.split('\n').filter(Boolean) : val, z.array(z.string())).optional(),
     })
   ).optional(),
   }
@@ -253,15 +254,10 @@ export function TripFormModal({
               }))
             : [{ title: "Standard", price: 0, tokenAmount: 0 }],
           itinerary: Array.isArray(trip.itinerary) ? trip.itinerary.map((day: any) => ({
-            day: day.day || "",
+            day: day.day || `Day ${day.dayNumber}`,
             title: day.title || "",
-            activities: Array.isArray(day.todos) 
-              ? day.todos 
-              : Array.isArray(day.activities) 
-                ? day.activities 
-                : typeof day.activities === 'string' 
-                  ? day.activities.split('\n')
-                  : [day.description || ""].filter(Boolean),
+            description: day.description || "",
+            todos: Array.isArray(day.todos) ? day.todos : [],
           })) : [],
           isPublished: trip.isPublished || false,
           isFeatured: trip.isFeatured || false,
@@ -330,9 +326,8 @@ export function TripFormModal({
           itinerary: (sourceCircuit.days || []).map((day: any) => ({
             day: `Day ${day.dayNumber}`,
             title: day.title,
-            activities: Array.isArray(day.todos) && day.todos.length > 0 
-              ? day.todos 
-              : [day.description || "Planned activities"].filter(Boolean),
+            description: day.description || "",
+            todos: Array.isArray(day.todos) ? day.todos : [],
           })),
           isPublished: false,
           isFeatured: false,

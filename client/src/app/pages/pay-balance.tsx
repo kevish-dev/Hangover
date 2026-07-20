@@ -143,9 +143,9 @@ function ResultPage({
 }) {
   const item = booking.customTrip || booking.trip || booking.festival || booking.slot?.trip || booking.slot?.festival;
   const itemPath = booking.customTrip ? "/profile" : booking.festival
-    ? `/festivals/${item?.slug}`
-    : item?.slug
-      ? `/trips/${item.slug}`
+    ? `/festivals/${item?.id}`
+    : item?.id
+      ? `/trips/${item.id}`
       : "/trips";
   const isVerifying = type === "verifying";
   const isSuccess = type === "success";
@@ -251,7 +251,7 @@ export default function PayBalancePage() {
   const item = booking?.customTrip || booking?.trip || booking?.festival || booking?.slot?.trip || booking?.slot?.festival;
   const isCustom = booking?.source === "CUSTOM" || Boolean(booking?.customTrip);
   const isFestival = Boolean(booking?.festival || booking?.slot?.festival);
-  const itemPath = isCustom ? "/profile" : item?.slug ? (isFestival ? `/festivals/${item.slug}` : `/trips/${item.slug}`) : "/trips";
+  const itemPath = isCustom ? "/profile" : item?.id ? (isFestival ? `/festivals/${item.id}` : `/trips/${item.id}`) : "/trips";
   const tripStartDate = booking?.customTrip?.startDate || booking?.slot?.startDate;
   const tripEndDate = booking?.customTrip?.endDate || booking?.slot?.endDate;
   const totalAmount = Number(booking?.totalAmount || 0);

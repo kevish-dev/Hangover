@@ -196,7 +196,7 @@ export default function AdminTripsPage() {
     try {
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       const { data } = await apiClient.post(`/trips/${trip.id}/share-link`, { expiresAt });
-      const url = `${window.location.origin}/trips/${trip.slug}?share=${encodeURIComponent(data.token)}`;
+      const url = `${window.location.origin}/trips/${trip.id}?share=${encodeURIComponent(data.token)}`;
       setGeneratedShareLink({ title: trip.title, url });
       try {
         await navigator.clipboard.writeText(url);
@@ -417,13 +417,20 @@ export default function AdminTripsPage() {
                   </div>
 
                   {/* Actions + navigate */}
-                  <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-                    <div className="hidden md:flex items-center gap-1.5 text-xs font-semibold text-[#781216] group-hover:gap-2 transition-all px-3 py-2 rounded-xl bg-red-50 pointer-events-none">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/dashboard/trips/${trip.id}`);
+                      }}
+                      className="hidden md:flex items-center gap-1.5 text-xs font-semibold text-[#781216] group-hover:gap-2 transition-all px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100"
+                    >
                       <BarChart2 className="w-4 h-4" />
                       <span>View Details</span>
                       <ChevronRight className="w-4 h-4" />
-                    </div>
-                    <TripActionMenu
+                    </button>
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <TripActionMenu
                       trip={trip}
                       processingId={processingId}
                       processingAction={processingAction}
@@ -435,7 +442,8 @@ export default function AdminTripsPage() {
                   </div>
                 </div>
               </div>
-            );
+            </div>
+          );
           })
         )}
       </div>

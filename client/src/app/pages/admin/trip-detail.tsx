@@ -50,6 +50,7 @@ import { TripFormModal } from "../../components/admin/TripFormModal";
 import { formatTripType } from "../../../lib/tripApi";
 import { paymentApi } from "../../../lib/paymentApi";
 import { showErrorToast } from "../../../lib/errors";
+import CreateBookingModal from "../../components/admin/CreateBookingModal";
 
 // ─── Shared helpers ───────────────────────────────────────────────
 const money = (v: unknown) =>
@@ -150,6 +151,7 @@ function BookingsTab({ tripId }: { tripId: string }) {
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [refetchKey, setRefetchKey] = useState(0);
 
   const {
@@ -249,6 +251,13 @@ function BookingsTab({ tripId }: { tripId: string }) {
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3 bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+          <button 
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-2 bg-[#c8a96e] hover:bg-[#b09561] text-white rounded-xl text-sm font-medium transition-colors shadow-sm flex items-center justify-center gap-2 whitespace-nowrap"
+          >
+            <Plus className="w-4 h-4" />
+            Create Booking
+          </button>
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -358,6 +367,18 @@ function BookingsTab({ tripId }: { tripId: string }) {
             refetch();
             setRefetchKey((k) => k + 1);
           }}
+        />
+      )}
+
+      {showCreateModal && (
+        <CreateBookingModal 
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => {
+            setShowCreateModal(false);
+            refetch();
+          }}
+          prefillType="TRIP"
+          prefillItemId={tripId}
         />
       )}
     </>
@@ -1757,7 +1778,7 @@ export default function AdminTripDetailPage() {
       const { data } = await apiClient.post(`/trips/${trip.id}/share-link`, {
         expiresAt,
       });
-      const url = `${window.location.origin}/trips/${trip.slug}?share=${encodeURIComponent(data.token)}`;
+      const url = `${window.location.origin}/trips/${trip.id}?share=${encodeURIComponent(data.token)}`;
       setGeneratedShareLink({ title: trip.title, url });
       try {
         await navigator.clipboard.writeText(url);
@@ -1824,18 +1845,6 @@ export default function AdminTripDetailPage() {
         </button>
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          {/* Banner */}
-          {trip.bannerImages?.length > 0 && (
-            <div className="w-full h-40 md:h-52 overflow-hidden relative">
-              <img
-                src={trip.bannerImages[0]}
-                alt={trip.title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-            </div>
-          )}
-
           <div className="p-5 md:p-6">
             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
               <div className="min-w-0">

@@ -195,7 +195,7 @@ export function FestivalVideo() {
                     date: formatFestivalDate(festival),
                     tag: festival.bestTimeToVisit || "Featured Festival",
                   }}
-                  onClick={() => navigate(`/festivals/${festival.slug}`)}
+                  onClick={() => navigate(`/festivals/${festival.id}`)}
                 />
               ))}
             </div>

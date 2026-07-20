@@ -407,7 +407,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
             {isFullyRefunded && (
               <Link
                 className="profile-booking-primary-action"
-                to={`/book/${item?.slug}${isFestival ? "?type=festival" : ""}`}
+                to={`/book/${item?.id}${isFestival ? "?type=festival" : ""}`}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -431,7 +431,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
             )}
             {!isCustom ? <Link
               className="profile-booking-view-action"
-              to={isFestival ? `/festivals/${item?.slug}` : `/trips/${item?.slug}`}
+              to={isFestival ? `/festivals/${item?.id}` : `/trips/${item?.id}`}
               style={{
                 display: "flex",
                 alignItems: "center",
