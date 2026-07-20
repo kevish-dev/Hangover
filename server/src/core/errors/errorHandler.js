@@ -39,10 +39,13 @@ export const errorHandler = (err, req, res, next) => {
   }
 
   if (err?.code === "P2003") {
+    const isDelete = err.message?.includes("delete") || err.meta?.cause?.includes("delete");
     return res.status(400).json({
       success: false,
-      code: "INVALID_REFERENCE",
-      message: "One of the selected records does not exist.",
+      code: isDelete ? "DELETE_RESTRICTED" : "INVALID_REFERENCE",
+      message: isDelete 
+        ? "Cannot delete this record because it has related records (like bookings) preventing deletion."
+        : "One of the selected records does not exist.",
     });
   }
 

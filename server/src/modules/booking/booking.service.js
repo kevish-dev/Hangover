@@ -306,6 +306,265 @@ export const createBooking = async (userId, data) => {
   return booking;
 };
 
+export const adminCreateBooking = async (adminId, data) => {
+  if (!data.email) {
+    throw new ValidationError("Email is required for admin booking creation.");
+  }
+  
+  const email = data.email.toLowerCase().trim();
+  let user = await prisma.user.findUnique({
+    where: { email },
+    include: { profile: true },
+  });
+
+  if (user) {
+    const profileUpdate = {};
+    if (data.fullName) profileUpdate.fullName = data.fullName;
+    if (data.phone) profileUpdate.phone = data.phone;
+    if (data.gender) profileUpdate.gender = data.gender.toUpperCase();
+    if (data.dateOfBirth) profileUpdate.dateOfBirth = new Date(data.dateOfBirth);
+    
+    if (Object.keys(profileUpdate).length > 0) {
+      if (user.profile) {
+        await prisma.userProfile.update({
+          where: { id: user.profile.id },
+          data: profileUpdate,
+        });
+      } else {
+        await prisma.userProfile.create({
+          data: { ...profileUpdate, userId: user.id }
+        });
+      }
+    }
+  } else {
+    user = await prisma.user.create({
+      data: {
+        email,
+        googleId: `admin_created_${crypto.randomUUID()}`,
+        role: "USER",
+        profile: {
+          create: {
+            fullName: data.fullName || null,
+            phone: data.phone || null,
+            gender: data.gender ? data.gender.toUpperCase() : null,
+            dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
+          }
+        }
+      },
+      include: { profile: true }
+    });
+  }
+
+  if (!data.slotId) {
+    throw new ValidationError("Must provide a slotId to book.");
+  }
+
+  const slot = await prisma.slot.findUnique({ 
+    where: { id: data.slotId },
+    include: { 
+      trip: { include: { packages: true, addOns: true } }, 
+      festival: { include: { packages: true, addOns: true } } 
+    } 
+  });
+  if (!slot) {
+    throw new NotFoundError("Booking slot not found");
+  }
+
+  const isTrip = !!slot.tripId;
+  const item = isTrip ? slot.trip : slot.festival;
+  if (!item) throw new NotFoundError("Booking item not found");
+  if (!item.isActive) throw new ValidationError("This item is no longer available.");
+
+  const numberOfTravelers = data.numberOfTravelers || 1;
+  const spotsLeft = slot.capacity - slot.filledSpots;
+  if (numberOfTravelers > spotsLeft) {
+    throw new ValidationError(`Only ${spotsLeft} spot(s) remaining.`);
+  }
+
+  let selectedPackage = null;
+  if (data.packageId) {
+    selectedPackage = item.packages?.find(p => p.id === data.packageId);
+  }
+  if (!selectedPackage && item.packages && item.packages.length > 0) {
+    selectedPackage = item.packages[0];
+  }
+  if (!selectedPackage) {
+    throw new ValidationError("A package must be selected.");
+  }
+
+  const itemPrice = Number(selectedPackage.price);
+  const itemToken = Number(selectedPackage.tokenAmount);
+
+  let addOnsTotalCost = 0;
+  const bookingAddOnsData = [];
+
+  if (data.addOns && Array.isArray(data.addOns)) {
+    for (const addonReq of data.addOns) {
+      if (!addonReq.addOnId) continue;
+      const addOnModel = item.addOns?.find((addOn) => addOn.id === addonReq.addOnId);
+      if (!addOnModel || !addOnModel.isActive) {
+        throw new ValidationError("One or more selected add-ons are not available.");
+      }
+      const qty = Number(addonReq.quantity || 1);
+      const price = Number(addOnModel.price);
+      const totalAddOnPrice = price * qty;
+      addOnsTotalCost += totalAddOnPrice;
+      bookingAddOnsData.push({
+        addOnId: addOnModel.id,
+        quantity: qty,
+        unitPrice: price,
+        totalPrice: totalAddOnPrice,
+        status: data.paymentAction === "MARK_PAID" ? "PAID" : "PENDING",
+      });
+    }
+  }
+
+  const baseTotalAmount = (itemPrice * numberOfTravelers) + addOnsTotalCost;
+  const totalAmount = toDecimal2(baseTotalAmount + (baseTotalAmount * 0.05));
+
+  const baseTokenAmount = itemToken * numberOfTravelers;
+  const tokenAmount = toDecimal2(baseTokenAmount + (baseTokenAmount * 0.05));
+
+  let initialPaymentType = data.initialPaymentType || "TOKEN";
+  if (tokenAmount === 0) initialPaymentType = "FULL";
+  const amountDue = initialPaymentType === "FULL" ? 0 : toDecimal2(totalAmount - tokenAmount);
+
+  const balanceDueDate = new Date(slot.startDate);
+  balanceDueDate.setDate(balanceDueDate.getDate() - 10);
+
+  let status = "PENDING";
+  let paymentStatus = "PENDING";
+  let amountPaid = 0;
+  let amountToPay = initialPaymentType === "FULL" ? totalAmount : tokenAmount;
+
+  if (data.paymentAction === "MARK_PAID") {
+    amountPaid = amountToPay;
+    paymentStatus = initialPaymentType === "FULL" ? "PAID" : "PARTIALLY_PAID";
+    status = "CONFIRMED";
+  }
+
+  const bookingData = {
+    bookingReference: `HNG-${crypto.randomBytes(4).toString("hex").toUpperCase()}`,
+    userId: user.id,
+    slotId: data.slotId,
+    numberOfTravelers,
+    initialPaymentType,
+    totalAmount,
+    tokenAmount,
+    amountDue,
+    amountPaid,
+    balanceDueDate,
+    specialRequests: data.specialRequests || null,
+    status,
+    paymentStatus,
+    source: "CATALOG",
+  };
+
+  if (isTrip) bookingData.tripId = slot.tripId;
+  else bookingData.festivalId = slot.festivalId;
+  if (selectedPackage) bookingData.packageId = selectedPackage.id;
+
+  if (bookingAddOnsData.length > 0) {
+    bookingData.addOns = { create: bookingAddOnsData };
+  }
+
+  const booking = await prisma.$transaction(async (tx) => {
+    const newBooking = await tx.booking.create({ data: bookingData, include: { user: { include: { profile: true } }, package: true, trip: true, festival: true, slot: true } });
+
+    await tx.slot.update({
+      where: { id: slot.id },
+      data: { filledSpots: { increment: numberOfTravelers } },
+    });
+
+    if (data.paymentAction === "MARK_PAID") {
+      const payment = await tx.payment.create({
+        data: {
+          bookingId: newBooking.id,
+          type: initialPaymentType,
+          status: "SUCCESS",
+          amount: amountPaid,
+          currency: "INR",
+          razorpayOrderId: `OFFLINE_${crypto.randomUUID()}`,
+          idempotencyKey: `ADMIN_${newBooking.id}_${crypto.randomUUID()}`,
+          paidAt: new Date(),
+          paymentMethod: "OFFLINE",
+          notes: { adminId },
+        },
+      });
+
+      await tx.ledgerEntry.create({
+        data: {
+          type: "INCOME",
+          scope: isTrip ? "TRIP" : "FESTIVAL",
+          tripId: isTrip ? slot.tripId : null,
+          festivalId: isTrip ? null : slot.festivalId,
+          bookingId: newBooking.id,
+          paymentId: payment.id,
+          source: "MANUAL",
+          category: initialPaymentType === "FULL" ? "Full Payment" : "Token Payment",
+          amount: amountPaid,
+          description: "Payment collected offline/manually by admin",
+          isAutoGenerated: true,
+          createdById: adminId,
+        },
+      });
+    }
+
+    return newBooking;
+  });
+
+  operationsService.generateBookingOperations(booking, slot, data.addOns || []).catch(
+    (err) => console.error("[OpsGen] Failed to generate operations for admin booking", booking.id, err)
+  );
+
+  if (data.paymentAction === "MARK_PAID") {
+    import("../../core/services/email.service.js").then(({ sendBookingConfirmedEmail }) => {
+      sendBookingConfirmedEmail({
+        to: email,
+        name: data.fullName || email.split("@")[0],
+        bookingRef: booking.bookingReference,
+        tripTitle: item.title,
+        tripStartDate: slot.startDate,
+        tripEndDate: slot.endDate,
+        packageName: selectedPackage?.title,
+        travelersCount: numberOfTravelers,
+        amountPaid: amountPaid,
+        balanceAmount: booking.amountDue,
+        totalAmount: booking.totalAmount,
+        dueDate: booking.balanceDueDate,
+      }).catch(err => console.error("Failed to send booking confirmed email", err));
+    });
+  } else if (data.paymentAction === "SEND_LINK") {
+    import("../payment/payment.service.js").then(({ initiatePayment }) => {
+      initiatePayment(user.id, booking.id, initialPaymentType).then(() => {
+        import("../../core/services/email.service.js").then(({ sendPaymentReminderEmail }) => {
+           import("../../core/env/env.js").then((envModule) => {
+             const env = envModule.default;
+             const paymentLink = `${env.ORIGIN}/bookings/${booking.id}/pay-balance`;
+             sendPaymentReminderEmail({
+               to: email,
+               name: data.fullName || email.split("@")[0],
+               bookingRef: booking.bookingReference,
+               tripTitle: item.title,
+               tripStartDate: slot.startDate,
+               tripEndDate: slot.endDate,
+               packageName: selectedPackage?.title,
+               travelersCount: numberOfTravelers,
+               amountPaid: 0,
+               balanceAmount: amountToPay,
+               totalAmount: booking.totalAmount,
+               dueDate: booking.balanceDueDate,
+               paymentLink,
+             }).catch(err => console.error("Failed to send payment link email", err));
+           });
+        });
+      }).catch(err => console.error("Failed to initiate payment for admin booking", err));
+    });
+  }
+
+  return booking;
+};
+
 export const cancelBooking = async (bookingId, userId, reason) => {
   const booking = await repo.getBookingById(bookingId);
   if (!booking) throw new NotFoundError("Booking not found");

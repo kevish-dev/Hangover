@@ -38,6 +38,7 @@ export const router = createBrowserRouter([
       { path: "trips", lazy: lazyPage(() => import("./pages/admin/trips")) },
       { path: "trips/:id", lazy: lazyPage(() => import("./pages/admin/trip-detail")) },
       { path: "bookings", lazy: lazyPage(() => import("./pages/admin/bookings")) },
+      { path: "bookings/:id", lazy: lazyPage(() => import("./pages/admin/booking-detail")) },
       { path: "operations", lazy: lazyPage(() => import("./pages/admin/operations")) },
       { path: "ledger", lazy: lazyPage(() => import("./pages/admin/ledger")) },
       { path: "payments", lazy: lazyPage(() => import("./pages/admin/payments")) },

@@ -645,10 +645,10 @@ function OperationsTab({
                     ? 100
                     : 0;
               return (
-                <button
+                <div
                   key={task.id}
                   onClick={() => setEditingTask(task)}
-                  className="w-full text-left px-4 py-4 hover:bg-gray-50 transition-colors group"
+                  className="w-full text-left px-4 py-4 hover:bg-gray-50 transition-colors group cursor-pointer"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -713,7 +713,7 @@ function OperationsTab({
                       </div>
                     </div>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
@@ -729,10 +729,10 @@ function OperationsTab({
           </div>
           <div className="divide-y divide-gray-50">
             {doneTasks.map((task: any) => (
-              <button
+              <div
                 key={task.id}
                 onClick={() => setEditingTask(task)}
-                className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors opacity-60 group"
+                className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors opacity-60 group cursor-pointer"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
@@ -759,7 +759,7 @@ function OperationsTab({
                     </button>
                   </div>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         </div>

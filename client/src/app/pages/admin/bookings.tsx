@@ -193,7 +193,7 @@ function ConfirmCancelModal({ booking, onConfirm, onClose }: { booking: any, onC
 
 export default function AdminBookingsPage() {
   const queryClient = useQueryClient();
-  const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
+
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   
@@ -368,7 +368,7 @@ export default function AdminBookingsPage() {
           processedBookings.map((b: any) => (
             <article
               key={b.id}
-              onClick={() => setSelectedBooking(b)}
+              onClick={() => navigate(`/dashboard/bookings/${b.id}`)}
               className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
             >
               <div className="flex items-start justify-between gap-3">
@@ -447,7 +447,7 @@ export default function AdminBookingsPage() {
                   <tr 
                     key={b.id} 
                     className="hover:bg-[#fbf7ed]/50 transition-colors cursor-pointer"
-                    onClick={() => setSelectedBooking(b)}
+                    onClick={() => navigate(`/dashboard/bookings/${b.id}`)}
                   >
                     <td className="px-4 py-4 font-mono font-medium text-gray-900 text-xs">
                       {b.bookingReference}
@@ -507,208 +507,7 @@ export default function AdminBookingsPage() {
         />
       )}
 
-      {selectedBooking && (
-        <div role="dialog" aria-modal="true" aria-label="Booking details" className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedBooking(null)}>
-          <div 
-            className="bg-white rounded-none md:rounded-2xl shadow-2xl w-full max-w-4xl h-dvh md:h-auto max-h-dvh md:max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="sticky top-0 bg-white/90 backdrop-blur-md border-b border-[#e8d9b7]/40 px-4 md:px-6 py-5 flex items-start md:items-center justify-between gap-3 z-10">
-              <h2 className="min-w-0 break-words text-base md:text-lg font-bold text-gray-900">
-                Booking Details - <span className="font-mono text-[#c8a96e]">{selectedBooking.bookingReference}</span>
-              </h2>
-              <button
-                aria-label="Close booking details"
-                onClick={() => setSelectedBooking(null)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center hover:bg-gray-100 rounded-full transition-colors text-gray-500"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-              {/* Left Column */}
-              <div className="space-y-5 md:space-y-8">
-                {/* User Profile */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <User className="w-4 h-4 text-[#781216]" /> Primary Traveler
-                  </h3>
-                  <div className="bg-[#fbf7ed]/30 border border-[#e8d9b7]/40 p-5 rounded-2xl space-y-4">
-                    <div className="admin-booking-detail-grid grid grid-cols-3 gap-2 text-sm">
-                      <span className="text-gray-500">Name:</span>
-                      <span className="col-span-2 font-medium text-gray-900">{selectedBooking.user?.profile?.fullName || "N/A"}</span>
-                      
-                      <span className="text-gray-500">Email:</span>
-                      <span className="col-span-2 text-gray-900">{selectedBooking.user?.email || "N/A"}</span>
-                      
-                      <span className="text-gray-500">Phone:</span>
-                      <span className="col-span-2 text-gray-900">{selectedBooking.user?.profile?.phone || "N/A"}</span>
-                      
-                      <span className="text-gray-500">Address:</span>
-                      <span className="col-span-2 text-gray-900">{selectedBooking.user?.profile?.addressLine1 || "N/A"}</span>
 
-                      <span className="text-gray-500">Gender:</span>
-                      <span className="col-span-2 text-gray-900">{selectedBooking.user?.profile?.gender || "N/A"}</span>
-
-                      <span className="text-gray-500">DOB:</span>
-                      <span className="col-span-2 text-gray-900">
-                        {selectedBooking.user?.profile?.dateOfBirth ? format(new Date(selectedBooking.user.profile.dateOfBirth), "PP") : "N/A"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Govt ID */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <ImageIcon className="w-4 h-4 text-[#781216]" /> Government ID
-                  </h3>
-                  {selectedBooking.user?.profile?.govtIdImageUrl ? (
-                    selectedBooking.user.profile.govtIdMimeType === "application/pdf" ? (
-                      <a href={selectedBooking.user.profile.govtIdImageUrl} target="_blank" rel="noreferrer" className="block text-sm text-[#781216] underline">View Government ID PDF</a>
-                    ) : (
-                    <a 
-                      href={selectedBooking.user.profile.govtIdImageUrl} 
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="block border-2 border-dashed border-gray-300 rounded-lg overflow-hidden hover:border-[#781216] transition-colors"
-                    >
-                      <img 
-                        src={selectedBooking.user.profile.govtIdImageUrl} 
-                        alt="Govt ID" 
-                        className="w-full h-48 object-cover"
-                      />
-                    </a>
-                    )
-                  ) : (
-                    <div className="bg-[#fbf7ed]/30 border border-[#e8d9b7]/40 p-5 rounded-2xl text-sm text-gray-500 text-center">
-                      No Government ID provided.
-                    </div>
-                  )}
-                </div>
-
-                {/* Other Travelers */}
-                {selectedBooking.travelers && selectedBooking.travelers.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                      <User className="w-4 h-4 text-[#781216]" /> Other Travelers
-                    </h3>
-                    <div className="space-y-3">
-                      {selectedBooking.travelers.map((traveler: any, idx: number) => (
-                        <div key={traveler.id || idx} className="bg-[#fbf7ed]/30 border border-[#e8d9b7]/40 p-5 rounded-2xl text-sm">
-                          <div className="font-medium text-gray-900 mb-2">Traveler {idx + 1}: {traveler.fullName}</div>
-                          <div className="admin-booking-detail-grid grid grid-cols-3 gap-2">
-                            <span className="text-gray-500">Gender:</span>
-                            <span className="col-span-2 text-gray-900">{traveler.gender || "N/A"}</span>
-                            
-                            <span className="text-gray-500">DOB:</span>
-                            <span className="col-span-2 text-gray-900">
-                              {traveler.dateOfBirth ? format(new Date(traveler.dateOfBirth), "PP") : "N/A"}
-                            </span>
-                            
-                            <span className="text-gray-500">Phone:</span>
-                            <span className="col-span-2 text-gray-900">{traveler.phone || "N/A"}</span>
-                            
-                            <span className="text-gray-500">Aadhaar:</span>
-                            <span className="col-span-2 text-gray-900">
-                              {traveler.aadhaar ? (
-                                <a href={traveler.aadhaar} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
-                                  View Document
-                                </a>
-                              ) : "N/A"}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Right Column */}
-              <div className="space-y-5 md:space-y-8">
-                {/* Item Details */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-[#781216]" /> Item Details
-                  </h3>
-                  <div className="bg-[#fbf7ed]/30 border border-[#e8d9b7]/40 p-5 rounded-2xl space-y-4">
-                    <div className="admin-booking-detail-grid grid grid-cols-3 gap-2 text-sm">
-                      <span className="text-gray-500">Item:</span>
-                      <span className="col-span-2 font-medium text-gray-900">{selectedBooking.customTrip?.title || selectedBooking.trip?.title || selectedBooking.festival?.title || "N/A"}</span>
-                      
-                      <span className="text-gray-500">Package:</span>
-                      <span className="col-span-2 text-gray-900">{selectedBooking.customTrip ? "Private custom trip" : selectedBooking.package?.title || "No Package"}</span>
-                      
-                      <span className="text-gray-500">Slot:</span>
-                      <span className="col-span-2 text-gray-900">
-                        {selectedBooking.customTrip
-                          ? `${format(new Date(selectedBooking.customTrip.startDate), "PP")} - ${format(new Date(selectedBooking.customTrip.endDate), "PP")}`
-                          : selectedBooking.slot
-                          ? `${format(new Date(selectedBooking.slot.startDate), "PP")} - ${format(new Date(selectedBooking.slot.endDate), "PP")}`
-                          : "No Slot Selected"}
-                      </span>
-
-                      <span className="text-gray-500">Travelers:</span>
-                      <span className="col-span-2 text-gray-900">{selectedBooking.numberOfTravelers} Person(s)</span>
-                      
-                      <span className="text-gray-500">Booked On:</span>
-                      <span className="col-span-2 text-gray-900">{format(new Date(selectedBooking.createdAt), "PPp")}</span>
-
-                      <span className="text-gray-500">Status:</span>
-                      <span className="col-span-2"><BookingStatusBadge status={selectedBooking.status} /></span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Payment Breakdown */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <IndianRupee className="w-4 h-4 text-[#781216]" /> Payment Breakdown
-                  </h3>
-                  <div className="bg-[#fbf7ed]/30 border border-[#e8d9b7]/40 p-5 rounded-2xl space-y-4">
-                    <div className="admin-booking-detail-grid grid grid-cols-3 gap-2 text-sm">
-                      <span className="text-gray-500">Total Amount:</span>
-                      <span className="col-span-2 font-medium text-gray-900">₹{Number(selectedBooking.totalAmount).toLocaleString("en-IN")}</span>
-                      
-                      <span className="text-gray-500">Amount Paid:</span>
-                      <span className="col-span-2 text-green-600 font-medium">₹{Number(selectedBooking.amountPaid).toLocaleString("en-IN")}</span>
-                      
-                      <span className="text-gray-500">Balance Due:</span>
-                      <span className="col-span-2 text-red-600 font-medium">₹{Number(selectedBooking.amountDue).toLocaleString("en-IN")}</span>
-
-                      <span className="text-gray-500">Status:</span>
-                      <span className="col-span-2"><PaymentStatusBadge status={selectedBooking.paymentStatus} /></span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Special Requests */}
-                {selectedBooking.specialRequests && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4">
-                      Special Requests
-                    </h3>
-                    <div className="bg-yellow-50 text-yellow-800 p-4 rounded-lg text-sm whitespace-pre-wrap">
-                      {selectedBooking.specialRequests}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <div className="bg-white/90 backdrop-blur-md border-t border-[#e8d9b7]/40 p-4 text-right sticky bottom-0 z-10">
-              <button 
-                onClick={() => setSelectedBooking(null)}
-                className="w-full md:w-auto min-h-10 px-4 py-2 bg-gray-200 text-gray-800 font-medium rounded-lg hover:bg-gray-300 transition-colors text-sm"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showCreateModal && (
         <CreateBookingModal 

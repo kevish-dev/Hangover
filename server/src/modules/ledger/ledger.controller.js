@@ -16,6 +16,14 @@ export const addManualEntry = async (req, res, next) => {
   }
 };
 
+export const updateManualEntry = async (req, res, next) => {
+  try {
+    res.status(200).json(await ledgerService.updateManualLedgerEntry(req.params.entryId, req.body));
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const deleteManualEntry = async (req, res, next) => {
   try {
     await ledgerService.removeManualLedgerEntry(req.params.entryId);

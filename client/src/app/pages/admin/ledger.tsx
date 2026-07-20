@@ -1,13 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { BookOpen, Loader2, Plus, Search, Trash2, X } from "lucide-react";
+import { BookOpen, Loader2, Plus, Search, Trash2, X, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "../../../lib/axios";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
-import { Label } from "../../components/ui/label";
-import { Textarea } from "../../components/ui/textarea";
 import { getErrorMessage, showErrorToast } from "../../../lib/errors";
 
 type Entry = {
@@ -23,6 +21,9 @@ type Entry = {
   trip?: { id: string; title: string } | null;
   festival?: { id: string; title: string } | null;
   booking?: { id: string; bookingReference: string } | null;
+  tripId?: string | null;
+  festivalId?: string | null;
+  bookingId?: string | null;
 };
 
 type Ledger = {
@@ -38,375 +39,182 @@ type Ledger = {
   };
 };
 
+const CATEGORIES = [
+  "HOTEL", "TRANSPORT", "PERMIT", "VENDOR", "ACTIVITY", 
+  "DOCUMENTATION", "PAYMENT_COLLECTION", "SALARY", "MARKETING", 
+  "OFFICE_RENT", "SOFTWARE_SUBSCRIPTION", "OTHER_EXPENSE",
+  "BOOKING_PAYMENT", "REFUND", "OTHER_INCOME"
+];
+
 const money = (value: unknown) =>
   `₹${Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-function EntryDialog({
-  trips,
-  onClose,
-}: {
-  trips: any[];
-  onClose: () => void;
-}) {
-  const queryClient = useQueryClient();
-  const [values, setValues] = useState({
-    type: "INCOME",
-    scope: "OTHER",
-    tripId: "",
-    category: "",
-    amount: "",
-    description: "",
-    entryDate: format(new Date(), "yyyy-MM-dd"),
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const mutation = useMutation({
-    mutationFn: (payload: Record<string, unknown>) =>
-      apiClient.post("/ledgers/entries", payload),
-    onSuccess: async () => {
-      toast.success("Manual ledger entry added");
-      await queryClient.invalidateQueries({ queryKey: ["admin", "ledger"] });
-      onClose();
-    },
-    onError: (error: unknown) =>
-      showErrorToast(error, "Could not add the ledger entry"),
-  });
-  const submit = () => {
-    const nextErrors: Record<string, string> = {};
-    const amount = Number(values.amount);
-    const parsedDate = new Date(`${values.entryDate}T12:00:00`);
-    if (!values.category.trim()) nextErrors.category = "Category is required.";
-    if (!Number.isFinite(amount) || amount <= 0)
-      nextErrors.amount = "Amount must be greater than zero.";
-    if (!values.entryDate || Number.isNaN(parsedDate.getTime()))
-      nextErrors.entryDate = "Choose a valid entry date.";
-    if (values.scope === "TRIP" && !values.tripId)
-      nextErrors.tripId = "Choose the trip for this entry.";
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) {
-      toast.error("Please fix the highlighted ledger fields.", {
-        description: Object.values(nextErrors)[0],
-      });
-      return;
-    }
-    mutation.mutate({
-      ...values,
-      category: values.category.trim(),
-      description: values.description.trim() || undefined,
-      tripId: values.scope === "TRIP" ? values.tripId : undefined,
-      amount,
-      entryDate: parsedDate.toISOString(),
-    });
-  };
-  const fieldError = (name: string) =>
-    errors[name] ? (
-      <p className="mt-1 text-xs text-red-600">{errors[name]}</p>
-    ) : null;
-  return (
-    <div
-      className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="w-full max-w-xl rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b px-5 py-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#781216]">
-              Manual adjustment
-            </p>
-            <h2 className="mt-1 text-xl font-bold">Add ledger entry</h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="space-y-4 p-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label>Type</Label>
-              <select
-                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={values.type}
-                onChange={(event) =>
-                  setValues({ ...values, type: event.target.value })
-                }
-              >
-                <option>INCOME</option>
-                <option>EXPENSE</option>
-              </select>
-            </div>
-            <div>
-              <Label>Scope</Label>
-              <select
-                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={values.scope}
-                onChange={(event) => {
-                  setValues({
-                    ...values,
-                    scope: event.target.value,
-                    tripId: "",
-                  });
-                  setErrors((current) => ({ ...current, tripId: "" }));
-                }}
-              >
-                <option value="OTHER">Non-trip</option>
-                <option value="TRIP">Trip</option>
-              </select>
-            </div>
-          </div>
-          {values.scope === "TRIP" && (
-            <div>
-              <Label>Trip *</Label>
-              <select
-                aria-invalid={Boolean(errors.tripId)}
-                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={values.tripId}
-                onChange={(event) => {
-                  setValues({ ...values, tripId: event.target.value });
-                  setErrors((current) => ({ ...current, tripId: "" }));
-                }}
-              >
-                <option value="">Select trip</option>
-                {trips.map((trip) => (
-                  <option key={trip.id} value={trip.id}>
-                    {trip.title}
-                  </option>
-                ))}
-              </select>
-              {fieldError("tripId")}
-            </div>
-          )}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label>Category *</Label>
-              <Input
-                aria-invalid={Boolean(errors.category)}
-                className="mt-1"
-                value={values.category}
-                onChange={(event) => {
-                  setValues({ ...values, category: event.target.value });
-                  setErrors((current) => ({ ...current, category: "" }));
-                }}
-                placeholder="Sponsorship, vendor, marketing…"
-              />
-              {fieldError("category")}
-            </div>
-            <div>
-              <Label>Amount *</Label>
-              <Input
-                aria-invalid={Boolean(errors.amount)}
-                className="mt-1"
-                type="number"
-                min={0.01}
-                step="0.01"
-                value={values.amount}
-                onChange={(event) => {
-                  setValues({ ...values, amount: event.target.value });
-                  setErrors((current) => ({ ...current, amount: "" }));
-                }}
-              />
-              {fieldError("amount")}
-            </div>
-          </div>
-          <div>
-            <Label>Entry date *</Label>
-            <Input
-              aria-invalid={Boolean(errors.entryDate)}
-              className="mt-1"
-              type="date"
-              value={values.entryDate}
-              onChange={(event) => {
-                setValues({ ...values, entryDate: event.target.value });
-                setErrors((current) => ({ ...current, entryDate: "" }));
-              }}
-            />
-            {fieldError("entryDate")}
-          </div>
-          <div>
-            <Label>Description</Label>
-            <Textarea
-              className="mt-1"
-              rows={3}
-              value={values.description}
-              onChange={(event) =>
-                setValues({ ...values, description: event.target.value })
-              }
-            />
-          </div>
-        </div>
-        <div className="flex justify-end gap-2 border-t px-5 py-3">
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            disabled={mutation.isPending}
-            onClick={submit}
-            className="bg-[#781216] hover:bg-[#5f0e11]"
-          >
-            {mutation.isPending && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            )}
-            Add entry
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function AdminLedgerPage() {
   const queryClient = useQueryClient();
-  const [dialog, setDialog] = useState(false);
   const [search, setSearch] = useState("");
   const [type, setType] = useState("");
   const [scope, setScope] = useState("");
-  const ledgerQuery = useQuery({
+  
+  const query = useQuery({
     queryKey: ["admin", "ledger"],
-    queryFn: async () =>
-      (await apiClient.get<Ledger>("/ledgers", { params: { limit: 2000 } }))
-        .data,
+    queryFn: async () => (await apiClient.get<Ledger>("/ledgers", { params: { limit: 1000 } })).data,
   });
+
   const tripsQuery = useQuery({
-    queryKey: ["admin", "trips", "ledger-options"],
-    queryFn: async () =>
-      (
-        await apiClient.get("/trips", {
-          params: { adminView: true, limit: 500 },
-        })
-      ).data.data,
+    queryKey: ["admin", "trips", "list"],
+    queryFn: async () => (await apiClient.get("/trips", { params: { adminView: true } })).data,
   });
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/ledgers/entries/${id}`),
-    onSuccess: async () => {
-      toast.success("Ledger entry deleted");
-      await queryClient.invalidateQueries({ queryKey: ["admin", "ledger"] });
-    },
-    onError: (error: unknown) =>
-      showErrorToast(error, "Could not delete the entry"),
-  });
+
+  const trips = tripsQuery.data?.data || [];
+
   useEffect(() => {
-    if (ledgerQuery.isError)
-      toast.error(
-        getErrorMessage(
-          ledgerQuery.error,
-          "The unified ledger could not be loaded",
-        ),
-        { id: "ledger-load-error" },
-      );
-    if (tripsQuery.isError)
-      toast.error(
-        getErrorMessage(tripsQuery.error, "Trip options could not be loaded"),
-        { id: "ledger-trips-load-error" },
-      );
-  }, [
-    ledgerQuery.error,
-    ledgerQuery.isError,
-    tripsQuery.error,
-    tripsQuery.isError,
-  ]);
-  const ledger = ledgerQuery.data;
-  const entries = useMemo(
-    () =>
-      (ledger?.entries || []).filter((entry) => {
-        if (type && entry.type !== type) return false;
-        if (scope && entry.scope !== scope) return false;
-        const needle = search.trim().toLowerCase();
-        return (
-          !needle ||
-          [
-            entry.category,
-            entry.description,
-            entry.trip?.title,
-            entry.festival?.title,
-            entry.booking?.bookingReference,
-            entry.source,
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase()
-            .includes(needle)
-        );
-      }),
-    [ledger?.entries, scope, search, type],
-  );
-  if (ledgerQuery.isLoading)
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-[#781216]" />
-      </div>
-    );
-  if (ledgerQuery.isError || !ledger)
-    return (
-      <div
-        role="alert"
-        className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800"
-      >
-        <p className="font-bold">The unified ledger could not be loaded.</p>
-        <button
-          type="button"
-          onClick={() => ledgerQuery.refetch()}
-          className="mt-3 text-sm font-semibold underline"
-        >
-          Try again
-        </button>
-      </div>
-    );
+    if (query.isError) toast.error(getErrorMessage(query.error, "Ledger could not be loaded"), { id: "ledger-load-error" });
+  }, [query.error, query.isError]);
+
+  const allEntries = query.data?.entries || [];
+  
+  const entries = useMemo(() => {
+    return allEntries.filter((entry) => {
+      if (type && entry.type !== type) return false;
+      if (scope && entry.scope !== scope) return false;
+      const needle = search.trim().toLowerCase();
+      if (!needle) return true;
+      return [
+        entry.category,
+        entry.description,
+        entry.source,
+        entry.trip?.title,
+        entry.festival?.title,
+        entry.booking?.bookingReference,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(needle);
+    });
+  }, [allEntries, type, scope, search]);
+
+  const summary = query.data?.summary || { tripIncome: 0, tripExpense: 0, otherIncome: 0, otherExpense: 0, totalIncome: 0, totalExpense: 0, netBalance: 0 };
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Entry> }) => {
+      await apiClient.patch(`/ledgers/entries/${id}`, data);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "ledger"] }),
+    onError: (err) => showErrorToast(err, "Failed to update entry"),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: Partial<Entry>) => {
+      await apiClient.post("/ledgers/entries", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "ledger"] });
+      setNewRow({ type: "EXPENSE", scope: "OTHER", category: "OTHER_EXPENSE", amount: "", description: "", entryDate: format(new Date(), "yyyy-MM-dd"), tripId: "" });
+    },
+    onError: (err) => showErrorToast(err, "Failed to create entry"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/ledgers/entries/${id}`);
+    },
+    onSuccess: () => {
+      toast.success("Entry deleted");
+      queryClient.invalidateQueries({ queryKey: ["admin", "ledger"] });
+    },
+    onError: (err) => showErrorToast(err, "Failed to delete entry"),
+  });
+
+  const [newRow, setNewRow] = useState<any>({
+    type: "EXPENSE",
+    scope: "OTHER",
+    category: "OTHER_EXPENSE",
+    amount: "",
+    description: "",
+    entryDate: format(new Date(), "yyyy-MM-dd"),
+    tripId: "",
+  });
+
+  const handleCellChange = (entry: Entry, field: string, value: any) => {
+    if (entry.isAutoGenerated) return;
+    if (entry[field as keyof Entry] === value) return;
+    updateMutation.mutate({ id: entry.id, data: { [field]: value } });
+  };
+
+  const handleNewRowSubmit = () => {
+    const amount = Number(newRow.amount);
+    if (!amount || amount <= 0) return toast.error("Amount must be greater than zero");
+    if (!newRow.category.trim()) return toast.error("Category is required");
+    
+    createMutation.mutate({
+      type: newRow.type,
+      scope: newRow.scope,
+      category: newRow.category,
+      amount,
+      description: newRow.description,
+      entryDate: new Date(newRow.entryDate).toISOString(),
+      tripId: newRow.scope === "TRIP" ? newRow.tripId : undefined,
+    });
+  };
+
+  if (query.isLoading) return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#781216]" /></div>;
+  if (query.isError) return <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800"><h1 className="font-bold">Ledger could not be loaded</h1><button type="button" onClick={() => query.refetch()} className="mt-3 text-sm font-semibold underline">Try again</button></div>;
+
   return (
     <div className="mx-auto max-w-[1500px] space-y-5 pb-12">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#781216]">
-            Unified finance
+            Financial core
           </p>
-          <h1 className="mt-1 text-2xl font-bold text-gray-950 sm:text-3xl">
-            Balance sheet
+          <h1 className="mt-1 text-2xl font-bold text-gray-950 sm:text-3xl flex items-center gap-2">
+            <FileSpreadsheet className="w-8 h-8 text-emerald-600" /> Unified Ledger
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
-            Payments, refunds, operational costs, add-ons, and manual
-            adjustments in one ledger. Automatic entries remain linked to their
-            source.
+            All income and expenses across trips, festivals, and general operations. Editable spreadsheet interface.
           </p>
         </div>
-        <Button
-          onClick={() => setDialog(true)}
-          className="bg-[#781216] hover:bg-[#5f0e11]"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Manual entry
-        </Button>
       </header>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+          <p className="text-sm font-semibold text-gray-500 mb-1">Total Income</p>
+          <p className="text-2xl font-bold text-emerald-600">{money(summary.totalIncome)}</p>
+          <div className="mt-2 text-xs text-gray-400 flex justify-between">
+            <span>Trips: {money(summary.tripIncome)}</span>
+            <span>Other: {money(summary.otherIncome)}</span>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+          <p className="text-sm font-semibold text-gray-500 mb-1">Total Expenses</p>
+          <p className="text-2xl font-bold text-red-600">{money(summary.totalExpense)}</p>
+          <div className="mt-2 text-xs text-gray-400 flex justify-between">
+            <span>Trips: {money(summary.tripExpense)}</span>
+            <span>Other: {money(summary.otherExpense)}</span>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm xl:col-span-2 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-emerald-800 mb-1">Net Balance</p>
+            <p className={`text-3xl font-bold ${summary.netBalance >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+              {summary.netBalance >= 0 ? "+" : ""}{money(summary.netBalance)}
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="grid gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_180px_180px]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Category, trip, booking, or description"
-            className="pl-10"
-          />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Category, trip, booking, or description" className="pl-10" />
         </div>
-        <select
-          value={type}
-          onChange={(event) => setType(event.target.value)}
-          className="flex h-10 rounded-md border border-input bg-background px-3 text-sm"
-        >
+        <select value={type} onChange={(e) => setType(e.target.value)} className="flex h-10 rounded-md border border-input bg-background px-3 text-sm">
           <option value="">All types</option>
           <option>INCOME</option>
           <option>EXPENSE</option>
         </select>
-        <select
-          value={scope}
-          onChange={(event) => setScope(event.target.value)}
-          className="flex h-10 rounded-md border border-input bg-background px-3 text-sm"
-        >
+        <select value={scope} onChange={(e) => setScope(e.target.value)} className="flex h-10 rounded-md border border-input bg-background px-3 text-sm">
           <option value="">All scopes</option>
           <option value="TRIP">Trip</option>
           <option value="BOOKING">Booking</option>
@@ -414,129 +222,215 @@ export default function AdminLedgerPage() {
           <option value="OTHER">Other</option>
         </select>
       </div>
-      <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b px-4 py-3 sm:px-5">
-          <div>
-            <h2 className="flex items-center gap-2 font-bold">
-              <BookOpen className="h-4 w-4 text-[#781216]" />
-              Ledger entries
-            </h2>
-            <p className="text-xs text-gray-500">{entries.length} entry(s)</p>
-          </div>
-        </div>
-        {entries.length === 0 ? (
-          <div className="p-12 text-center text-sm text-gray-500">
-            No entries match these filters.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
-                <tr>
-                  <th className="px-4 py-3 font-semibold border-r border-gray-200">
-                    Date
-                  </th>
-                  <th className="px-4 py-3 font-semibold border-r border-gray-200">
-                    Category
-                  </th>
-                  <th className="px-4 py-3 font-semibold border-r border-gray-200">
-                    Description
-                  </th>
-                  <th className="px-4 py-3 font-semibold border-r border-gray-200">
-                    Context
-                  </th>
-                  <th className="px-4 py-3 font-semibold border-r border-gray-200">
-                    Type / Source
-                  </th>
-                  <th className="px-4 py-3 font-semibold border-r border-gray-200 text-right">
-                    Amount
-                  </th>
-                  <th className="px-4 py-3 font-semibold text-center w-12"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {entries.map((entry) => {
-                  const context =
-                    entry.trip?.title ||
-                    entry.festival?.title ||
-                    entry.booking?.bookingReference ||
-                    "Non-trip";
-                  return (
-                    <tr key={entry.id} className="hover:bg-gray-50 group">
-                      <td className="px-4 py-2 border-r border-gray-200 text-gray-700">
-                        {format(new Date(entry.entryDate), "dd MMM yyyy")}
-                      </td>
-                      <td className="px-4 py-2 border-r border-gray-200 font-medium text-gray-900">
+
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm border-collapse">
+            <thead className="bg-gray-100 border-b border-gray-300">
+              <tr>
+                <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-32">Date</th>
+                <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-32">Type</th>
+                <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-32">Scope</th>
+                <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-48">Context (Trip)</th>
+                <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-40">Category</th>
+                <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300">Description</th>
+                <th className="px-3 py-2 font-semibold text-gray-600 border-r border-gray-300 w-36 text-right">Amount</th>
+                <th className="px-2 py-2 font-semibold text-gray-600 w-10 text-center"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {entries.map((entry) => (
+                <tr key={entry.id} className={`group ${entry.isAutoGenerated ? "bg-gray-50/50" : "hover:bg-blue-50/30"}`}>
+                  <td className="border-r border-gray-200 p-0">
+                    <input 
+                      type="date"
+                      disabled={entry.isAutoGenerated}
+                      defaultValue={format(new Date(entry.entryDate), "yyyy-MM-dd")}
+                      onBlur={(e) => handleCellChange(entry, "entryDate", e.target.value)}
+                      className="w-full h-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    <select 
+                      disabled={entry.isAutoGenerated}
+                      defaultValue={entry.type}
+                      onChange={(e) => handleCellChange(entry, "type", e.target.value)}
+                      className={`w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 font-semibold disabled:opacity-50 disabled:cursor-not-allowed ${entry.type === 'INCOME' ? 'text-emerald-700' : 'text-red-700'}`}
+                    >
+                      <option value="INCOME">INCOME</option>
+                      <option value="EXPENSE">EXPENSE</option>
+                    </select>
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    <select 
+                      disabled={entry.isAutoGenerated}
+                      defaultValue={entry.scope}
+                      onChange={(e) => handleCellChange(entry, "scope", e.target.value)}
+                      className="w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="TRIP">TRIP</option>
+                      <option value="BOOKING">BOOKING</option>
+                      <option value="FESTIVAL">FESTIVAL</option>
+                      <option value="OTHER">OTHER</option>
+                    </select>
+                  </td>
+                  <td className="border-r border-gray-200 p-0 relative">
+                    {entry.isAutoGenerated ? (
+                      <div className="w-full h-full min-h-10 px-3 flex items-center text-gray-500 truncate text-xs">
+                        {entry.trip?.title || entry.festival?.title || entry.booking?.bookingReference || "N/A"}
+                      </div>
+                    ) : entry.scope === "TRIP" ? (
+                      <select 
+                        defaultValue={entry.tripId || ""}
+                        onChange={(e) => handleCellChange(entry, "tripId", e.target.value)}
+                        className="w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 text-xs"
+                      >
+                        <option value="">Select trip...</option>
+                        {trips.map((t: any) => <option key={t.id} value={t.id}>{t.title}</option>)}
+                      </select>
+                    ) : (
+                      <div className="w-full h-full min-h-10 px-3 flex items-center text-gray-400 italic">Not applicable</div>
+                    )}
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    {entry.isAutoGenerated ? (
+                      <div className="w-full h-full min-h-10 px-3 flex items-center text-gray-700 font-medium truncate">
                         {entry.category}
-                      </td>
-                      <td
-                        className="px-4 py-2 border-r border-gray-200 text-gray-600 max-w-[200px] truncate"
-                        title={
-                          entry.description || entry.source.replaceAll("_", " ")
-                        }
+                      </div>
+                    ) : (
+                      <select 
+                        defaultValue={entry.category}
+                        onChange={(e) => handleCellChange(entry, "category", e.target.value)}
+                        className="w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 text-xs"
                       >
-                        {entry.description || entry.source.replaceAll("_", " ")}
-                      </td>
-                      <td className="px-4 py-2 border-r border-gray-200">
-                        <div className="text-gray-900">{context}</div>
-                        <div className="text-[10px] uppercase text-gray-500">
-                          {entry.scope}
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 border-r border-gray-200">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${entry.type === "INCOME" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}
-                          >
-                            {entry.type}
-                          </span>
-                          {entry.isAutoGenerated && (
-                            <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">
-                              AUTO
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[10px] uppercase text-gray-500 mt-1">
-                          {entry.source.replaceAll("_", " ")}
-                        </div>
-                      </td>
-                      <td
-                        className={`px-4 py-2 border-r border-gray-200 text-right font-medium ${entry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`}
+                        {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    )}
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    <input 
+                      type="text"
+                      disabled={entry.isAutoGenerated}
+                      defaultValue={entry.description || ""}
+                      onBlur={(e) => handleCellChange(entry, "description", e.target.value)}
+                      placeholder={entry.isAutoGenerated ? entry.source : "Description"}
+                      className="w-full h-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    <input 
+                      type="number"
+                      step="0.01"
+                      disabled={entry.isAutoGenerated}
+                      defaultValue={entry.amount}
+                      onBlur={(e) => handleCellChange(entry, "amount", e.target.value)}
+                      className={`w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono font-medium focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${entry.type === 'INCOME' ? 'text-emerald-700' : 'text-red-700'}`}
+                    />
+                  </td>
+                  <td className="p-0 text-center align-middle">
+                    {!entry.isAutoGenerated && (
+                      <button 
+                        onClick={() => deleteMutation.mutate(entry.id)}
+                        className="text-gray-400 hover:text-red-600 transition-colors mx-auto p-1.5 opacity-0 group-hover:opacity-100"
+                        title="Delete manual entry"
                       >
-                        {entry.type === "INCOME" ? "+" : "−"}
-                        {money(entry.amount)}
-                      </td>
-                      <td className="px-2 py-2 text-center">
-                        {!entry.isAutoGenerated && (
-                          <button
-                            type="button"
-                            aria-label="Delete manual entry"
-                            disabled={deleteMutation.isPending}
-                            onClick={() =>
-                              window.confirm(
-                                "Delete this manual ledger entry?",
-                              ) && deleteMutation.mutate(entry.id)
-                            }
-                            className="inline-flex h-7 w-7 items-center justify-center rounded text-gray-400 opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 transition-opacity"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-      {dialog && (
-        <EntryDialog
-          trips={tripsQuery.data || []}
-          onClose={() => setDialog(false)}
-        />
-      )}
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              
+              {/* Add New Row */}
+              <tr className="bg-emerald-50/30 border-t-2 border-emerald-200">
+                <td className="border-r border-gray-200 p-0">
+                  <input 
+                    type="date"
+                    value={newRow.entryDate}
+                    onChange={(e) => setNewRow({...newRow, entryDate: e.target.value})}
+                    className="w-full h-full min-h-10 px-3 bg-transparent outline-none focus:bg-emerald-100 focus:ring-1 focus:ring-emerald-500"
+                  />
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <select 
+                    value={newRow.type}
+                    onChange={(e) => setNewRow({...newRow, type: e.target.value as "INCOME" | "EXPENSE"})}
+                    className={`w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-emerald-100 focus:ring-1 focus:ring-emerald-500 font-semibold ${newRow.type === 'INCOME' ? 'text-emerald-700' : 'text-red-700'}`}
+                  >
+                    <option value="INCOME">INCOME</option>
+                    <option value="EXPENSE">EXPENSE</option>
+                  </select>
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <select 
+                    value={newRow.scope}
+                    onChange={(e) => setNewRow({...newRow, scope: e.target.value})}
+                    className="w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-emerald-100 focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="TRIP">TRIP</option>
+                    <option value="OTHER">OTHER</option>
+                  </select>
+                </td>
+                <td className="border-r border-gray-200 p-0 relative">
+                  {newRow.scope === "TRIP" ? (
+                    <select 
+                      value={newRow.tripId}
+                      onChange={(e) => setNewRow({...newRow, tripId: e.target.value})}
+                      className="w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-emerald-100 focus:ring-1 focus:ring-emerald-500 text-xs"
+                    >
+                      <option value="">Select trip...</option>
+                      {trips.map((t: any) => <option key={t.id} value={t.id}>{t.title}</option>)}
+                    </select>
+                  ) : (
+                    <div className="w-full h-full min-h-10 px-3 flex items-center text-emerald-600/50 italic">N/A</div>
+                  )}
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <select 
+                    value={newRow.category}
+                    onChange={(e) => setNewRow({...newRow, category: e.target.value})}
+                    className="w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-emerald-100 focus:ring-1 focus:ring-emerald-500 text-xs"
+                  >
+                    <option value="">Category...</option>
+                    {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <input 
+                    type="text"
+                    value={newRow.description}
+                    onChange={(e) => setNewRow({...newRow, description: e.target.value})}
+                    onKeyDown={(e) => e.key === 'Enter' && handleNewRowSubmit()}
+                    placeholder="New description..."
+                    className="w-full h-full min-h-10 px-3 bg-transparent outline-none focus:bg-emerald-100 focus:ring-1 focus:ring-emerald-500"
+                  />
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <input 
+                    type="number"
+                    step="0.01"
+                    value={newRow.amount}
+                    onChange={(e) => setNewRow({...newRow, amount: e.target.value})}
+                    onKeyDown={(e) => e.key === 'Enter' && handleNewRowSubmit()}
+                    placeholder="Amount..."
+                    className={`w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono font-medium focus:bg-emerald-100 focus:ring-1 focus:ring-emerald-500 ${newRow.type === 'INCOME' ? 'text-emerald-700' : 'text-red-700'}`}
+                  />
+                </td>
+                <td className="p-0 text-center align-middle">
+                  <button 
+                    onClick={handleNewRowSubmit}
+                    disabled={createMutation.isPending}
+                    className="text-emerald-600 hover:text-emerald-800 transition-colors mx-auto p-1.5"
+                    title="Add Entry"
+                  >
+                    {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-5 h-5" />}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

@@ -148,11 +148,10 @@ function TaskHealthBadge({ task }: { task: any }) {
 
 // ─── Tab 1: Bookings ──────────────────────────────────────────────
 function BookingsTab({ tripId }: { tripId: string }) {
-  const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [refetchKey, setRefetchKey] = useState(0);
 
   const {
     data: bookings = [],
@@ -304,7 +303,7 @@ function BookingsTab({ tripId }: { tripId: string }) {
               {filtered.map((b: any) => (
                 <button
                   key={b.id}
-                  onClick={() => setSelectedBooking(b)}
+                  onClick={() => navigate(`/dashboard/bookings/${b.id}`)}
                   className="w-full text-left px-4 py-4 hover:bg-gray-50 transition-colors group"
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -358,18 +357,6 @@ function BookingsTab({ tripId }: { tripId: string }) {
         )}
       </div>
 
-      {selectedBooking && (
-        <BookingDetailModal
-          booking={selectedBooking}
-          onClose={() => setSelectedBooking(null)}
-          queryKeySuffix={`trip-${tripId}`}
-          onRefetch={() => {
-            refetch();
-            setRefetchKey((k) => k + 1);
-          }}
-        />
-      )}
-
       {showCreateModal && (
         <CreateBookingModal 
           onClose={() => setShowCreateModal(false)}
@@ -398,13 +385,23 @@ const CATEGORIES = [
   "GENERAL",
 ];
 
+const STATUS_COLORS: Record<string, string> = {
+  PENDING: "text-amber-700",
+  IN_PROGRESS: "text-blue-700",
+  BLOCKED: "text-red-700",
+  DONE: "text-emerald-700",
+  CANCELLED: "text-gray-400",
+};
+
 function OperationsTab({ tripId }: { tripId: string }) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [editingTask, setEditingTask] = useState<any>(null);
-  const [showCreateTask, setShowCreateTask] = useState(false);
+  const [newRow, setNewRow] = useState<any>({
+    bookingId: "", title: "", category: "GENERAL", status: "PENDING",
+    estimatedAmount: "", dueAt: format(new Date(), "yyyy-MM-dd"),
+  });
 
   const { data: bookings = [] } = useQuery({
     queryKey: ["admin", "trip-bookings", tripId],
@@ -417,9 +414,7 @@ function OperationsTab({ tripId }: { tripId: string }) {
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["admin", "trip-ops", tripId],
     queryFn: async () => {
-      const res = await apiClient.get(`/operations`, {
-        params: { tripId, limit: 500 },
-      });
+      const res = await apiClient.get(`/operations`, { params: { tripId, limit: 500 } });
       return res.data as any[];
     },
   });
@@ -428,11 +423,7 @@ function OperationsTab({ tripId }: { tripId: string }) {
     mutationFn: ({ taskId, payload }: { taskId: string; payload: any }) =>
       apiClient.patch(`/operations/${taskId}`, payload),
     onSuccess: async () => {
-      toast.success("Task updated");
-      await queryClient.invalidateQueries({
-        queryKey: ["admin", "trip-ops", tripId],
-      });
-      setEditingTask(null);
+      await queryClient.invalidateQueries({ queryKey: ["admin", "trip-ops", tripId] });
     },
     onError: (err: any) => showErrorToast(err, "Failed to update task"),
   });
@@ -441,12 +432,9 @@ function OperationsTab({ tripId }: { tripId: string }) {
     mutationFn: (taskId: string) => apiClient.delete(`/operations/${taskId}`),
     onSuccess: async () => {
       toast.success("Task deleted");
-      await queryClient.invalidateQueries({
-        queryKey: ["admin", "trip-ops", tripId],
-      });
+      await queryClient.invalidateQueries({ queryKey: ["admin", "trip-ops", tripId] });
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.message || "Failed to delete task"),
+    onError: (err: any) => toast.error(err?.response?.data?.message || "Failed to delete task"),
   });
 
   const createMutation = useMutation({
@@ -456,45 +444,47 @@ function OperationsTab({ tripId }: { tripId: string }) {
     },
     onSuccess: async () => {
       toast.success("Task created");
-      await queryClient.invalidateQueries({
-        queryKey: ["admin", "trip-ops", tripId],
-      });
-      setShowCreateTask(false);
+      await queryClient.invalidateQueries({ queryKey: ["admin", "trip-ops", tripId] });
+      setNewRow({ bookingId: "", title: "", category: "GENERAL", status: "PENDING", estimatedAmount: "", dueAt: format(new Date(), "yyyy-MM-dd") });
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.message || "Failed to create task"),
+    onError: (err: any) => toast.error(err?.response?.data?.message || "Failed to create task"),
   });
+
+  const handleCellChange = (task: any, field: string, value: any) => {
+    if (task[field] == value) return;
+    if (field === "dueAt") value = value ? new Date(value).toISOString() : null;
+    updateMutation.mutate({ taskId: task.id, payload: { [field]: value } });
+  };
+
+  const handleNewRowSubmit = () => {
+    if (!newRow.bookingId) return toast.error("Select a booking first");
+    if (!newRow.title.trim()) return toast.error("Title is required");
+    createMutation.mutate({
+      bookingId: newRow.bookingId,
+      title: newRow.title,
+      category: newRow.category,
+      status: newRow.status,
+      estimatedAmount: Number(newRow.estimatedAmount) || 0,
+      dueAt: newRow.dueAt ? new Date(newRow.dueAt).toISOString() : null,
+    });
+  };
 
   const filtered = tasks.filter((t: any) => {
     if (statusFilter && t.status !== statusFilter) return false;
     if (categoryFilter && t.category !== categoryFilter) return false;
     if (!search.trim()) return true;
     const q = search.toLowerCase();
-    return [
-      t.title,
-      t.description,
-      t.booking?.bookingReference,
-      t.booking?.user?.profile?.fullName,
-      t.booking?.user?.email,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase()
-      .includes(q);
+    return [t.title, t.description, t.booking?.bookingReference, t.booking?.user?.profile?.fullName, t.booking?.user?.email]
+      .filter(Boolean).join(" ").toLowerCase().includes(q);
   });
 
-  const openTasks = tasks.filter(
-    (t: any) => !["DONE", "CANCELLED"].includes(t.status),
-  );
+  const openTasks = tasks.filter((t: any) => !["DONE", "CANCELLED"].includes(t.status));
   const overdue = tasks.filter((t: any) => {
     if (["DONE", "CANCELLED"].includes(t.status)) return false;
     const due = t.dueAt ? new Date(t.dueAt).getTime() : null;
     return due !== null && due < Date.now();
   });
-  const totalSpend = tasks.reduce(
-    (s: number, t: any) => s + Number(t.amountPaid || 0),
-    0,
-  );
+  const totalSpend = tasks.reduce((s: number, t: any) => s + Number(t.amountPaid || 0), 0);
 
   if (isLoading)
     return (
@@ -508,463 +498,187 @@ function OperationsTab({ tripId }: { tripId: string }) {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          {
-            label: "Open Tasks",
-            value: openTasks.length,
-            icon: SlidersHorizontal,
-            color: "text-blue-700 bg-blue-50",
-          },
-          {
-            label: "Overdue",
-            value: overdue.length,
-            icon: AlertTriangle,
-            color:
-              overdue.length > 0
-                ? "text-red-700 bg-red-50"
-                : "text-gray-500 bg-gray-100",
-          },
-          {
-            label: "Total Tasks",
-            value: tasks.length,
-            icon: CheckCircle2,
-            color: "text-gray-700 bg-gray-100",
-          },
-          {
-            label: "Spent",
-            value: money(totalSpend),
-            icon: CircleDollarSign,
-            color: "text-[#781216] bg-red-50",
-          },
+          { label: "Open Tasks", value: openTasks.length, icon: SlidersHorizontal, color: "text-blue-700 bg-blue-50" },
+          { label: "Overdue", value: overdue.length, icon: AlertTriangle, color: overdue.length > 0 ? "text-red-700 bg-red-50" : "text-gray-500 bg-gray-100" },
+          { label: "Total Tasks", value: tasks.length, icon: CheckCircle2, color: "text-gray-700 bg-gray-100" },
+          { label: "Spent", value: money(totalSpend), icon: CircleDollarSign, color: "text-[#781216] bg-red-50" },
         ].map((s) => (
-          <div
-            key={s.label}
-            className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm"
-          >
-            <div
-              className={`w-9 h-9 rounded-xl flex items-center justify-center mb-2 ${s.color.split(" ").slice(1).join(" ")}`}
-            >
+          <div key={s.label} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-2 ${s.color.split(" ").slice(1).join(" ")}`}>
               <s.icon className={`w-4 h-4 ${s.color.split(" ")[0]}`} />
             </div>
             <p className="text-xl font-bold text-gray-900">{s.value}</p>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">
-              {s.label}
-            </p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">{s.label}</p>
           </div>
         ))}
       </div>
 
       {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-white rounded-2xl border border-gray-100 p-4 shadow-sm items-center">
-        <div className="relative md:col-span-1">
+        <div className="relative md:col-span-2">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Task, booking, traveler..."
-            value={search}
+          <input type="text" placeholder="Task, booking, traveler..." value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 pr-4 py-2 w-full border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/40"
-          />
+            className="pl-9 pr-4 py-2 w-full border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/40" />
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none bg-white"
-        >
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none bg-white">
           <option value="">All Statuses</option>
-          {STATUSES_OPS.map((s) => (
-            <option key={s}>{s.replace(/_/g, " ")}</option>
-          ))}
+          {STATUSES_OPS.map((s) => <option key={s}>{s.replace(/_/g, " ")}</option>)}
         </select>
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none bg-white"
-        >
+        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none bg-white">
           <option value="">All Categories</option>
-          {CATEGORIES.map((c) => (
-            <option key={c}>{c.replace(/_/g, " ")}</option>
-          ))}
+          {CATEGORIES.map((c) => <option key={c}>{c.replace(/_/g, " ")}</option>)}
         </select>
-        <Button
-          onClick={() => setShowCreateTask(!showCreateTask)}
-          className="bg-[#781216] hover:bg-[#5f0e11] shrink-0"
-          size="sm"
-        >
-          <Plus className="w-4 h-4 mr-1.5" /> Add Task
-        </Button>
       </div>
 
-      {showCreateTask && (
-        <OpsTaskEditorModal
-          task={{
-            status: "PENDING",
-            title: "",
-            description: "",
-            category: "GENERAL",
-            estimatedAmount: 0,
-            amountArranged: 0,
-            amountPaid: 0,
-          }}
-          saving={createMutation.isPending}
-          onClose={() => setShowCreateTask(false)}
-          onSave={(payload) => createMutation.mutate(payload)}
-          isNew={true}
-          bookings={bookings}
-        />
-      )}
-
-      {filtered.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
-          <CheckCircle2 className="w-10 h-10 text-emerald-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium">
-            No tasks match your filters
-          </p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/50">
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
-              {filtered.length} task(s)
-            </p>
-          </div>
-          <div className="divide-y divide-gray-50">
-            {filtered.map((task: any) => {
-              const est = Number(task.estimatedAmount || 0);
-              const arr = Number(task.amountArranged || 0);
-              const pct =
-                est > 0
-                  ? Math.min(100, Math.round((arr / est) * 100))
-                  : task.status === "DONE"
-                    ? 100
-                    : 0;
-              return (
-                <div
-                  key={task.id}
-                  onClick={() => setEditingTask(task)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setEditingTask(task); }}
-                  className="w-full text-left px-4 py-4 hover:bg-gray-50 transition-colors group cursor-pointer"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-semibold text-gray-900 text-sm">
-                          {task.title}
-                        </p>
-                        <TaskHealthBadge task={task} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                          {task.category?.replace(/_/g, " ")}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {task.booking?.user?.profile?.fullName ||
-                          task.booking?.user?.email}{" "}
-                        · {task.booking?.bookingReference}
-                      </p>
-                      {task.dueAt && (
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          Due: {format(new Date(task.dueAt), "PP")}
-                        </p>
-                      )}
-                      {est > 0 && (
-                        <div className="mt-2">
-                          <div className="flex justify-between text-[10px] text-gray-400 mb-1">
-                            <span>Arranged {money(arr)}</span>
-                            <span>{pct}%</span>
-                          </div>
-                          <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-[#c8a96e] transition-all"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <p className="text-[10px] text-gray-400 mt-0.5">
-                            Req. {money(est)}
-                          </p>
-                        </div>
-                      )}
+      {/* Excel Grid */}
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm border-collapse">
+            <thead className="bg-gray-100 border-b-2 border-gray-300 sticky top-0 z-10">
+              <tr>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-40">Booking</th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-32">Status</th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-36">Category</th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300">Title</th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-32">Due Date</th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-28 text-right">Est. ₹</th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-28 text-right">Arranged ₹</th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-28 text-right">Paid ₹</th>
+                <th className="px-2 py-2.5 text-gray-600 w-10"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filtered.map((task: any) => (
+                <tr key={task.id} className="group hover:bg-blue-50/20 transition-colors">
+                  <td className="border-r border-gray-200 p-0">
+                    <div className="w-full min-h-10 px-3 flex items-center text-xs font-mono font-bold text-[#781216]">
+                      {task.booking?.bookingReference}
+                      <span className="text-gray-400 font-normal ml-1 truncate block max-w-[80px]">
+                        {task.booking?.user?.profile?.fullName?.split(" ")[0] || ""}
+                      </span>
                     </div>
-                    <div className="shrink-0 flex flex-col items-end gap-2">
-                      <div className="text-right">
-                        <p className="font-bold text-gray-900 text-sm">
-                          {money(task.amountPaid)}
-                        </p>
-                        <p className="text-[10px] text-gray-400 uppercase tracking-wider">
-                          Paid
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 mt-auto">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (window.confirm("Delete this task?"))
-                              deleteMutation.mutate(task.id);
-                          }}
-                          disabled={deleteMutation.isPending}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-600 transition-all opacity-0 group-hover:opacity-100"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                        <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    <select defaultValue={task.status}
+                      onChange={(e) => handleCellChange(task, "status", e.target.value)}
+                      className={`w-full min-h-10 px-2 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 font-bold text-[11px] tracking-wide ${STATUS_COLORS[task.status] || "text-gray-600"}`}>
+                      {STATUSES_OPS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    <select defaultValue={task.category}
+                      onChange={(e) => handleCellChange(task, "category", e.target.value)}
+                      className="w-full min-h-10 px-2 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 text-xs text-gray-600">
+                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    <input type="text" defaultValue={task.title}
+                      onBlur={(e) => handleCellChange(task, "title", e.target.value)}
+                      className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 font-medium text-gray-900" />
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    <input type="date" defaultValue={task.dueAt ? format(new Date(task.dueAt), "yyyy-MM-dd") : ""}
+                      onBlur={(e) => handleCellChange(task, "dueAt", e.target.value)}
+                      className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 text-xs text-gray-600" />
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    <input type="number" step="0.01" defaultValue={task.estimatedAmount}
+                      onBlur={(e) => handleCellChange(task, "estimatedAmount", e.target.value)}
+                      className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-gray-500 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400" />
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    <input type="number" step="0.01" defaultValue={task.amountArranged}
+                      onBlur={(e) => handleCellChange(task, "amountArranged", e.target.value)}
+                      className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono font-semibold text-blue-600 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400" />
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    <input type="number" step="0.01" defaultValue={task.amountPaid}
+                      onBlur={(e) => handleCellChange(task, "amountPaid", e.target.value)}
+                      className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono font-semibold text-emerald-600 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400" />
+                  </td>
+                  <td className="p-0 text-center">
+                    <button onClick={() => { if (window.confirm("Delete this task?")) deleteMutation.mutate(task.id); }}
+                      disabled={deleteMutation.isPending}
+                      className="text-gray-300 hover:text-red-500 transition-colors p-1.5 opacity-0 group-hover:opacity-100">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
 
-      {editingTask && (
-        <OpsTaskEditorModal
-          task={editingTask}
-          saving={updateMutation.isPending}
-          onClose={() => setEditingTask(null)}
-          onSave={(payload: any) =>
-            updateMutation.mutate({ taskId: editingTask.id, payload })
-          }
-        />
-      )}
-    </div>
-  );
-}
-
-function OpsTaskEditorModal({
-  task,
-  saving,
-  onClose,
-  onSave,
-  isNew,
-  bookings,
-}: {
-  task: any;
-  saving: boolean;
-  onClose: () => void;
-  onSave: (p: any) => void;
-  isNew?: boolean;
-  bookings?: any[];
-}) {
-  const [values, setValues] = useState({
-    bookingId: task.bookingId || "",
-    status: task.status || "PENDING",
-    category: task.category || "GENERAL",
-    title: task.title || "",
-    description: task.description || "",
-    estimatedAmount: String(task.estimatedAmount || 0),
-    amountArranged: String(task.amountArranged || 0),
-    amountPaid: String(task.amountPaid || 0),
-    dueAt: task.dueAt ? format(new Date(task.dueAt), "yyyy-MM-dd'T'HH:mm") : "",
-  });
-
-  const handleSave = () => {
-    const payload: any = {};
-    if (isNew) {
-      if (!values.bookingId) return toast.error("Booking is required.");
-      if (!values.title.trim()) return toast.error("Title is required.");
-      return onSave({
-        ...values,
-        title: values.title.trim(),
-        estimatedAmount: Number(values.estimatedAmount),
-        amountArranged: Number(values.amountArranged),
-        amountPaid: Number(values.amountPaid),
-        dueAt: values.dueAt ? new Date(values.dueAt).toISOString() : null,
-      });
-    }
-
-    if (values.status !== task.status) payload.status = values.status;
-    const trimTitle = values.title.trim();
-    if (trimTitle !== task.title.trim()) payload.title = trimTitle;
-    if (values.description.trim() !== (task.description || "").trim())
-      payload.description = values.description.trim() || null;
-    const est = Number(values.estimatedAmount);
-    const arr = Number(values.amountArranged);
-    const paid = Number(values.amountPaid);
-    if (est !== Number(task.estimatedAmount || 0))
-      payload.estimatedAmount = est;
-    if (arr !== Number(task.amountArranged || 0)) payload.amountArranged = arr;
-    if (paid !== Number(task.amountPaid || 0)) payload.amountPaid = paid;
-    if (paid > arr) return toast.error("Paid cannot exceed arranged.");
-    const origDue = task.dueAt
-      ? format(new Date(task.dueAt), "yyyy-MM-dd'T'HH:mm")
-      : "";
-    if (values.dueAt !== origDue)
-      payload.dueAt = values.dueAt
-        ? new Date(values.dueAt).toISOString()
-        : null;
-    if (Object.keys(payload).length === 0) return toast.info("No changes.");
-    onSave(payload);
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-[80] flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white w-full max-w-lg rounded-t-2xl md:rounded-2xl shadow-2xl max-h-[90dvh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#781216]">
-              {task.category?.replace(/_/g, " ") || "New Task"}
-            </p>
-            <h2 className="text-lg font-bold text-gray-900 mt-0.5">
-              {isNew ? "Create Task" : task.title}
-            </h2>
-            {!isNew && (
-              <p className="text-xs text-gray-500 mt-0.5">
-                {task.booking?.user?.profile?.fullName} ·{" "}
-                {task.booking?.bookingReference}
-              </p>
-            )}
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-full hover:bg-gray-100 text-gray-400"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="p-5 space-y-4">
-          {isNew && (
-            <div>
-              <Label>Booking</Label>
-              <select
-                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={values.bookingId}
-                onChange={(e) =>
-                  setValues({ ...values, bookingId: e.target.value })
-                }
-              >
-                <option value="">Select a booking</option>
-                {bookings?.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.bookingReference} - {b.user?.profile?.fullName}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-4">
-            {isNew ? (
-              <div>
-                <Label>Category</Label>
-                <select
-                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={values.category}
-                  onChange={(e) =>
-                    setValues({ ...values, category: e.target.value })
-                  }
-                >
-                  {CATEGORIES.map((s) => (
-                    <option key={s} value={s}>
-                      {s.replace(/_/g, " ")}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div>
-                <Label>Status</Label>
-                <select
-                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={values.status}
-                  onChange={(e) =>
-                    setValues({ ...values, status: e.target.value })
-                  }
-                >
-                  {STATUSES_OPS.map((s) => (
-                    <option key={s}>{s.replace(/_/g, " ")}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <div>
-              <Label>Due Date</Label>
-              <Input
-                type="datetime-local"
-                className="mt-1"
-                value={values.dueAt}
-                onChange={(e) =>
-                  setValues({ ...values, dueAt: e.target.value })
-                }
-              />
-            </div>
-          </div>
-          <div>
-            <Label>Title</Label>
-            <Input
-              className="mt-1"
-              value={values.title}
-              onChange={(e) => setValues({ ...values, title: e.target.value })}
-            />
-          </div>
-          <div>
-            <Label>Description</Label>
-            <Textarea
-              className="mt-1"
-              rows={2}
-              value={values.description}
-              onChange={(e) =>
-                setValues({ ...values, description: e.target.value })
-              }
-            />
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: "Total Needed", key: "estimatedAmount" },
-              { label: "Arranged", key: "amountArranged" },
-              { label: "Paid", key: "amountPaid" },
-            ].map((f) => (
-              <div key={f.key}>
-                <Label>{f.label}</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  className="mt-1"
-                  value={(values as any)[f.key]}
-                  onChange={(e) =>
-                    setValues({ ...values, [f.key]: e.target.value })
-                  }
-                />
-              </div>
-            ))}
-          </div>
-          <div className="bg-[#fcf8ef] border border-[#eadcb9] rounded-xl px-4 py-3 text-sm text-[#6d541f]">
-            Updating paid amount syncs with the ledger.
-          </div>
-        </div>
-        <div className="sticky bottom-0 bg-white border-t border-gray-100 px-5 py-3 flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            disabled={saving}
-            onClick={handleSave}
-            className="bg-[#781216] hover:bg-[#5f0e11]"
-          >
-            {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}Save
-            Task
-          </Button>
+              {/* New row */}
+              <tr className="bg-indigo-50/40 border-t-2 border-indigo-200">
+                <td className="border-r border-gray-200 p-0">
+                  <select value={newRow.bookingId} onChange={(e) => setNewRow({...newRow, bookingId: e.target.value})}
+                    className="w-full min-h-10 px-2 bg-transparent outline-none focus:bg-indigo-100 text-xs font-mono font-bold text-[#781216]">
+                    <option value="">Select booking...</option>
+                    {bookings.map((b: any) => <option key={b.id} value={b.id}>{b.bookingReference}</option>)}
+                  </select>
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <select value={newRow.status} onChange={(e) => setNewRow({...newRow, status: e.target.value})}
+                    className="w-full min-h-10 px-2 bg-transparent outline-none focus:bg-indigo-100 text-[11px] font-bold text-gray-500">
+                    {STATUSES_OPS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <select value={newRow.category} onChange={(e) => setNewRow({...newRow, category: e.target.value})}
+                    className="w-full min-h-10 px-2 bg-transparent outline-none focus:bg-indigo-100 text-xs">
+                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <input type="text" value={newRow.title} placeholder="New task title..."
+                    onChange={(e) => setNewRow({...newRow, title: e.target.value})}
+                    onKeyDown={(e) => e.key === "Enter" && handleNewRowSubmit()}
+                    className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-indigo-100 font-medium text-gray-900 placeholder:text-gray-300" />
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <input type="date" value={newRow.dueAt} onChange={(e) => setNewRow({...newRow, dueAt: e.target.value})}
+                    className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-indigo-100 text-xs" />
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <input type="number" step="0.01" value={newRow.estimatedAmount} placeholder="0"
+                    onChange={(e) => setNewRow({...newRow, estimatedAmount: e.target.value})}
+                    onKeyDown={(e) => e.key === "Enter" && handleNewRowSubmit()}
+                    className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono focus:bg-indigo-100" />
+                </td>
+                <td className="border-r border-gray-200 p-0 bg-gray-50/50">
+                  <div className="w-full min-h-10 px-3 flex items-center justify-end text-gray-300 text-xs italic">auto</div>
+                </td>
+                <td className="border-r border-gray-200 p-0 bg-gray-50/50">
+                  <div className="w-full min-h-10 px-3 flex items-center justify-end text-gray-300 text-xs italic">auto</div>
+                </td>
+                <td className="p-0 text-center">
+                  <button onClick={handleNewRowSubmit} disabled={createMutation.isPending}
+                    className="text-indigo-500 hover:text-indigo-700 transition-colors p-1.5">
+                    {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-5 h-5" />}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
   );
 }
+
 
 // ─── Tab 3: Ledger ────────────────────────────────────────────────
+const LEDGER_CATEGORIES = ["HOTEL", "TRANSPORT", "PERMIT", "VENDOR", "ACTIVITY", "DOCUMENTATION", "PAYMENT_COLLECTION", "SALARY", "MARKETING", "BOOKING_PAYMENT", "REFUND", "OTHER_INCOME", "OTHER_EXPENSE"];
+
 function LedgerTab({ tripId }: { tripId: string }) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
-  const [showAdd, setShowAdd] = useState(false);
   const [newEntry, setNewEntry] = useState({
-    type: "INCOME",
-    category: "",
+    type: "EXPENSE",
+    category: "HOTEL",
     amount: "",
     description: "",
     entryDate: format(new Date(), "yyyy-MM-dd"),
@@ -983,44 +697,44 @@ function LedgerTab({ tripId }: { tripId: string }) {
   const addMutation = useMutation({
     mutationFn: (payload: any) => apiClient.post(`/ledgers/entries`, payload),
     onSuccess: async () => {
-      toast.success("Entry added");
-      await queryClient.invalidateQueries({
-        queryKey: ["admin", "trip-ledger", tripId],
-      });
-      setShowAdd(false);
-      setNewEntry({
-        type: "INCOME",
-        category: "",
-        amount: "",
-        description: "",
-        entryDate: format(new Date(), "yyyy-MM-dd"),
-      });
+      await queryClient.invalidateQueries({ queryKey: ["admin", "trip-ledger", tripId] });
+      setNewEntry({ type: "EXPENSE", category: "HOTEL", amount: "", description: "", entryDate: format(new Date(), "yyyy-MM-dd") });
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.message || "Failed to add entry"),
+    onError: (err: any) => toast.error(err?.response?.data?.message || "Failed to add entry"),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => apiClient.patch(`/ledgers/entries/${id}`, data),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin", "trip-ledger", tripId] });
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.message || "Failed to update entry"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/ledgers/entries/${id}`),
     onSuccess: async () => {
       toast.success("Entry deleted");
-      await queryClient.invalidateQueries({
-        queryKey: ["admin", "trip-ledger", tripId],
-      });
+      await queryClient.invalidateQueries({ queryKey: ["admin", "trip-ledger", tripId] });
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.message || "Failed to delete"),
+    onError: (err: any) => toast.error(err?.response?.data?.message || "Failed to delete"),
   });
 
+  const handleCellChange = (entry: any, field: string, value: any) => {
+    if (entry.isAutoGenerated) return;
+    if (entry[field] == value) return;
+    if (field === "entryDate") value = value ? new Date(value).toISOString() : null;
+    updateMutation.mutate({ id: entry.id, data: { [field]: value } });
+  };
+
   const handleAdd = () => {
-    if (!newEntry.category.trim()) return toast.error("Category required");
     const amount = Number(newEntry.amount);
     if (!amount || amount <= 0) return toast.error("Amount must be positive");
     addMutation.mutate({
       type: newEntry.type,
       scope: "TRIP",
       tripId,
-      category: newEntry.category.trim(),
+      category: newEntry.category,
       amount,
       description: newEntry.description.trim() || undefined,
       entryDate: new Date(`${newEntry.entryDate}T12:00:00`).toISOString(),
@@ -1047,218 +761,144 @@ function LedgerTab({ tripId }: { tripId: string }) {
 
   return (
     <div className="space-y-4">
-      {/* Filters + Add */}
+      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 bg-white rounded-2xl border border-gray-100 p-4 shadow-sm items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Category, description, booking ref..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 pr-4 py-2 w-full border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/40"
-          />
+          <input type="text" placeholder="Category, description, booking ref..."
+            value={search} onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 pr-4 py-2 w-full border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/40" />
         </div>
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none bg-white"
-        >
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none bg-white">
           <option value="">All Types</option>
           <option>INCOME</option>
           <option>EXPENSE</option>
         </select>
-        <Button
-          onClick={() => setShowAdd(!showAdd)}
-          className="bg-[#781216] hover:bg-[#5f0e11] shrink-0"
-          size="sm"
-        >
-          <Plus className="w-4 h-4 mr-1.5" /> Add Entry
-        </Button>
       </div>
 
-      {showAdd && (
-        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 space-y-4">
-          <h3 className="font-semibold text-gray-900">
-            New Ledger Entry (Trip-scoped)
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Type</Label>
-              <select
-                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={newEntry.type}
-                onChange={(e) =>
-                  setNewEntry({ ...newEntry, type: e.target.value })
-                }
-              >
-                <option>INCOME</option>
-                <option>EXPENSE</option>
-              </select>
-            </div>
-            <div>
-              <Label>Amount (₹)</Label>
-              <Input
-                type="number"
-                min={0}
-                className="mt-1"
-                value={newEntry.amount}
-                onChange={(e) =>
-                  setNewEntry({ ...newEntry, amount: e.target.value })
-                }
-              />
-            </div>
-          </div>
-          <div>
-            <Label>Category</Label>
-            <Input
-              className="mt-1"
-              placeholder="Hotel, Transport, Commission..."
-              value={newEntry.category}
-              onChange={(e) =>
-                setNewEntry({ ...newEntry, category: e.target.value })
-              }
-            />
-          </div>
-          <div>
-            <Label>Description (optional)</Label>
-            <Textarea
-              rows={2}
-              className="mt-1"
-              value={newEntry.description}
-              onChange={(e) =>
-                setNewEntry({ ...newEntry, description: e.target.value })
-              }
-            />
-          </div>
-          <div>
-            <Label>Entry Date</Label>
-            <Input
-              type="date"
-              className="mt-1"
-              value={newEntry.entryDate}
-              onChange={(e) =>
-                setNewEntry({ ...newEntry, entryDate: e.target.value })
-              }
-            />
-          </div>
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setShowAdd(false)}>
-              Cancel
-            </Button>
-            <Button
-              disabled={addMutation.isPending}
-              onClick={handleAdd}
-              className="bg-[#781216] hover:bg-[#5f0e11]"
-            >
-              {addMutation.isPending && (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              )}
-              Add Entry
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {entries.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-2xl border border-gray-100 text-gray-400 text-sm">
-          No ledger entries match your filters.
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/50">
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
-              {entries.length} entr(ies)
-            </p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
-                <tr>
-                  <th className="px-4 py-3 font-semibold border-r border-gray-200">
-                    Date
-                  </th>
-                  <th className="px-4 py-3 font-semibold border-r border-gray-200">
-                    Category
-                  </th>
-                  <th className="px-4 py-3 font-semibold border-r border-gray-200">
-                    Description
-                  </th>
-                  <th className="px-4 py-3 font-semibold border-r border-gray-200">
-                    Context
-                  </th>
-                  <th className="px-4 py-3 font-semibold border-r border-gray-200">
-                    Type
-                  </th>
-                  <th className="px-4 py-3 font-semibold border-r border-gray-200 text-right">
-                    Amount
-                  </th>
-                  <th className="px-4 py-3 font-semibold text-center w-12"></th>
+      {/* Excel grid */}
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm border-collapse">
+            <thead className="bg-gray-100 border-b-2 border-gray-300 sticky top-0 z-10">
+              <tr>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-32">Date</th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-28">Type</th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-40">Category</th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300">Description</th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-24 text-center">Context</th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-32 text-right">Amount ₹</th>
+                <th className="px-2 py-2.5 text-gray-600 w-10"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {entries.map((entry: any) => (
+                <tr key={entry.id} className={`group transition-colors ${entry.isAutoGenerated ? "bg-gray-50/50" : "hover:bg-blue-50/20"}`}>
+                  <td className="border-r border-gray-200 p-0">
+                    <input type="date" defaultValue={format(new Date(entry.entryDate), "yyyy-MM-dd")}
+                      disabled={entry.isAutoGenerated}
+                      onBlur={(e) => handleCellChange(entry, "entryDate", e.target.value)}
+                      className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 text-xs disabled:opacity-50 disabled:cursor-not-allowed" />
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    {entry.isAutoGenerated ? (
+                      <div className="min-h-10 px-3 flex items-center gap-1.5">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${entry.type === "INCOME" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{entry.type}</span>
+                        <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">AUTO</span>
+                      </div>
+                    ) : (
+                      <select defaultValue={entry.type} onChange={(e) => handleCellChange(entry, "type", e.target.value)}
+                        className={`w-full min-h-10 px-2 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 font-bold text-[11px] ${entry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`}>
+                        <option value="INCOME">INCOME</option>
+                        <option value="EXPENSE">EXPENSE</option>
+                      </select>
+                    )}
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    {entry.isAutoGenerated ? (
+                      <div className="min-h-10 px-3 flex items-center text-gray-700 font-medium text-xs">{entry.category}</div>
+                    ) : (
+                      <select defaultValue={entry.category} onChange={(e) => handleCellChange(entry, "category", e.target.value)}
+                        className="w-full min-h-10 px-2 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 text-xs">
+                        {LEDGER_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    )}
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    <input type="text" defaultValue={entry.description || ""}
+                      disabled={entry.isAutoGenerated}
+                      onBlur={(e) => handleCellChange(entry, "description", e.target.value)}
+                      placeholder={entry.isAutoGenerated ? entry.source || "" : "Description..."}
+                      className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed" />
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    <div className="min-h-10 px-2 flex items-center justify-center">
+                      <span className="text-[10px] font-mono text-gray-400">{entry.booking?.bookingReference || "Trip"}</span>
+                    </div>
+                  </td>
+                  <td className="border-r border-gray-200 p-0">
+                    <input type="number" step="0.01" defaultValue={entry.amount}
+                      disabled={entry.isAutoGenerated}
+                      onBlur={(e) => handleCellChange(entry, "amount", e.target.value)}
+                      className={`w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono font-semibold focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed ${entry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`} />
+                  </td>
+                  <td className="p-0 text-center">
+                    {!entry.isAutoGenerated && (
+                      <button onClick={() => window.confirm("Delete this entry?") && deleteMutation.mutate(entry.id)}
+                        className="text-gray-300 hover:text-red-500 transition-colors p-1.5 opacity-0 group-hover:opacity-100">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {entries.map((entry: any) => {
-                  const context = entry.booking?.bookingReference || "Non-trip";
-                  return (
-                    <tr key={entry.id} className="hover:bg-gray-50 group">
-                      <td className="px-4 py-2 border-r border-gray-200 text-gray-700">
-                        {format(new Date(entry.entryDate), "dd MMM yyyy")}
-                      </td>
-                      <td className="px-4 py-2 border-r border-gray-200 font-medium text-gray-900">
-                        {entry.category}
-                      </td>
-                      <td
-                        className="px-4 py-2 border-r border-gray-200 text-gray-600 max-w-[200px] truncate"
-                        title={entry.description || ""}
-                      >
-                        {entry.description || "-"}
-                      </td>
-                      <td className="px-4 py-2 border-r border-gray-200">
-                        <div className="text-gray-900">{context}</div>
-                      </td>
-                      <td className="px-4 py-2 border-r border-gray-200">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${entry.type === "INCOME" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}
-                          >
-                            {entry.type}
-                          </span>
-                          {entry.isAutoGenerated && (
-                            <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">
-                              AUTO
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td
-                        className={`px-4 py-2 border-r border-gray-200 text-right font-medium ${entry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`}
-                      >
-                        {entry.type === "INCOME" ? "+" : "−"}
-                        {money(entry.amount)}
-                      </td>
-                      <td className="px-2 py-2 text-center">
-                        {!entry.isAutoGenerated && (
-                          <button
-                            type="button"
-                            aria-label="Delete manual entry"
-                            onClick={() =>
-                              window.confirm("Delete this entry?") &&
-                              deleteMutation.mutate(entry.id)
-                            }
-                            className="inline-flex h-7 w-7 items-center justify-center rounded text-gray-400 opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 transition-opacity"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+              ))}
+
+              {/* New row */}
+              <tr className="bg-emerald-50/30 border-t-2 border-emerald-200">
+                <td className="border-r border-gray-200 p-0">
+                  <input type="date" value={newEntry.entryDate} onChange={(e) => setNewEntry({...newEntry, entryDate: e.target.value})}
+                    className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-emerald-100 text-xs" />
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <select value={newEntry.type} onChange={(e) => setNewEntry({...newEntry, type: e.target.value})}
+                    className={`w-full min-h-10 px-2 bg-transparent outline-none focus:bg-emerald-100 font-bold text-[11px] ${newEntry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`}>
+                    <option value="INCOME">INCOME</option>
+                    <option value="EXPENSE">EXPENSE</option>
+                  </select>
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <select value={newEntry.category} onChange={(e) => setNewEntry({...newEntry, category: e.target.value})}
+                    className="w-full min-h-10 px-2 bg-transparent outline-none focus:bg-emerald-100 text-xs">
+                    {LEDGER_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <input type="text" value={newEntry.description} placeholder="Description (optional)"
+                    onChange={(e) => setNewEntry({...newEntry, description: e.target.value})}
+                    onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                    className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-emerald-100 text-gray-600 placeholder:text-gray-300" />
+                </td>
+                <td className="border-r border-gray-200 p-0 bg-gray-50/50">
+                  <div className="min-h-10 px-2 flex items-center justify-center text-gray-300 text-xs italic">Trip</div>
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <input type="number" step="0.01" value={newEntry.amount} placeholder="Amount..."
+                    onChange={(e) => setNewEntry({...newEntry, amount: e.target.value})}
+                    onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                    className={`w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono font-semibold focus:bg-emerald-100 placeholder:text-gray-300 ${newEntry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`} />
+                </td>
+                <td className="p-0 text-center">
+                  <button onClick={handleAdd} disabled={addMutation.isPending}
+                    className="text-emerald-500 hover:text-emerald-700 transition-colors p-1.5">
+                    {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-5 h-5" />}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
     </div>
   );
 }

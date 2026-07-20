@@ -8,6 +8,7 @@ router.use(requireAuth);
 
 router.get("/", requireAdmin, ledgerController.getUnifiedLedger);
 router.post("/entries", requireAdmin, ledgerController.addManualEntry);
+router.patch("/entries/:entryId", requireAdmin, ledgerController.updateManualEntry);
 router.delete("/entries/:entryId", requireAdmin, ledgerController.deleteManualEntry);
 router.get("/bookings/:bookingId/balance-sheet", requireAdmin, ledgerController.getBalanceSheet);
 router.post("/bookings/:bookingId/balance-sheet/entries", requireAdmin, ledgerController.addLedgerEntry);
