@@ -572,18 +572,42 @@ export const cancelBooking = async (bookingId, userId, reason) => {
   if (booking.userId !== userId)
     throw new ForbiddenError("You can only cancel your own bookings.");
 
-  const cancellableStatuses = ["PENDING", "RESERVED"];
+  const cancellableStatuses = ["PENDING", "RESERVED", "CONFIRMED"];
   if (!cancellableStatuses.includes(booking.status)) {
     throw new ValidationError(
       `Booking cannot be cancelled in its current status: ${booking.status}.`,
     );
   }
 
-  const cancelledBooking = await repo.updateBooking(bookingId, {
-    status: "CANCELLED",
-    cancelledAt: new Date(),
-    cancelledBy: userId,
-    cancellationReason: reason || null,
+  const cancelledBooking = await prisma.$transaction(async (tx) => {
+    const updated = await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        status: "CANCELLED",
+        cancelledAt: new Date(),
+        cancelledBy: userId,
+        cancellationReason: reason || null,
+      },
+      include: {
+        slot: { include: { trip: true, festival: true } },
+        package: true,
+        addOns: { include: { addOn: true } },
+        travelers: { include: { aadhaarAsset: true } },
+        payments: { include: { refunds: true } },
+        user: { include: { profile: { include: { govtIdAsset: true } } } },
+      }
+    });
+
+    if (booking.slotId && (booking.status === "RESERVED" || booking.status === "CONFIRMED")) {
+      await tx.slot.update({
+        where: { id: booking.slotId },
+        data: {
+          filledSpots: Math.max(0, (booking.slot.filledSpots || 0) - booking.numberOfTravelers),
+        },
+      });
+    }
+    
+    return updated;
   });
 
   import("../../core/services/email.service.js")

@@ -270,6 +270,15 @@ export default function AdminPaymentsPage() {
     queryFn: () => paymentApi.getAllPayments({ limit: 1000 }),
   });
 
+  const [isSpinning, setIsSpinning] = useState(false);
+  const handleRefresh = async () => {
+    setIsSpinning(true);
+    await refetch();
+    setTimeout(() => {
+      setIsSpinning(false);
+    }, 600);
+  };
+
   const allPayments = data?.data || [];
 
   const payments = useMemo(() => {
@@ -361,11 +370,11 @@ export default function AdminPaymentsPage() {
         </div>
         <button
           type="button"
-          onClick={() => refetch()}
-          disabled={isFetching}
+          onClick={handleRefresh}
+          disabled={isFetching || isSpinning}
           className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-[#c8a96e] hover:text-[#781216] disabled:opacity-60"
         >
-          <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} /> Refresh data
+          <RefreshCw className={`h-4 w-4 ${isSpinning || isFetching ? "animate-spin" : ""}`} /> Refresh data
         </button>
       </div>
 

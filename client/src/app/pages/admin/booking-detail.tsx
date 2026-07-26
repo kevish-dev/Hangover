@@ -380,6 +380,17 @@ export default function AdminBookingDetailPage() {
                   
                   <span className="text-gray-500">Address:</span>
                   <span className="col-span-2 text-gray-900">{booking.user?.profile?.addressLine1 || "N/A"}</span>
+                  
+                  <span className="text-gray-500">Govt ID:</span>
+                  <span className="col-span-2 flex items-center">
+                    {booking.user?.profile?.govtIdImageUrl ? (
+                      <a href={booking.user.profile.govtIdImageUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-[#781216] hover:bg-[#5f0e11] rounded-lg transition-colors shadow-sm">
+                        <ImageIcon className="w-3.5 h-3.5" /> View ID
+                      </a>
+                    ) : (
+                      <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg">NO ID</span>
+                    )}
+                  </span>
                 </div>
               </div>
             </div>

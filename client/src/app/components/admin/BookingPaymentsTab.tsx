@@ -15,6 +15,7 @@ export function BookingPaymentsTab({ bookingId, booking }: { bookingId: string; 
   
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [cancelRefundAmount, setCancelRefundAmount] = useState("");
 
   const refundMutation = useMutation({
     mutationFn: async ({ paymentId, amount, reason }: { paymentId: string, amount: number, reason: string }) => {
@@ -34,14 +35,15 @@ export function BookingPaymentsTab({ bookingId, booking }: { bookingId: string; 
   });
 
   const cancelMutation = useMutation({
-    mutationFn: async ({ reason }: { reason: string }) => {
-      const res = await apiClient.patch(`/bookings/${bookingId}/cancel`, { reason });
+    mutationFn: async ({ reason, refundAmount }: { reason: string, refundAmount?: number }) => {
+      const res = await apiClient.post(`/bookings/${bookingId}/cancel-and-refund`, { reason, refundAmount });
       return res.data;
     },
     onSuccess: () => {
       toast.success("Booking cancelled successfully");
       setIsCancelling(false);
       setCancelReason("");
+      setCancelRefundAmount("");
       queryClient.invalidateQueries({ queryKey: ["admin", "booking", bookingId] });
     },
     onError: (err: any) => {
@@ -60,7 +62,8 @@ export function BookingPaymentsTab({ bookingId, booking }: { bookingId: string; 
   const handleCancelSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!cancelReason.trim()) return toast.error("Cancellation reason is required");
-    cancelMutation.mutate({ reason: cancelReason });
+    const amount = cancelRefundAmount ? Number(cancelRefundAmount) : 0;
+    cancelMutation.mutate({ reason: cancelReason, refundAmount: amount });
   };
 
   const payments = booking.payments || [];
@@ -75,7 +78,7 @@ export function BookingPaymentsTab({ bookingId, booking }: { bookingId: string; 
               <h4 className="text-red-800 font-semibold flex items-center gap-2">
                 <Ban className="w-5 h-5" /> Cancel Booking
               </h4>
-              <p className="text-xs text-red-600 mt-1">This action will cancel the booking. Make sure to issue refunds manually if applicable.</p>
+              <p className="text-xs text-red-600 mt-1">This action will cancel the booking and optionally issue a refund.</p>
             </div>
             {!isCancelling ? (
               <Button variant="destructive" size="sm" onClick={() => setIsCancelling(true)}>
@@ -85,8 +88,8 @@ export function BookingPaymentsTab({ bookingId, booking }: { bookingId: string; 
           </div>
           
           {isCancelling && (
-            <form onSubmit={handleCancelSubmit} className="mt-4 flex items-end gap-3">
-              <div className="flex-1">
+            <form onSubmit={handleCancelSubmit} className="mt-4 flex flex-col sm:flex-row items-end gap-3">
+              <div className="flex-1 w-full">
                 <label className="text-xs font-semibold text-red-800 mb-1 block">Reason for cancellation</label>
                 <Input 
                   value={cancelReason} 
@@ -96,12 +99,24 @@ export function BookingPaymentsTab({ bookingId, booking }: { bookingId: string; 
                   required
                 />
               </div>
-              <Button variant="outline" type="button" onClick={() => setIsCancelling(false)} disabled={cancelMutation.isPending}>
-                Abort
-              </Button>
-              <Button variant="destructive" type="submit" disabled={cancelMutation.isPending}>
-                {cancelMutation.isPending ? "Cancelling..." : "Confirm"}
-              </Button>
+              <div className="w-full sm:w-32">
+                <label className="text-xs font-semibold text-red-800 mb-1 block">Refund Amount (₹)</label>
+                <Input 
+                  type="number"
+                  value={cancelRefundAmount} 
+                  onChange={(e) => setCancelRefundAmount(e.target.value)} 
+                  placeholder="0" 
+                  className="bg-white border-red-200 focus-visible:ring-red-500"
+                />
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                <Button variant="outline" type="button" onClick={() => setIsCancelling(false)} disabled={cancelMutation.isPending} className="flex-1 sm:flex-none">
+                  Abort
+                </Button>
+                <Button variant="destructive" type="submit" disabled={cancelMutation.isPending} className="flex-1 sm:flex-none">
+                  {cancelMutation.isPending ? "Cancelling..." : "Confirm"}
+                </Button>
+              </div>
             </form>
           )}
         </div>

@@ -658,7 +658,7 @@ function OperationsTab({ tripId }: { tripId: string }) {
                       <SelectValue placeholder="Select booking..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {bookings.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.bookingReference}</SelectItem>)}
+                      {bookings.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.bookingReference} {b.user?.profile?.fullName ? `(${b.user.profile.fullName})` : ""}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </td>
