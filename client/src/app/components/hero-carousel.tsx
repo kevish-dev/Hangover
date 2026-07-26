@@ -375,7 +375,7 @@ export function HeroCarousel() {
                       fontSize: "0.88rem",
                     }}
                   >
-                    From ₹{slide.price.toLocaleString("en-IN")}
+                    From ₹{slide.price?.toLocaleString("en-IN") ?? "N/A"}
                   </div>
                 </div>
               </div>

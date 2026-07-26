@@ -10,9 +10,9 @@ import {
   Select,
   SelectContent,
   SelectItem,
-  SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
+import { SyncIndicator } from "../../components/ui/sync-indicator";
 
 type Task = {
   id: string;
@@ -151,6 +151,7 @@ export default function AdminOperationsPage() {
         task.booking?.bookingReference,
         task.booking?.trip?.title,
         task.booking?.festival?.title,
+        task.booking?.user?.profile?.fullName,
       ]
         .filter(Boolean)
         .join(" ")
@@ -207,6 +208,10 @@ export default function AdminOperationsPage() {
         </Select>
       </div>
 
+      <div className="flex justify-end items-center mb-[-12px]">
+        <SyncIndicator isMutating={createMutation.isPending || updateMutation.isPending || deleteMutation.isPending} isError={createMutation.isError || updateMutation.isError || deleteMutation.isError} />
+      </div>
+
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm border-collapse">
@@ -227,8 +232,13 @@ export default function AdminOperationsPage() {
               {filtered.map((task) => (
                 <tr key={task.id} className="group hover:bg-blue-50/30">
                   <td className="border-r border-gray-200 p-0">
-                    <div className="w-full h-full min-h-10 px-3 flex items-center text-xs font-mono font-medium text-gray-600 cursor-not-allowed">
-                      {task.booking?.bookingReference}
+                    <div className="w-full h-full min-h-10 px-3 py-1.5 flex flex-col justify-center text-xs">
+                      <span className="font-mono font-medium text-gray-700 leading-none">{task.booking?.bookingReference}</span>
+                      {task.booking?.user?.profile?.fullName && (
+                        <span className="text-[10px] text-gray-500 mt-1 truncate max-w-[150px]">
+                          {task.booking.user.profile.fullName}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="border-r border-gray-200 p-0">

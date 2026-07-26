@@ -56,3 +56,26 @@ export const remove = async (id) => {
     where: { id },
   });
 };
+
+export const linkExistingEntities = async (destinationId, circuitIds) => {
+  if (!circuitIds || circuitIds.length === 0) return { updatedTrips: 0, updatedFestivals: 0 };
+  
+  const updatedTrips = await prisma.trip.updateMany({
+    where: {
+      circuitId: { in: circuitIds }
+    },
+    data: { destinationId }
+  });
+
+  const updatedFestivals = await prisma.festival.updateMany({
+    where: {
+      circuitId: { in: circuitIds }
+    },
+    data: { destinationId }
+  });
+
+  return {
+    updatedTrips: updatedTrips.count,
+    updatedFestivals: updatedFestivals.count
+  };
+};

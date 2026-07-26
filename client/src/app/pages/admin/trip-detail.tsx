@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../lib/axios";
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { SyncIndicator } from "../../components/ui/sync-indicator";
 import {
   ArrowLeft,
   Map,
@@ -550,6 +551,10 @@ function OperationsTab({ tripId }: { tripId: string }) {
         </Select>
       </div>
 
+      <div className="flex justify-end items-center mb-[-12px]">
+        <SyncIndicator isMutating={createMutation.isPending || updateMutation.isPending || deleteMutation.isPending} isError={createMutation.isError || updateMutation.isError || deleteMutation.isError} />
+      </div>
+
       {/* Excel Grid */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -838,6 +843,10 @@ function LedgerTab({ tripId }: { tripId: string }) {
             <SelectItem value="EXPENSE">EXPENSE</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="flex justify-end items-center mb-[-12px]">
+        <SyncIndicator isMutating={addMutation.isPending || updateMutation.isPending || deleteMutation.isPending} isError={addMutation.isError || updateMutation.isError || deleteMutation.isError} />
       </div>
 
       {/* Excel grid */}

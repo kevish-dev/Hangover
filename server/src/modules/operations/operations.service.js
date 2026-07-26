@@ -51,8 +51,8 @@ export const generateBookingOperations = async (booking, slot, chosenAddOns = []
   const itineraryDays = await prisma.itineraryDay.findMany({
     where: {
       OR: [
-        { tripId: isTrip && slot.trip ? slot.trip.id : undefined },
-        { festivalId: !isTrip && slot.festival ? slot.festival.id : undefined }
+        isTrip && slot.trip ? { tripId: slot.trip.id } : null,
+        !isTrip && slot.festival ? { festivalId: slot.festival.id } : null
       ].filter(Boolean)
     },
     include: { tasks: true }

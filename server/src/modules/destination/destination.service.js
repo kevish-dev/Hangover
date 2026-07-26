@@ -36,3 +36,7 @@ export const updateDestination = async (id, data) => {
 export const deleteDestination = async (id) => {
   return destinationRepo.remove(id);
 };
+
+export const linkExistingEntities = async (id, circuitIds) => {
+  return destinationRepo.linkExistingEntities(id, circuitIds);
+};

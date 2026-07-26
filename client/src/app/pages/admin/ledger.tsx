@@ -7,6 +7,7 @@ import { apiClient } from "../../../lib/axios";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { getErrorMessage, showErrorToast } from "../../../lib/errors";
+import { SyncIndicator } from "../../components/ui/sync-indicator";
 
 type Entry = {
   id: string;
@@ -221,6 +222,10 @@ export default function AdminLedgerPage() {
           <option value="FESTIVAL">Festival</option>
           <option value="OTHER">Other</option>
         </select>
+      </div>
+      
+      <div className="flex justify-end items-center mb-[-12px]">
+        <SyncIndicator isMutating={createMutation.isPending || updateMutation.isPending || deleteMutation.isPending} isError={createMutation.isError || updateMutation.isError || deleteMutation.isError} />
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col">

@@ -183,24 +183,28 @@ export default function AdminCircuitsPage() {
                 </div>
 
                 <div className="mt-5 grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    onClick={() => openTripFromCircuit(circuit)}
-                    disabled={!circuit.isActive || loadingCircuitId === circuit.id}
-                    className="w-full bg-[#781216] text-white hover:bg-[#5f0e11] px-2 text-xs h-9"
-                  >
-                    {loadingCircuitId === circuit.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Rocket className="mr-1.5 h-3.5 w-3.5" />}
-                    Create trip
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => openFestivalFromCircuit(circuit)}
-                    disabled={!circuit.isActive || loadingCircuitId === circuit.id}
-                    className="w-full bg-[#c8a96e] text-white hover:bg-[#b8943a] px-2 text-xs h-9"
-                  >
-                    {loadingCircuitId === circuit.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Tent className="mr-1.5 h-3.5 w-3.5" />}
-                    Create festival
-                  </Button>
+                  <div className={!circuit.isActive || loadingCircuitId === circuit.id ? "cursor-not-allowed" : ""}>
+                    <Button
+                      type="button"
+                      onClick={() => openTripFromCircuit(circuit)}
+                      disabled={!circuit.isActive || loadingCircuitId === circuit.id}
+                      className="w-full bg-[#781216] text-white hover:bg-[#5f0e11] px-2 text-xs h-9"
+                    >
+                      {loadingCircuitId === circuit.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Rocket className="mr-1.5 h-3.5 w-3.5" />}
+                      Create trip
+                    </Button>
+                  </div>
+                  <div className={!circuit.isActive || loadingCircuitId === circuit.id ? "cursor-not-allowed" : ""}>
+                    <Button
+                      type="button"
+                      onClick={() => openFestivalFromCircuit(circuit)}
+                      disabled={!circuit.isActive || loadingCircuitId === circuit.id}
+                      className="w-full bg-[#c8a96e] text-white hover:bg-[#b8943a] px-2 text-xs h-9"
+                    >
+                      {loadingCircuitId === circuit.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Tent className="mr-1.5 h-3.5 w-3.5" />}
+                      Create festival
+                    </Button>
+                  </div>
                 </div>
                 
                 <div className="mt-auto pt-4 flex flex-wrap items-center justify-start md:justify-end gap-3 md:gap-2 border-t border-gray-100 mt-6">

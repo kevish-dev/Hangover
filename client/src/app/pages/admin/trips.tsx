@@ -29,7 +29,7 @@ import {
 import { format } from "date-fns";
 import { Button } from "../../components/ui/button";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { Input } from "../../components/ui/input";
 import { getErrorMessage, showErrorToast } from "../../../lib/errors";
 
@@ -96,7 +96,7 @@ function TripActionMenu({ trip, processingId, processingAction, onShare, onToggl
           </button>
 
           <button
-            onClick={(e) => { e.stopPropagation(); setOpen(false); onDelete(trip.id); }}
+            onClick={(e) => { e.stopPropagation(); setOpen(false); onDelete(trip); }}
             disabled={processingId === trip.id}
             className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors"
           >
@@ -122,6 +122,8 @@ export default function AdminTripsPage() {
   const [editingTrip, setEditingTrip] = useState<any>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [processingAction, setProcessingAction] = useState<"delete" | "publish" | "edit" | null>(null);
+  const [tripToDelete, setTripToDelete] = useState<any>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [generatedShareLink, setGeneratedShareLink] = useState<{ title: string; url: string } | null>(null);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("ALL");
@@ -147,26 +149,36 @@ export default function AdminTripsPage() {
     });
   };
 
-  const handleDelete = (tripId: string) => {
-    confirmAction(
-      "Are you sure you want to delete this trip?",
-      "This action cannot be undone.",
-      "Delete",
-      async () => {
-        setProcessingId(tripId);
-        setProcessingAction("delete");
-        try {
-          await apiClient.delete(`/trips/${tripId}`);
-          toast.success("Trip deleted successfully");
-          queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
-        } catch (error) {
-          showErrorToast(error, "Failed to delete trip");
-        } finally {
-          setProcessingId(null);
-          setProcessingAction(null);
-        }
-      }
-    );
+  const executeDelete = async (tripId: string) => {
+    setProcessingId(tripId);
+    setProcessingAction("delete");
+    try {
+      await apiClient.delete(`/trips/${tripId}`);
+      toast.success("Trip deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
+      setTripToDelete(null);
+      setDeleteConfirmText("");
+    } catch (error) {
+      showErrorToast(error, "Failed to delete trip");
+    } finally {
+      setProcessingId(null);
+      setProcessingAction(null);
+    }
+  };
+
+  const handleDelete = (trip: any) => {
+    const tripBookings = (trip.slots || []).reduce((ss: number, sl: any) => ss + Number(sl.filledSpots || 0), 0);
+    if (tripBookings > 0) {
+      setTripToDelete(trip);
+      setDeleteConfirmText("");
+    } else {
+      confirmAction(
+        "Are you sure you want to delete this trip?",
+        "This action cannot be undone.",
+        "Delete",
+        () => executeDelete(trip.id)
+      );
+    }
   };
 
   const handleTogglePublish = (trip: any) => {
@@ -447,6 +459,37 @@ export default function AdminTripsPage() {
           })
         )}
       </div>
+
+      <Dialog open={!!tripToDelete} onOpenChange={(open) => !open && setTripToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Delete Trip with Active Bookings</DialogTitle>
+            <DialogDescription>
+              This trip has active bookings. Deleting it will permanently delete the trip and all associated bookings. 
+              This action cannot be undone.
+              <br /><br />
+              To confirm, please type <strong className="select-all">delete {tripToDelete?.title}</strong> below:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="my-4">
+            <Input 
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder={`delete ${tripToDelete?.title}`}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTripToDelete(null)}>Cancel</Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => executeDelete(tripToDelete?.id)}
+              disabled={deleteConfirmText !== `delete ${tripToDelete?.title}` || processingId === tripToDelete?.id}
+            >
+              {processingId === tripToDelete?.id ? "Deleting..." : "Delete Permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

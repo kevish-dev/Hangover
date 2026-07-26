@@ -1,11 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../lib/axios";
-import { CalendarCheck, IndianRupee, Loader2, ArrowLeft, User, MapPin, Mail, Phone, Image as ImageIcon, AlertCircle, Plus, Trash2, ClipboardCheck } from "lucide-react";
+import { CalendarCheck, IndianRupee, Loader2, ArrowLeft, User, MapPin, Mail, Phone, Image as ImageIcon, AlertCircle, Plus, Trash2, ClipboardCheck, BookOpen } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { toast } from "sonner";
 import { useNavigate, useParams } from "react-router";
+import { BalanceSheetTab } from "../../components/admin/BookingDetailModal";
+import { SyncIndicator } from "../../components/ui/sync-indicator";
 
 function BookingStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -44,14 +46,17 @@ function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ["admin", "operations", "booking", bookingId],
-    queryFn: async () => (await apiClient.get<{ tasks: any[] }>(`/operations/bookings/${bookingId}`)).data.tasks,
+    queryFn: async () => (await apiClient.get<any[]>(`/operations/bookings/${bookingId}`)).data,
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
       await apiClient.patch(`/operations/${id}`, data);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "operations", "booking", bookingId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "operations", "booking", bookingId] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "booking-ledger", bookingId] });
+    },
   });
 
   const createMutation = useMutation({
@@ -60,6 +65,7 @@ function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "operations", "booking", bookingId] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "booking-ledger", bookingId] });
       setNewRow({
         title: "",
         category: "GENERAL",
@@ -79,6 +85,7 @@ function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
     onSuccess: () => {
       toast.success("Task deleted");
       queryClient.invalidateQueries({ queryKey: ["admin", "operations", "booking", bookingId] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "booking-ledger", bookingId] });
     },
   });
 
@@ -119,9 +126,12 @@ function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
   return (
     <div className="mt-8 border-t border-[#e8d9b7]/40">
       <div className="p-4 md:p-6 bg-[#fbf7ed]/10">
-        <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-          <ClipboardCheck className="w-4 h-4 text-[#781216]" /> Ground Operations
-        </h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+            <ClipboardCheck className="w-4 h-4 text-[#781216]" /> Ground Operations
+          </h3>
+          <SyncIndicator isMutating={createMutation.isPending || updateMutation.isPending || deleteMutation.isPending} isError={createMutation.isError || updateMutation.isError || deleteMutation.isError} />
+        </div>
         
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col">
           <div className="overflow-x-auto">
@@ -305,7 +315,7 @@ export default function AdminBookingDetailPage() {
     queryKey: ["admin", "booking", id],
     queryFn: async () => {
       const res = await apiClient.get(`/bookings/${id}`);
-      return res.data?.data;
+      return res.data;
     }
   });
 
@@ -331,11 +341,11 @@ export default function AdminBookingDetailPage() {
   return (
     <div className="max-w-[1500px] mx-auto space-y-6 pb-12">
       <button 
-        onClick={() => navigate('/dashboard/bookings')}
+        onClick={() => navigate(-1)}
         className="flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors group"
       >
         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-        Back to Bookings
+        Back
       </button>
 
       <div className="bg-white rounded-2xl shadow-sm border border-[#e8d9b7]/40 overflow-hidden">
@@ -473,6 +483,18 @@ export default function AdminBookingDetailPage() {
         </div>
 
         {id && <BookingOperationsGrid bookingId={id} />}
+        {id && (
+          <div className="border-t border-[#e8d9b7]/40">
+            <div className="p-4 md:p-6 bg-[#fbf7ed]/10">
+              <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-[#781216]" /> Booking Ledger
+              </h3>
+              <div className="w-full">
+                <BalanceSheetTab bookingId={id} queryKeySuffix="page" />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -83,15 +83,48 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
     setIsSubmitting(true);
     
     try {
+      const oldCircuitIds = destination?.circuits?.map((c: any) => c.id) || [];
+      const newCircuitIds = formData.circuitIds.filter(id => !oldCircuitIds.includes(id));
+
+      let destId = destination?.id;
+
       if (destination) {
         await apiClient.put(`/destinations/${destination.id}`, formData);
         toast.success("Destination updated successfully");
       } else {
-        await apiClient.post("/destinations", formData);
+        const res = await apiClient.post("/destinations", formData);
+        destId = res.data.id;
         toast.success("Destination created successfully");
       }
+      
       queryClient.invalidateQueries({ queryKey: ["admin", "destinations"] });
       onOpenChange(false);
+
+      if (newCircuitIds.length > 0) {
+        toast("Update existing trips and festivals?", {
+          description: "Would you like to link all existing trips and festivals from the newly added circuits to this destination?",
+          action: {
+            label: "Yes, update",
+            onClick: async () => {
+              try {
+                await apiClient.post(`/destinations/${destId}/link-existing-entities`, { circuitIds: newCircuitIds });
+                toast.success("Successfully updated trips and festivals");
+                queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
+                queryClient.invalidateQueries({ queryKey: ["admin", "festivals"] });
+              } catch (error) {
+                console.error(error);
+                toast.error("Failed to update trips and festivals");
+              }
+            }
+          },
+          cancel: {
+            label: "No, skip",
+            onClick: () => {}
+          },
+          duration: 10000,
+        });
+      }
+
     } catch (error) {
       console.error(error);
       toast.error(destination ? "Failed to update destination" : "Failed to create destination");

@@ -335,6 +335,14 @@ export function FestivalFormModal({
             title: day.title,
             description: day.description || "",
             todos: Array.isArray(day.todos) ? day.todos : [],
+            tasks: (day.tasks || []).map((task: any) => ({
+              category: task.category,
+              title: task.title,
+              description: task.description || "",
+              unitPrice: task.unitPrice || undefined,
+              quantityNeeded: task.quantityNeeded || undefined,
+              dueOffsetDays: task.dueOffsetDays || undefined,
+            })),
           })) : [],
           faqs: sourceCircuit.faqs?.length
             ? sourceCircuit.faqs.map((f: any) => ({

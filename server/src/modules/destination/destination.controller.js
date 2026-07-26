@@ -58,3 +58,13 @@ export const deleteDestination = async (req, res, next) => {
     next(error);
   }
 };
+
+export const linkExistingEntities = async (req, res, next) => {
+  try {
+    const { circuitIds } = req.body;
+    const result = await destinationService.linkExistingEntities(req.params.id, circuitIds);
+    res.json({ message: "Entities linked successfully", ...result });
+  } catch (error) {
+    next(error);
+  }
+};
