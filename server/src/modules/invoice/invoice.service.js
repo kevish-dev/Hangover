@@ -9,9 +9,9 @@ export const createInvoice = async (data) => {
     data: {
       customerName,
       customerEmail,
-      customerPhone,
+      customerPhone: customerPhone || null,
       title,
-      description,
+      description: description || null,
       items: items || [],
       amount,
       currency: currency || "INR",

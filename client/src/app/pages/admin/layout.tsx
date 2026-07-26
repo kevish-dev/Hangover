@@ -29,10 +29,12 @@ import {
   LayoutDashboard,
   Receipt,
   Image,
+  BarChart3,
 } from "lucide-react";
 
 const overviewItems = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
 ];
 
 const crmItems = [

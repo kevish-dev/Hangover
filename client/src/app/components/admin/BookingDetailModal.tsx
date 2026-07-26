@@ -1407,13 +1407,13 @@ export function BookingDetailModal({
   };
 
   const handleFinalize = () => {
-    if (
-      window.confirm(
-        "Mark this trip as COMPLETED and send a review email to the guest?",
-      )
-    ) {
-      finalizeMutation.mutate();
-    }
+    toast("Finalize this trip?", {
+      description: "Mark this trip as COMPLETED and send a review email to the guest?",
+      action: {
+        label: "Confirm",
+        onClick: () => finalizeMutation.mutate(),
+      },
+    });
   };
 
   const tabs: { key: Tab; label: string; icon: any }[] = [

@@ -209,7 +209,7 @@ export default function AdminOperationsPage() {
         </Select>
       </div>
 
-      <div className="flex justify-end items-center mb-[-12px]">
+      <div className="flex justify-end items-center mb-3">
         <SyncIndicator isMutating={createMutation.isPending || updateMutation.isPending || deleteMutation.isPending} isError={createMutation.isError || updateMutation.isError || deleteMutation.isError} />
       </div>
 

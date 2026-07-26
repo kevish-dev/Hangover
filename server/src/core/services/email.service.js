@@ -1086,6 +1086,7 @@ export const sendCustomInvoiceEmail = async (options = {}) => {
     { label: "Invoice Title", value: title },
     { label: "Description", value: description },
     { label: "Date", value: formatDate(dueDate || new Date()) },
+    { label: "GSTIN", value: BRAND.gstin },
   ];
 
   const amountRows = items && items.length > 0

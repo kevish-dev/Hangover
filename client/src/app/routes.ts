@@ -31,6 +31,7 @@ export const router = createBrowserRouter([
     ErrorBoundary: RouteErrorBoundary,
     children: [
       { index: true, lazy: lazyPage(() => import("./pages/admin/dashboard")) },
+      { path: "analytics", lazy: lazyPage(() => import("./pages/admin/analytics")) },
       { path: "destinations", lazy: lazyPage(() => import("./pages/admin/destinations")) },
       { path: "circuits", lazy: lazyPage(() => import("./pages/admin/circuits")) },
       { path: "circuits/new", lazy: lazyPage(() => import("./pages/admin/circuit-form-page")) },

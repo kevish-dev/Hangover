@@ -551,7 +551,7 @@ function OperationsTab({ tripId }: { tripId: string }) {
         </Select>
       </div>
 
-      <div className="flex justify-end items-center mb-[-12px]">
+      <div className="flex justify-end items-center mb-3">
         <SyncIndicator isMutating={createMutation.isPending || updateMutation.isPending || deleteMutation.isPending} isError={createMutation.isError || updateMutation.isError || deleteMutation.isError} />
       </div>
 
@@ -855,7 +855,7 @@ function LedgerTab({ tripId }: { tripId: string }) {
         </Select>
       </div>
 
-      <div className="flex justify-end items-center mb-[-12px]">
+      <div className="flex justify-end items-center mb-3">
         <SyncIndicator isMutating={addMutation.isPending || updateMutation.isPending || deleteMutation.isPending} isError={addMutation.isError || updateMutation.isError || deleteMutation.isError} />
       </div>
 

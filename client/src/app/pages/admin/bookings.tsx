@@ -251,9 +251,13 @@ export default function AdminBookingsPage() {
   };
 
   const handleFinalize = (bookingId: string) => {
-    if (window.confirm("Are you sure you want to mark this trip as COMPLETED and send a review email to the user?")) {
-      finalizeMutation.mutate(bookingId);
-    }
+    toast("Finalize this trip?", {
+      description: "Are you sure you want to mark this trip as COMPLETED and send a review email to the user?",
+      action: {
+        label: "Confirm",
+        onClick: () => finalizeMutation.mutate(bookingId),
+      },
+    });
   };
 
   const allBookings = data?.data || [];
