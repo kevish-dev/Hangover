@@ -44,6 +44,7 @@ export const router = createBrowserRouter([
       { path: "payments", lazy: lazyPage(() => import("./pages/admin/payments")) },
       { path: "reviews", lazy: lazyPage(() => import("./pages/admin/reviews")) },
       { path: "invoices", lazy: lazyPage(() => import("./pages/admin/invoices")) },
+      { path: "landing", lazy: lazyPage(() => import("./pages/admin/landing-page")) },
     ],
   },
   {

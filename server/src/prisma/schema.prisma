@@ -470,6 +470,7 @@ model Traveler {
   id             String      @id @default(uuid())
   bookingId      String
   fullName       String
+  email          String?
   gender         String?
   dateOfBirth    DateTime?
   phone          String?

@@ -245,7 +245,9 @@ function LandingReasonsManager() {
     try {
       const payload = new FormData();
       payload.append("image", file);
-      const response = await apiClient.post("/landing-reasons/image", payload);
+      const response = await apiClient.post("/landing-reasons/image", payload, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       setForm((current) => ({ ...current, imageUrl: response.data.imageUrl }));
       toast.success("Panel image uploaded");
     } catch (error: any) {
@@ -383,7 +385,9 @@ function LandingTripTypesManager() {
     try {
       const payload = new FormData();
       payload.append("image", file);
-      const response = await apiClient.post("/landing-trip-types/image", payload);
+      const response = await apiClient.post("/landing-trip-types/image", payload, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       setForm((current) => ({ ...current, imageUrl: response.data.imageUrl }));
       toast.success("Trip type image uploaded");
     } catch (error: any) { toast.error(error?.response?.data?.message || "Failed to upload the image"); }

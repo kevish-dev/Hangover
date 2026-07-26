@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { finalizeBooking } from "../../../lib/bookingApi";
 import { useMutation } from "@tanstack/react-query";
 import CreateBookingModal from "../../components/admin/CreateBookingModal";
+import { useNavigate } from "react-router";
 
 function BookingStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -193,6 +194,7 @@ function ConfirmCancelModal({ booking, onConfirm, onClose }: { booking: any, onC
 
 export default function AdminBookingsPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);

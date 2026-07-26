@@ -239,6 +239,7 @@ export const createBooking = async (userId, data) => {
         }
         return {
         fullName: t.fullName,
+        email: t.email || null,
         gender: t.gender,
         dateOfBirth: t.dateOfBirth ? new Date(t.dateOfBirth) : null,
         phone: t.phone,

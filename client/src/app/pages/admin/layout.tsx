@@ -28,11 +28,14 @@ import {
   Star,
   LayoutDashboard,
   Receipt,
+  Image,
 } from "lucide-react";
 
-const navItems = [
+const overviewItems = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Destinations", url: "/dashboard/destinations", icon: MapPin },
+];
+
+const crmItems = [
   { title: "Circuits", url: "/dashboard/circuits", icon: Map },
   { title: "Trips & departures", url: "/dashboard/trips", icon: CalendarRange },
   { title: "Bookings", url: "/dashboard/bookings", icon: CalendarCheck },
@@ -40,7 +43,12 @@ const navItems = [
   { title: "Balance sheet", url: "/dashboard/ledger", icon: BookOpen },
   { title: "Payments", url: "/dashboard/payments", icon: CreditCard },
   { title: "Invoices", url: "/dashboard/invoices", icon: Receipt },
+];
+
+const websiteItems = [
+  { title: "Destinations", url: "/dashboard/destinations", icon: MapPin },
   { title: "Reviews", url: "/dashboard/reviews", icon: Star },
+  { title: "Landing Page", url: "/dashboard/landing", icon: Image },
   { title: "Public site", url: "/", icon: Home },
 ];
 
@@ -60,6 +68,24 @@ export default function AdminLayout() {
   if (!user || user.role !== "ADMIN") {
     return <Navigate to="/" replace />;
   }
+
+  const renderItem = (item: { title: string; url: string; icon: any }) => {
+    const isActive = item.url === "/"
+      ? location.pathname === "/"
+      : item.url === "/dashboard"
+        ? location.pathname === "/dashboard"
+        : location.pathname.startsWith(item.url);
+    return (
+      <SidebarMenuItem key={item.title}>
+        <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
+          <Link to={item.url}>
+            <item.icon />
+            <span>{item.title}</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  };
 
   return (
     <SidebarProvider>
@@ -88,27 +114,25 @@ export default function AdminLayout() {
             <SidebarGroupLabel>Menu</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {navItems.map((item) => {
-                  const isActive = item.url === "/"
-                    ? location.pathname === "/"
-                    : item.url === "/dashboard"
-                      ? location.pathname === "/dashboard"
-                      : location.pathname.startsWith(item.url);
-                  return (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isActive}
-                        tooltip={item.title}
-                      >
-                        <Link to={item.url}>
-                          <item.icon />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
+                {overviewItems.map(renderItem)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup>
+            <SidebarGroupLabel>CRM</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {crmItems.map(renderItem)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup>
+            <SidebarGroupLabel>Website</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {websiteItems.map(renderItem)}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

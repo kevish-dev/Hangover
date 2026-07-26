@@ -450,8 +450,8 @@ export default function AdminBookingDetailPage() {
                           <p className="font-medium text-gray-900 text-sm">{t.fullName}</p>
                           <p className="text-xs text-gray-500 mt-0.5">{t.email || "No email"}</p>
                         </div>
-                        {t.govtIdUrl ? (
-                          <a href={t.govtIdUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs font-semibold text-[#c8a96e] hover:text-[#b59410] bg-white border border-[#e8d9b7] px-2 py-1 rounded-lg shadow-sm">
+                        {t.aadhaar ? (
+                          <a href={t.aadhaar} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs font-semibold text-[#c8a96e] hover:text-[#b59410] bg-white border border-[#e8d9b7] px-2 py-1 rounded-lg shadow-sm">
                             <ImageIcon className="w-3 h-3" /> ID
                           </a>
                         ) : (

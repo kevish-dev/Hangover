@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "../../components/ui/dialog";
+import { apiClient } from "../../../lib/axios";
 
 type InvoiceItem = { description: string; price: number };
 
@@ -54,10 +55,9 @@ export default function InvoicesPage() {
   const fetchInvoices = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/v1/invoices");
-      const json = await res.json();
-      if (json.status === "success") {
-        setInvoices(json.data);
+      const res = await apiClient.get("/invoices");
+      if (res.data.status === "success") {
+        setInvoices(res.data.data);
       }
     } catch (error) {
       toast.error("Failed to fetch invoices");
@@ -96,23 +96,19 @@ export default function InvoicesPage() {
 
     setIsSubmitting(true);
     try {
-      const res = await fetch("/api/v1/invoices", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerName,
-          customerEmail,
-          customerPhone,
-          title,
-          description,
-          dueDate,
-          items,
-          amount: totalAmount,
-          currency: "INR",
-        }),
+      const res = await apiClient.post("/invoices", {
+        customerName,
+        customerEmail,
+        customerPhone,
+        title,
+        description,
+        dueDate,
+        items,
+        amount: totalAmount,
+        currency: "INR",
       });
-      const json = await res.json();
-      if (json.status === "success") {
+      
+      if (res.data.status === "success") {
         toast.success("Receipt created and emailed successfully!");
         setIsDialogOpen(false);
         fetchInvoices();
@@ -125,10 +121,10 @@ export default function InvoicesPage() {
         setDueDate("");
         setItems([]);
       } else {
-        toast.error(json.message || "Failed to create invoice");
+        toast.error(res.data.message || "Failed to create invoice");
       }
-    } catch (error) {
-      toast.error("An error occurred");
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "An error occurred");
     } finally {
       setIsSubmitting(false);
     }
