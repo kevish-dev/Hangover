@@ -10,6 +10,7 @@ export const findAll = async (skip, take, where = {}, isAdmin = false) => {
       select: {
         id: true,
         title: true,
+        slug: true,
         overview: true,
         location: true,
         bannerImages: true,

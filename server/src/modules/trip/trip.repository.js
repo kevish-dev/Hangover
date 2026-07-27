@@ -1,7 +1,7 @@
 import { prisma } from "../../prisma/client.js";
 
 const TRIP_FULL_INCLUDE = {
-  circuit: { select: { id: true, title: true } },
+  circuit: { select: { id: true, title: true, slug: true } },
   faqs: { orderBy: { order: "asc" } },
   tripTags: true,
   packages: true,
@@ -21,6 +21,7 @@ export const findAll = async (skip, take, where = {}, isAdmin = false) => {
       select: {
         id: true,
         title: true,
+        slug: true,
         overview: true,
         location: true,
         bannerImages: true,
@@ -34,7 +35,7 @@ export const findAll = async (skip, take, where = {}, isAdmin = false) => {
         signatureOrder: true,
         isListed: true,
         circuitId: true,
-        circuit: { select: { id: true, title: true } },
+        circuit: { select: { id: true, title: true, slug: true } },
         createdAt: true,
         destination: true,
         tripTags: true,
@@ -326,6 +327,7 @@ export const getFeaturedTrips = async () => {
     select: {
       id: true,
       title: true,
+      slug: true,
       overview: true,
       location: true,
       duration: true,
@@ -355,6 +357,7 @@ export const getSignatureTrips = async () => {
     select: {
       id: true,
       title: true,
+      slug: true,
       overview: true,
       location: true,
       duration: true,

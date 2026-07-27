@@ -93,6 +93,7 @@ model UserProfile {
 model Circuit {
   id                  String       @id @default(uuid())
   title               String
+  slug                String       @unique
   tripType            TripType
   location            String
   destinationId       String?
@@ -165,6 +166,7 @@ model Trip {
   circuitId           String?
   circuit             Circuit?     @relation(fields: [circuitId], references: [id], onDelete: SetNull)
   title               String
+  slug                String       @unique
   location            String
   bannerImages        String[]
   duration            Int
@@ -318,6 +320,7 @@ model FestivalTag {
 model Festival {
   id                  String         @id @default(uuid())
   title               String
+  slug                String         @unique
   location            String
   bannerImages        String[]
   videoUrl            String?

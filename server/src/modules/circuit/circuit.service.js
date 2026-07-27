@@ -61,11 +61,20 @@ import {
 } from "../../core/services/upload.service.js";
 import { ValidationError } from "../../core/errors/errors.js";
 
+const generateSlug = (title) => title
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/(^-|-$)+/g, "");
+
 export const createCircuit = async (data, adminId) => {
   console.log("CREATE CIRCUIT PAYLOAD:", JSON.stringify(data, null, 2));
   try {
     const parsed = createCircuitSchema.parse(data);
-    return await repo.create({ ...parsed, createdById: adminId });
+    return await repo.create({
+      ...parsed,
+      slug: `${generateSlug(parsed.title)}-${Date.now()}`,
+      createdById: adminId,
+    });
   } catch(e) {
     console.error("ERROR IN CREATE:", e);
     throw e;

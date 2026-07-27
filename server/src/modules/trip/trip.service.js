@@ -27,13 +27,19 @@ export const getTrips = async (page = 1, limit = 10, isAdmin = false) => {
 
 
 const hashShareToken = (token) => createHash("sha256").update(token).digest("hex");
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const generateSlug = (title) => title
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/(^-|-$)+/g, "");
 
 export const getTripById = async (id, isAdmin = false, shareToken = null) => {
+  const idField = UUID_RE.test(id) ? "id" : "slug";
   const where = isAdmin
-    ? { id }
+    ? { [idField]: id }
     : shareToken
       ? {
-          id,
+          [idField]: id,
           OR: [
             { isPublished: true },
             {
@@ -45,7 +51,7 @@ export const getTripById = async (id, isAdmin = false, shareToken = null) => {
             },
           ],
         }
-      : { id, isPublished: true };
+      : { [idField]: id, isPublished: true };
   const trip = await tripRepo.findById(where, isAdmin);
   if (!trip) throw new Error("Trip not found");
   return trip;
@@ -113,6 +119,7 @@ export const createTrip = async (data) => {
   }
 
   if (!createData.title) throw new ValidationError("Trip title is required.");
+  if (!createData.slug) createData.slug = `${generateSlug(createData.title)}-${Date.now()}`;
   if (!createData.stayTransportImages) createData.stayTransportImages = [];
   if (!createData.bannerImages) createData.bannerImages = [];
   delete createData.galleryImages;

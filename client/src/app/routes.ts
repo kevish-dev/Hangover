@@ -50,6 +50,6 @@ export const router = createBrowserRouter([
   },
   {
     path: "*",
-    loader: () => redirect("/trips"),
+    loader: () => redirect("/"),
   },
 ]);
