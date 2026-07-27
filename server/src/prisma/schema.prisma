@@ -658,8 +658,10 @@ model BookingAddOn {
   id            String             @id @default(uuid())
   bookingId     String
   booking       Booking            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  addOnId       String
-  addOn         AddOn              @relation(fields: [addOnId], references: [id], onDelete: Cascade)
+  // Keep the purchase when an admin removes the source add-on later. The
+  // booking is historical data; it must not be erased with catalogue edits.
+  addOnId       String?
+  addOn         AddOn?             @relation(fields: [addOnId], references: [id], onDelete: SetNull)
   quantity      Int                @default(1)
   unitPrice     Decimal            @db.Decimal(10, 2)
   totalPrice    Decimal            @db.Decimal(10, 2)

@@ -64,8 +64,10 @@ export const findById = async (whereObj, isAdmin = false) => {
 };
 
 export const create = async (data) => {
-  const { tags, faqs, packages, slots, itinerary, addOns, ...rest } = data;
+  const { tags, faqs, packages, slots, itinerary, addOns, destinationId, ...rest } = data;
   const payload = { ...rest };
+
+  if (destinationId) payload.destination = { connect: { id: destinationId } };
   
   if (tags && Array.isArray(tags)) {
     payload.tags = {
@@ -156,8 +158,14 @@ export const create = async (data) => {
 };
 
 export const update = async (id, data) => {
-  const { tags, faqs, packages, slots, itinerary, addOns, ...rest } = data;
+  const { tags, faqs, packages, slots, itinerary, addOns, destinationId, ...rest } = data;
   const payload = { ...rest };
+
+  if (destinationId !== undefined) {
+    payload.destination = destinationId
+      ? { connect: { id: destinationId } }
+      : { disconnect: true };
+  }
   
   if (tags && Array.isArray(tags)) {
     // 1. Clear existing tags

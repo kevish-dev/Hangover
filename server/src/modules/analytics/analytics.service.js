@@ -8,7 +8,8 @@ function getTimeframeDates(timeframe) {
   if (timeframe === "1M") {
     startDate.setMonth(now.getMonth() - 1);
   } else if (timeframe === "6M") {
-    startDate.setMonth(now.getMonth() - 6);
+    // Show six calendar months including the current month.
+    startDate = new Date(now.getFullYear(), now.getMonth() - 5, 1);
   } else if (timeframe === "1Y") {
     startDate.setFullYear(now.getFullYear() - 1);
   } else {
@@ -48,28 +49,34 @@ function getBucketKey(date, timeframe) {
 // Initialize buckets
 function initBuckets(startDate, endDate, timeframe) {
   const buckets = [];
-  let current = new Date(startDate);
   
   if (timeframe === "1M") {
-    // 1M -> ~4 weekly buckets. Let's do 4 discrete buckets for Week 1, 2, 3, 4
-    for (let i = 0; i < 4; i++) {
-       const weekStart = new Date(startDate);
-       weekStart.setDate(startDate.getDate() + (i * 7));
+    // Include a final partial week instead of dropping the newest days after
+    // four fixed weeks (a calendar month can be 30 or 31 days).
+    let weekStart = new Date(startDate);
+    let weekNumber = 1;
+    while (weekStart < endDate) {
+       const weekEnd = new Date(weekStart);
+       weekEnd.setDate(weekEnd.getDate() + 7);
+       if (weekEnd > endDate) weekEnd.setTime(endDate.getTime());
        buckets.push({
-         key: `Week ${i + 1}`,
-         label: `Week ${i + 1}`,
+         label: `Week ${weekNumber}`,
          startDate: weekStart,
-         endDate: new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000)
+         endDate: weekEnd
        });
+       weekStart = weekEnd;
+       weekNumber += 1;
     }
   } else if (timeframe === "6M") {
-    for (let i = 0; i < 6; i++) {
-       const mStart = new Date(startDate);
-       mStart.setMonth(startDate.getMonth() + i);
+    let monthStart = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    while (monthStart <= endDate) {
+       const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
        buckets.push({
-         key: `${mStart.getFullYear()}-${mStart.getMonth()}`,
-         label: mStart.toLocaleDateString('en-US', { month: 'short' }),
+         label: monthStart.toLocaleDateString('en-US', { month: 'short' }),
+         startDate: monthStart,
+         endDate: monthEnd,
        });
+       monthStart = monthEnd;
     }
   } else if (timeframe === "1Y") {
     // Quarter buckets
@@ -146,14 +153,13 @@ export const getDashboardAnalytics = async (timeframe) => {
 
   const buckets = initBuckets(startDate, endDate, timeframe);
   
-  // Helper to find bucket index
+  // Assign by real bucket boundaries. This prevents the current month/week
+  // from being omitted when its label does not have a pre-created key.
   const findBucketIndex = (date) => {
-    if (timeframe === "1M" || timeframe === "1Y") {
-       return buckets.findIndex(b => date >= b.startDate && date < b.endDate);
-    } else {
-       const key = getBucketKey(date, timeframe);
-       return buckets.findIndex(b => b.key === key);
-    }
+    return buckets.findIndex((bucket, index) =>
+      date >= bucket.startDate &&
+      (date < bucket.endDate || (index === buckets.length - 1 && date <= bucket.endDate))
+    );
   };
 
   // Initialize data structures for buckets

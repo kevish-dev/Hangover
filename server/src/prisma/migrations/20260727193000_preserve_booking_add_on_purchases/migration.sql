@@ -1,0 +1,8 @@
+ALTER TABLE "BookingAddOn" DROP CONSTRAINT "BookingAddOn_addOnId_fkey";
+
+ALTER TABLE "BookingAddOn" ALTER COLUMN "addOnId" DROP NOT NULL;
+
+ALTER TABLE "BookingAddOn"
+  ADD CONSTRAINT "BookingAddOn_addOnId_fkey"
+  FOREIGN KEY ("addOnId") REFERENCES "AddOn"("id")
+  ON DELETE SET NULL ON UPDATE CASCADE;

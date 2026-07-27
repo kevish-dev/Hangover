@@ -311,17 +311,57 @@ export const update = async (id, data) => {
   }
 
   if (addOns && Array.isArray(addOns)) {
+    const existingAddOns = await prisma.addOn.findMany({
+      where: { tripId: id },
+      select: { id: true },
+    });
+    const existingAddOnIds = new Set(existingAddOns.map((addOn) => addOn.id));
+    const incomingAddOnIds = addOns.map((addOn) => addOn.id).filter(Boolean);
+
+    if (new Set(incomingAddOnIds).size !== incomingAddOnIds.length) {
+      throw new Error("Duplicate add-on IDs are not allowed");
+    }
+
+    if (incomingAddOnIds.some((addOnId) => !existingAddOnIds.has(addOnId))) {
+      throw new Error("One or more add-ons do not belong to this trip");
+    }
+
+    const addOnsToDelete = existingAddOns.filter((addOn) => !incomingAddOnIds.includes(addOn.id));
+    if (addOnsToDelete.length > 0) {
+      const purchasedAddOn = await prisma.bookingAddOn.findFirst({
+        where: { addOnId: { in: addOnsToDelete.map((addOn) => addOn.id) } },
+        select: { id: true },
+      });
+
+      if (purchasedAddOn) {
+        throw new Error("Cannot remove add-ons that are used in existing bookings");
+      }
+    }
+
     payload.addOns = {
-      deleteMany: {},
-      create: addOns.map((addOn) => ({
-        title: addOn.title,
-        description: addOn.description || null,
-        imageUrl: addOn.imageUrl || null,
-        price: Number(addOn.price),
-        maxQuantityPerBooking: addOn.maxQuantityPerBooking || null,
-        maxQuantityPerSlot: addOn.maxQuantityPerSlot || null,
-        purchaseCutoffOffsetDays: addOn.purchaseCutoffOffsetDays ?? null,
-        isActive: addOn.isActive ?? true,
+      deleteMany: { id: { in: addOnsToDelete.map((addOn) => addOn.id) } },
+      upsert: addOns.map((addOn) => ({
+        where: { id: addOn.id || "00000000-0000-0000-0000-000000000000" },
+        update: {
+          title: addOn.title,
+          description: addOn.description || null,
+          imageUrl: addOn.imageUrl || null,
+          price: Number(addOn.price),
+          maxQuantityPerBooking: addOn.maxQuantityPerBooking || null,
+          maxQuantityPerSlot: addOn.maxQuantityPerSlot || null,
+          purchaseCutoffOffsetDays: addOn.purchaseCutoffOffsetDays ?? null,
+          isActive: addOn.isActive ?? true,
+        },
+        create: {
+          title: addOn.title,
+          description: addOn.description || null,
+          imageUrl: addOn.imageUrl || null,
+          price: Number(addOn.price),
+          maxQuantityPerBooking: addOn.maxQuantityPerBooking || null,
+          maxQuantityPerSlot: addOn.maxQuantityPerSlot || null,
+          purchaseCutoffOffsetDays: addOn.purchaseCutoffOffsetDays ?? null,
+          isActive: addOn.isActive ?? true,
+        },
       })),
     };
   }

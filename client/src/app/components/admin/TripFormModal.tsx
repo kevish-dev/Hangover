@@ -29,7 +29,7 @@ import {
   X,
 } from "lucide-react";
 import { apiClient } from "../../../lib/axios";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ItineraryStep } from "./ItineraryStep";
@@ -229,6 +229,12 @@ export function TripFormModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [canSubmit, setCanSubmit] = useState(false);
   const queryClient = useQueryClient();
+  const destinationsQuery = useQuery({
+    queryKey: ["admin", "destinations", "trip-form"],
+    queryFn: async () => (await apiClient.get("/destinations", { params: { adminView: true, limit: 200 } })).data.data as Array<{ id: string; name: string; state?: string | null }>,
+    enabled: open,
+  });
+  const destinations = destinationsQuery.data || [];
 
   const isEdit = !!trip;
 
@@ -809,8 +815,8 @@ export function TripFormModal({
       toast.error("Please fill all required fields correctly.", { position: "bottom-right" });
     }
   };
-  const onSubmit = async (data: TripFormValues) => {
-    if (step !== STEPS.length - 1) return;
+  const onSubmit = async (data: TripFormValues, saveFromCurrentStep = false) => {
+    if (!saveFromCurrentStep && step !== STEPS.length - 1) return;
 
     setIsSubmitting(true);
     let tripId = trip?.id;
@@ -819,6 +825,9 @@ export function TripFormModal({
     try {
       const payload = {
         ...data,
+        // Send null explicitly when the unlinked option is selected so edits
+        // disconnect the existing relation instead of leaving it unchanged.
+        destinationId: data.destinationId || null,
         slots: data.slots.map(s => ({
             ...s,
             startDate: s.startDate ? new Date(s.startDate).toISOString() : null,
@@ -965,6 +974,13 @@ export function TripFormModal({
     }
   };
 
+  const saveCurrentChanges = () => {
+    void form.handleSubmit(
+      (data) => onSubmit(data, true),
+      onError,
+    )();
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
     if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "TEXTAREA") {
       e.preventDefault();
@@ -1071,6 +1087,23 @@ export function TripFormModal({
                       {form.formState.errors.tripType.message}
                     </p>
                   )}
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Destination</Label>
+                  <select
+                    value={form.watch("destinationId") || ""}
+                    onChange={(event) => form.setValue("destinationId", event.target.value || undefined, { shouldDirty: true })}
+                    disabled={destinationsQuery.isLoading}
+                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <option value="">No destination — leave unlinked</option>
+                    {destinations.map((destination) => (
+                      <option key={destination.id} value={destination.id}>
+                        {destination.name}{destination.state ? `, ${destination.state}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500">Choose another destination to relink this trip, or leave it unlinked.</p>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Best Time to Visit <span className="text-red-500">*</span></Label>
@@ -2133,14 +2166,29 @@ export function TripFormModal({
           </Button>
 
           {step < STEPS.length - 1 ? (
-            <Button
-              key="continue-btn"
-              type="button"
-              onClick={nextStep}
-              className="bg-[#b59410] hover:bg-[#8a710c] text-white flex items-center gap-2"
-            >
-              Continue <ArrowRight className="w-4 h-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              {isEdit && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={saveCurrentChanges}
+                  disabled={isSubmitting}
+                  className="flex items-center gap-2"
+                >
+                  {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
+                  Save changes
+                </Button>
+              )}
+              <Button
+                key="continue-btn"
+                type="button"
+                onClick={nextStep}
+                disabled={isSubmitting}
+                className="bg-[#b59410] hover:bg-[#8a710c] text-white flex items-center gap-2"
+              >
+                Continue <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
           ) : (
             <Button
               key="submit-btn"

@@ -1421,8 +1421,8 @@ export function BookingDetailModal({
   const tabs: { key: Tab; label: string; icon: any }[] = [
     { key: "details", label: "Details", icon: User },
     { key: "operations", label: "Operations", icon: Activity },
-    { key: "addons", label: "Add-ons", icon: PackagePlus },
     { key: "balance-sheet", label: "Balance Sheet", icon: BookOpen },
+    { key: "addons", label: "Add-ons", icon: PackagePlus },
   ];
 
   return (

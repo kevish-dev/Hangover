@@ -79,44 +79,17 @@ const normalizeAddOnSelections = (addOns) => {
   return Array.from(quantitiesById, ([addOnId, quantity]) => ({ addOnId, quantity }));
 };
 
-const generateCustomBookingId = async (item, slot, user, prismaClient) => {
-  const currentYear = new Date().getFullYear();
-  const yearStr = currentYear.toString().slice(2);
-  const yearStart = new Date(currentYear, 0, 1);
-  const yearEnd = new Date(currentYear + 1, 0, 1);
-  
-  const bookingsThisYear = await prismaClient.booking.count({
-    where: {
-      createdAt: {
-        gte: yearStart,
-        lt: yearEnd,
-      }
-    }
-  });
-  
-  const countStr = (bookingsThisYear + 1).toString().padStart(2, '0');
-  
-  let location = item.location || "Unknown";
-  location = location.split(' ')[0].replace(/[^a-zA-Z0-9]/g, '');
-  
-  const duration = item.duration || 1;
-  
-  const startDate = new Date(slot.startDate);
-  const startDay = startDate.getDate().toString().padStart(2, '0');
-  const startMonth = (startDate.getMonth() + 1).toString().padStart(2, '0');
-  
-  const endDate = slot.endDate ? new Date(slot.endDate) : new Date(startDate.getTime() + (duration - 1) * 24 * 60 * 60 * 1000);
-  const endDay = endDate.getDate().toString().padStart(2, '0');
-  const endMonth = (endDate.getMonth() + 1).toString().padStart(2, '0');
-  
-  const fStart = `${startDay}${startMonth}`;
-  const fEnd = `${endDay}${endMonth}`;
-  
-  const fullName = user.profile?.fullName || user.fullName || "User";
-  const firstName = fullName.split(' ')[0].replace(/[^a-zA-Z0-9]/g, '');
-  
-  // Format: H2601-Tawang-6-1605-2005-Satish
-  return `H${yearStr}${countStr}-${location}-${duration}-${fStart}-${fEnd}-${firstName}`;
+const generateBookingReference = async (prismaClient) => {
+  // nextval is atomic, unlike counting booking rows. The minimum width is
+  // four digits; larger values remain intact (for example H10000).
+  const rows = await prismaClient.$queryRaw`
+    SELECT nextval('"BookingReferenceSequence"') AS "sequence"
+  `;
+  const sequence = Number(rows[0]?.sequence);
+  if (!Number.isSafeInteger(sequence) || sequence < 1) {
+    throw new Error("Unable to generate a booking reference.");
+  }
+  return `H${String(sequence).padStart(4, "0")}`;
 };
 
 export const createBooking = async (userId, data) => {
@@ -350,7 +323,7 @@ export const createBooking = async (userId, data) => {
   }
 
   // Generate booking reference and complete payload for a new booking
-  const customBookingId = await generateCustomBookingId(item, slot, user, prisma);
+  const customBookingId = await generateBookingReference(prisma);
   bookingData.id = customBookingId;
   bookingData.bookingReference = customBookingId;
   bookingData.userId = userId;
@@ -542,7 +515,7 @@ export const adminCreateBooking = async (adminId, data) => {
     status = "CONFIRMED";
   }
 
-  const customBookingId = await generateCustomBookingId(item, slot, user, prisma);
+  const customBookingId = await generateBookingReference(prisma);
 
   const bookingData = {
     id: customBookingId,
