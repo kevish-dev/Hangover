@@ -167,6 +167,7 @@ export function TripFormModal({
   const [step, setStep] = useState(0);
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [localBannerImages, setLocalBannerImages] = useState<string[]>([]);
 
   // Highlight State
   const [highlightItems, setHighlightItems] = useState<
@@ -314,6 +315,12 @@ export function TripFormModal({
           })) : []
         );
 
+        let parsedBanners = trip.bannerImages || [];
+        if (typeof parsedBanners === "string") {
+          try { parsedBanners = JSON.parse(parsedBanners); } catch(e) { parsedBanners = []; }
+        }
+        setLocalBannerImages(Array.isArray(parsedBanners) ? parsedBanners : []);
+
         // Initialize Stay items
         let parsedStay = trip.stayTransportImages || [];
         if (typeof parsedStay === "string") {
@@ -378,6 +385,13 @@ export function TripFormModal({
           url: item.imageUrl,
           preview: item.imageUrl,
         })));
+
+        let parsedBanners = sourceCircuit.bannerImages || [];
+        if (typeof parsedBanners === "string") {
+          try { parsedBanners = JSON.parse(parsedBanners); } catch(e) { parsedBanners = []; }
+        }
+        setLocalBannerImages(Array.isArray(parsedBanners) ? parsedBanners : []);
+        
         form.clearErrors();
       } else {
         form.reset({
@@ -409,6 +423,7 @@ export function TripFormModal({
         form.clearErrors();
         setStayItems([]);
         setHighlightItems([]);
+        setLocalBannerImages([]);
       }
       setStep(0);
       setImages([]);
@@ -583,7 +598,10 @@ export function TripFormModal({
   };
 
   const deleteExistingImage = async (url: string) => {
-    if (!trip?.id) return;
+    if (!trip?.id) {
+      setLocalBannerImages(prev => prev.filter(img => img !== url));
+      return;
+    }
     if (
       !window.confirm(
         "Are you sure you want to permanently delete this banner image?",
@@ -599,6 +617,7 @@ export function TripFormModal({
       trip.bannerImages = trip.bannerImages.filter(
         (img: string) => img !== url,
       );
+      setLocalBannerImages(prev => prev.filter(img => img !== url));
       queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
     } catch (error: unknown) {
       showErrorToast(error, "Failed to delete image");
@@ -664,7 +683,19 @@ export function TripFormModal({
     if (step === 5) fieldsToValidate = ["itinerary"]; // Operations validates the tasks inside itinerary
     if (step === 6) return true; // Stay & Transport has local state, basic validation can be skipped or added if needed
 
-    const isValid = await form.trigger(fieldsToValidate);
+    let fieldsToTrigger: any = fieldsToValidate;
+    if (step === 4) {
+      const itineraryCount = form.getValues("itinerary")?.length || 0;
+      fieldsToTrigger = [];
+      for (let i = 0; i < itineraryCount; i++) {
+        fieldsToTrigger.push(`itinerary.${i}.day`);
+        fieldsToTrigger.push(`itinerary.${i}.title`);
+        fieldsToTrigger.push(`itinerary.${i}.description`);
+        fieldsToTrigger.push(`itinerary.${i}.todos`);
+      }
+    }
+
+    const isValid = await form.trigger(fieldsToTrigger);
 
     if (step === 2) {
       const invalid = highlightItems.some(
@@ -785,8 +816,8 @@ export function TripFormModal({
         faqs: data.faqs?.filter(
           (f) => f.question.trim() !== "" && f.answer.trim() !== "",
         ),
-        ...(!isEdit && sourceCircuit?.bannerImages && sourceCircuit.bannerImages.length > 0 
-            ? { bannerImages: sourceCircuit.bannerImages } 
+        ...(!isEdit && localBannerImages.length > 0 
+            ? { bannerImages: localBannerImages } 
             : {}),
       };
 
@@ -1811,13 +1842,13 @@ export function TripFormModal({
             {/* STEP 7: MEDIA (BANNER IMAGES) */}
             <div className={step === 7 ? "block" : "hidden"}>
               <div className="space-y-4">
-                {((isEdit && trip?.bannerImages?.length > 0) || (!isEdit && sourceCircuit?.bannerImages?.length > 0)) && (
+                {localBannerImages.length > 0 && (
                   <div className="mb-6">
                     <h4 className="font-medium mb-3 text-sm text-gray-500">
-                      {isEdit ? "Current Banner Images" : "Inherited Banner Images (from template)"}
+                      Current Banner Images
                     </h4>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {(isEdit ? trip.bannerImages : sourceCircuit.bannerImages).map((url: string, i: number) => (
+                      {localBannerImages.map((url: string, i: number) => (
                         <div
                           key={url}
                           className="relative group rounded-lg overflow-hidden border border-gray-200 aspect-video bg-gray-100"

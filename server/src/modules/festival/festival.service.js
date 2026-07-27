@@ -2,7 +2,7 @@ import { prisma } from "../../prisma/client.js";
 import * as festivalRepo from "./festival.repository.js";
 import { uploadToCloudinary, uploadPublicVideo, deleteFromCloudinary, deleteFestivalAssets, createDirectImageUploadSignature, isExpectedPublicImageUrl } from "../../core/services/upload.service.js";
 import { ValidationError } from "../../core/errors/errors.js";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash, randomBytes } from "crypto";
 
 const generateSlug = (title) => {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
@@ -267,6 +267,26 @@ export const deleteVideo = async (festivalId) => {
 // ============ V2 apis for User ====================
 
 export const getFeaturedFestivals = async () => {
-  const data = await festivalRepo.getFeaturedFestivals();
-  return { data };
-}
+  return festivalRepo.getFeaturedFestivals();
+};
+
+const hashShareToken = (token) => createHash("sha256").update(token).digest("hex");
+
+export const createShareLink = async (id, expiresAt) => {
+  await getFestivalById(id, true);
+  const token = randomBytes(32).toString("base64url");
+  const parsedExpiry = expiresAt ? new Date(expiresAt) : null;
+  if (parsedExpiry && Number.isNaN(parsedExpiry.getTime())) {
+    throw new ValidationError("Invalid share link expiry.");
+  }
+  const festival = await festivalRepo.update(id, {
+    shareTokenHash: hashShareToken(token),
+    shareTokenExpiresAt: parsedExpiry,
+  });
+  return { token, expiresAt: festival.shareTokenExpiresAt };
+};
+
+export const revokeShareLink = async (id) => {
+  await getFestivalById(id, true);
+  await festivalRepo.update(id, { shareTokenHash: null, shareTokenExpiresAt: null });
+};

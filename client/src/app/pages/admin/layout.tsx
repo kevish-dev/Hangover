@@ -30,6 +30,7 @@ import {
   Receipt,
   Image,
   BarChart3,
+  Tent,
 } from "lucide-react";
 
 const overviewItems = [
@@ -40,6 +41,7 @@ const overviewItems = [
 const crmItems = [
   { title: "Circuits", url: "/dashboard/circuits", icon: Map },
   { title: "Trips & departures", url: "/dashboard/trips", icon: CalendarRange },
+  { title: "Festivals", url: "/dashboard/festivals", icon: Tent },
   { title: "Bookings", url: "/dashboard/bookings", icon: CalendarCheck },
   { title: "Operations", url: "/dashboard/operations", icon: ClipboardCheck },
   { title: "Balance sheet", url: "/dashboard/ledger", icon: BookOpen },

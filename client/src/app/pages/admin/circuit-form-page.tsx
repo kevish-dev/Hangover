@@ -474,7 +474,19 @@ export default function CircuitFormPage() {
   );
 
   const next = async () => {
-    if (await form.trigger(stepFields[step])) {
+    let fieldsToTrigger: any = stepFields[step];
+    if (step === 4) {
+      const daysCount = form.getValues("days")?.length || 0;
+      fieldsToTrigger = [];
+      for (let i = 0; i < daysCount; i++) {
+        fieldsToTrigger.push(`days.${i}.dayNumber`);
+        fieldsToTrigger.push(`days.${i}.title`);
+        fieldsToTrigger.push(`days.${i}.description`);
+        fieldsToTrigger.push(`days.${i}.todos`);
+      }
+    }
+
+    if (await form.trigger(fieldsToTrigger)) {
       setStep((value) => {
         const next = Math.min(STEPS.length - 1, value + 1);
         if (next === STEPS.length - 1) {
