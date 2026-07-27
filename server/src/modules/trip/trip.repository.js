@@ -1,12 +1,22 @@
 import { prisma } from "../../prisma/client.js";
 
 const TRIP_FULL_INCLUDE = {
-  circuit: { select: { id: true, title: true, slug: true } },
+  circuit: {
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      addOns: { where: { isActive: true }, orderBy: { createdAt: "asc" } },
+    },
+  },
   faqs: { orderBy: { order: "asc" } },
   tripTags: true,
   packages: true,
   addOns: { orderBy: { createdAt: "asc" } },
-  itinerary: { orderBy: { dayNumber: "asc" } },
+  itinerary: {
+    orderBy: { dayNumber: "asc" },
+    include: { tasks: { orderBy: { createdAt: "asc" } } },
+  },
   slots: { orderBy: [{ priority: "desc" }, { startDate: "asc" }] },
   destination: true,
 };
@@ -141,6 +151,7 @@ export const create = async (data) => {
         imageUrl: addOn.imageUrl || null,
         price: Number(addOn.price),
         maxQuantityPerBooking: addOn.maxQuantityPerBooking || null,
+        maxQuantityPerSlot: addOn.maxQuantityPerSlot || null,
         purchaseCutoffOffsetDays: addOn.purchaseCutoffOffsetDays ?? null,
         isActive: addOn.isActive ?? true,
       })),
@@ -295,6 +306,22 @@ export const update = async (id, data) => {
             dueOffsetDays: task.dueOffsetDays ?? null,
           })) : []
         },
+      })),
+    };
+  }
+
+  if (addOns && Array.isArray(addOns)) {
+    payload.addOns = {
+      deleteMany: {},
+      create: addOns.map((addOn) => ({
+        title: addOn.title,
+        description: addOn.description || null,
+        imageUrl: addOn.imageUrl || null,
+        price: Number(addOn.price),
+        maxQuantityPerBooking: addOn.maxQuantityPerBooking || null,
+        maxQuantityPerSlot: addOn.maxQuantityPerSlot || null,
+        purchaseCutoffOffsetDays: addOn.purchaseCutoffOffsetDays ?? null,
+        isActive: addOn.isActive ?? true,
       })),
     };
   }

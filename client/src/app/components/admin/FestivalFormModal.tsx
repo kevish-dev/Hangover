@@ -24,17 +24,39 @@ import {
   ArrowUp,
   ArrowDown,
   Trash,
-  ClipboardList
+  ClipboardList,
+  ImagePlus,
+  X
 } from "lucide-react";
 import { apiClient } from "../../../lib/axios";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ItineraryStep } from "./ItineraryStep";
-import { uploadBannerImagesDirect } from "../../../lib/directImageUpload";
+import { uploadBannerImagesDirect, uploadGenericImageDirect } from "../../../lib/directImageUpload";
+import {
+  toAddOnFields,
+  toArray,
+  toFaqFields,
+  toItineraryFields,
+  toPackageFields,
+  toTagFields,
+  toValueFields,
+} from "./formDataMappers";
 
 // --- VALIDATION SCHEMA ---
+const optionalPositiveInteger = z.preprocess(
+  (a) => (a === "" ? undefined : a),
+  z.coerce.number().int().positive().optional()
+);
+
+const optionalNonnegativeInteger = z.preprocess(
+  (a) => (a === "" ? undefined : a),
+  z.coerce.number().int().nonnegative().optional()
+);
 const festivalSchema = z.object({
+  circuitId: z.string().uuid().optional(),
+  destinationId: z.string().uuid().optional(),
   title: z.string().min(3, "Title must be at least 3 characters"),
   location: z.string().min(2, "Location is required"),
   duration: z.coerce.number().min(1, "Duration must be at least 1 day"),
@@ -101,6 +123,19 @@ const festivalSchema = z.object({
       ).optional().default([]),
     })
   ).optional(),
+  addOns: z.array(
+    z.object({
+      id: z.string().uuid().optional(),
+      title: z.string().min(1, "Add-on title is required"),
+      description: z.string().optional(),
+      imageUrl: z.string().url("Enter a valid URL").optional().or(z.literal("")),
+      price: z.coerce.number().positive(),
+      maxQuantityPerBooking: optionalPositiveInteger,
+      maxQuantityPerSlot: optionalPositiveInteger,
+      purchaseCutoffOffsetDays: optionalNonnegativeInteger,
+      isActive: z.boolean().default(true),
+    })
+  ).optional(),
   }
 );
 
@@ -147,6 +182,7 @@ export function FestivalFormModal({
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [localBannerImages, setLocalBannerImages] = useState<string[]>([]);
+  const [uploadingImageKey, setUploadingImageKey] = useState<string | null>(null);
 
   // Highlight State
   const [highlightItems, setHighlightItems] = useState<
@@ -191,6 +227,8 @@ export function FestivalFormModal({
   const form = useForm<FestivalFormValues>({
     resolver: zodResolver(festivalSchema),
     defaultValues: {
+      circuitId: undefined,
+      destinationId: undefined,
       title: "",
       location: "",
       duration: 1,
@@ -201,6 +239,8 @@ export function FestivalFormModal({
       exclusions: [],
       tags: [],
       packages: [{ title: "Standard", price: 0, tokenAmount: 0 }],
+      addOns: [],
+      itinerary: [],
       faqs: [],
       isPublished: false,
       isFeatured: false,
@@ -213,6 +253,8 @@ export function FestivalFormModal({
     if (open) {
       if (festival) {
         form.reset({
+          circuitId: festival.circuitId || undefined,
+          destinationId: festival.destinationId || undefined,
           title: festival.title || "",
           location: festival.location || "",
           duration: festival.duration || 1,
@@ -226,39 +268,15 @@ export function FestivalFormModal({
             capacity: s.capacity
           })) : [{ startDate: "", endDate: "", capacity: 12, title: "", priority: 0 }],
           overview: festival.overview || "",
-          inclusions: Array.isArray(festival.inclusions) && festival.inclusions.length > 0
-            ? festival.inclusions.map((i: any) => ({ value: typeof i === 'string' ? i : (i.value || "") }))
-            : typeof festival.inclusions === 'string' && festival.inclusions.trim().startsWith('[')
-              ? JSON.parse(festival.inclusions).map((i: any) => ({ value: typeof i === 'string' ? i : (i.value || "") }))
-              : [{ value: "" }],
-          exclusions: Array.isArray(festival.exclusions) && festival.exclusions.length > 0
-            ? festival.exclusions.map((e: any) => ({ value: typeof e === 'string' ? e : (e.value || "") }))
-            : typeof festival.exclusions === 'string' && festival.exclusions.trim().startsWith('[')
-              ? JSON.parse(festival.exclusions).map((e: any) => ({ value: typeof e === 'string' ? e : (e.value || "") }))
-              : [{ value: "" }],
-          tags: festival.tags?.length
-            ? festival.tags.map((t: any) => ({ value: t.tag }))
-            : [{ value: "" }],
-          packages: festival.packages?.length
-            ? festival.packages.map((p: any) => ({
-                id: p.id,
-                title: p.title,
-                price: Number(p.price),
-                tokenAmount: Number(p.tokenAmount),
-              }))
+          inclusions: toValueFields(festival.inclusions),
+          exclusions: toValueFields(festival.exclusions),
+          tags: toTagFields(festival.tags),
+          packages: toPackageFields(festival.packages).length
+            ? toPackageFields(festival.packages)
             : [{ title: "Standard", price: 0, tokenAmount: 0 }],
-          itinerary: Array.isArray(festival.itinerary) ? festival.itinerary.map((day: any) => ({
-            day: day.day || `Day ${day.dayNumber}`,
-            title: day.title || "",
-            description: day.description || "",
-            todos: Array.isArray(day.todos) ? day.todos : [],
-          })) : [],
-          faqs: festival.faqs?.length
-            ? festival.faqs.map((f: any) => ({
-                question: f.question,
-                answer: f.answer,
-              }))
-            : [],
+          addOns: toAddOnFields(festival.addOns),
+          itinerary: toItineraryFields(festival.itinerary),
+          faqs: toFaqFields(festival.faqs),
           isPublished: festival.isPublished || false,
           isFeatured: festival.isFeatured || false,
         });
@@ -270,7 +288,9 @@ export function FestivalFormModal({
         replaceExclusions(form.getValues("exclusions"));
         replaceTags(form.getValues("tags"));
         replacePackages(form.getValues("packages"));
+        replaceAddOns(form.getValues("addOns"));
         replaceFaqs(form.getValues("faqs"));
+        replaceItinerary(form.getValues("itinerary"));
         form.clearErrors();
 
         // Initialize Highlight items
@@ -310,53 +330,21 @@ export function FestivalFormModal({
         );
       } else if (sourceCircuit) {
         form.reset({
+          circuitId: sourceCircuit.id,
+          destinationId: sourceCircuit.destinationId || undefined,
           title: sourceCircuit.title || "",
           location: sourceCircuit.location || "",
           duration: sourceCircuit.duration || 1,
           bestTimeToVisit: sourceCircuit.bestTimeToVisit || "",
           slots: [{ startDate: "", endDate: "", capacity: 12 }],
           overview: sourceCircuit.overview || "",
-          inclusions: Array.isArray(sourceCircuit.inclusions) && sourceCircuit.inclusions.length > 0
-            ? sourceCircuit.inclusions.map((i: any) => ({ value: typeof i === 'string' ? i : (i.value || "") }))
-            : typeof sourceCircuit.inclusions === 'string' && sourceCircuit.inclusions.trim().startsWith('[')
-              ? JSON.parse(sourceCircuit.inclusions).map((i: any) => ({ value: typeof i === 'string' ? i : (i.value || "") }))
-              : [{ value: "" }],
-          exclusions: Array.isArray(sourceCircuit.exclusions) && sourceCircuit.exclusions.length > 0
-            ? sourceCircuit.exclusions.map((e: any) => ({ value: typeof e === 'string' ? e : (e.value || "") }))
-            : typeof sourceCircuit.exclusions === 'string' && sourceCircuit.exclusions.trim().startsWith('[')
-              ? JSON.parse(sourceCircuit.exclusions).map((e: any) => ({ value: typeof e === 'string' ? e : (e.value || "") }))
-              : [{ value: "" }],
-          tags: sourceCircuit.tags?.length
-            ? sourceCircuit.tags.map((t: any) => ({ value: t.tag }))
-            : [{ value: "" }],
-          packages: sourceCircuit.packages?.length
-            ? sourceCircuit.packages.map((p: any) => ({
-                id: p.id,
-                title: p.title,
-                price: Number(p.price),
-                tokenAmount: Number(p.tokenAmount),
-              }))
-            : [{ title: "Standard", price: 0, tokenAmount: 0 }],
-          itinerary: Array.isArray(sourceCircuit.days) ? sourceCircuit.days.map((day: any) => ({
-            day: `Day ${day.dayNumber}`,
-            title: day.title,
-            description: day.description || "",
-            todos: Array.isArray(day.todos) ? day.todos : [],
-            tasks: (day.tasks || []).map((task: any) => ({
-              category: task.category,
-              title: task.title,
-              description: task.description || "",
-              unitPrice: task.unitPrice || undefined,
-              quantityNeeded: task.quantityNeeded || undefined,
-              dueOffsetDays: task.dueOffsetDays || undefined,
-            })),
-          })) : [],
-          faqs: sourceCircuit.faqs?.length
-            ? sourceCircuit.faqs.map((f: any) => ({
-                question: f.question,
-                answer: f.answer,
-              }))
-            : [],
+          inclusions: toValueFields(sourceCircuit.inclusions),
+          exclusions: toValueFields(sourceCircuit.exclusions),
+          tags: toTagFields(sourceCircuit.tags),
+          packages: toPackageFields(sourceCircuit.packages),
+          addOns: toAddOnFields(sourceCircuit.addOns),
+          itinerary: toItineraryFields(sourceCircuit.days),
+          faqs: toFaqFields(sourceCircuit.faqs),
           isPublished: false,
           isFeatured: false,
         });
@@ -365,7 +353,9 @@ export function FestivalFormModal({
         replaceExclusions(form.getValues("exclusions"));
         replaceTags(form.getValues("tags"));
         replacePackages(form.getValues("packages"));
+        replaceAddOns(form.getValues("addOns"));
         replaceFaqs(form.getValues("faqs"));
+        replaceItinerary(form.getValues("itinerary"));
         form.clearErrors();
 
         let parsedHighlights = sourceCircuit.highlights || [];
@@ -373,13 +363,13 @@ export function FestivalFormModal({
           try { parsedHighlights = JSON.parse(parsedHighlights); } catch(e) { parsedHighlights = []; }
         }
         setHighlightItems(
-          Array.isArray(parsedHighlights) ? parsedHighlights.map((item: any) => ({
+          toArray(parsedHighlights).map((item: any) => ({
             id: Math.random().toString(),
             text: item.text || "",
             type: "EXISTING",
             url: item.imageUrl,
             preview: item.imageUrl,
-          })) : []
+          }))
         );
 
         let parsedBanners = sourceCircuit.bannerImages || [];
@@ -393,16 +383,18 @@ export function FestivalFormModal({
           try { parsedStay = JSON.parse(parsedStay); } catch(e) { parsedStay = []; }
         }
         setStayItems(
-          Array.isArray(parsedStay) ? parsedStay.map((item: any) => ({
+          toArray(parsedStay).map((item: any) => ({
             id: Math.random().toString(),
             text: item.text || "",
             type: "EXISTING",
             url: item.imageUrl,
             preview: item.imageUrl,
-          })) : []
+          }))
         );
       } else {
         form.reset({
+          circuitId: undefined,
+          destinationId: undefined,
           title: "",
           location: "",
           duration: 1,
@@ -413,6 +405,7 @@ export function FestivalFormModal({
           exclusions: [],
           packages: [{ title: "Standard", price: 0, tokenAmount: 0 }],
           tags: [],
+          addOns: [],
           faqs: [],
           itinerary: [],
           isPublished: false,
@@ -423,7 +416,9 @@ export function FestivalFormModal({
         replaceExclusions(form.getValues("exclusions"));
         replaceTags([]);
         replacePackages([{ title: "Standard", price: 0, tokenAmount: 0 }]);
+        replaceAddOns([]);
         replaceFaqs([]);
+        replaceItinerary([]);
         form.clearErrors();
         setStayItems([]);
         setHighlightItems([]);
@@ -475,6 +470,16 @@ export function FestivalFormModal({
   });
 
   const {
+    fields: addOnsFields,
+    append: appendAddOn,
+    remove: removeAddOn,
+    replace: replaceAddOns,
+  } = useFieldArray({
+    name: "addOns",
+    control: form.control,
+  });
+
+  const {
     fields: slotFields,
     append: appendSlot,
     remove: removeSlot,
@@ -495,7 +500,7 @@ export function FestivalFormModal({
     name: "faqs",
   });
 
-  const { fields: itineraryFields } = useFieldArray({
+  const { fields: itineraryFields, replace: replaceItinerary } = useFieldArray({
     control: form.control,
     name: "itinerary",
   });
@@ -702,6 +707,7 @@ export function FestivalFormModal({
         "duration",
         "bestTimeToVisit",
         "packages",
+        "addOns",
       ];
     else if (step === 1) {
       fieldsToValidate = ["slots"];
@@ -756,7 +762,7 @@ export function FestivalFormModal({
   const nextStep = async () => {
     let fieldsToValidate: (keyof FestivalFormValues)[] = [];
     if (step === 0)
-      fieldsToValidate = ["title", "location", "duration", "bestTimeToVisit", "packages"];
+      fieldsToValidate = ["title", "location", "duration", "bestTimeToVisit", "packages", "addOns"];
     else if (step === 1) fieldsToValidate = ["slots"];
     else if (step === 2) fieldsToValidate = ["overview", "inclusions", "exclusions"];
     else if (step === 4) fieldsToValidate = ["itinerary"];
@@ -836,6 +842,11 @@ export function FestivalFormModal({
           ?.map((t) => t.value)
           .filter((t) => t.trim() !== ""),
         packages: data.packages,
+        addOns: data.addOns?.map((a) => ({
+          ...a,
+          description: a.description || undefined,
+          imageUrl: a.imageUrl || undefined,
+        })),
         itinerary: data.itinerary,
         faqs: data.faqs?.filter(
           (f) => f.question.trim() !== "" && f.answer.trim() !== "",
@@ -1116,6 +1127,154 @@ export function FestivalFormModal({
                     onClick={() => appendPackage({ title: "", price: 0, tokenAmount: 0 })}
                   >
                     <Plus className="w-4 h-4 mr-2" /> Add Package
+                  </Button>
+                </div>
+
+                <div className="md:col-span-2 space-y-4">
+                  <div className="mb-2">
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Optional add-ons</Label>
+                    <p className="text-xs text-gray-500">Travelers can add these while booking, before the cutoff.</p>
+                  </div>
+                  {addOnsFields.map((field, index) => {
+                    const currentUrl = form.watch(`addOns.${index}.imageUrl`);
+                    return (
+                      <div key={field.id} className="flex flex-col gap-4 p-4 border rounded-lg bg-gray-50 md:flex-row">
+                        <div className="w-full md:w-32 shrink-0">
+                          <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
+                            Image
+                          </Label>
+                          {currentUrl ? (
+                            <div className="relative group w-full aspect-square mt-1">
+                              <img
+                                src={currentUrl}
+                                alt=""
+                                className="w-full h-full rounded-lg object-cover border bg-white shadow-sm"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  form.setValue(`addOns.${index}.imageUrl`, "", {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                  })
+                                }
+                                className="absolute -top-2 -right-2 hidden group-hover:flex items-center justify-center h-6 w-6 rounded-full bg-red-500 text-white shadow-md transition-transform hover:scale-110"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <label
+                              className={`mt-1 flex flex-col items-center justify-center w-full aspect-square rounded-lg border-2 border-dashed border-gray-300 bg-white transition-colors shadow-sm ${uploadingImageKey === `addOns.${index}` ? "opacity-70 cursor-not-allowed" : "hover:bg-gray-50 cursor-pointer"}`}
+                            >
+                              {uploadingImageKey === `addOns.${index}` ? (
+                                <Loader2 className="h-6 w-6 text-gray-400 mb-2 animate-spin" />
+                              ) : (
+                                <ImagePlus className="h-6 w-6 text-gray-400 mb-2" />
+                              )}
+                              <span className="text-xs font-semibold text-gray-500">
+                                {uploadingImageKey === `addOns.${index}` ? "Uploading..." : "Upload"}
+                              </span>
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept="image/*"
+                                disabled={uploadingImageKey === `addOns.${index}`}
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  setUploadingImageKey(`addOns.${index}`);
+                                  try {
+                                    const url = await uploadGenericImageDirect(file);
+                                    form.setValue(`addOns.${index}.imageUrl`, url, {
+                                      shouldDirty: true,
+                                      shouldValidate: true,
+                                    });
+                                    toast.success("Image uploaded successfully");
+                                  } catch (err: any) {
+                                    toast.error(err.message || "Failed to upload image");
+                                  } finally {
+                                    setUploadingImageKey(null);
+                                  }
+                                }}
+                              />
+                            </label>
+                          )}
+                        </div>
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Name <span className="text-red-500">*</span></Label>
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                              {...form.register(`addOns.${index}.title`)}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Price <span className="text-red-500">*</span></Label>
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              {...form.register(`addOns.${index}.price`)}
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Description</Label>
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                              {...form.register(`addOns.${index}.description`)}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Max Qty (Per Booking)</Label>
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                              type="number"
+                              min="1"
+                              {...form.register(`addOns.${index}.maxQuantityPerBooking`)}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Max Qty (Total / Slot)</Label>
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                              type="number"
+                              min="1"
+                              {...form.register(`addOns.${index}.maxQuantityPerSlot`)}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Cutoff (days before start)</Label>
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                              type="number"
+                              min="0"
+                              {...form.register(`addOns.${index}.purchaseCutoffOffsetDays`)}
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 mt-auto pb-2">
+                            <input
+                              type="checkbox"
+                              {...form.register(`addOns.${index}.isActive`)}
+                              className="h-4 w-4 accent-[#781216]"
+                            />
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-0 block">Active</Label>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="text-red-500 shrink-0 mt-6"
+                          onClick={() => removeAddOn(index)}
+                        >
+                          <Trash className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )
+                  })}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 w-full border-dashed"
+                    onClick={() => appendAddOn({ title: "", price: 0, description: "", isActive: true })}
+                  >
+                    <Plus className="w-4 h-4 mr-2" /> Add Add-on
                   </Button>
                 </div>
 

@@ -536,6 +536,10 @@ export default function BookingPage() {
     queryFn: getMyProfile,
     enabled: !!user,
   });
+  const maintenance = useQuery({
+    queryKey: ["site-settings"],
+    queryFn: async () => (await apiClient.get("/site-settings")).data.data as { maintenanceMode: boolean },
+  });
 
   // Pre-fill from profile once loaded
   useEffect(() => {
@@ -1028,6 +1032,20 @@ export default function BookingPage() {
               />
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (maintenance.data?.maintenanceMode) {
+    const detailPath = isFestival ? `/festivals/${slug}` : `/trips/${slug}`;
+    return (
+      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: "120px 20px 60px", background: "#f5f0e6", fontFamily: "'Poppins', sans-serif" }}>
+        <div style={{ maxWidth: 540, borderRadius: 16, background: "#fff", padding: "clamp(28px, 6vw, 44px)", textAlign: "center", border: "1px solid rgba(184,148,58,0.26)", boxShadow: "0 20px 50px rgba(30,26,20,0.08)" }}>
+          <Info size={32} color="#9f7f2f" strokeWidth={1.5} style={{ margin: "0 auto 16px" }} />
+          <h1 style={{ margin: "0 0 10px", color: "#1e1a14", fontSize: "1.75rem", fontWeight: 400 }}>Bookings are temporarily paused</h1>
+          <p style={{ margin: "0 0 24px", color: "rgba(30,26,20,0.6)", fontSize: "0.84rem", lineHeight: 1.75 }}>We are carrying out maintenance. You can continue browsing trip information, but booking and payment actions will be available again shortly.</p>
+          <Link to={detailPath} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "12px 18px", borderRadius: 8, background: "#781216", color: "#fff", textDecoration: "none", fontSize: "0.76rem", fontWeight: 600 }}><ArrowLeft size={14} /> Back to trip details</Link>
         </div>
       </div>
     );
@@ -1982,50 +2000,6 @@ export default function BookingPage() {
               )}
             </div>
 
-            {availableAddOns.length > 0 && (
-              <section style={{ marginTop: "4px" }}>
-                <div style={{ marginBottom: "12px" }}>
-                  <h3 style={{ color: "#1e1a14", fontSize: "1rem", fontWeight: 400, margin: 0, fontFamily: "'Playfair Display', serif" }}>
-                    Make it yours
-                  </h3>
-                  <p style={{ margin: "4px 0 0", color: "rgba(30,26,20,0.48)", fontSize: "0.72rem" }}>
-                    Optional extras are added once per booking and included in the final total.
-                  </p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {availableAddOns.map((addOn: any) => {
-                    const quantity = Number(selectedAddOns[addOn.id] || 0);
-                    const maxQuantity = Number(addOn.maxQuantityPerBooking || 10);
-                    return (
-                      <article key={addOn.id} style={{ display: "flex", gap: "12px", border: quantity > 0 ? "1.5px solid #c8a96e" : "1px solid rgba(30,26,20,0.1)", borderRadius: "10px", background: quantity > 0 ? "rgba(200,169,110,0.05)" : "#fff", padding: "12px" }}>
-                        {addOn.imageUrl && <img src={addOn.imageUrl} alt="" style={{ width: "62px", height: "62px", borderRadius: "8px", objectFit: "cover", flexShrink: 0 }} />}
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}>
-                            <div>
-                              <h4 style={{ margin: 0, color: "#1e1a14", fontSize: "0.82rem", fontWeight: 600 }}>{addOn.title}</h4>
-                              {addOn.description && <p style={{ margin: "3px 0 0", color: "rgba(30,26,20,0.5)", fontSize: "0.68rem", lineHeight: 1.45 }}>{addOn.description}</p>}
-                            </div>
-                            <strong style={{ color: "#781216", fontSize: "0.8rem", whiteSpace: "nowrap" }}>{formatPrice(addOn.price)}</strong>
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "10px" }}>
-                            <span style={{ color: "rgba(30,26,20,0.45)", fontSize: "0.65rem" }}>
-                              {addOn.purchaseCutoffOffsetDays != null ? `Closes ${addOn.purchaseCutoffOffsetDays} day(s) before` : "Available until departure"}
-                            </span>
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                              <button type="button" aria-label={`Remove ${addOn.title}`} disabled={quantity === 0} onClick={() => setSelectedAddOns((current) => ({ ...current, [addOn.id]: Math.max(0, quantity - 1) }))} style={{ width: "28px", height: "28px", borderRadius: "50%", border: "1px solid rgba(30,26,20,0.15)", background: "#fff", color: quantity === 0 ? "rgba(30,26,20,0.25)" : "#781216", cursor: quantity === 0 ? "not-allowed" : "pointer" }}>−</button>
-                              <span style={{ minWidth: "18px", textAlign: "center", fontSize: "0.78rem", fontWeight: 600 }}>{quantity}</span>
-                              <button type="button" aria-label={`Add ${addOn.title}`} disabled={quantity >= maxQuantity} onClick={() => setSelectedAddOns((current) => ({ ...current, [addOn.id]: Math.min(maxQuantity, quantity + 1) }))} style={{ width: "28px", height: "28px", borderRadius: "50%", border: "none", background: quantity >= maxQuantity ? "rgba(120,18,22,0.25)" : "#781216", color: "#fff", cursor: quantity >= maxQuantity ? "not-allowed" : "pointer" }}>+</button>
-                            </div>
-                          </div>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-
-            <hr style={{ border: "none", borderTop: "1px solid rgba(30,26,20,0.1)", margin: "0" }} />
 
             {/* ══ Form ══ */}
             <form
@@ -2484,6 +2458,58 @@ export default function BookingPage() {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {availableAddOns.length > 0 && (
+              <div
+                style={{
+                  background: "#ffffff",
+                  borderRadius: "14px",
+                  border: "1px solid rgba(30,26,20,0.07)",
+                  padding: "clamp(22px,3vw,32px)",
+                  boxShadow: "0 2px 10px rgba(30,26,20,0.04)",
+                  marginBottom: "24px",
+                }}
+              >
+                <div style={{ marginBottom: "20px" }}>
+                  <h3 style={{ color: "#1e1a14", fontSize: "1.2rem", fontWeight: 600, margin: 0, fontFamily: "'Poppins', sans-serif" }}>
+                    Make it yours
+                  </h3>
+                  <p style={{ margin: "4px 0 0", color: "rgba(30,26,20,0.48)", fontSize: "0.85rem", fontFamily: "'Poppins', sans-serif" }}>
+                    Optional extras are added once per booking and included in the final total.
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {availableAddOns.map((addOn: any) => {
+                    const quantity = Number(selectedAddOns[addOn.id] || 0);
+                    const maxQuantity = Number(addOn.maxQuantityPerBooking || 10);
+                    return (
+                      <article key={addOn.id} style={{ display: "flex", gap: "12px", border: quantity > 0 ? "1.5px solid #c8a96e" : "1px solid rgba(30,26,20,0.1)", borderRadius: "10px", background: quantity > 0 ? "rgba(200,169,110,0.05)" : "#fff", padding: "12px" }}>
+                        {addOn.imageUrl && <img src={addOn.imageUrl} alt="" style={{ width: "62px", height: "62px", borderRadius: "8px", objectFit: "cover", flexShrink: 0 }} />}
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}>
+                            <div>
+                              <h4 style={{ margin: 0, color: "#1e1a14", fontSize: "0.85rem", fontWeight: 600 }}>{addOn.title}</h4>
+                              {addOn.description && <p style={{ margin: "3px 0 0", color: "rgba(30,26,20,0.5)", fontSize: "0.75rem", lineHeight: 1.45 }}>{addOn.description}</p>}
+                            </div>
+                            <strong style={{ color: "#781216", fontSize: "0.85rem", whiteSpace: "nowrap" }}>{formatPrice(addOn.price)}</strong>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "10px" }}>
+                            <span style={{ color: "rgba(30,26,20,0.45)", fontSize: "0.7rem" }}>
+                              {addOn.purchaseCutoffOffsetDays != null ? `Closes ${addOn.purchaseCutoffOffsetDays} day(s) before` : "Available until departure"}
+                            </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <button type="button" aria-label={`Remove ${addOn.title}`} disabled={quantity === 0} onClick={() => setSelectedAddOns((current) => ({ ...current, [addOn.id]: Math.max(0, quantity - 1) }))} style={{ width: "28px", height: "28px", borderRadius: "50%", border: "1px solid rgba(30,26,20,0.15)", background: "#fff", color: quantity === 0 ? "rgba(30,26,20,0.25)" : "#781216", cursor: quantity === 0 ? "not-allowed" : "pointer" }}>−</button>
+                              <span style={{ minWidth: "18px", textAlign: "center", fontSize: "0.78rem", fontWeight: 600 }}>{quantity}</span>
+                              <button type="button" aria-label={`Add ${addOn.title}`} disabled={quantity >= maxQuantity} onClick={() => setSelectedAddOns((current) => ({ ...current, [addOn.id]: Math.min(maxQuantity, quantity + 1) }))} style={{ width: "28px", height: "28px", borderRadius: "50%", border: "none", background: quantity >= maxQuantity ? "rgba(120,18,22,0.25)" : "#781216", color: "#fff", cursor: quantity >= maxQuantity ? "not-allowed" : "pointer" }}>+</button>
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* ── 3. Special Requests ── */}
             <div

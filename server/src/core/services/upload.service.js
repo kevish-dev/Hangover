@@ -107,7 +107,7 @@ export const uploadSensitiveDocument = async (file, options = {}) => {
   const resolvedPublicId = isPdf && !publicId.endsWith(".pdf") ? `${publicId}.pdf` : publicId;
   const payload = isPdf
     ? file.buffer
-    : await sharp(file.buffer, { limitInputPixels: 20_000_000 })
+    : await sharp(file.buffer, { limitInputPixels: false })
         .rotate()
         .resize(1800, 1800, { fit: "inside", withoutEnlargement: true })
         .webp({ quality: 88, smartSubsample: true })

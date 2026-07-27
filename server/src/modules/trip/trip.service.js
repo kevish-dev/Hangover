@@ -54,6 +54,11 @@ export const getTripById = async (id, isAdmin = false, shareToken = null) => {
       : { [idField]: id, isPublished: true };
   const trip = await tripRepo.findById(where, isAdmin);
   if (!trip) throw new Error("Trip not found");
+  // Add-ons can live directly on a trip or be inherited from its circuit.
+  // Prefer the trip-specific list so newly configured trips do not show both.
+  if ((!trip.addOns || trip.addOns.length === 0) && trip.circuit?.addOns?.length) {
+    trip.addOns = trip.circuit.addOns;
+  }
   return trip;
 };
 
@@ -99,6 +104,7 @@ export const createTrip = async (data) => {
         imageUrl: addOn.imageUrl,
         price: Number(addOn.price),
         maxQuantityPerBooking: addOn.maxQuantityPerBooking,
+        maxQuantityPerSlot: addOn.maxQuantityPerSlot,
         purchaseCutoffOffsetDays: addOn.purchaseCutoffOffsetDays,
         isActive: addOn.isActive,
       })),

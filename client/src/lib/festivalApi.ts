@@ -83,6 +83,17 @@ export interface ApiFestival {
   destination: ApiDestination | null;
   tags: ApiTag[];
   faqs: ApiFaq[];
+  addOns?: Array<{
+    id: string;
+    title: string;
+    description?: string | null;
+    imageUrl?: string | null;
+    price: string | number;
+    maxQuantityPerBooking?: number | null;
+    maxQuantityPerSlot?: number | null;
+    purchaseCutoffOffsetDays?: number | null;
+    isActive: boolean;
+  }>;
   slots: ApiSlot[];
   itinerary?: ApiItineraryDay[];
   createdAt: string;

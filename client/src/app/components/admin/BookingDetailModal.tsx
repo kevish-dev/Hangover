@@ -32,6 +32,7 @@ import {
   Calendar,
   Hash,
   FileText,
+  PackagePlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { showErrorToast } from "../../../lib/errors";
@@ -41,6 +42,7 @@ import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { SyncIndicator } from "../ui/sync-indicator";
+import { BookingAddOnsTab } from "./BookingAddOnsTab";
 
 // ─── Shared helpers ───────────────────────────────────────────────
 const money = (v: unknown) =>
@@ -1347,7 +1349,7 @@ function CancelRefundModal({
 }
 
 // ─── Main export ──────────────────────────────────────────────────
-type Tab = "details" | "operations" | "balance-sheet";
+type Tab = "details" | "operations" | "addons" | "balance-sheet";
 
 export function BookingDetailModal({
   booking,
@@ -1419,6 +1421,7 @@ export function BookingDetailModal({
   const tabs: { key: Tab; label: string; icon: any }[] = [
     { key: "details", label: "Details", icon: User },
     { key: "operations", label: "Operations", icon: Activity },
+    { key: "addons", label: "Add-ons", icon: PackagePlus },
     { key: "balance-sheet", label: "Balance Sheet", icon: BookOpen },
   ];
 
@@ -1492,6 +1495,7 @@ export function BookingDetailModal({
                 queryKeySuffix={queryKeySuffix}
               />
             )}
+            {activeTab === "addons" && <BookingAddOnsTab booking={booking} />}
             {activeTab === "balance-sheet" && (
               <BalanceSheetTab
                 bookingId={booking.id}

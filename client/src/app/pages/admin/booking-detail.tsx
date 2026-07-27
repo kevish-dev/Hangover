@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../lib/axios";
-import { CalendarCheck, IndianRupee, Loader2, ArrowLeft, User, MapPin, Mail, Phone, Image as ImageIcon, AlertCircle, Plus, Trash2, ClipboardCheck, BookOpen } from "lucide-react";
+import { CalendarCheck, IndianRupee, Loader2, ArrowLeft, User, MapPin, Mail, Phone, Image as ImageIcon, AlertCircle, Plus, Trash2, ClipboardCheck, BookOpen, PackagePlus } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
@@ -9,6 +9,7 @@ import { useNavigate, useParams } from "react-router";
 import { BalanceSheetTab } from "../../components/admin/BookingDetailModal";
 import { SyncIndicator } from "../../components/ui/sync-indicator";
 import { BookingPaymentsTab } from "../../components/admin/BookingPaymentsTab";
+import { BookingAddOnsTab } from "../../components/admin/BookingAddOnsTab";
 
 function BookingStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -311,7 +312,7 @@ function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
 export default function AdminBookingDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<"ledger" | "payments">("ledger");
+  const [activeTab, setActiveTab] = useState<"operations" | "addons" | "ledger" | "payments">("operations");
   
   const query = useQuery({
     queryKey: ["admin", "booking", id],
@@ -496,10 +497,22 @@ export default function AdminBookingDetailPage() {
         <div className="mt-8 border-t border-[#e8d9b7]/40">
           <div className="flex border-b border-[#e8d9b7]/40 bg-[#fbf7ed]/10 px-4 pt-4 gap-4">
             <button
+              className={`px-4 py-2 text-sm font-bold tracking-wide uppercase border-b-2 transition-colors ${activeTab === "operations" ? "border-[#781216] text-[#781216]" : "border-transparent text-gray-500 hover:text-gray-800"}`}
+              onClick={() => setActiveTab("operations")}
+            >
+              Operations
+            </button>
+            <button
+              className={`px-4 py-2 text-sm font-bold tracking-wide uppercase border-b-2 transition-colors ${activeTab === "addons" ? "border-[#781216] text-[#781216]" : "border-transparent text-gray-500 hover:text-gray-800"}`}
+              onClick={() => setActiveTab("addons")}
+            >
+              <span className="inline-flex items-center gap-1.5"><PackagePlus className="w-3.5 h-3.5" /> Add-ons</span>
+            </button>
+            <button
               className={`px-4 py-2 text-sm font-bold tracking-wide uppercase border-b-2 transition-colors ${activeTab === "ledger" ? "border-[#781216] text-[#781216]" : "border-transparent text-gray-500 hover:text-gray-800"}`}
               onClick={() => setActiveTab("ledger")}
             >
-              Operations & Ledger
+              Ledger
             </button>
             <button
               className={`px-4 py-2 text-sm font-bold tracking-wide uppercase border-b-2 transition-colors ${activeTab === "payments" ? "border-[#781216] text-[#781216]" : "border-transparent text-gray-500 hover:text-gray-800"}`}
@@ -509,19 +522,20 @@ export default function AdminBookingDetailPage() {
             </button>
           </div>
           
-          {activeTab === "ledger" ? (
+          {activeTab === "operations" ? (
             <div className="bg-white rounded-b-xl border border-t-0 border-[#e8d9b7]/40 shadow-sm overflow-hidden">
               {id && <BookingOperationsGrid bookingId={id} />}
+            </div>
+          ) : activeTab === "addons" ? (
+            <BookingAddOnsTab booking={booking} />
+          ) : activeTab === "ledger" ? (
+            <div className="bg-white rounded-b-xl border border-t-0 border-[#e8d9b7]/40 shadow-sm overflow-hidden">
               {id && (
-                <div className="border-t border-[#e8d9b7]/40">
-                  <div className="p-4 md:p-6 bg-[#fbf7ed]/10">
-                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                      <BookOpen className="w-4 h-4 text-[#781216]" /> Booking Ledger
-                    </h3>
-                    <div className="w-full">
-                      <BalanceSheetTab bookingId={id} queryKeySuffix="page" />
-                    </div>
-                  </div>
+                <div className="p-4 md:p-6 bg-[#fbf7ed]/10">
+                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-[#781216]" /> Booking Ledger
+                  </h3>
+                  <BalanceSheetTab bookingId={id} queryKeySuffix="page" />
                 </div>
               )}
             </div>

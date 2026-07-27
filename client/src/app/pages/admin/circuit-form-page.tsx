@@ -149,6 +149,7 @@ const circuitSchema = z
         imageUrl: optionalUrl,
         price: z.coerce.number().positive(),
         maxQuantityPerBooking: optionalPositiveInteger,
+        maxQuantityPerSlot: optionalPositiveInteger,
         purchaseCutoffOffsetDays: optionalNonnegativeInteger,
         isActive: z.boolean(),
       }),
@@ -289,6 +290,7 @@ const toFormValues = (circuit: any): CircuitFormValues => ({
     imageUrl: item.imageUrl || "",
     price: Number(item.price),
     maxQuantityPerBooking: item.maxQuantityPerBooking ?? undefined,
+    maxQuantityPerSlot: item.maxQuantityPerSlot ?? undefined,
     purchaseCutoffOffsetDays: item.purchaseCutoffOffsetDays ?? undefined,
     isActive: item.isActive ?? true,
   })),
@@ -407,7 +409,21 @@ export default function CircuitFormPage() {
 
   useEffect(() => {
     if (isEditing && !circuit) return;
-    const values = circuit ? toFormValues(circuit) : emptyCircuit();
+
+    let values = emptyCircuit();
+    const draftKey = `circuit_form_draft_${id || "new"}`;
+    const draft = localStorage.getItem(draftKey);
+
+    if (isEditing && circuit) {
+      values = toFormValues(circuit);
+    } else if (draft) {
+      try {
+        values = JSON.parse(draft);
+      } catch (e) {
+        console.error("Failed to parse circuit draft", e);
+      }
+    }
+
     if (!values.inclusions.length) values.inclusions = [{ value: "" }];
     if (!values.exclusions.length) values.exclusions = [{ value: "" }];
     if (!values.packages.length)
@@ -418,7 +434,14 @@ export default function CircuitFormPage() {
       ];
     form.reset(values);
     setStep(0);
-  }, [circuit, form, isEditing]);
+  }, [circuit, form, isEditing, id]);
+
+  const saveDraft = () => {
+    const values = form.getValues();
+    const draftKey = `circuit_form_draft_${id || "new"}`;
+    localStorage.setItem(draftKey, JSON.stringify(values));
+    toast.success("Draft saved locally");
+  };
   useEffect(() => {
     if (destinationsQuery.isError)
       toast.error(
@@ -547,6 +570,9 @@ export default function CircuitFormPage() {
       if (circuit?.id) await apiClient.put(`/circuits/${circuit.id}`, payload);
       else await apiClient.post("/circuits", payload);
 
+      const draftKey = `circuit_form_draft_${id || "new"}`;
+      localStorage.removeItem(draftKey);
+
       toast.success(
         circuit ? "Circuit template updated" : "Circuit template created",
       );
@@ -589,6 +615,11 @@ export default function CircuitFormPage() {
           <h1 className="text-2xl font-bold text-gray-900">
             {circuit ? "Edit circuit template" : "Create circuit template"}
           </h1>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button type="button" variant="outline" onClick={saveDraft}>
+            Save Draft
+          </Button>
         </div>
       </div>
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -883,6 +914,7 @@ export default function CircuitFormPage() {
                             imageUrl: "",
                             price: 1,
                             maxQuantityPerBooking: 1,
+                            maxQuantityPerSlot: 10,
                             purchaseCutoffOffsetDays: 3,
                             isActive: true,
                           })
@@ -1061,7 +1093,7 @@ export default function CircuitFormPage() {
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                   <div>
                                     <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
-                                      Max quantity
+                                      Max Qty (Per Booking)
                                     </Label>
                                     <Input
                                       className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
@@ -1076,6 +1108,26 @@ export default function CircuitFormPage() {
                                       message={
                                         form.formState.errors.addOns?.[index]
                                           ?.maxQuantityPerBooking?.message
+                                      }
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
+                                      Max Qty (Total / Slot)
+                                    </Label>
+                                    <Input
+                                      className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                      type="number"
+                                      min={1}
+                                      step={1}
+                                      {...form.register(
+                                        `addOns.${index}.maxQuantityPerSlot`,
+                                      )}
+                                    />
+                                    <ErrorText
+                                      message={
+                                        form.formState.errors.addOns?.[index]
+                                          ?.maxQuantityPerSlot?.message
                                       }
                                     />
                                   </div>

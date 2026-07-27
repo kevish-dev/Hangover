@@ -25,6 +25,8 @@ import {
   ArrowDown,
   Trash,
   ClipboardList,
+  ImagePlus,
+  X,
 } from "lucide-react";
 import { apiClient } from "../../../lib/axios";
 import { useQueryClient } from "@tanstack/react-query";
@@ -32,10 +34,28 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ItineraryStep } from "./ItineraryStep";
 import { formatTripType } from "../../../lib/tripApi";
-import { uploadBannerImagesDirect } from "../../../lib/directImageUpload";
+import { uploadBannerImagesDirect, uploadGenericImageDirect } from "../../../lib/directImageUpload";
 import { showErrorToast } from "../../../lib/errors";
+import {
+  toAddOnFields,
+  toArray,
+  toFaqFields,
+  toItineraryFields,
+  toPackageFields,
+  toTagFields,
+  toValueFields,
+} from "./formDataMappers";
 
 // --- VALIDATION SCHEMA ---
+const optionalPositiveInteger = z.preprocess(
+  (a) => (a === "" ? undefined : a),
+  z.coerce.number().int().positive().optional()
+);
+
+const optionalNonnegativeInteger = z.preprocess(
+  (a) => (a === "" ? undefined : a),
+  z.coerce.number().int().nonnegative().optional()
+);
 const tripSchema = z.object({
   circuitId: z.string().uuid().optional(),
   destinationId: z.string().uuid().optional(),
@@ -110,8 +130,20 @@ const tripSchema = z.object({
         ).optional().default([]),
       })
     ).optional(),
-  }
-);
+  addOns: z.array(
+    z.object({
+      id: z.string().uuid().optional(),
+      title: z.string().min(1, "Add-on title is required"),
+      description: z.string().optional(),
+      imageUrl: z.string().url("Enter a valid URL").optional().or(z.literal("")),
+      price: z.coerce.number().positive(),
+      maxQuantityPerBooking: optionalPositiveInteger,
+      maxQuantityPerSlot: optionalPositiveInteger,
+      purchaseCutoffOffsetDays: optionalNonnegativeInteger,
+      isActive: z.boolean().default(true),
+    })
+  ).optional(),
+});
 
 type TripFormValues = z.infer<typeof tripSchema>;
 
@@ -168,6 +200,7 @@ export function TripFormModal({
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [localBannerImages, setLocalBannerImages] = useState<string[]>([]);
+  const [uploadingImageKey, setUploadingImageKey] = useState<string | null>(null);
 
   // Highlight State
   const [highlightItems, setHighlightItems] = useState<
@@ -224,6 +257,8 @@ export function TripFormModal({
       exclusions: [],
       tripTags: [],
       packages: [{ title: "Standard", price: 0, tokenAmount: 0 }],
+      addOns: [],
+      itinerary: [],
       faqs: [],
       isPublished: false,
       isFeatured: false,
@@ -253,37 +288,15 @@ export function TripFormModal({
             capacity: s.capacity
           })) : [{ startDate: "", endDate: "", capacity: 12, title: "", priority: 0 }],
           overview: trip.overview || "",
-          inclusions: Array.isArray(trip.inclusions) && trip.inclusions.length > 0
-            ? trip.inclusions.map((i: any) => ({ value: typeof i === 'string' ? i : (i.value || "") }))
-            : typeof trip.inclusions === 'string' && trip.inclusions.trim().startsWith('[')
-              ? JSON.parse(trip.inclusions).map((i: any) => ({ value: typeof i === 'string' ? i : (i.value || "") }))
-              : [{ value: "" }],
-          exclusions: Array.isArray(trip.exclusions) && trip.exclusions.length > 0
-            ? trip.exclusions.map((e: any) => ({ value: typeof e === 'string' ? e : (e.value || "") }))
-            : typeof trip.exclusions === 'string' && trip.exclusions.trim().startsWith('[')
-              ? JSON.parse(trip.exclusions).map((e: any) => ({ value: typeof e === 'string' ? e : (e.value || "") }))
-              : [{ value: "" }],
-          tripTags: [],
-          faqs: trip.faqs?.length
-            ? trip.faqs.map((f: any) => ({
-                question: f.question,
-                answer: f.answer,
-              }))
-            : [],
-          packages: trip.packages?.length
-            ? trip.packages.map((p: any) => ({
-                id: p.id,
-                title: p.title,
-                price: Number(p.price),
-                tokenAmount: Number(p.tokenAmount),
-              }))
+          inclusions: toValueFields(trip.inclusions),
+          exclusions: toValueFields(trip.exclusions),
+          tripTags: toTagFields(trip.tripTags ?? trip.tags),
+          faqs: toFaqFields(trip.faqs),
+          packages: toPackageFields(trip.packages).length
+            ? toPackageFields(trip.packages)
             : [{ title: "Standard", price: 0, tokenAmount: 0 }],
-          itinerary: Array.isArray(trip.itinerary) ? trip.itinerary.map((day: any) => ({
-            day: day.day || `Day ${day.dayNumber}`,
-            title: day.title || "",
-            description: day.description || "",
-            todos: Array.isArray(day.todos) ? day.todos : [],
-          })) : [],
+          addOns: toAddOnFields(trip.addOns),
+          itinerary: toItineraryFields(trip.itinerary),
           isPublished: trip.isPublished || false,
           isFeatured: trip.isFeatured || false,
           isActive: trip.isActive ?? true,
@@ -297,7 +310,9 @@ export function TripFormModal({
         replaceExclusions(form.getValues("exclusions"));
         replaceTripTags(form.getValues("tripTags"));
         replacePackages(form.getValues("packages"));
+        replaceAddOns(form.getValues("addOns"));
         replaceFaqs(form.getValues("faqs"));
+        replaceItinerary(form.getValues("itinerary"));
         form.clearErrors();
 
         // Initialize Highlight items
@@ -345,21 +360,13 @@ export function TripFormModal({
           bestTimeToVisit: sourceCircuit.bestTimeToVisit || "",
           slots: [{ startDate: "", endDate: "", capacity: 12, title: "", priority: 0 }],
           overview: sourceCircuit.overview || "",
-          inclusions: (sourceCircuit.inclusions || []).map((value: string) => ({ value })),
-          exclusions: (sourceCircuit.exclusions || []).map((value: string) => ({ value })),
-          tripTags: (sourceCircuit.tags || []).map((tag: any) => ({ value: tag.tag })),
-          packages: (sourceCircuit.packages || []).map((item: any) => ({
-            title: item.title,
-            price: Number(item.price),
-            tokenAmount: Number(item.tokenAmount),
-          })),
-          faqs: (sourceCircuit.faqs || []).map((item: any) => ({ question: item.question, answer: item.answer })),
-          itinerary: (sourceCircuit.days || []).map((day: any) => ({
-            day: `Day ${day.dayNumber}`,
-            title: day.title,
-            description: day.description || "",
-            todos: Array.isArray(day.todos) ? day.todos : [],
-          })),
+          inclusions: toValueFields(sourceCircuit.inclusions),
+          exclusions: toValueFields(sourceCircuit.exclusions),
+          tripTags: toTagFields(sourceCircuit.tags),
+          packages: toPackageFields(sourceCircuit.packages),
+          addOns: toAddOnFields(sourceCircuit.addOns),
+          faqs: toFaqFields(sourceCircuit.faqs),
+          itinerary: toItineraryFields(sourceCircuit.days),
           isPublished: false,
           isFeatured: false,
           isActive: true,
@@ -370,15 +377,17 @@ export function TripFormModal({
         replaceExclusions(form.getValues("exclusions"));
         replaceTripTags(form.getValues("tripTags"));
         replacePackages(form.getValues("packages"));
+        replaceAddOns(form.getValues("addOns"));
         replaceFaqs(form.getValues("faqs"));
-        setHighlightItems((Array.isArray(sourceCircuit.highlights) ? sourceCircuit.highlights : []).map((item: any) => ({
+        replaceItinerary(form.getValues("itinerary"));
+        setHighlightItems(toArray(sourceCircuit.highlights).map((item: any) => ({
           id: Math.random().toString(),
           text: item.text || "",
           type: "EXISTING" as const,
           url: item.imageUrl,
           preview: item.imageUrl,
         })));
-        setStayItems((Array.isArray(sourceCircuit.stayTransportImages) ? sourceCircuit.stayTransportImages : []).map((item: any) => ({
+        setStayItems(toArray(sourceCircuit.stayTransportImages).map((item: any) => ({
           id: Math.random().toString(),
           text: item.text || "",
           type: "EXISTING" as const,
@@ -407,6 +416,7 @@ export function TripFormModal({
           exclusions: [],
           tripTags: [],
           packages: [{ title: "Standard", price: 0, tokenAmount: 0 }],
+          addOns: [],
           faqs: [],
           itinerary: [],
           isPublished: false,
@@ -419,7 +429,9 @@ export function TripFormModal({
         replaceExclusions(form.getValues("exclusions"));
         replaceTripTags([]);
         replacePackages([{ title: "Standard", price: 0, tokenAmount: 0 }]);
+        replaceAddOns([]);
         replaceFaqs([]);
+        replaceItinerary([]);
         form.clearErrors();
         setStayItems([]);
         setHighlightItems([]);
@@ -468,6 +480,15 @@ export function TripFormModal({
     control: form.control,
   });
   const {
+    fields: addOnsFields,
+    append: appendAddOn,
+    remove: removeAddOn,
+    replace: replaceAddOns,
+  } = useFieldArray({
+    name: "addOns",
+    control: form.control,
+  });
+  const {
     fields: slotFields,
     append: appendSlot,
     remove: removeSlot,
@@ -487,7 +508,7 @@ export function TripFormModal({
     name: "faqs",
   });
   
-  const { fields: itineraryFields } = useFieldArray({
+  const { fields: itineraryFields, replace: replaceItinerary } = useFieldArray({
     control: form.control,
     name: "itinerary",
   });
@@ -672,6 +693,7 @@ export function TripFormModal({
         "tripType",
         "bestTimeToVisit",
         "packages",
+        "addOns",
       ];
     else if (step === 1) {
       fieldsToValidate = ["slots"];
@@ -727,7 +749,7 @@ export function TripFormModal({
   const nextStep = async () => {
     let fieldsToValidate: (keyof TripFormValues)[] = [];
     if (step === 0)
-      fieldsToValidate = ["title", "location", "tripType", "bestTimeToVisit", "packages"];
+      fieldsToValidate = ["title", "location", "tripType", "bestTimeToVisit", "packages", "addOns"];
     else if (step === 1) fieldsToValidate = ["slots"];
     else if (step === 2) fieldsToValidate = ["overview", "inclusions", "exclusions"];
     else if (step === 3) fieldsToValidate = ["faqs", "tripTags"];
@@ -1132,6 +1154,163 @@ export function TripFormModal({
                     onClick={() => appendPackage({ title: "", price: 0, tokenAmount: 0 })}
                   >
                     <Plus className="w-4 h-4 mr-2" /> Add Package
+                  </Button>
+                </div>
+
+                <div className="md:col-span-2 space-y-4">
+                  <div className="mb-2">
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Optional add-ons</Label>
+                    <p className="text-xs text-gray-500">Travelers can add these while booking, before the cutoff.</p>
+                  </div>
+                  {addOnsFields.map((field, index) => {
+                    const currentUrl = form.watch(`addOns.${index}.imageUrl`);
+                    return (
+                      <div key={field.id} className="flex flex-col gap-4 p-4 border rounded-lg bg-gray-50 md:flex-row">
+                        <div className="w-full md:w-32 shrink-0">
+                          <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
+                            Image
+                          </Label>
+                          {currentUrl ? (
+                            <div className="relative group w-full aspect-square mt-1">
+                              <img
+                                src={currentUrl}
+                                alt=""
+                                className="w-full h-full rounded-lg object-cover border bg-white shadow-sm"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  form.setValue(`addOns.${index}.imageUrl`, "", {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                  })
+                                }
+                                className="absolute -top-2 -right-2 hidden group-hover:flex items-center justify-center h-6 w-6 rounded-full bg-red-500 text-white shadow-md transition-transform hover:scale-110"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <label
+                              className={`mt-1 flex flex-col items-center justify-center w-full aspect-square rounded-lg border-2 border-dashed border-gray-300 bg-white transition-colors shadow-sm ${uploadingImageKey === `addOns.${index}` ? "opacity-70 cursor-not-allowed" : "hover:bg-gray-50 cursor-pointer"}`}
+                            >
+                              {uploadingImageKey === `addOns.${index}` ? (
+                                <Loader2 className="h-6 w-6 text-gray-400 mb-2 animate-spin" />
+                              ) : (
+                                <ImagePlus className="h-6 w-6 text-gray-400 mb-2" />
+                              )}
+                              <span className="text-xs font-semibold text-gray-500">
+                                {uploadingImageKey === `addOns.${index}` ? "Uploading..." : "Upload"}
+                              </span>
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept="image/*"
+                                disabled={uploadingImageKey === `addOns.${index}`}
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  setUploadingImageKey(`addOns.${index}`);
+                                  try {
+                                    const url = await uploadGenericImageDirect(file);
+                                    form.setValue(`addOns.${index}.imageUrl`, url, {
+                                      shouldDirty: true,
+                                      shouldValidate: true,
+                                    });
+                                    toast.success("Image uploaded successfully");
+                                  } catch (err: any) {
+                                    toast.error(err.message || "Failed to upload image");
+                                  } finally {
+                                    setUploadingImageKey(null);
+                                  }
+                                }}
+                              />
+                            </label>
+                          )}
+                          {form.formState.errors.addOns?.[index]?.imageUrl && (
+                            <p className="text-xs font-semibold text-red-600 mt-1">{form.formState.errors.addOns[index]?.imageUrl?.message}</p>
+                          )}
+                        </div>
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Name <span className="text-red-500">*</span></Label>
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                              {...form.register(`addOns.${index}.title` as const)}
+                            />
+                            {form.formState.errors.addOns?.[index]?.title && (
+                              <p className="text-xs font-semibold text-red-600 mt-1">{form.formState.errors.addOns[index]?.title?.message}</p>
+                            )}
+                          </div>
+                          <div>
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Price <span className="text-red-500">*</span></Label>
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              {...form.register(`addOns.${index}.price` as const)}
+                            />
+                            {form.formState.errors.addOns?.[index]?.price && (
+                              <p className="text-xs font-semibold text-red-600 mt-1">{form.formState.errors.addOns[index]?.price?.message}</p>
+                            )}
+                          </div>
+                          <div className="md:col-span-2">
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Description</Label>
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                              {...form.register(`addOns.${index}.description` as const)}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Max Qty (Per Booking)</Label>
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                              type="number"
+                              min="1"
+                              {...form.register(`addOns.${index}.maxQuantityPerBooking` as const)}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Max Qty (Total / Slot)</Label>
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                              type="number"
+                              min="1"
+                              {...form.register(`addOns.${index}.maxQuantityPerSlot` as const)}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Cutoff (days before start)</Label>
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                              type="number"
+                              min="0"
+                              {...form.register(`addOns.${index}.purchaseCutoffOffsetDays` as const)}
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 mt-auto pb-2">
+                            <input
+                              type="checkbox"
+                              {...form.register(`addOns.${index}.isActive` as const)}
+                              className="h-4 w-4 accent-[#781216]"
+                            />
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-0 block">Active</Label>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="text-red-500 shrink-0 mt-6"
+                          onClick={() => removeAddOn(index)}
+                        >
+                          <Trash className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 w-full border-dashed"
+                    onClick={() => appendAddOn({ title: "", price: 0, description: "", isActive: true })}
+                  >
+                    <Plus className="w-4 h-4 mr-2" /> Add Add-on
                   </Button>
                 </div>
                 <div className="space-y-2 md:col-span-2 flex flex-col md:flex-row md:items-center gap-4 mt-2">

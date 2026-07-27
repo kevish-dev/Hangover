@@ -90,6 +90,7 @@ export interface ApiTrip {
     imageUrl?: string | null;
     price: string | number;
     maxQuantityPerBooking?: number | null;
+    maxQuantityPerSlot?: number | null;
     purchaseCutoffOffsetDays?: number | null;
     isActive: boolean;
   }>;

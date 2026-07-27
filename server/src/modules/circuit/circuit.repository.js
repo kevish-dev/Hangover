@@ -27,7 +27,7 @@ export const findAll = async (skip, take, filter = {}) => {
       include: {
         destination: true,
         tags: true,
-        _count: { select: { days: true, trips: true } },
+        _count: { select: { days: true, trips: true, festivals: true } },
       },
     }),
     prisma.circuit.count({ where: filter }),
@@ -143,6 +143,7 @@ export const update = async (
           imageUrl: item.imageUrl || null,
           price: item.price,
           maxQuantityPerBooking: item.maxQuantityPerBooking || null,
+          maxQuantityPerSlot: item.maxQuantityPerSlot || null,
           purchaseCutoffOffsetDays: item.purchaseCutoffOffsetDays ?? null,
           isActive: item.isActive ?? true,
         };

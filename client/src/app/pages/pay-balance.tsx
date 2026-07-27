@@ -217,6 +217,10 @@ export default function PayBalancePage() {
     enabled: Boolean(user && bookingId),
     retry: false,
   });
+  const maintenance = useQuery({
+    queryKey: ["site-settings"],
+    queryFn: async () => (await apiClient.get("/site-settings")).data.data as { maintenanceMode: boolean },
+  });
 
   useEffect(() => {
     if (!pendingVerify || paymentStep !== "verifying") return;
@@ -260,7 +264,8 @@ export default function PayBalancePage() {
   const paymentProgress = totalAmount > 0 ? Math.min(100, Math.max(0, (amountPaid / totalAmount) * 100)) : 0;
   const isInitialPayment = booking?.status === "PENDING" && (booking?.paymentStatus === "PENDING" || booking?.paymentStatus === "FAILED");
   const initialPaymentAmount = booking?.initialPaymentType === "TOKEN" ? Number(booking?.tokenAmount || 0) : totalAmount;
-  const isEligible = (booking?.status === "RESERVED" && booking?.paymentStatus === "PARTIALLY_PAID" && amountDue > 0) || isInitialPayment;
+  const isMaintenanceMode = maintenance.data?.maintenanceMode === true;
+  const isEligible = !isMaintenanceMode && ((booking?.status === "RESERVED" && booking?.paymentStatus === "PARTIALLY_PAID" && amountDue > 0) || isInitialPayment);
   const isPaid = booking?.status === "CONFIRMED" || booking?.paymentStatus === "PAID";
   const isRefunded = booking?.paymentStatus === "REFUNDED" || booking?.paymentStatus === "PARTIALLY_REFUNDED";
   const isCancelled = booking?.status === "CANCELLED";
@@ -473,8 +478,8 @@ export default function PayBalancePage() {
                 </button>
               ) : (
                 <div style={{ padding: "15px", borderRadius: 9, background: amountDue <= 0 ? "rgba(34,139,34,0.07)" : "rgba(184,148,58,0.08)", border: `1px solid ${amountDue <= 0 ? "rgba(34,139,34,0.16)" : "rgba(184,148,58,0.2)"}` }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, color: isPaid ? "#228b22" : "#9f7f2f", fontSize: "0.72rem", fontWeight: 600, marginBottom: 5 }}>{isPaid ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}{isPaid ? "Payment complete" : isRefunded ? "Refund recorded" : isCancelled ? "Booking cancelled" : "Payment currently unavailable"}</div>
-                  <p style={{ margin: 0, color: "rgba(30,26,20,0.52)", fontSize: "0.62rem", lineHeight: 1.6 }}>{isPaid ? "There is no outstanding balance on this booking." : `This booking is ${String(booking.status).toLowerCase().replace(/_/g, " ")}. Contact us if you need help.`}</p>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, color: isPaid ? "#228b22" : "#9f7f2f", fontSize: "0.72rem", fontWeight: 600, marginBottom: 5 }}>{isPaid ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}{isPaid ? "Payment complete" : isRefunded ? "Refund recorded" : isCancelled ? "Booking cancelled" : isMaintenanceMode ? "Payments are temporarily paused" : "Payment currently unavailable"}</div>
+                  <p style={{ margin: 0, color: "rgba(30,26,20,0.52)", fontSize: "0.62rem", lineHeight: 1.6 }}>{isPaid ? "There is no outstanding balance on this booking." : isMaintenanceMode ? "Maintenance is in progress. Your booking details remain available, and payment can resume once maintenance ends." : `This booking is ${String(booking.status).toLowerCase().replace(/_/g, " ")}. Contact us if you need help.`}</p>
                 </div>
               )}
 

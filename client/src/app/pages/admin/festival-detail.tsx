@@ -162,7 +162,7 @@ function BookingsTab({ festivalId }: { festivalId: string }) {
   } = useQuery({
     queryKey: ["admin", "festival-bookings", festivalId],
     queryFn: async () => {
-      const res = await apiClient.get(`/bookings/trip/${festivalId}`);
+      const res = await apiClient.get(`/bookings/festival/${festivalId}`);
       return res.data as any[];
     },
   });
@@ -413,7 +413,7 @@ function OperationsTab({ festivalId }: { festivalId: string }) {
   const { data: bookings = [] } = useQuery({
     queryKey: ["admin", "festival-bookings", festivalId],
     queryFn: async () => {
-      const res = await apiClient.get(`/bookings/trip/${festivalId}`);
+      const res = await apiClient.get(`/bookings/festival/${festivalId}`);
       return res.data as any[];
     },
   });
@@ -752,7 +752,7 @@ function LedgerTab({ festivalId }: { festivalId: string }) {
   const { data: bookings = [] } = useQuery({
     queryKey: ["admin", "festival-bookings", festivalId],
     queryFn: async () => {
-      const res = await apiClient.get(`/bookings/trip/${festivalId}`);
+      const res = await apiClient.get(`/bookings/festival/${festivalId}`);
       return res.data as any[];
     }
   });
@@ -1039,7 +1039,7 @@ function RevenueDashboardTab({ festivalId }: { festivalId: string }) {
   const { data: bookings = [], isLoading: bookingsLoading } = useQuery({
     queryKey: ["admin", "festival-bookings", festivalId],
     queryFn: async () => {
-      const res = await apiClient.get(`/bookings/trip/${festivalId}`);
+      const res = await apiClient.get(`/bookings/festival/${festivalId}`);
       return res.data as any[];
     },
   });
@@ -1081,7 +1081,7 @@ function RevenueDashboardTab({ festivalId }: { festivalId: string }) {
     (s: number, b: any) => s + Number(b.amountDue || 0),
     0,
   );
-  const totalExpenses = Number(ledgerData?.summary?.tripExpense || 0);
+  const totalExpenses = Number(ledgerData?.summary?.festivalExpense || 0);
   const grossProfit = totalCollected - totalExpenses;
   const collectionRate =
     totalRevenue > 0 ? Math.round((totalCollected / totalRevenue) * 100) : 0;
@@ -1449,7 +1449,7 @@ function PaymentsTab({ festivalId }: { festivalId: string }) {
       {payments.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
           <CreditCard className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium">No payments found for this trip</p>
+          <p className="text-gray-500 font-medium">No payments found for this festival</p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -1492,7 +1492,7 @@ export default function AdminFestivalDetailPage() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>("bookings");
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [fullTripData, setFullTripData] = useState<any>(null);
+  const [fullFestivalData, setFullFestivalData] = useState<any>(null);
   const [processingPublish, setProcessingPublish] = useState(false);
   const [generatedShareLink, setGeneratedShareLink] = useState<{
     title: string;
@@ -1514,7 +1514,7 @@ export default function AdminFestivalDetailPage() {
   });
 
   const handleTogglePublish = async () => {
-    if (!trip) return;
+    if (!festival) return;
     setProcessingPublish(true);
     try {
       await apiClient.put(`/festivals/${festival.id}`, {
@@ -1522,7 +1522,7 @@ export default function AdminFestivalDetailPage() {
       });
       toast.success(festival.isPublished ? "Festival unpublished" : "Festival published");
       await refetch();
-      queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "festivals"] });
     } catch (err) {
       showErrorToast(err, "Failed to update festival status");
     } finally {
@@ -1533,7 +1533,7 @@ export default function AdminFestivalDetailPage() {
   const handleOpenEdit = async () => {
     try {
       const res = await apiClient.get(`/festivals/${id}?adminView=true`);
-      setFullTripData(res.data);
+      setFullFestivalData(res.data);
       setEditModalOpen(true);
     } catch (err) {
       showErrorToast(err, "Failed to load festival for editing");
@@ -1541,7 +1541,7 @@ export default function AdminFestivalDetailPage() {
   };
 
   const handleCreateShareLink = async () => {
-    if (!trip) return;
+    if (!festival) return;
     try {
       const expiresAt = new Date(
         Date.now() + 30 * 24 * 60 * 60 * 1000,
@@ -1569,7 +1569,7 @@ export default function AdminFestivalDetailPage() {
       </div>
     );
 
-  if (isError || !trip)
+  if (isError || !festival)
     return (
       <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
         <p className="font-bold text-red-800 text-lg">Festival not found</p>
@@ -1577,7 +1577,7 @@ export default function AdminFestivalDetailPage() {
           onClick={() => navigate("/dashboard/festivals")}
           className="mt-4 text-sm font-semibold text-[#781216] underline"
         >
-          Back to Trips
+          Back to Festivals
         </button>
       </div>
     );
@@ -1747,7 +1747,7 @@ export default function AdminFestivalDetailPage() {
       <FestivalFormModal
         open={editModalOpen}
         onOpenChange={setEditModalOpen}
-        festival={fullTripData}
+        festival={fullFestivalData}
       />
 
       {/* Share link dialog */}

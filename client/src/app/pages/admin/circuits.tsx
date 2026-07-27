@@ -16,6 +16,38 @@ export default function AdminCircuitsPage() {
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
   const [isFestivalModalOpen, setIsFestivalModalOpen] = useState(false);
   const [loadingCircuitId, setLoadingCircuitId] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<{ id: string; title: string }[]>([]);
+
+  useEffect(() => {
+    const loadedDrafts: { id: string; title: string }[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("circuit_form_draft_")) {
+        try {
+          const draftStr = localStorage.getItem(key);
+          if (draftStr) {
+            const draft = JSON.parse(draftStr);
+            const id = key.replace("circuit_form_draft_", "");
+            loadedDrafts.push({
+              id,
+              title: draft.title || (id === "new" ? "New Circuit" : "Untitled Circuit"),
+            });
+          }
+        } catch (e) {}
+      }
+    }
+    setDrafts(loadedDrafts);
+  }, []);
+
+  const resumeDraft = (id: string) => {
+    navigate(`/dashboard/circuits/${id}`);
+  };
+
+  const deleteDraft = (id: string) => {
+    localStorage.removeItem(`circuit_form_draft_${id}`);
+    setDrafts((prev) => prev.filter((d) => d.id !== id));
+    toast.success("Draft discarded");
+  };
 
   const circuitsQuery = useQuery({
     queryKey: ["admin", "circuits"],
@@ -144,6 +176,27 @@ export default function AdminCircuitsPage() {
         sourceCircuit={sourceCircuit}
       />
 
+      {drafts.length > 0 && (
+        <div className="mb-6 bg-orange-50 border border-orange-200 rounded-xl p-4">
+          <h2 className="text-orange-800 font-bold mb-3 flex items-center gap-2">
+            <ClipboardList className="w-5 h-5" /> Local Drafts
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {drafts.map(draft => (
+              <div key={draft.id} className="bg-white rounded-lg p-3 border border-orange-100 flex items-center justify-between shadow-sm">
+                <span className="font-medium text-gray-900 truncate pr-2">{draft.title}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button size="sm" variant="outline" className="h-8 text-xs px-2" onClick={() => resumeDraft(draft.id)}>Resume</Button>
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => deleteDraft(draft.id)}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
         {circuits.length === 0 ? (
           <div className="col-span-full py-12 text-center bg-white border border-gray-200 border-dashed rounded-xl">
@@ -180,6 +233,7 @@ export default function AdminCircuitsPage() {
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-gray-500">
                   <span className="flex items-center gap-1.5"><ClipboardList className="h-3.5 w-3.5" />{circuit._count?.days || 0} itinerary days</span>
                   <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" />{circuit._count?.trips || 0} created trips</span>
+                  <span className="flex items-center gap-1.5 col-span-2"><CalendarDays className="h-3.5 w-3.5" />{circuit._count?.festivals || 0} created festivals</span>
                 </div>
 
                 <div className="mt-5 grid grid-cols-2 gap-2">

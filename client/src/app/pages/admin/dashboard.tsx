@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { AlertTriangle, ArrowRight, BookOpen, CalendarCheck, CalendarRange, CheckCircle2, ClipboardCheck, Loader2, Map, RefreshCcw } from "lucide-react";
+import { AlertTriangle, ArrowRight, BookOpen, CalendarCheck, CalendarRange, CheckCircle2, ClipboardCheck, Loader2, Map, RefreshCcw, Wrench } from "lucide-react";
 import { apiClient } from "../../../lib/axios";
 import { toast } from "sonner";
 import { getErrorMessage } from "../../../lib/errors";
@@ -19,9 +19,25 @@ export default function AdminDashboard() {
   const trips = useQuery({ queryKey: ["admin", "trips", "overview"], queryFn: async () => (await apiClient.get("/trips", { params: { adminView: true, limit: 200 } })).data.data });
   const bookings = useQuery({ queryKey: ["admin", "bookings", "overview"], queryFn: async () => (await apiClient.get("/bookings", { params: { limit: 1000 } })).data.data });
   const tasks = useQuery({ queryKey: ["admin", "operational-tasks", "overview"], queryFn: async () => (await apiClient.get("/operations", { params: { limit: 500 } })).data });
+  const maintenance = useQuery({ queryKey: ["site-settings"], queryFn: async () => (await apiClient.get("/site-settings")).data.data as { maintenanceMode: boolean } });
   
   const loading = circuits.isLoading || trips.isLoading || bookings.isLoading || tasks.isLoading;
   const failedQueries = [circuits, trips, bookings, tasks].filter((query) => query.isError);
+
+  const toggleMaintenance = async () => {
+    const enabled = !maintenance.data?.maintenanceMode;
+    try {
+      await apiClient.put("/site-settings/maintenance", { maintenanceMode: enabled });
+      await maintenance.refetch();
+      toast.success(enabled ? "Maintenance mode is on" : "Maintenance mode is off", {
+        description: enabled ? "Customer actions are paused; admins can continue working." : "Customer actions are available again.",
+      });
+    } catch (error) {
+      toast.error("Could not update maintenance mode", {
+        description: getErrorMessage(error, "Please try again."),
+      });
+    }
+  };
   
   useEffect(() => {
     if (failedQueries.length > 0) {
@@ -58,6 +74,35 @@ export default function AdminDashboard() {
           </div>
         </div>
       </header>
+
+      <section className={`rounded-lg border p-5 ${maintenance.data?.maintenanceMode ? "border-amber-300 bg-amber-50" : "border-gray-200 bg-white"}`}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className={`rounded-md p-2 ${maintenance.data?.maintenanceMode ? "bg-amber-100 text-amber-800" : "bg-gray-100 text-gray-600"}`}>
+              <Wrench className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-gray-900">Maintenance mode</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                {maintenance.data?.maintenanceMode
+                  ? "Enabled — customers can browse, but cannot book, pay, submit forms, or change their details."
+                  : "Disabled — customers can book and use the site normally."}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={maintenance.data?.maintenanceMode ?? false}
+            aria-label="Toggle maintenance mode"
+            disabled={maintenance.isLoading || maintenance.isFetching}
+            onClick={toggleMaintenance}
+            className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${maintenance.data?.maintenanceMode ? "bg-amber-600" : "bg-gray-300"}`}
+          >
+            <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform ${maintenance.data?.maintenanceMode ? "translate-x-7" : "translate-x-1"}`} />
+          </button>
+        </div>
+      </section>
 
       {loading ? (
         <div className="flex min-h-32 items-center justify-center">

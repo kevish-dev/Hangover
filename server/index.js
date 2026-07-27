@@ -24,9 +24,12 @@ import ledgerRoutes from "./src/modules/ledger/ledger.routes.js";
 import operationsRoutes from "./src/modules/operations/operations.routes.js";
 import invoiceRoutes from "./src/modules/invoice/invoice.routes.js";
 import analyticsRoutes from "./src/modules/analytics/analytics.routes.js";
+import siteSettingsRoutes from "./src/modules/site-settings/site-settings.routes.js";
 import { errorHandler } from "./src/core/errors/errorHandler.js";
 import { prisma } from "./src/prisma/client.js";
 import { startOperationsWorker } from "./src/workers/operations.worker.js";
+import { optionalAuth } from "./src/core/middlewares/auth.middleware.js";
+import { blockCustomerWritesDuringMaintenance } from "./src/core/middlewares/maintenance.middleware.js";
 const app = express();
 
 // Raw body parser for Razorpay webhook (must be before express.json)
@@ -49,7 +52,12 @@ app.use(
 
 app.use(cookieParser());
 
+// Resolve an existing session once so maintenance mode can exempt administrators
+// before any customer-facing route handles a write request.
+app.use("/api/v1", optionalAuth, blockCustomerWritesDuringMaintenance);
+
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/site-settings", siteSettingsRoutes);
 app.use("/api/v1/trips", tripRoutes);
 app.use("/api/v1/festivals", festivalRoutes);
 app.use("/api/v1/circuits", circuitRoutes);

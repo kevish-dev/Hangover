@@ -59,6 +59,14 @@ model User {
   @@index([role])
 }
 
+// A single, application-wide setting row. The fixed ID keeps reads and updates
+// deterministic while allowing this setting to grow without environment flags.
+model SiteSetting {
+  id              String   @id @default("default")
+  maintenanceMode Boolean  @default(false)
+  updatedAt       DateTime @updatedAt
+}
+
 model UserProfile {
   id                       String      @id @default(uuid())
   userId                   String      @unique
@@ -443,16 +451,16 @@ model Booking {
   source             BookingSource     @default(CATALOG)
   packageId          String?
   slotId             String?
-  package            Package?          @relation(fields: [packageId], references: [id], onDelete: Restrict)
-  slot               Slot?             @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  package            Package?          @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  slot               Slot?             @relation(fields: [slotId], references: [id], onDelete: SetNull)
   user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   payments           Payment[]
   paymentIntents     PaymentIntent[]
   reminders          PaymentReminder[]
   travelers          Traveler[]
-  trip               Trip?             @relation(fields: [tripId], references: [id], onDelete: Restrict)
+  trip               Trip?             @relation(fields: [tripId], references: [id], onDelete: Cascade)
   tripId             String?
-  festival           Festival?         @relation(fields: [festivalId], references: [id], onDelete: Restrict)
+  festival           Festival?         @relation(fields: [festivalId], references: [id], onDelete: Cascade)
   festivalId         String?
   review             Review?
 
@@ -633,6 +641,7 @@ model AddOn {
   imageUrl                 String?
   price                    Decimal        @db.Decimal(10, 2)
   maxQuantityPerBooking    Int?
+  maxQuantityPerSlot       Int?
   purchaseCutoffOffsetDays Int?
   isActive                 Boolean        @default(true)
   createdAt                DateTime       @default(now())
@@ -650,7 +659,7 @@ model BookingAddOn {
   bookingId     String
   booking       Booking            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   addOnId       String
-  addOn         AddOn              @relation(fields: [addOnId], references: [id], onDelete: Restrict)
+  addOn         AddOn              @relation(fields: [addOnId], references: [id], onDelete: Cascade)
   quantity      Int                @default(1)
   unitPrice     Decimal            @db.Decimal(10, 2)
   totalPrice    Decimal            @db.Decimal(10, 2)

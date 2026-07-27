@@ -34,6 +34,11 @@ export const getFestivalById = async (id, isAdmin = false) => {
   const where = isAdmin ? { [idField]: id } : { [idField]: id, isPublished: true };
   const festival = await festivalRepo.findById(where, isAdmin);
   if (!festival) throw new Error("Festival not found");
+  // Circuit add-ons are available to checkout when this festival has no
+  // festival-specific add-ons of its own.
+  if ((!festival.addOns || festival.addOns.length === 0) && festival.circuit?.addOns?.length) {
+    festival.addOns = festival.circuit.addOns;
+  }
   return festival;
 };
 
@@ -58,7 +63,9 @@ export const createFestival = async (data) => {
 
   const festival = await festivalRepo.create(data);
 
-  if (data.circuitId) {
+  // The create form already sends a parsed itinerary when it is forked from a
+  // circuit. Only clone the circuit days for older callers that send none.
+  if (data.circuitId && (!Array.isArray(data.itinerary) || data.itinerary.length === 0)) {
     const circuit = await prisma.circuit.findUnique({
       where: { id: data.circuitId },
       include: { days: true }
