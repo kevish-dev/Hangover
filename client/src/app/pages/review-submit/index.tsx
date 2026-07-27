@@ -4,6 +4,7 @@ import { Star, Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { submitReview } from "../../../lib/reviewApi";
 import { useMutation } from "@tanstack/react-query";
+import { showErrorToast } from "../../../lib/errors";
 
 export default function ReviewSubmitPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
@@ -17,15 +18,13 @@ export default function ReviewSubmitPage() {
     mutationFn: async () => {
       if (!bookingId) throw new Error("Booking ID missing");
       if (rating === 0) throw new Error("Please select a rating");
-      return submitReview({ bookingId, rating, comment });
+      return submitReview({ bookingId, rating, comment: comment.trim() || undefined });
     },
     onSuccess: () => {
       setIsSuccess(true);
       toast.success("Thank you for your review!");
     },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || error.message || "Failed to submit review");
-    }
+    onError: (error: unknown) => showErrorToast(error, "Failed to submit review"),
   });
 
   if (isSuccess) {

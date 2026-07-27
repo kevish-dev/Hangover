@@ -1,6 +1,7 @@
 import { apiClient } from "./axios";
 
 export interface Review {
+  customTrip: any;
   id: string;
   rating: number;
   comment: string | null;

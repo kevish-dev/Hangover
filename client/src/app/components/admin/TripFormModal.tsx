@@ -24,17 +24,41 @@ import {
   ArrowUp,
   ArrowDown,
   Trash,
+  ClipboardList,
+  ImagePlus,
+  X,
 } from "lucide-react";
 import { apiClient } from "../../../lib/axios";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ItineraryStep } from "./ItineraryStep";
 import { formatTripType } from "../../../lib/tripApi";
-import { uploadBannerImagesDirect } from "../../../lib/directImageUpload";
+import { uploadBannerImagesDirect, uploadGenericImageDirect } from "../../../lib/directImageUpload";
+import { showErrorToast } from "../../../lib/errors";
+import {
+  toAddOnFields,
+  toArray,
+  toFaqFields,
+  toItineraryFields,
+  toPackageFields,
+  toTagFields,
+  toValueFields,
+} from "./formDataMappers";
 
 // --- VALIDATION SCHEMA ---
+const optionalPositiveInteger = z.preprocess(
+  (a) => (a === "" ? undefined : a),
+  z.coerce.number().int().positive().optional()
+);
+
+const optionalNonnegativeInteger = z.preprocess(
+  (a) => (a === "" ? undefined : a),
+  z.coerce.number().int().nonnegative().optional()
+);
 const tripSchema = z.object({
+  circuitId: z.string().uuid().optional(),
+  destinationId: z.string().uuid().optional(),
   title: z.string().min(3, "Title must be at least 3 characters"),
   location: z.string().min(2, "Location is required"),
   tripType: z.string().min(1, "Trip type is required"),
@@ -42,27 +66,33 @@ const tripSchema = z.object({
   slots: z.array(
     z.object({
       id: z.string().optional(),
-      startDate: z.string().optional(),
-      endDate: z.string().optional(),
+      startDate: z.string().min(1, "Start date is required"),
+      endDate: z.string().min(1, "End date is required"),
       title: z.string().optional(),
       priority: z.coerce.number().optional(),
       capacity: z.coerce.number().min(1, "Capacity must be at least 1"),
     })
-  ).min(1, "At least one slot is required"),
+  ).min(1, "At least one slot is required").superRefine((slots, context) => {
+    slots.forEach((slot, index) => {
+      if (slot.startDate && slot.endDate && new Date(slot.endDate) <= new Date(slot.startDate)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "End date must be after the start date",
+          path: [index, "endDate"],
+        });
+      }
+    });
+  }),
 
-  overview: z.string().min(10, "Overview must be detailed"),
-  inclusions: z
-    .array(z.object({ value: z.string().min(1, "Inclusion is required") }))
-    .min(1, "At least one inclusion is required"),
-  exclusions: z
-    .array(z.object({ value: z.string().min(1, "Exclusion is required") }))
-    .min(1, "At least one exclusion is required"),
-  tripTags: z.array(z.object({ value: z.string().min(1) })).optional(),
+  overview: z.string().optional(),
+  inclusions: z.array(z.object({ value: z.string().optional() })).optional(),
+  exclusions: z.array(z.object({ value: z.string().optional() })).optional(),
+  tripTags: z.array(z.object({ value: z.string().optional() })).optional(),
   faqs: z
     .array(
       z.object({
-        question: z.string().min(1, "Required"),
-        answer: z.string().min(1, "Required"),
+        question: z.string().optional(),
+        answer: z.string().optional(),
       }),
     )
     .optional(),
@@ -72,19 +102,48 @@ const tripSchema = z.object({
       title: z.string().min(1, "Package name is required"),
       price: z.coerce.number().min(1, "Price must be greater than 0"),
       tokenAmount: z.coerce.number().min(0, "Booking amount must be 0 or more"),
+    }).refine((value) => value.tokenAmount <= value.price, {
+      message: "Booking amount cannot exceed the package price",
+      path: ["tokenAmount"],
     })
   ).min(1, "At least one pricing package is required"),
   isPublished: z.boolean().default(false),
   isFeatured: z.boolean().default(false),
-  itinerary: z.array(
+  isActive: z.boolean().default(true),
+  isListed: z.boolean().default(true),
+    itinerary: z.array(
+      z.object({
+        day: z.string().min(1, "Day is required"),
+        title: z.string().min(1, "Title is required"),
+        description: z.string().optional(),
+        todos: z.preprocess((val) => typeof val === 'string' ? val.split('\n').filter(Boolean) : val, z.array(z.string())).optional(),
+        tasks: z.array(
+          z.object({
+            id: z.string().uuid().optional(),
+            category: z.string().min(1),
+            title: z.string().min(1, "Task title is required"),
+            description: z.string().optional(),
+            unitPrice: z.coerce.number().positive().optional(),
+            quantityNeeded: z.coerce.number().int().nonnegative().optional(),
+            dueOffsetDays: z.coerce.number().int().nonnegative().optional(),
+          })
+        ).optional().default([]),
+      })
+    ).optional(),
+  addOns: z.array(
     z.object({
-      day: z.string().min(1, "Day is required"),
-      title: z.string().min(1, "Title is required"),
-      activities: z.string().min(1, "Activities are required")
+      id: z.string().uuid().optional(),
+      title: z.string().min(1, "Add-on title is required"),
+      description: z.string().optional(),
+      imageUrl: z.string().url("Enter a valid URL").optional().or(z.literal("")),
+      price: z.coerce.number().positive(),
+      maxQuantityPerBooking: optionalPositiveInteger,
+      maxQuantityPerSlot: optionalPositiveInteger,
+      purchaseCutoffOffsetDays: optionalNonnegativeInteger,
+      isActive: z.boolean().default(true),
     })
   ).optional(),
-  }
-);
+});
 
 type TripFormValues = z.infer<typeof tripSchema>;
 
@@ -102,30 +161,46 @@ const TRIP_TYPES = [
   "CUSTOM_TRIP",
 ];
 
+const TASK_CATEGORIES = [
+  "HOTEL",
+  "TRANSPORT",
+  "PERMIT",
+  "VENDOR",
+  "ACTIVITY",
+  "DOCUMENTATION",
+  "PAYMENT_COLLECTION",
+  "GENERAL",
+];
+
 const STEPS = [
   "Basics",
   "Logistics",
   "Content",
   "FAQs & Tags",
   "Itinerary",
+  "Operations",
   "Stay & Transport",
   "Media",
 ];
 
 interface TripFormModalProps {
   trip?: any;
+  sourceCircuit?: any;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function TripFormModal({
   trip,
+  sourceCircuit,
   open,
   onOpenChange,
 }: TripFormModalProps) {
   const [step, setStep] = useState(0);
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [localBannerImages, setLocalBannerImages] = useState<string[]>([]);
+  const [uploadingImageKey, setUploadingImageKey] = useState<string | null>(null);
 
   // Highlight State
   const [highlightItems, setHighlightItems] = useState<
@@ -152,7 +227,14 @@ export function TripFormModal({
   >([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [canSubmit, setCanSubmit] = useState(false);
   const queryClient = useQueryClient();
+  const destinationsQuery = useQuery({
+    queryKey: ["admin", "destinations", "trip-form"],
+    queryFn: async () => (await apiClient.get("/destinations", { params: { adminView: true, limit: 200 } })).data.data as Array<{ id: string; name: string; state?: string | null }>,
+    enabled: open,
+  });
+  const destinations = destinationsQuery.data || [];
 
   const isEdit = !!trip;
 
@@ -169,6 +251,8 @@ export function TripFormModal({
   const form = useForm<TripFormValues>({
     resolver: zodResolver(tripSchema),
     defaultValues: {
+      circuitId: undefined,
+      destinationId: undefined,
       title: "",
       location: "",
       tripType: "MOUNTAIN_TREK",
@@ -179,9 +263,13 @@ export function TripFormModal({
       exclusions: [],
       tripTags: [],
       packages: [{ title: "Standard", price: 0, tokenAmount: 0 }],
+      addOns: [],
+      itinerary: [],
       faqs: [],
       isPublished: false,
       isFeatured: false,
+      isActive: true,
+      isListed: true,
     },
     mode: "onTouched",
   });
@@ -192,6 +280,8 @@ export function TripFormModal({
       if (trip) {
         form.reset({
           title: trip.title || "",
+          circuitId: trip.circuitId || undefined,
+          destinationId: trip.destinationId || undefined,
           location: trip.location || "",
           tripType: trip.tripType || "MOUNTAIN_TREK",
           bestTimeToVisit: trip.bestTimeToVisit || "",
@@ -204,44 +294,19 @@ export function TripFormModal({
             capacity: s.capacity
           })) : [{ startDate: "", endDate: "", capacity: 12, title: "", priority: 0 }],
           overview: trip.overview || "",
-          inclusions: Array.isArray(trip.inclusions) && trip.inclusions.length > 0
-            ? trip.inclusions.map((i: any) => ({ value: typeof i === 'string' ? i : (i.value || "") }))
-            : typeof trip.inclusions === 'string' && trip.inclusions.trim().startsWith('[')
-              ? JSON.parse(trip.inclusions).map((i: any) => ({ value: typeof i === 'string' ? i : (i.value || "") }))
-              : [{ value: "" }],
-          exclusions: Array.isArray(trip.exclusions) && trip.exclusions.length > 0
-            ? trip.exclusions.map((e: any) => ({ value: typeof e === 'string' ? e : (e.value || "") }))
-            : typeof trip.exclusions === 'string' && trip.exclusions.trim().startsWith('[')
-              ? JSON.parse(trip.exclusions).map((e: any) => ({ value: typeof e === 'string' ? e : (e.value || "") }))
-              : [{ value: "" }],
-          tripTags: trip.tripTags?.length
-            ? trip.tripTags.map((t: any) => ({ value: t.tag }))
-            : [{ value: "" }],
-          faqs: trip.faqs?.length
-            ? trip.faqs.map((f: any) => ({
-                question: f.question,
-                answer: f.answer,
-              }))
-            : [],
-          packages: trip.packages?.length
-            ? trip.packages.map((p: any) => ({
-                id: p.id,
-                title: p.title,
-                price: Number(p.price),
-                tokenAmount: Number(p.tokenAmount),
-              }))
+          inclusions: toValueFields(trip.inclusions),
+          exclusions: toValueFields(trip.exclusions),
+          tripTags: toTagFields(trip.tripTags ?? trip.tags),
+          faqs: toFaqFields(trip.faqs),
+          packages: toPackageFields(trip.packages).length
+            ? toPackageFields(trip.packages)
             : [{ title: "Standard", price: 0, tokenAmount: 0 }],
-          itinerary: Array.isArray(trip.itinerary) ? trip.itinerary.map((day: any) => ({
-            day: day.day || `Day ${day.dayNumber || 1}`,
-            title: day.title || "",
-            activities: typeof day.activities === 'string' 
-              ? day.activities 
-              : Array.isArray(day.activities) 
-                ? day.activities.join('\n') 
-                : ""
-          })) : [],
+          addOns: toAddOnFields(trip.addOns),
+          itinerary: toItineraryFields(trip.itinerary),
           isPublished: trip.isPublished || false,
           isFeatured: trip.isFeatured || false,
+          isActive: trip.isActive ?? true,
+          isListed: trip.isListed ?? true,
         });
         // Keep the field-array source of truth in sync with the values shown
         // after editing an existing trip. This prevents validation from reading
@@ -249,6 +314,11 @@ export function TripFormModal({
         replaceSlots(form.getValues("slots"));
         replaceInclusions(form.getValues("inclusions"));
         replaceExclusions(form.getValues("exclusions"));
+        replaceTripTags(form.getValues("tripTags"));
+        replacePackages(form.getValues("packages"));
+        replaceAddOns(form.getValues("addOns"));
+        replaceFaqs(form.getValues("faqs"));
+        replaceItinerary(form.getValues("itinerary"));
         form.clearErrors();
 
         // Initialize Highlight items
@@ -266,6 +336,12 @@ export function TripFormModal({
           })) : []
         );
 
+        let parsedBanners = trip.bannerImages || [];
+        if (typeof parsedBanners === "string") {
+          try { parsedBanners = JSON.parse(parsedBanners); } catch(e) { parsedBanners = []; }
+        }
+        setLocalBannerImages(Array.isArray(parsedBanners) ? parsedBanners : []);
+
         // Initialize Stay items
         let parsedStay = trip.stayTransportImages || [];
         if (typeof parsedStay === "string") {
@@ -280,8 +356,62 @@ export function TripFormModal({
             preview: item.imageUrl,
           })) : []
         );
+      } else if (sourceCircuit) {
+        form.reset({
+          circuitId: sourceCircuit.id,
+          destinationId: sourceCircuit.destinationId || undefined,
+          title: sourceCircuit.title || "",
+          location: sourceCircuit.location || "",
+          tripType: sourceCircuit.tripType || "MOUNTAIN_TREK",
+          bestTimeToVisit: sourceCircuit.bestTimeToVisit || "",
+          slots: [{ startDate: "", endDate: "", capacity: 12, title: "", priority: 0 }],
+          overview: sourceCircuit.overview || "",
+          inclusions: toValueFields(sourceCircuit.inclusions),
+          exclusions: toValueFields(sourceCircuit.exclusions),
+          tripTags: toTagFields(sourceCircuit.tags),
+          packages: toPackageFields(sourceCircuit.packages),
+          addOns: toAddOnFields(sourceCircuit.addOns),
+          faqs: toFaqFields(sourceCircuit.faqs),
+          itinerary: toItineraryFields(sourceCircuit.days),
+          isPublished: false,
+          isFeatured: false,
+          isActive: true,
+          isListed: true,
+        });
+        replaceSlots(form.getValues("slots"));
+        replaceInclusions(form.getValues("inclusions"));
+        replaceExclusions(form.getValues("exclusions"));
+        replaceTripTags(form.getValues("tripTags"));
+        replacePackages(form.getValues("packages"));
+        replaceAddOns(form.getValues("addOns"));
+        replaceFaqs(form.getValues("faqs"));
+        replaceItinerary(form.getValues("itinerary"));
+        setHighlightItems(toArray(sourceCircuit.highlights).map((item: any) => ({
+          id: Math.random().toString(),
+          text: item.text || "",
+          type: "EXISTING" as const,
+          url: item.imageUrl,
+          preview: item.imageUrl,
+        })));
+        setStayItems(toArray(sourceCircuit.stayTransportImages).map((item: any) => ({
+          id: Math.random().toString(),
+          text: item.text || "",
+          type: "EXISTING" as const,
+          url: item.imageUrl,
+          preview: item.imageUrl,
+        })));
+
+        let parsedBanners = sourceCircuit.bannerImages || [];
+        if (typeof parsedBanners === "string") {
+          try { parsedBanners = JSON.parse(parsedBanners); } catch(e) { parsedBanners = []; }
+        }
+        setLocalBannerImages(Array.isArray(parsedBanners) ? parsedBanners : []);
+        
+        form.clearErrors();
       } else {
         form.reset({
+          circuitId: undefined,
+          destinationId: undefined,
           title: "",
           location: "",
           tripType: "MOUNTAIN_TREK",
@@ -292,23 +422,32 @@ export function TripFormModal({
           exclusions: [],
           tripTags: [],
           packages: [{ title: "Standard", price: 0, tokenAmount: 0 }],
+          addOns: [],
           faqs: [],
           itinerary: [],
           isPublished: false,
           isFeatured: false,
+          isActive: true,
+          isListed: true,
         });
         replaceSlots(form.getValues("slots"));
         replaceInclusions(form.getValues("inclusions"));
         replaceExclusions(form.getValues("exclusions"));
+        replaceTripTags([]);
+        replacePackages([{ title: "Standard", price: 0, tokenAmount: 0 }]);
+        replaceAddOns([]);
+        replaceFaqs([]);
+        replaceItinerary([]);
         form.clearErrors();
         setStayItems([]);
         setHighlightItems([]);
+        setLocalBannerImages([]);
       }
       setStep(0);
       setImages([]);
       setImagePreviews([]);
     }
-  }, [trip, open, form]);
+  }, [trip, sourceCircuit, open, form]);
 
   const {
     fields: inclusionFields,
@@ -332,6 +471,7 @@ export function TripFormModal({
     fields: tripTagFields,
     append: addTripTag,
     remove: removeTripTag,
+    replace: replaceTripTags,
   } = useFieldArray({
     control: form.control,
     name: "tripTags",
@@ -340,8 +480,18 @@ export function TripFormModal({
     fields: packageFields,
     append: appendPackage,
     remove: removePackage,
+    replace: replacePackages,
   } = useFieldArray({
     name: "packages",
+    control: form.control,
+  });
+  const {
+    fields: addOnsFields,
+    append: appendAddOn,
+    remove: removeAddOn,
+    replace: replaceAddOns,
+  } = useFieldArray({
+    name: "addOns",
     control: form.control,
   });
   const {
@@ -358,9 +508,15 @@ export function TripFormModal({
     append: addFaq,
     remove: removeFaq,
     move: moveFaq,
+    replace: replaceFaqs,
   } = useFieldArray({
     control: form.control,
     name: "faqs",
+  });
+  
+  const { fields: itineraryFields, replace: replaceItinerary } = useFieldArray({
+    control: form.control,
+    name: "itinerary",
   });
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -469,7 +625,10 @@ export function TripFormModal({
   };
 
   const deleteExistingImage = async (url: string) => {
-    if (!trip?.id) return;
+    if (!trip?.id) {
+      setLocalBannerImages(prev => prev.filter(img => img !== url));
+      return;
+    }
     if (
       !window.confirm(
         "Are you sure you want to permanently delete this banner image?",
@@ -485,34 +644,14 @@ export function TripFormModal({
       trip.bannerImages = trip.bannerImages.filter(
         (img: string) => img !== url,
       );
+      setLocalBannerImages(prev => prev.filter(img => img !== url));
       queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Failed to delete image");
+    } catch (error: unknown) {
+      showErrorToast(error, "Failed to delete image");
     }
   };
 
-  const deleteExistingGalleryImage = async (url: string) => {
-    if (!trip?.id) return;
-    if (
-      !window.confirm(
-        "Are you sure you want to permanently delete this gallery image?",
-      )
-    )
-      return;
 
-    try {
-      await apiClient.delete(`/trips/${trip.id}/gallery-images`, {
-        data: { imageUrl: url },
-      });
-      toast.success("Gallery image deleted successfully");
-      trip.galleryImages = trip.galleryImages.filter(
-        (img: string) => img !== url,
-      );
-      queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Failed to delete image");
-    }
-  };
 
   // Human-readable labels for trip form fields
   const FIELD_LABELS: Record<string, string> = {
@@ -560,6 +699,7 @@ export function TripFormModal({
         "tripType",
         "bestTimeToVisit",
         "packages",
+        "addOns",
       ];
     else if (step === 1) {
       fieldsToValidate = ["slots"];
@@ -568,9 +708,22 @@ export function TripFormModal({
     }
     if (step === 3) fieldsToValidate = ["faqs", "tripTags"];
     if (step === 4) fieldsToValidate = ["itinerary"];
-    if (step === 5) return true; // Stay & Transport has local state, basic validation can be skipped or added if needed
+    if (step === 5) fieldsToValidate = ["itinerary"]; // Operations validates the tasks inside itinerary
+    if (step === 6) return true; // Stay & Transport has local state, basic validation can be skipped or added if needed
 
-    const isValid = await form.trigger(fieldsToValidate);
+    let fieldsToTrigger: any = fieldsToValidate;
+    if (step === 4) {
+      const itineraryCount = form.getValues("itinerary")?.length || 0;
+      fieldsToTrigger = [];
+      for (let i = 0; i < itineraryCount; i++) {
+        fieldsToTrigger.push(`itinerary.${i}.day`);
+        fieldsToTrigger.push(`itinerary.${i}.title`);
+        fieldsToTrigger.push(`itinerary.${i}.description`);
+        fieldsToTrigger.push(`itinerary.${i}.todos`);
+      }
+    }
+
+    const isValid = await form.trigger(fieldsToTrigger);
 
     if (step === 2) {
       const invalid = highlightItems.some(
@@ -584,7 +737,7 @@ export function TripFormModal({
       }
     }
 
-    if (step === 5) {
+    if (step === 6) {
       const invalid = stayItems.some(
         (i) => i.text.trim() === "" || (!i.preview && !i.url),
       );
@@ -602,14 +755,22 @@ export function TripFormModal({
   const nextStep = async () => {
     let fieldsToValidate: (keyof TripFormValues)[] = [];
     if (step === 0)
-      fieldsToValidate = ["title", "location", "tripType", "bestTimeToVisit", "packages"];
+      fieldsToValidate = ["title", "location", "tripType", "bestTimeToVisit", "packages", "addOns"];
     else if (step === 1) fieldsToValidate = ["slots"];
     else if (step === 2) fieldsToValidate = ["overview", "inclusions", "exclusions"];
     else if (step === 3) fieldsToValidate = ["faqs", "tripTags"];
     else if (step === 4) fieldsToValidate = ["itinerary"];
+    else if (step === 5) fieldsToValidate = ["itinerary"]; // Operations validates the tasks inside itinerary
 
     if (await validateStep()) {
-      setStep((s) => Math.min(STEPS.length - 1, s + 1));
+      setStep((s) => {
+        const next = Math.min(STEPS.length - 1, s + 1);
+        if (next === STEPS.length - 1) {
+          setCanSubmit(false);
+          setTimeout(() => setCanSubmit(true), 500);
+        }
+        return next;
+      });
     } else {
       const errors = fieldsToValidate.reduce<Record<string, unknown>>(
         (stepErrors, field) => {
@@ -625,7 +786,7 @@ export function TripFormModal({
           <div>
             <p className="font-semibold mb-1">Please fix the following before continuing:</p>
             <ul className="list-disc list-inside space-y-0.5 text-sm">
-              {missing.map((m, i) => <li key={i}>{m}</li>)}
+              {missing.map((m, i) => <li key={i}>{m.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</li>)}
             </ul>
           </div>,
           { position: "bottom-right", duration: 5000 }
@@ -645,7 +806,7 @@ export function TripFormModal({
         <div>
           <p className="font-semibold mb-1">Please fix the following before submitting:</p>
           <ul className="list-disc list-inside space-y-0.5 text-sm">
-            {missing.map((m, i) => <li key={i}>{m}</li>)}
+            {missing.map((m, i) => <li key={i}>{m.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</li>)}
           </ul>
         </div>,
         { position: "bottom-right", duration: 5000 }
@@ -654,19 +815,19 @@ export function TripFormModal({
       toast.error("Please fill all required fields correctly.", { position: "bottom-right" });
     }
   };
-  const onSubmit = async (data: TripFormValues) => {
-    if (step !== STEPS.length - 1) return;
+  const onSubmit = async (data: TripFormValues, saveFromCurrentStep = false) => {
+    if (!saveFromCurrentStep && step !== STEPS.length - 1) return;
 
     setIsSubmitting(true);
+    let tripId = trip?.id;
+    let coreTripSaved = false;
+    let createdNewTrip = false;
     try {
-      // Derive price/tokenAmount from cheapest package for DB compatibility
-      const sortedPkgs = [...data.packages].sort((a, b) => Number(a.price) - Number(b.price));
-      const lowestPkg = sortedPkgs[0];
-
       const payload = {
         ...data,
-        price: Number(lowestPkg.price),
-        tokenAmount: Number(lowestPkg.tokenAmount),
+        // Send null explicitly when the unlinked option is selected so edits
+        // disconnect the existing relation instead of leaving it unchanged.
+        destinationId: data.destinationId || null,
         slots: data.slots.map(s => ({
             ...s,
             startDate: s.startDate ? new Date(s.startDate).toISOString() : null,
@@ -686,16 +847,20 @@ export function TripFormModal({
         faqs: data.faqs?.filter(
           (f) => f.question.trim() !== "" && f.answer.trim() !== "",
         ),
+        ...(!isEdit && localBannerImages.length > 0 
+            ? { bannerImages: localBannerImages } 
+            : {}),
       };
-
-      let tripId = trip?.id;
 
       if (isEdit) {
         await apiClient.put(`/trips/${tripId}`, payload);
+        coreTripSaved = true;
         toast.success("Trip updated successfully!");
       } else {
         const createRes = await apiClient.post("/trips", payload);
         tripId = createRes.data.trip.id;
+        coreTripSaved = true;
+        createdNewTrip = true;
         toast.success("Trip created successfully!");
       }
 
@@ -795,10 +960,25 @@ export function TripFormModal({
       queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
       onOpenChange(false);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Failed to save trip");
+      if (coreTripSaved) {
+        await queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
+        toast.warning(createdNewTrip ? "Trip created, but some media could not be uploaded" : "Trip saved, but some media could not be updated", {
+          description: "The trip itself is safe. Open it from Trip Management and retry the media update.",
+        });
+        onOpenChange(false);
+      } else {
+        showErrorToast(error, isEdit ? "Could not update the trip" : "Could not create the trip");
+      }
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const saveCurrentChanges = () => {
+    void form.handleSubmit(
+      (data) => onSubmit(data, true),
+      onError,
+    )();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
@@ -809,16 +989,19 @@ export function TripFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!w-[calc(100%-0.75rem)] !max-h-[calc(100dvh-0.75rem)] md:!w-full md:!max-h-[90vh] sm:max-w-[700px] flex flex-col p-0 overflow-hidden">
+      <DialogContent className="!w-[calc(100%-0.75rem)] !max-h-[calc(100dvh-0.75rem)] sm:max-w-[800px] overflow-y-auto p-0 border-0 shadow-xl md:!w-full md:!max-h-[90vh] bg-white rounded-xl">
         <div className="px-4 pt-5 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b">
-          <DialogHeader>
+          <div className="p-6 sm:p-8">
+          <DialogHeader className="mb-6 border-b border-gray-100 pb-4">
             <DialogTitle className="text-xl sm:text-2xl font-bold pr-6">
-              {isEdit ? "Edit Trip" : "Create New Trip"}
+              {isEdit ? "Edit Trip" : sourceCircuit ? "Create trip from circuit" : "Create New Trip"}
             </DialogTitle>
             <DialogDescription>
               {isEdit
                 ? "Modify the details of your trip below."
-                : "Follow the steps to configure all details for the new trip."}
+                : sourceCircuit
+                  ? `Forked from ${sourceCircuit.title}. Add departure dates and adjust anything that differs.`
+                  : "Follow the steps to configure all details for the new trip."}
             </DialogDescription>
           </DialogHeader>
 
@@ -857,10 +1040,15 @@ export function TripFormModal({
           >
             {/* STEP 0: BASICS */}
             <div className={step === 0 ? "block" : "hidden"}>
+              {sourceCircuit && !isEdit && (
+                <div className="mb-4 rounded-xl border border-[#e8d9b7] bg-[#fbf7ed] p-4 text-sm text-[#6d541f]">
+                  Content, pricing, itinerary, task templates, tags, and add-ons are inherited from this circuit. This trip will remain linked to the template for booking operations.
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2 space-y-2">
-                  <Label>Trip Title <span className="text-red-500">*</span></Label>
-                  <Input
+                  <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Trip Title <span className="text-red-500">*</span></Label>
+                  <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                     {...form.register("title")}
                     placeholder="e.g. Kedarkantha Winter Trek"
                   />
@@ -871,8 +1059,8 @@ export function TripFormModal({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Location <span className="text-red-500">*</span></Label>
-                  <Input
+                  <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Location <span className="text-red-500">*</span></Label>
+                  <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                     {...form.register("location")}
                     placeholder="e.g. Uttarakhand, India"
                   />
@@ -883,7 +1071,7 @@ export function TripFormModal({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Trip Type <span className="text-red-500">*</span></Label>
+                  <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Trip Type <span className="text-red-500">*</span></Label>
                   <select
                     {...form.register("tripType")}
                     className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
@@ -901,8 +1089,25 @@ export function TripFormModal({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Best Time to Visit <span className="text-red-500">*</span></Label>
-                  <Input
+                  <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Destination</Label>
+                  <select
+                    value={form.watch("destinationId") || ""}
+                    onChange={(event) => form.setValue("destinationId", event.target.value || undefined, { shouldDirty: true })}
+                    disabled={destinationsQuery.isLoading}
+                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <option value="">No destination — leave unlinked</option>
+                    {destinations.map((destination) => (
+                      <option key={destination.id} value={destination.id}>
+                        {destination.name}{destination.state ? `, ${destination.state}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500">Choose another destination to relink this trip, or leave it unlinked.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Best Time to Visit <span className="text-red-500">*</span></Label>
+                  <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                     {...form.register("bestTimeToVisit")}
                     placeholder="e.g. Dec to March"
                   />
@@ -914,7 +1119,7 @@ export function TripFormModal({
                 </div>
 
                 {/* Pricing Packages Section */}
-                <div className="md:col-span-2 space-y-3 border-2 border-[#c8a96e]/30 bg-amber-50/30 p-3 sm:p-4 rounded-md">
+                <div className="md:col-span-2 space-y-3 border-2 border-[#b59410]/30 bg-gray-50/30 p-3 sm:p-4 rounded-md">
                   <div className="flex justify-between items-center">
                     <div>
                       <h3 className="font-semibold text-gray-900">Pricing Packages <span className="text-red-500">*</span></h3>
@@ -922,13 +1127,13 @@ export function TripFormModal({
                     </div>
                   </div>
                   {form.formState.errors.packages?.root?.message && (
-                    <p className="text-sm text-red-500">{form.formState.errors.packages.root.message}</p>
+                    <p className="text-xs font-semibold text-red-600 mt-1.5 flex items-center gap-1.5 bg-red-50 p-2 rounded-md border border-red-100">⚠️ {}</p>
                   )}
                   {packageFields.map((field, index) => (
                     <div key={field.id} className="flex flex-col md:flex-row gap-3 md:gap-4 items-stretch md:items-start relative p-3 border rounded-md">
                       <div className="flex-1 space-y-2">
-                        <Label>Title</Label>
-                        <Input
+                        <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Title</Label>
+                        <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                           placeholder="e.g. VIP Package"
                           {...form.register(`packages.${index}.title` as const)}
                         />
@@ -939,8 +1144,8 @@ export function TripFormModal({
                         )}
                       </div>
                       <div className="flex-1 space-y-2">
-                        <Label>Price (₹) <span className="text-red-500">*</span></Label>
-                        <Input
+                        <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Price (₹) <span className="text-red-500">*</span></Label>
+                        <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                           type="number"
                           {...form.register(`packages.${index}.price` as const)}
                         />
@@ -951,8 +1156,8 @@ export function TripFormModal({
                         )}
                       </div>
                       <div className="flex-1 space-y-2">
-                        <Label>Booking Amount (₹) <span className="text-red-500">*</span></Label>
-                        <Input
+                        <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Booking Amount (₹) <span className="text-red-500">*</span></Label>
+                        <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                           type="number"
                           {...form.register(`packages.${index}.tokenAmount` as const)}
                         />
@@ -984,15 +1189,172 @@ export function TripFormModal({
                     <Plus className="w-4 h-4 mr-2" /> Add Package
                   </Button>
                 </div>
+
+                <div className="md:col-span-2 space-y-4">
+                  <div className="mb-2">
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Optional add-ons</Label>
+                    <p className="text-xs text-gray-500">Travelers can add these while booking, before the cutoff.</p>
+                  </div>
+                  {addOnsFields.map((field, index) => {
+                    const currentUrl = form.watch(`addOns.${index}.imageUrl`);
+                    return (
+                      <div key={field.id} className="flex flex-col gap-4 p-4 border rounded-lg bg-gray-50 md:flex-row">
+                        <div className="w-full md:w-32 shrink-0">
+                          <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
+                            Image
+                          </Label>
+                          {currentUrl ? (
+                            <div className="relative group w-full aspect-square mt-1">
+                              <img
+                                src={currentUrl}
+                                alt=""
+                                className="w-full h-full rounded-lg object-cover border bg-white shadow-sm"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  form.setValue(`addOns.${index}.imageUrl`, "", {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                  })
+                                }
+                                className="absolute -top-2 -right-2 hidden group-hover:flex items-center justify-center h-6 w-6 rounded-full bg-red-500 text-white shadow-md transition-transform hover:scale-110"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <label
+                              className={`mt-1 flex flex-col items-center justify-center w-full aspect-square rounded-lg border-2 border-dashed border-gray-300 bg-white transition-colors shadow-sm ${uploadingImageKey === `addOns.${index}` ? "opacity-70 cursor-not-allowed" : "hover:bg-gray-50 cursor-pointer"}`}
+                            >
+                              {uploadingImageKey === `addOns.${index}` ? (
+                                <Loader2 className="h-6 w-6 text-gray-400 mb-2 animate-spin" />
+                              ) : (
+                                <ImagePlus className="h-6 w-6 text-gray-400 mb-2" />
+                              )}
+                              <span className="text-xs font-semibold text-gray-500">
+                                {uploadingImageKey === `addOns.${index}` ? "Uploading..." : "Upload"}
+                              </span>
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept="image/*"
+                                disabled={uploadingImageKey === `addOns.${index}`}
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  setUploadingImageKey(`addOns.${index}`);
+                                  try {
+                                    const url = await uploadGenericImageDirect(file);
+                                    form.setValue(`addOns.${index}.imageUrl`, url, {
+                                      shouldDirty: true,
+                                      shouldValidate: true,
+                                    });
+                                    toast.success("Image uploaded successfully");
+                                  } catch (err: any) {
+                                    toast.error(err.message || "Failed to upload image");
+                                  } finally {
+                                    setUploadingImageKey(null);
+                                  }
+                                }}
+                              />
+                            </label>
+                          )}
+                          {form.formState.errors.addOns?.[index]?.imageUrl && (
+                            <p className="text-xs font-semibold text-red-600 mt-1">{form.formState.errors.addOns[index]?.imageUrl?.message}</p>
+                          )}
+                        </div>
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Name <span className="text-red-500">*</span></Label>
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                              {...form.register(`addOns.${index}.title` as const)}
+                            />
+                            {form.formState.errors.addOns?.[index]?.title && (
+                              <p className="text-xs font-semibold text-red-600 mt-1">{form.formState.errors.addOns[index]?.title?.message}</p>
+                            )}
+                          </div>
+                          <div>
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Price <span className="text-red-500">*</span></Label>
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              {...form.register(`addOns.${index}.price` as const)}
+                            />
+                            {form.formState.errors.addOns?.[index]?.price && (
+                              <p className="text-xs font-semibold text-red-600 mt-1">{form.formState.errors.addOns[index]?.price?.message}</p>
+                            )}
+                          </div>
+                          <div className="md:col-span-2">
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Description</Label>
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                              {...form.register(`addOns.${index}.description` as const)}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Max Qty (Per Booking)</Label>
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                              type="number"
+                              min="1"
+                              {...form.register(`addOns.${index}.maxQuantityPerBooking` as const)}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Max Qty (Total / Slot)</Label>
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                              type="number"
+                              min="1"
+                              {...form.register(`addOns.${index}.maxQuantityPerSlot` as const)}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Cutoff (days before start)</Label>
+                            <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                              type="number"
+                              min="0"
+                              {...form.register(`addOns.${index}.purchaseCutoffOffsetDays` as const)}
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 mt-auto pb-2">
+                            <input
+                              type="checkbox"
+                              {...form.register(`addOns.${index}.isActive` as const)}
+                              className="h-4 w-4 accent-[#781216]"
+                            />
+                            <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-0 block">Active</Label>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="text-red-500 shrink-0 mt-6"
+                          onClick={() => removeAddOn(index)}
+                        >
+                          <Trash className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 w-full border-dashed"
+                    onClick={() => appendAddOn({ title: "", price: 0, description: "", isActive: true })}
+                  >
+                    <Plus className="w-4 h-4 mr-2" /> Add Add-on
+                  </Button>
+                </div>
                 <div className="space-y-2 md:col-span-2 flex flex-col md:flex-row md:items-center gap-4 mt-2">
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       id="isPublished"
                       {...form.register("isPublished")}
-                      className="w-4 h-4 text-[#c8a96e] rounded border-gray-300 focus:ring-[#c8a96e]"
+                      className="w-4 h-4 text-[#b59410] rounded border-gray-300 focus:ring-[#b59410]"
                     />
-                    <Label htmlFor="isPublished" className="mb-0 cursor-pointer">
+                    <Label htmlFor="isPublished" className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block mb-0 cursor-pointer">
                       Publish this trip (visible to public)
                     </Label>
                   </div>
@@ -1001,10 +1363,32 @@ export function TripFormModal({
                       type="checkbox"
                       id="isFeatured"
                       {...form.register("isFeatured")}
-                      className="w-4 h-4 text-[#c8a96e] rounded border-gray-300 focus:ring-[#c8a96e]"
+                      className="w-4 h-4 text-[#b59410] rounded border-gray-300 focus:ring-[#b59410]"
                     />
-                    <Label htmlFor="isFeatured" className="mb-0 cursor-pointer">
+                    <Label htmlFor="isFeatured" className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block mb-0 cursor-pointer">
                       Feature this trip (highlight on homepage)
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="isListed"
+                      {...form.register("isListed")}
+                      className="w-4 h-4 text-[#b59410] rounded border-gray-300 focus:ring-[#b59410]"
+                    />
+                    <Label htmlFor="isListed" className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block mb-0 cursor-pointer">
+                      List in the public catalog
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="isActive"
+                      {...form.register("isActive")}
+                      className="w-4 h-4 text-[#b59410] rounded border-gray-300 focus:ring-[#b59410]"
+                    />
+                    <Label htmlFor="isActive" className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block mb-0 cursor-pointer">
+                      Accept bookings
                     </Label>
                   </div>
                 </div>
@@ -1016,7 +1400,7 @@ export function TripFormModal({
               <div className="space-y-6">
                 <div>
                   <div className="mb-2">
-                    <Label>Slots (Dates & Capacity) <span className="text-red-500">*</span></Label>
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Slots (Dates & Capacity) <span className="text-red-500">*</span></Label>
                   </div>
                   {form.formState.errors.slots?.root && (
                     <p className="text-sm text-red-500 mb-2">
@@ -1029,8 +1413,8 @@ export function TripFormModal({
                         <div className="flex-1 space-y-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label>Start Date <span className="text-red-500">*</span></Label>
-                              <Input
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Start Date <span className="text-red-500">*</span></Label>
+                              <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                                 type="datetime-local"
                                 {...form.register(`slots.${index}.startDate`)}
                               />
@@ -1041,8 +1425,8 @@ export function TripFormModal({
                               )}
                             </div>
                             <div className="space-y-2">
-                              <Label>End Date <span className="text-red-500">*</span></Label>
-                              <Input
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">End Date <span className="text-red-500">*</span></Label>
+                              <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                                 type="datetime-local"
                                 {...form.register(`slots.${index}.endDate`)}
                               />
@@ -1053,23 +1437,23 @@ export function TripFormModal({
                               )}
                             </div>
                             <div className="space-y-2">
-                              <Label>Title (e.g. Diwali Weekend)</Label>
-                              <Input
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Title (e.g. Diwali Weekend)</Label>
+                              <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                                 placeholder="Optional"
                                 {...form.register(`slots.${index}.title`)}
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label>Priority (1 is highest)</Label>
-                              <Input
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Priority (1 is highest)</Label>
+                              <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                                 type="number"
                                 placeholder="0"
                                 {...form.register(`slots.${index}.priority`)}
                               />
                             </div>
                             <div className="space-y-2 md:col-span-2">
-                              <Label>Capacity for this Slot <span className="text-red-500">*</span></Label>
-                              <Input
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Capacity for this Slot <span className="text-red-500">*</span></Label>
+                              <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                                 type="number"
                                 {...form.register(`slots.${index}.capacity`)}
                               />
@@ -1112,12 +1496,11 @@ export function TripFormModal({
             <div className={step === 2 ? "block" : "hidden"}>
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <Label>Overview <span className="text-red-500">*</span></Label>
-                  <Textarea
-                    {...form.register("overview")}
+                  <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">Overview <span className="text-red-500">*</span></Label>
+                  <Textarea {...form.register("overview")}
                     rows={4}
                     placeholder="Describe the trip..."
-                    className="resize-none"
+                    className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm resize-y disabled:cursor-not-allowed disabled:opacity-50"
                   />
                   {form.formState.errors.overview && (
                     <p className="text-sm text-red-500">
@@ -1129,7 +1512,7 @@ export function TripFormModal({
                 {/* HIGHLIGHTS */}
                 <div className="space-y-4 pt-2">
                   <div>
-                    <Label className="text-base font-semibold">
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-base font-semibold">
                       Highlights
                     </Label>
                   </div>
@@ -1161,10 +1544,10 @@ export function TripFormModal({
                           />
                         </div>
                         <div className="flex-1 space-y-2">
-                          <Label className="text-xs text-gray-500 uppercase font-semibold">
+                          <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-xs text-gray-500 uppercase font-semibold">
                             Highlight Description
                           </Label>
-                          <Input
+                          <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                             value={item.text}
                             onChange={(e) =>
                               updateHighlightItemText(index, e.target.value)
@@ -1197,13 +1580,13 @@ export function TripFormModal({
                 {/* INCLUSIONS */}
                 <div className="space-y-3 p-4 border rounded-lg bg-green-50/30 border-green-100">
                   <div>
-                    <Label className="text-base font-semibold text-green-800">
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-base font-semibold text-green-800">
                       Inclusions <span className="text-red-500">*</span>
                     </Label>
                   </div>
                   {inclusionFields.map((field, index) => (
                     <div key={field.id} className="flex items-center gap-2">
-                      <Input
+                      <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                         {...form.register(`inclusions.${index}.value`)}
                         placeholder={`Inclusion ${index + 1}`}
                       />
@@ -1238,13 +1621,13 @@ export function TripFormModal({
                 {/* EXCLUSIONS */}
                 <div className="space-y-3 p-4 border rounded-lg bg-red-50/30 border-red-100">
                   <div>
-                    <Label className="text-base font-semibold text-red-800">
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-base font-semibold text-red-800">
                       Exclusions <span className="text-red-500">*</span>
                     </Label>
                   </div>
                   {exclusionFields.map((field, index) => (
                     <div key={field.id} className="flex items-center gap-2">
-                      <Input
+                      <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                         {...form.register(`exclusions.${index}.value`)}
                         placeholder={`Exclusion ${index + 1}`}
                       />
@@ -1304,7 +1687,7 @@ export function TripFormModal({
                         className="p-4 border rounded-lg bg-white shadow-sm flex flex-col gap-3 group relative"
                       >
                         <div className="flex justify-between items-center">
-                          <Label className="text-xs text-gray-500 uppercase tracking-wider font-semibold">
+                          <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-xs text-gray-500 uppercase tracking-wider font-semibold">
                             Question {index + 1}
                           </Label>
                           <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
@@ -1346,10 +1729,9 @@ export function TripFormModal({
                           </div>
                         </div>
                         <div>
-                          <Input
-                            {...form.register(`faqs.${index}.question`)}
+                          <Input {...form.register(`faqs.${index}.question`)}
                             placeholder="e.g. What is the fitness level required?"
-                            className="font-medium"
+                            className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                           />
                           {form.formState.errors.faqs?.[index]?.question && (
                             <p className="text-xs text-red-500 mt-1">
@@ -1361,11 +1743,10 @@ export function TripFormModal({
                           )}
                         </div>
                         <div>
-                          <Textarea
-                            {...form.register(`faqs.${index}.answer`)}
+                          <Textarea {...form.register(`faqs.${index}.answer`)}
                             placeholder="Provide a detailed answer..."
                             rows={2}
-                            className="resize-none"
+                            className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm resize-y disabled:cursor-not-allowed disabled:opacity-50"
                           />
                           {form.formState.errors.faqs?.[index]?.answer && (
                             <p className="text-xs text-red-500 mt-1">
@@ -1388,7 +1769,7 @@ export function TripFormModal({
                 {/* TRIP TAGS */}
                 <div className="space-y-3 p-4 mt-6 border rounded-lg bg-blue-50/30 border-blue-100">
                   <div>
-                    <Label className="text-base font-semibold text-blue-800">
+                    <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-base font-semibold text-blue-800">
                       Trip Tags
                     </Label>
                   </div>
@@ -1399,10 +1780,9 @@ export function TripFormModal({
                   <div className="space-y-3">
                     {tripTagFields.map((field, index) => (
                       <div key={field.id} className="flex items-center gap-2">
-                        <Input
-                          {...form.register(`tripTags.${index}.value`)}
+                        <Input {...form.register(`tripTags.${index}.value`)}
                           placeholder={`Tag ${index + 1}`}
-                          className="bg-white"
+                          className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                         />
                         <Button
                           type="button"
@@ -1434,8 +1814,166 @@ export function TripFormModal({
               <ItineraryStep control={form.control} register={form.register} errors={form.formState.errors} />
             </div>
 
-            {/* STEP 5: STAY & TRANSPORT */}
+            {/* STEP 5: OPERATIONS */}
             <div className={step === 5 ? "block" : "hidden"}>
+              <div className="space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold text-lg text-gray-900">Operations & Tasks</h3>
+                    <p className="text-sm text-gray-500">
+                      Internal operational tasks and templates to be materialized on departure.
+                    </p>
+                  </div>
+                </div>
+                {itineraryFields.map((field, dayIndex) => {
+                  const day = form.getValues(`itinerary.${dayIndex}`);
+                  return (
+                    <section
+                      key={field.id}
+                      className="rounded-xl border border-[#eadcb9] bg-[#fcf8ef] p-4 sm:p-5"
+                    >
+                      <div className="mb-3 flex items-center justify-between border-b border-[#e1cf9d] pb-3">
+                        <div className="flex items-center gap-2">
+                          <ClipboardList className="h-5 w-5 text-[#8a6414]" />
+                          <h4 className="font-semibold text-[#8a6414]">
+                            {day?.day || `Day ${dayIndex + 1}`}{" "}
+                            {day?.title ? `- ${day?.title}` : ""}
+                          </h4>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const currentTasks = form.getValues(`itinerary.${dayIndex}.tasks`) || [];
+                            form.setValue(`itinerary.${dayIndex}.tasks`, [
+                              ...currentTasks,
+                              {
+                                category: "GENERAL",
+                                title: "",
+                                description: "",
+                                unitPrice: undefined,
+                                quantityNeeded: undefined,
+                                dueOffsetDays: undefined,
+                              },
+                            ]);
+                          }}
+                        >
+                          <Plus className="mr-1 h-4 w-4" /> Add Task
+                        </Button>
+                      </div>
+                      {!(day?.tasks?.length) ? (
+                        <p className="text-sm text-gray-500 italic">
+                          No operational work configured for this day.
+                        </p>
+                      ) : (
+                        day.tasks.map((_: any, taskIndex: number) => (
+                          <div
+                            key={taskIndex}
+                            className="mb-3 grid gap-2 rounded-lg border bg-white p-3 md:grid-cols-2 shadow-sm"
+                          >
+                            <div className="flex justify-end md:col-span-2">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const currentTasks = form.getValues(`itinerary.${dayIndex}.tasks`);
+                                  currentTasks.splice(taskIndex, 1);
+                                  form.setValue(`itinerary.${dayIndex}.tasks`, currentTasks);
+                                }}
+                                className="h-6 px-2 text-red-500 hover:bg-red-50 hover:text-red-600"
+                              >
+                                <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove Task
+                              </Button>
+                            </div>
+                            <div>
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
+                                Category
+                              </Label>
+                              <select
+                                {...form.register(`itinerary.${dayIndex}.tasks.${taskIndex}.category`)}
+                                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {TASK_CATEGORIES.map((value) => (
+                                  <option key={value} value={value}>
+                                    {value.replaceAll("_", " ")}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
+                                Task title
+                              </Label>
+                              <Input
+                                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                {...form.register(`itinerary.${dayIndex}.tasks.${taskIndex}.title`)}
+                              />
+                              {form.formState.errors.itinerary?.[dayIndex]?.tasks?.[taskIndex]?.title && (
+                                <p className="mt-1 text-xs text-red-600">
+                                  {form.formState.errors.itinerary[dayIndex]?.tasks?.[taskIndex]?.title?.message}
+                                </p>
+                              )}
+                            </div>
+                            <div className="md:col-span-2">
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
+                                Description
+                              </Label>
+                              <Input
+                                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                {...form.register(`itinerary.${dayIndex}.tasks.${taskIndex}.description`)}
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
+                                Unit Price
+                              </Label>
+                              <Input
+                                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                type="number"
+                                min={0.01}
+                                step="0.01"
+                                {...form.register(`itinerary.${dayIndex}.tasks.${taskIndex}.unitPrice`)}
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
+                                Qty Needed
+                              </Label>
+                              <Input
+                                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                type="number"
+                                min={1}
+                                step={1}
+                                {...form.register(`itinerary.${dayIndex}.tasks.${taskIndex}.quantityNeeded`)}
+                              />
+                            </div>
+                            <div className="flex items-end gap-2">
+                              <div className="flex-1">
+                                <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block">
+                                  Due before departure (days)
+                                </Label>
+                                <Input
+                                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                  type="number"
+                                  min={0}
+                                  step={1}
+                                  {...form.register(`itinerary.${dayIndex}.tasks.${taskIndex}.dueOffsetDays`)}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </section>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* STEP 6: STAY & TRANSPORT */}
+            <div className={step === 6 ? "block" : "hidden"}>
               <div className="space-y-4">
                 <div className="border-b pb-3">
                   <div>
@@ -1479,10 +2017,10 @@ export function TripFormModal({
                           />
                         </div>
                         <div className="flex-1 space-y-2">
-                          <Label className="text-xs text-gray-500 uppercase font-semibold">
+                          <Label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block text-xs text-gray-500 uppercase font-semibold">
                             Description
                           </Label>
-                          <Input
+                          <Input className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                             value={item.text}
                             onChange={(e) =>
                               updateStayItemText(index, e.target.value)
@@ -1513,16 +2051,16 @@ export function TripFormModal({
               </div>
             </div>
 
-            {/* STEP 6: MEDIA (BANNER IMAGES) */}
-            <div className={step === 6 ? "block" : "hidden"}>
+            {/* STEP 7: MEDIA (BANNER IMAGES) */}
+            <div className={step === 7 ? "block" : "hidden"}>
               <div className="space-y-4">
-                {isEdit && trip?.bannerImages?.length > 0 && (
+                {localBannerImages.length > 0 && (
                   <div className="mb-6">
                     <h4 className="font-medium mb-3 text-sm text-gray-500">
                       Current Banner Images
                     </h4>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {trip.bannerImages.map((url: string, i: number) => (
+                      {localBannerImages.map((url: string, i: number) => (
                         <div
                           key={url}
                           className="relative group rounded-lg overflow-hidden border border-gray-200 aspect-video bg-gray-100"
@@ -1532,16 +2070,18 @@ export function TripFormModal({
                             alt={`Existing ${i}`}
                             className="w-full h-full object-cover"
                           />
-                          <div className="absolute inset-0 bg-black/30 opacity-100 md:bg-black/40 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <button
-                              type="button"
-                              onClick={() => deleteExistingImage(url)}
-                              className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
-                              title="Delete Image"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
+                          {isEdit && (
+                            <div className="absolute inset-0 bg-black/30 opacity-100 md:bg-black/40 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <button
+                                type="button"
+                                onClick={() => deleteExistingImage(url)}
+                                className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
+                                title="Delete Image"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1549,7 +2089,7 @@ export function TripFormModal({
                 )}
                 <div className="p-4 sm:p-8 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 flex flex-col items-center justify-center text-center">
                   <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 mb-4">
-                    <UploadCloud className="w-8 h-8 text-[#c8a96e]" />
+                    <UploadCloud className="w-8 h-8 text-[#b59410]" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-1">
                     {isEdit
@@ -1560,9 +2100,7 @@ export function TripFormModal({
                     High-quality images that will be shown at the top of the
                     trip page. Recommended size: 1920x1080.
                   </p>
-                  <Label
-                    htmlFor="image-upload"
-                    className="cursor-pointer bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2.5 rounded-lg font-medium transition-colors shadow-sm inline-flex items-center gap-2"
+                  <Label htmlFor="image-upload" className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block cursor-pointer bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2.5 rounded-lg font-medium transition-colors shadow-sm inline-flex items-center gap-2"
                   >
                     <ImageIcon className="w-4 h-4" />
                     Select Images
@@ -1628,20 +2166,35 @@ export function TripFormModal({
           </Button>
 
           {step < STEPS.length - 1 ? (
-            <Button
-              key="continue-btn"
-              type="button"
-              onClick={nextStep}
-              className="bg-[#c8a96e] hover:bg-[#b8943a] text-white flex items-center gap-2"
-            >
-              Continue <ArrowRight className="w-4 h-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              {isEdit && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={saveCurrentChanges}
+                  disabled={isSubmitting}
+                  className="flex items-center gap-2"
+                >
+                  {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
+                  Save changes
+                </Button>
+              )}
+              <Button
+                key="continue-btn"
+                type="button"
+                onClick={nextStep}
+                disabled={isSubmitting}
+                className="bg-[#b59410] hover:bg-[#8a710c] text-white flex items-center gap-2"
+              >
+                Continue <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
           ) : (
             <Button
               key="submit-btn"
               type="submit"
               form="trip-form"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !canSubmit}
               className="bg-[#781216] hover:bg-[#9a1a1f] text-white flex items-center gap-2 px-4 sm:px-8 shadow-md"
             >
               {isSubmitting ? (
@@ -1656,6 +2209,7 @@ export function TripFormModal({
                   : "Save Trip"}
             </Button>
           )}
+        </div>
         </div>
       </DialogContent>
     </Dialog>

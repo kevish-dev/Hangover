@@ -16,6 +16,8 @@ import {
 } from "../../lib/tripApi";
 import { fetchAllFestivals } from "../../lib/festivalApi";
 import { mediaImageUrl } from "../../lib/media";
+import { toast } from "sonner";
+import { getErrorMessage } from "../../lib/errors";
 
 export type ExtendedTrip = ApiTrip & { isFestival?: boolean };
 
@@ -414,12 +416,15 @@ function FilterSidebar({
 function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
   const [hovered, setHovered] = useState(false);
   const heroImage = trip.bannerImages?.[0] || trip.highlights?.[0]?.imageUrl || "";
-  const priceNum = priceToNumber(trip.price);
-  const spots = spotsLeft(trip.capacity, trip.filledSpots);
+  const tripPrice = trip.packages?.[0]?.price || 0;
+  const priceNum = priceToNumber(tripPrice);
+  const spots = Array.isArray(trip.slots)
+    ? trip.slots.reduce((total, slot) => total + spotsLeft(Number(slot.capacity || 0), Number(slot.filledSpots || 0)), 0)
+    : spotsLeft(trip.capacity, trip.filledSpots);
   const tags = trip.tripTags?.map((t) => t.tag) || [];
   const typeLabel = formatTripType(trip.tripType);
   const durationStr = formatDuration(trip.duration);
-  const priceStr = formatPrice(trip.price);
+  const priceStr = formatPrice(tripPrice);
 
   return (
     <motion.div
@@ -493,7 +498,7 @@ function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
               {isNotAvailable(priceStr) ? <NA /> : priceStr}
             </span>
           </div>
-          <Link className="trip-card-link" to={(trip as any).isFestival ? `/festivals/${trip.slug}` : `/trips/${trip.slug}`} style={{ background: hovered ? "#C8A96E" : "transparent", border: `1.5px solid ${hovered ? "#C8A96E" : "rgba(30,26,20,0.15)"}`, color: hovered ? "#1e1a14" : "rgba(30,26,20,0.6)", borderRadius: "4px", padding: "7px 16px", fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Poppins', sans-serif", transition: "all 0.25s ease", display: "flex", alignItems: "center", gap: "5px", textDecoration: "none" }}>
+          <Link className="trip-card-link" to={(trip as any).isFestival ? `/festivals/${trip.id}` : `/trips/${trip.id}`} style={{ background: hovered ? "#C8A96E" : "transparent", border: `1.5px solid ${hovered ? "#C8A96E" : "rgba(30,26,20,0.15)"}`, color: hovered ? "#1e1a14" : "rgba(30,26,20,0.6)", borderRadius: "4px", padding: "7px 16px", fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Poppins', sans-serif", transition: "all 0.25s ease", display: "flex", alignItems: "center", gap: "5px", textDecoration: "none" }}>
             View {(trip as any).isFestival ? "Festival" : "Trip"} <ArrowRight size={11} />
           </Link>
         </div>
@@ -726,7 +731,8 @@ function getPopularityScore(trip: ApiTrip): number {
 }
 
 function getSortablePrice(trip: ApiTrip): number | null {
-  const price = Number.parseFloat(String(trip.price));
+  const tripPrice = trip.packages?.[0]?.price || 0;
+  const price = Number.parseFloat(String(tripPrice));
   return Number.isFinite(price) ? price : null;
 }
 
@@ -806,8 +812,10 @@ export default function TripsPage() {
         tripTags: f.tags ? f.tags.map((t: any) => ({ tag: t.tag })) : []
       }));
       setTrips([...tripsData, ...festivalsAsTrips]);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || "Something went wrong");
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, "Trips could not be loaded");
+      setError(message);
+      toast.error(message, { id: "public-trips-load-error" });
     } finally {
       setLoading(false);
     }
@@ -844,7 +852,7 @@ export default function TripsPage() {
 
   const availablePriceRanges = useMemo(() => {
     return PRICE_RANGES.filter(r => trips.some(t => {
-      const price = priceToNumber(t.price);
+      const price = priceToNumber(t.packages?.[0]?.price || 0);
       return price >= r.min && price <= r.max;
     }));
   }, [trips]);
@@ -878,7 +886,7 @@ export default function TripsPage() {
       // Price
       if (filters.priceRange) {
         const range = PRICE_RANGES.find((r) => r.label === filters.priceRange);
-        const price = priceToNumber(t.price);
+        const price = priceToNumber(t.packages?.[0]?.price || 0);
         if (range && (price < range.min || price > range.max)) return false;
       }
 

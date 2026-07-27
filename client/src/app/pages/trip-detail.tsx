@@ -42,6 +42,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { apiClient } from "../../lib/axios";
 import { toast } from "sonner";
 import { mediaImageUrl } from "../../lib/media";
+import { getErrorMessage } from "../../lib/errors";
 
 // ── "Not Available" inline label ──────────────────────────────────
 function NA({ text = "Not Available" }: { text?: string }) {
@@ -194,7 +195,7 @@ function RelatedCard({ trip }: { trip: ApiTrip }) {
 
   return (
     <Link
-      to={`/trips/${trip.slug}`}
+      to={`/trips/${trip.id}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -348,7 +349,7 @@ function RelatedCard({ trip }: { trip: ApiTrip }) {
               letterSpacing: "-0.01em",
             }}
           >
-            {formatPrice(trip.price)}
+            {formatPrice(trip.packages?.[0]?.price || 0)}
           </span>
         </div>
       </div>
@@ -835,6 +836,8 @@ function ItineraryAccordion({
     day?: string;
     dayNumber?: number;
     title?: string;
+    description?: string | null;
+    todos?: string[];
     activities?: string | string[];
   }[];
 }) {
@@ -848,13 +851,19 @@ function ItineraryAccordion({
         const titleText = d.title || "";
         
         let acts: string[] = [];
-        if (Array.isArray(d.activities)) {
+        if (Array.isArray(d.todos) && d.todos.length > 0) {
+          acts = d.todos;
+        } else if (Array.isArray(d.activities)) {
           acts = d.activities;
         } else if (typeof d.activities === 'string') {
           acts = d.activities.split('\n');
+        } else if (d.description) {
+          acts = [d.description];
         }
 
-        acts = acts.filter(a => a.trim().length > 0);
+        acts = acts.map((activity) => activity.trim()).filter((activity) => activity.length > 0);
+        const description = d.description?.trim();
+        if (description && !acts.includes(description)) acts.unshift(description);
         const isOpen = openIndex === index;
 
         return (
@@ -1066,6 +1075,7 @@ export default function TripDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const isFestival = location.pathname.startsWith("/festivals");
+  const shareToken = new URLSearchParams(location.search).get("share");
   const { user } = useAuth();
   const [trip, setTrip] = useState<any>(null); // polymorphic: ApiTrip | ApiFestival
   const [loading, setLoading] = useState(true);
@@ -1074,20 +1084,25 @@ export default function TripDetail() {
   const [reservedBookingId, setReservedBookingId] = useState<string | null>(null);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadTrip = useCallback(async () => {
     if (!slug) return;
     setLoading(true);
     setError(null);
-    const fetcher = isFestival ? fetchFestivalBySlug : fetchTripBySlug;
-    fetcher(slug)
-      .then((data) => setTrip(data))
-      .catch((err) =>
-        setError(
-          err?.response?.data?.message || err?.message || (isFestival ? "Festival not found" : "Trip not found"),
-        ),
-      )
-      .finally(() => setLoading(false));
-  }, [slug, isFestival]);
+    try {
+      const data = await (isFestival ? fetchFestivalBySlug(slug) : fetchTripBySlug(slug, shareToken));
+      setTrip(data);
+    } catch (error) {
+      const message = getErrorMessage(error, isFestival ? "Festival not found" : "Trip not found");
+      setError(message);
+      toast.error(message, { id: `trip-detail-load-${slug}` });
+    } finally {
+      setLoading(false);
+    }
+  }, [isFestival, shareToken, slug]);
+
+  useEffect(() => {
+    loadTrip();
+  }, [loadTrip]);
 
   useEffect(() => {
     const slots = trip?.slots || [];
@@ -1125,7 +1140,7 @@ export default function TripDetail() {
           setHasBooked(!!confirmed);
           setReservedBookingId(reserved?.id || null);
         })
-        .catch(console.error);
+        .catch((error) => toast.error(getErrorMessage(error, "Your booking status could not be checked"), { id: `trip-booking-status-${trip.id}` }));
     }
   }, [user, trip, isFestival]);
 
@@ -1162,7 +1177,7 @@ export default function TripDetail() {
           </p>
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={loadTrip}
             style={{
               color: "#781216",
               fontSize: "0.82rem",
@@ -1174,8 +1189,9 @@ export default function TripDetail() {
               padding: 0
             }}
           >
-            ← Go Back
+            Try again
           </button>
+          <button type="button" onClick={() => navigate(-1)} style={{ marginLeft: "18px", color: "rgba(30,26,20,0.6)", fontSize: "0.82rem", background: "none", border: "none", cursor: "pointer" }}>← Go back</button>
         </div>
       </div>
     );
@@ -1185,7 +1201,8 @@ export default function TripDetail() {
   const heroImage = trip.bannerImages?.[0] || "";
   const allImages = trip.bannerImages || [];
   const typeLabel = trip.tripType ? formatTripType(trip.tripType) : "Festival";
-  const priceStr = formatPrice(trip.price);
+  const tripPrice = trip.packages?.[0]?.price || 0;
+  const priceStr = formatPrice(tripPrice);
   const durationStr = formatDuration(trip.duration);
   const slots = Array.isArray(trip.slots) ? trip.slots : [];
   const spots = slots.length > 0
@@ -1523,7 +1540,9 @@ function TripDetailContent({
   const bookingParams = new URLSearchParams();
   if (isFestival) bookingParams.set("type", "festival");
   if (selectedSlotId) bookingParams.set("slotId", selectedSlotId);
-  const bookingPath = `/book/${trip.slug}${bookingParams.size ? `?${bookingParams.toString()}` : ""}`;
+  const shareToken = new URLSearchParams(window.location.search).get("share");
+  if (shareToken) bookingParams.set("share", shareToken);
+  const bookingPath = `/book/${trip.id}${bookingParams.size ? `?${bookingParams.toString()}` : ""}`;
 
   const prevHero = () =>
     setHeroIndex((i) => (i - 1 + safeAllImages.length) % safeAllImages.length);

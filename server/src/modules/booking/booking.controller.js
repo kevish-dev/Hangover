@@ -10,6 +10,15 @@ export const createBooking = async (req, res, next) => {
   }
 };
 
+export const adminCreateBooking = async (req, res, next) => {
+  try {
+    const booking = await bookingService.adminCreateBooking(req.user.id, req.body);
+    res.status(201).json(booking);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getMyBookings = async (req, res, next) => {
   try {
     const { page, limit } = req.query;

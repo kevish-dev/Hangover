@@ -16,8 +16,6 @@ export const findAll = async (skip, take, where = {}, isAdmin = false) => {
         bannerImages: true,
         duration: true,
         bestTimeToVisit: true,
-        price: true,
-        tokenAmount: true,
         isActive: true,
         isPublished: true,
         isFeatured: true,
@@ -47,14 +45,29 @@ export const findById = async (whereObj, isAdmin = false) => {
       slots: {
         orderBy: { startDate: 'asc' }
       },
+      itinerary: {
+        orderBy: { dayNumber: "asc" },
+        include: { tasks: { orderBy: { createdAt: "asc" } } },
+      },
+      addOns: true,
+      circuit: {
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          addOns: { where: { isActive: true }, orderBy: { createdAt: "asc" } },
+        },
+      },
       destination: true,
     }
   });
 };
 
 export const create = async (data) => {
-  const { tags, faqs, packages, slots, ...rest } = data;
+  const { tags, faqs, packages, slots, itinerary, addOns, destinationId, ...rest } = data;
   const payload = { ...rest };
+
+  if (destinationId) payload.destination = { connect: { id: destinationId } };
   
   if (tags && Array.isArray(tags)) {
     payload.tags = {
@@ -98,14 +111,61 @@ export const create = async (data) => {
     };
   }
 
+  if (itinerary && Array.isArray(itinerary)) {
+    payload.itinerary = {
+      create: itinerary.map((day, index) => ({
+        dayNumber: Number(day.dayNumber ?? String(day.day || "").match(/\d+/)?.[0] ?? index + 1),
+        title: day.title,
+        description: day.description ?? (typeof day.activities === "string" ? day.activities : null),
+        todos: Array.isArray(day.todos)
+          ? day.todos
+          : Array.isArray(day.activities)
+            ? day.activities
+            : typeof day.activities === "string"
+              ? day.activities.split("\n").map((item) => item.trim()).filter(Boolean)
+              : [],
+        tasks: {
+          create: Array.isArray(day.tasks) ? day.tasks.map(task => ({
+            category: task.category,
+            title: task.title,
+            description: task.description || null,
+            config: task.config || {},
+            unitPrice: task.unitPrice ?? null,
+            quantityNeeded: task.quantityNeeded ?? null,
+            dueOffsetDays: task.dueOffsetDays ?? null,
+          })) : []
+        },
+      })),
+    };
+  }
 
+  if (addOns && Array.isArray(addOns)) {
+    payload.addOns = {
+      create: addOns.map((addOn) => ({
+        title: addOn.title,
+        description: addOn.description || null,
+        imageUrl: addOn.imageUrl || null,
+        price: Number(addOn.price),
+        maxQuantityPerBooking: addOn.maxQuantityPerBooking || null,
+        maxQuantityPerSlot: addOn.maxQuantityPerSlot || null,
+        purchaseCutoffOffsetDays: addOn.purchaseCutoffOffsetDays ?? null,
+        isActive: addOn.isActive ?? true,
+      })),
+    };
+  }
 
   return prisma.festival.create({ data: payload });
 };
 
 export const update = async (id, data) => {
-  const { tags, faqs, packages, slots, ...rest } = data;
+  const { tags, faqs, packages, slots, itinerary, addOns, destinationId, ...rest } = data;
   const payload = { ...rest };
+
+  if (destinationId !== undefined) {
+    payload.destination = destinationId
+      ? { connect: { id: destinationId } }
+      : { disconnect: true };
+  }
   
   if (tags && Array.isArray(tags)) {
     // 1. Clear existing tags
@@ -216,6 +276,76 @@ export const update = async (id, data) => {
     };
   }
 
+  if (itinerary && Array.isArray(itinerary)) {
+    payload.itinerary = {
+      deleteMany: {},
+      create: itinerary.map((day, index) => ({
+        dayNumber: Number(day.dayNumber ?? String(day.day || "").match(/\d+/)?.[0] ?? index + 1),
+        title: day.title,
+        description: day.description ?? (typeof day.activities === "string" ? day.activities : null),
+        todos: Array.isArray(day.todos)
+          ? day.todos
+          : Array.isArray(day.activities)
+            ? day.activities
+            : typeof day.activities === "string"
+              ? day.activities.split("\n").map((item) => item.trim()).filter(Boolean)
+              : [],
+        tasks: {
+          create: Array.isArray(day.tasks) ? day.tasks.map(task => ({
+            category: task.category,
+            title: task.title,
+            description: task.description || null,
+            config: task.config || {},
+            unitPrice: task.unitPrice ?? null,
+            quantityNeeded: task.quantityNeeded ?? null,
+            dueOffsetDays: task.dueOffsetDays ?? null,
+          })) : []
+        },
+      })),
+    };
+  }
+
+  if (addOns && Array.isArray(addOns)) {
+    const existingAddOns = await prisma.addOn.findMany({ where: { festivalId: id } });
+    const incomingAddOnIds = addOns.map(a => a.id).filter(Boolean);
+    const addOnsToDelete = existingAddOns.filter(a => !incomingAddOnIds.includes(a.id));
+
+    if (addOnsToDelete.length > 0) {
+      const addOnsWithBookings = await prisma.bookingAddOn.findFirst({
+        where: { addOnId: { in: addOnsToDelete.map(a => a.id) } }
+      });
+      if (addOnsWithBookings) {
+        throw new Error("Cannot delete add-ons that are used in existing bookings");
+      }
+    }
+
+    payload.addOns = {
+      deleteMany: { id: { in: addOnsToDelete.map(a => a.id) } },
+      upsert: addOns.map(addOn => ({
+        where: { id: addOn.id || "00000000-0000-0000-0000-000000000000" },
+        update: {
+          title: addOn.title,
+          description: addOn.description || null,
+          imageUrl: addOn.imageUrl || null,
+          price: Number(addOn.price),
+          maxQuantityPerBooking: addOn.maxQuantityPerBooking || null,
+          maxQuantityPerSlot: addOn.maxQuantityPerSlot || null,
+          purchaseCutoffOffsetDays: addOn.purchaseCutoffOffsetDays ?? null,
+          isActive: addOn.isActive ?? true,
+        },
+        create: {
+          title: addOn.title,
+          description: addOn.description || null,
+          imageUrl: addOn.imageUrl || null,
+          price: Number(addOn.price),
+          maxQuantityPerBooking: addOn.maxQuantityPerBooking || null,
+          maxQuantityPerSlot: addOn.maxQuantityPerSlot || null,
+          purchaseCutoffOffsetDays: addOn.purchaseCutoffOffsetDays ?? null,
+          isActive: addOn.isActive ?? true,
+        }
+      }))
+    };
+  }
 
   return prisma.festival.update({
     where: { id },
@@ -242,11 +372,9 @@ export const getFeaturedFestivals = async () => {
     select: {
       id: true,
       title: true,
-      slug: true,
       overview: true,
       location: true,
       duration: true,
-      price: true,
       isActive: true,
       isPublished: true,
       isFeatured: true,

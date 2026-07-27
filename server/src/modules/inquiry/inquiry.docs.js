@@ -17,6 +17,7 @@ registry.registerPath({
             phone: z.string(),
             tripType: z.string().optional(),
             tripId: z.string().optional(),
+            festivalId: z.string().optional(),
             subject: z.string().optional(),
             message: z.string()
           }),

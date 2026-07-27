@@ -334,17 +334,70 @@ const renderPlainText = ({ title, intro, sections = [], notice, cta, closing }) 
     .filter(Boolean)
     .join("\n\n");
 
-const sendTemplate = async ({ to, subject, text, ...layout }) => {
+const sendTemplate = async ({ to, subject, text, replyTo, ...layout }) => {
   const recipient = sanitizeHeader(to);
   if (!recipient) throw new TypeError("Email recipient is required.");
 
   return transport.sendMail({
     from: FROM,
-    replyTo: BRAND.supportEmail,
+    replyTo: sanitizeHeader(replyTo) || BRAND.supportEmail,
     to: recipient,
     subject: sanitizeHeader(subject, BRAND.name),
     text,
     html: renderEmail(layout),
+  });
+};
+
+export const sendNewInquiryNotificationEmail = async (options = {}) => {
+  const {
+    name,
+    email,
+    phone,
+    subject,
+    message,
+    tripType,
+    inquiryId,
+  } = options;
+  const recipient = options.to || env.INQUIRY_NOTIFICATION_EMAIL || BRAND.supportEmail;
+  const interest = options.itemTitle || options.tripTitle || options.festivalTitle || tripType || "General travel inquiry";
+  const rows = [
+    { label: "Customer", value: name, emphasis: true },
+    { label: "Email", value: email },
+    { label: "Phone", value: phone },
+    { label: "Interest", value: interest },
+    { label: "Subject", value: subject },
+    { label: "Inquiry ID", value: inquiryId },
+  ];
+  const notice = displayValue(message) || "No message was supplied.";
+  const cta = {
+    label: "Open inquiry dashboard",
+    url: safeAppUrl(options.crmUrl, "/dashboard/inquiries"),
+  };
+  const title = `New inquiry from ${displayValue(name) || "a traveler"}`;
+  const intro = "A new website inquiry has been captured and added to the CRM lead pipeline.";
+
+  return sendTemplate({
+    to: recipient,
+    replyTo: email,
+    subject: `New website inquiry – ${displayValue(name) || displayValue(interest) || "Hangover Trails"}`,
+    text: renderPlainText({
+      title,
+      intro,
+      sections: [plainSection("Inquiry details", rows)],
+      notice: `MESSAGE\n${notice}`,
+      cta,
+    }),
+    preheader: `${displayValue(name) || "A traveler"} submitted a new website inquiry.`,
+    eyebrow: "New CRM lead",
+    title,
+    intro,
+    badge: "Website inquiry",
+    bodyHtml: [
+      renderDetails("Inquiry details", rows),
+      renderNotice(notice),
+    ].join(""),
+    cta,
+    footerNote: "Reply directly to this email to contact the traveler, then log the interaction in the CRM.",
   });
 };
 
@@ -388,6 +441,8 @@ const paymentTypeDetails = (paymentType) => {
       };
   }
 };
+
+/** Send the private, expiring offer prepared by an administrator for one customer. */
 
 /**
  * Send a reservation/payment receipt. Existing fields remain supported; richer
@@ -962,5 +1017,107 @@ export const sendWelcomeEmail = async (options = {}) => {
     ].join(""),
     cta,
     footerNote: `You received this welcome email because an account was created with ${BRAND.name}.`,
+  });
+};
+
+/**
+ * Sends an operations task reminder to an admin.
+ * Called by the in-memory operations worker when a task's dueAt is approaching.
+ */
+export const sendOperationsReminderEmail = async (options = {}) => {
+  const {
+    to,
+    taskTitle,
+    taskCategory,
+    taskDescription,
+    dueAt,
+    daysTillDue,
+    bookingId,
+    isOverdue = false,
+  } = options;
+
+  const urgencyLabel = isOverdue
+    ? "⚠️ OVERDUE"
+    : daysTillDue <= 1
+    ? "⚠️ DUE TODAY / TOMORROW"
+    : `Due in ${daysTillDue} day(s)`;
+
+  const subject = `[Ops Alert] ${urgencyLabel} — ${taskTitle}`;
+
+  const rows = [
+    ["Task", taskTitle],
+    ["Category", taskCategory],
+    ...(taskDescription ? [["Details", taskDescription]] : []),
+    ["Due At", dueAt ? new Date(dueAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "—"],
+    ["Booking ID", bookingId],
+    ["Status", isOverdue ? "OVERDUE" : "URGENT"],
+  ];
+
+  return sendTemplate({
+    to,
+    subject,
+    preheader: `Ops task "${taskTitle}" needs your attention.`,
+    eyebrow: "Operations Alert",
+    title: urgencyLabel,
+    intro: `The following operational task requires your immediate attention.`,
+    bodyHtml: renderDetails("Task Details", rows),
+    footerNote: "This is an automated reminder from the Hangover Trails operations system.",
+    text: rows.map(([k, v]) => `${k}: ${v}`).join("\n"),
+  });
+};
+
+/**
+ * Send a custom invoice email.
+ */
+export const sendCustomInvoiceEmail = async (options = {}) => {
+  const {
+    to,
+    customerName,
+    title,
+    description,
+    items,
+    amount,
+    currency = "INR",
+    dueDate,
+  } = options;
+
+  const invoiceRows = [
+    { label: "Billed to", value: customerName, emphasis: true },
+    { label: "Invoice Title", value: title },
+    { label: "Description", value: description },
+    { label: "Date", value: formatDate(dueDate || new Date()) },
+    { label: "GSTIN", value: BRAND.gstin },
+  ];
+
+  const amountRows = items && items.length > 0
+    ? items.map(item => ({ label: item.description, value: formatCurrency(item.price, currency) }))
+    : [];
+
+  const summaryRows = [
+    ...amountRows,
+    { label: "Total Amount Paid", value: formatCurrency(amount, currency), strong: true, accent: true },
+  ];
+
+  const intro = `Please find your payment receipt details below.`;
+  const emailTitle = `Payment Receipt: ${title}`;
+
+  return sendTemplate({
+    to,
+    subject: `Payment Receipt: ${title}`,
+    text: renderPlainText({
+      title: emailTitle,
+      intro,
+      sections: [plainSection("Receipt Details", invoiceRows), plainSection("Amount Summary", summaryRows)],
+    }),
+    preheader: `Receipt for ${formatCurrency(amount, currency)} is ready.`,
+    eyebrow: "Payment Receipt",
+    title: emailTitle,
+    intro,
+    bodyHtml: [
+      renderDetails("Receipt Details", invoiceRows),
+      renderAmounts("Amount Summary", summaryRows),
+      renderNotice("This invoice has been marked as paid. Thank you for your payment!"),
+    ].join(""),
+    footerNote: "If you have any questions about this receipt, reply to this email.",
   });
 };

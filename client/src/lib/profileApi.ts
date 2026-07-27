@@ -31,7 +31,9 @@ export interface ApiBooking {
   tripId: string | null;
   festivalId: string | null;
   packageId: string | null;
-  slotId: string;
+  slotId: string | null;
+  customTripId: string | null;
+  source: "CATALOG" | "CUSTOM";
   status: BookingStatus;
   paymentStatus: PaymentStatus;
   numberOfTravelers: number;
@@ -51,9 +53,14 @@ export interface ApiBooking {
   updatedAt: string;
   trip?: ApiTrip;
   festival?: any; // Add festival type when available
+  customTrip?: {
+    id: string; reference: string; title: string; bannerImages: string[];
+    startDate: string; endDate: string; durationDays: number;
+  } | null;
   package?: any; // Add package type
   slot?: any; // Add slot type
   payments: ApiPayment[];
+  review?: { id: string; rating: number } | null;
 }
 
 export interface ApiBookingsResponse {
@@ -82,17 +89,19 @@ export function isUpcomingBooking(b: ApiBooking): boolean {
   const activeStatuses: BookingStatus[] = ["PENDING", "RESERVED", "CONFIRMED"];
   if (!activeStatuses.includes(b.status)) return false;
   
-  if (!b.slot?.startDate) return true; // Show active bookings without slots as upcoming
-  const tripStart = new Date(b.slot.startDate);
+  const startDate = b.customTrip?.startDate || b.slot?.startDate;
+  if (!startDate) return true;
+  const tripStart = new Date(startDate);
   const now = new Date();
   return tripStart > now;
 }
 
 export function isPastBooking(b: ApiBooking): boolean {
   if (b.status === "COMPLETED" || b.status === "CANCELLED") return true;
-  if (!b.slot?.startDate) return false; // If no slot and not completed/cancelled, it's upcoming
+  const startDate = b.customTrip?.startDate || b.slot?.startDate;
+  if (!startDate) return false;
   
-  const tripStart = new Date(b.slot.startDate);
+  const tripStart = new Date(startDate);
   const now = new Date();
   
   return tripStart <= now;

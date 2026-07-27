@@ -1,7 +1,7 @@
 import * as faqRepo from "./faq.repository.js";
 
-export const getFaqsByTripId = async (tripId) => {
-  return faqRepo.findAllByTripId(tripId);
+export const getFaqsByParent = async (whereCondition) => {
+  return faqRepo.findAllByParent(whereCondition);
 };
 
 export const getFaqById = async (id) => {
@@ -10,9 +10,9 @@ export const getFaqById = async (id) => {
   return faq;
 };
 
-export const createFaq = async (tripId, data) => {
+export const createFaq = async (parentRelation, data) => {
   // Can add logic here to automatically calculate the next 'order' if not provided
-  return faqRepo.create(tripId, data);
+  return faqRepo.create(parentRelation, data);
 };
 
 export const updateFaq = async (id, data) => {

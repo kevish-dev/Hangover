@@ -1,18 +1,15 @@
 import { Router } from "express";
 import * as itineraryController from "./itinerary.controller.js";
 import { requireAuth, requireAdmin } from "../../core/middlewares/auth.middleware.js";
-import "./itinerary.docs.js"; // Register OpenAPI specs
+
+import "./itinerary.docs.js";
 
 const router = Router();
 
-// Public routes
-router.get("/", itineraryController.getItineraries);
-router.get("/:id", itineraryController.getItineraryById);
-
-// Admin routes
-router.use(requireAuth, requireAdmin);
-router.post("/", itineraryController.createItinerary);
-router.put("/:id", itineraryController.updateItinerary);
-router.delete("/:id", itineraryController.deleteItinerary);
+router.get("/trip/:tripId", itineraryController.getTripItinerary);
+router.get("/festival/:festivalId", itineraryController.getFestivalItinerary);
+router.post("/", requireAuth, requireAdmin, itineraryController.createItinerary);
+router.put("/:id", requireAuth, requireAdmin, itineraryController.updateItineraryDay);
+router.delete("/:id", requireAuth, requireAdmin, itineraryController.deleteItineraryDay);
 
 export default router;

@@ -529,7 +529,7 @@ export function SiteFooter() {
             <p style={{ color: "rgba(242,237,228,0.22)", fontSize: "0.68rem", fontWeight: 300, letterSpacing: "0.06em", margin: 0 }}>
               © 2025 Hangover Trails. All rights reserved.
             </p>
-            <div style={{ display: "flex", gap: "20px" }}>
+            {/* <div style={{ display: "flex", gap: "20px" }}>
               {["Privacy Policy", "Terms of Service", "Refund Policy"].map((item) => (
                 <button key={item} style={{
                   background: "none", border: "none", padding: 0,
@@ -543,7 +543,7 @@ export function SiteFooter() {
                   {item}
                 </button>
               ))}
-            </div>
+            </div> */}
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#b8943a" }} />
               <span style={{ color: "rgba(242,237,228,0.22)", fontSize: "0.65rem", letterSpacing: "0.1em" }}>

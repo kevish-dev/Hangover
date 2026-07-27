@@ -1,7 +1,13 @@
 import * as repo from "./inquiry.repository.js";
+import { createInquirySchema } from "./inquiry.validation.js";
+import { sendNewInquiryNotificationEmail } from "../../core/services/email.service.js";
 
 export const createInquiry = async (data) => {
-  return repo.createInquiry(data);
+  const parsed = createInquirySchema.parse(data);
+  const inquiry = await repo.createInquiry(parsed);
+  sendNewInquiryNotificationEmail({ ...parsed, inquiryId: inquiry.id })
+    .catch((error) => console.error("[Email] Failed to send inquiry notification:", error));
+  return inquiry;
 };
 
 export const getInquiries = async (page = 1, limit = 10, filter = {}) => {

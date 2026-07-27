@@ -40,7 +40,7 @@ export const createReview = async (userId, data) => {
       userId,
       bookingId,
       tripId: booking.tripId,
-      festivalId: booking.festivalId
+      festivalId: booking.festivalId,
     }
   });
 };

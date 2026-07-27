@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -15,6 +15,7 @@ import {
   RotateCcw,
   ReceiptText,
   CreditCard,
+  Star,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -30,6 +31,8 @@ import { formatPrice, formatDuration, formatTripType } from "../../lib/tripApi";
 import { SiteFooter } from "../components/site-footer";
 import { ProfileSettings } from "../components/profile-settings";
 import { mediaImageUrl } from "../../lib/media";
+import { toast } from "sonner";
+import { getErrorMessage } from "../../lib/errors";
 
 // ── Status badge styling ──────────────────────────────────────────
 
@@ -70,19 +73,20 @@ function StatusBadge({ status }: { status: string }) {
 
 function BookingCard({ booking }: { booking: ApiBooking }) {
   const [hovered, setHovered] = useState(false);
-  const item = booking.trip || booking.festival;
+  const item: any = booking.customTrip || booking.trip || booking.festival;
+  const isCustom = booking.source === "CUSTOM" || Boolean(booking.customTrip);
   const isFestival = !!booking.festival;
   const heroImage = item?.bannerImages?.[0] || "";
-  const state = item?.destination?.state || item?.location || "";
+  const state = isCustom ? "Private custom trip" : (item as any)?.destination?.state || (item as any)?.location || "";
+  const travelStart = booking.customTrip?.startDate || booking.slot?.startDate;
   const paid = parseFloat(booking.amountPaid || "0");
   const due = parseFloat(booking.amountDue || "0");
   const isFullyRefunded = booking.paymentStatus === "REFUNDED";
   const isPartiallyRefunded = booking.paymentStatus === "PARTIALLY_REFUNDED";
   const isRefunded = isFullyRefunded || isPartiallyRefunded;
   const canPayBalance =
-    due > 0 &&
-    booking.status === "RESERVED" &&
-    booking.paymentStatus === "PARTIALLY_PAID";
+    (due > 0 && booking.status === "RESERVED" && booking.paymentStatus === "PARTIALLY_PAID") ||
+    (booking.status === "PENDING" && (booking.paymentStatus === "PENDING" || booking.paymentStatus === "FAILED"));
 
   // Sum up all successful or pending refunds across payments
   const totalRefunded = (booking.payments || []).reduce((sum, p) => {
@@ -263,9 +267,9 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
           }}
         >
           {[
-            { icon: Calendar, text: `Travel ${formatTravelMonth(booking.slot?.startDate)}` },
+            { icon: Calendar, text: `Travel ${formatTravelMonth(travelStart)}` },
             { icon: Users, text: `${booking.numberOfTravelers} Traveler${booking.numberOfTravelers > 1 ? "s" : ""}` },
-            ...(item?.duration ? [{ icon: Clock, text: formatDuration(item.duration) }] : []),
+            ...((item as any)?.duration || booking.customTrip?.durationDays ? [{ icon: Clock, text: formatDuration((item as any)?.duration || booking.customTrip?.durationDays) }] : []),
           ].map(({ icon: Icon, text }, i) => (
             <div className="profile-booking-meta-item" key={i} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
               <Icon size={11} color="rgba(30,26,20,0.35)" strokeWidth={1.5} />
@@ -334,7 +338,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
                 </span>
               </div>
             )}
-            {isFullyRefunded && (
+            {isFullyRefunded && !isCustom && (
               <div>
                 <span style={{ color: "rgba(30,26,20,0.35)", fontSize: "0.55rem", fontWeight: 400, display: "block", letterSpacing: "0.06em", textTransform: "uppercase" }}>
                   Refunded
@@ -353,6 +357,27 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
 
           {/* CTAs */}
           <div className="profile-booking-actions" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {booking.status === "COMPLETED" && !booking.review && (
+              <Link
+                className="profile-booking-primary-action"
+                to={`/bookings/${booking.id}/review`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  background: "#781216",
+                  color: "#fff",
+                  fontSize: "0.68rem",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  padding: "5px 12px",
+                  borderRadius: "6px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <Star size={10} /> Leave a review
+              </Link>
+            )}
             {canPayBalance && (
               <Link
                 className="profile-booking-primary-action"
@@ -375,14 +400,14 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
                 onMouseEnter={(e) => (e.currentTarget.style.background = "#9f7f2f")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "#b8943a")}
               >
-                <CreditCard size={10} /> Pay Balance
+                <CreditCard size={10} /> {booking.status === "PENDING" ? "Complete Booking" : "Pay Balance"}
               </Link>
             )}
             {/* Book Again — only shown for fully refunded trips */}
             {isFullyRefunded && (
               <Link
                 className="profile-booking-primary-action"
-                to={`/book/${item?.slug}${isFestival ? "?type=festival" : ""}`}
+                to={`/book/${item?.id}${isFestival ? "?type=festival" : ""}`}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -404,9 +429,9 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
                 <RotateCcw size={10} /> Book Again
               </Link>
             )}
-            <Link
+            {!isCustom ? <Link
               className="profile-booking-view-action"
-              to={isFestival ? `/festivals/${item?.slug}` : `/trips/${item?.slug}`}
+              to={isFestival ? `/festivals/${item?.id}` : `/trips/${item?.id}`}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -420,7 +445,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
               }}
             >
               View {isFestival ? "Festival" : "Trip"} <ChevronRight size={12} />
-            </Link>
+            </Link> : <span style={{ color: "rgba(30,26,20,0.45)", fontSize: "0.72rem", fontWeight: 500 }}>Private itinerary</span>}
           </div>
         </div>
       </div>
@@ -547,16 +572,25 @@ export default function ProfilePage() {
     }
   }, [authLoading, user, navigate]);
 
-  // Fetch bookings
-  useEffect(() => {
+  const loadBookings = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     setError(null);
-    fetchMyBookings()
-      .then((data) => setBookings(data))
-      .catch((err) => setError(err?.response?.data?.message || err?.message || "Failed to load bookings"))
-      .finally(() => setLoading(false));
+    try {
+      setBookings(await fetchMyBookings());
+    } catch (err) {
+      const message = getErrorMessage(err, "Failed to load bookings");
+      setError(message);
+      toast.error(message, { id: "profile-bookings-load-error" });
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
+
+  // Fetch bookings
+  useEffect(() => {
+    loadBookings();
+  }, [loadBookings]);
 
   if (authLoading) {
     return (
@@ -836,7 +870,8 @@ export default function ProfilePage() {
                     fontWeight: 500,
                   }}
                 >
-                  {error}
+                  <p>{error}</p>
+                  <button type="button" onClick={loadBookings} style={{ marginTop: "12px", color: "#781216", background: "none", border: 0, textDecoration: "underline", fontWeight: 600, cursor: "pointer" }}>Try again</button>
                 </div>
               ) : bookings.length === 0 ? (
                 <EmptyState message="You haven't booked any trips yet. Start exploring!" />

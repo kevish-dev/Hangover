@@ -17,4 +17,6 @@ router.post("/", requireAuth, requireAdmin, controller.createDestination);
 router.put("/:id", requireAuth, requireAdmin, controller.updateDestination);
 router.delete("/:id", requireAuth, requireAdmin, controller.deleteDestination);
 
+router.post("/:id/link-existing-entities", requireAuth, requireAdmin, controller.linkExistingEntities);
+
 export default router;

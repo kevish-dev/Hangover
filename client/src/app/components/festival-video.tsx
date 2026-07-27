@@ -187,7 +187,16 @@ export function FestivalVideo() {
               }}
             >
               {festivals.map((festival) => (
-                <FestivalChip key={festival.id} festival={{ name: festival.title, place: festival.location, date: formatFestivalDate(festival), tag: festival.bestTimeToVisit || "Featured Festival" }} />
+                <FestivalChip
+                  key={festival.id}
+                  festival={{
+                    name: festival.title,
+                    place: festival.location,
+                    date: formatFestivalDate(festival),
+                    tag: festival.bestTimeToVisit || "Featured Festival",
+                  }}
+                  onClick={() => navigate(`/festivals/${festival.id}`)}
+                />
               ))}
             </div>
           </ContainerAnimated>
@@ -510,11 +519,15 @@ function OutlineButton({
 
 function FestivalChip({
   festival,
+  onClick,
 }: {
   festival: { name: string; place: string; date: string; tag: string };
+  onClick: () => void;
 }) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
       style={{
         display: "inline-flex",
         flexDirection: "column",
@@ -529,17 +542,18 @@ function FestivalChip({
         minWidth: 0,
         maxWidth: "420px",
         flex: "1 1 220px",
+        fontFamily: "'Poppins', sans-serif",
         transition:
           "border-color 0.25s ease, background 0.25s ease, transform 0.2s ease",
       }}
       onMouseEnter={(e) => {
-        const el = e.currentTarget as HTMLDivElement;
+        const el = e.currentTarget;
         el.style.borderColor = "#f2c97a";
         el.style.background = "rgba(242,201,122,0.14)";
         el.style.transform = "translateY(-2px)";
       }}
       onMouseLeave={(e) => {
-        const el = e.currentTarget as HTMLDivElement;
+        const el = e.currentTarget;
         el.style.borderColor = "rgba(255,255,255,0.25)";
         el.style.background = "rgba(255,255,255,0.1)";
         el.style.transform = "translateY(0)";
@@ -630,6 +644,6 @@ function FestivalChip({
           </span>
         </span>
       </div>
-    </div>
+    </button>
   );
 }

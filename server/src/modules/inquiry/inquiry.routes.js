@@ -9,7 +9,7 @@ const router = Router();
 // Rate limiter for creating inquiries (e.g., max 5 per hour per IP)
 const createInquiryLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5,
+  max: 20,
   message: { message: "Too many inquiries submitted from this IP, please try again after an hour" },
   standardHeaders: true,
   legacyHeaders: false,

@@ -1,17 +1,15 @@
 import * as tripRepo from "./trip.repository.js";
 import { uploadToCloudinary, deleteFromCloudinary, deleteTripAssets, createDirectImageUploadSignature, isExpectedPublicImageUrl } from "../../core/services/upload.service.js";
 import { ValidationError } from "../../core/errors/errors.js";
-import { randomUUID } from "crypto";
+import { createHash, randomBytes, randomUUID } from "crypto";
+import { prisma } from "../../prisma/client.js";
 
-const generateSlug = (title) => {
-  return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
-};
 
 export const getTrips = async (page = 1, limit = 10, isAdmin = false) => {
   const skip = (page - 1) * limit;
   const take = parseInt(limit, 10);
   
-  const where = isAdmin ? {} : { isPublished: true };
+  const where = isAdmin ? {} : { isPublished: true, isListed: true };
 
   const { trips, total } = await tripRepo.findAll(skip, take, where, isAdmin);
 
@@ -26,38 +24,148 @@ export const getTrips = async (page = 1, limit = 10, isAdmin = false) => {
   };
 };
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export const getTripById = async (id, isAdmin = false) => {
-  const idField = UUID_RE.test(id) ? 'id' : 'slug';
-  const where = isAdmin ? { [idField]: id } : { [idField]: id, isPublished: true };
+
+const hashShareToken = (token) => createHash("sha256").update(token).digest("hex");
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const generateSlug = (title) => title
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/(^-|-$)+/g, "");
+
+export const getTripById = async (id, isAdmin = false, shareToken = null) => {
+  const idField = UUID_RE.test(id) ? "id" : "slug";
+  const where = isAdmin
+    ? { [idField]: id }
+    : shareToken
+      ? {
+          [idField]: id,
+          OR: [
+            { isPublished: true },
+            {
+              shareTokenHash: hashShareToken(shareToken),
+              OR: [
+                { shareTokenExpiresAt: null },
+                { shareTokenExpiresAt: { gt: new Date() } },
+              ],
+            },
+          ],
+        }
+      : { [idField]: id, isPublished: true };
   const trip = await tripRepo.findById(where, isAdmin);
   if (!trip) throw new Error("Trip not found");
+  // Add-ons can live directly on a trip or be inherited from its circuit.
+  // Prefer the trip-specific list so newly configured trips do not show both.
+  if ((!trip.addOns || trip.addOns.length === 0) && trip.circuit?.addOns?.length) {
+    trip.addOns = trip.circuit.addOns;
+  }
   return trip;
 };
 
 export const createTrip = async (data) => {
-  if (!data.slug) {
-    data.slug = generateSlug(data.title) + "-" + Date.now();
-  }
-  if (!data.stayTransportImages) data.stayTransportImages = [];
+  let createData = { ...data };
 
-  if (data.slots && data.slots.length > 0 && data.slots[0].startDate && data.slots[0].endDate) {
-    const start = new Date(data.slots[0].startDate);
-    const end = new Date(data.slots[0].endDate);
-    if (end <= start) {
-      throw new Error("End date must be strictly after start date");
+  if (createData.circuitId) {
+    const circuit = await prisma.circuit.findUnique({
+      where: { id: createData.circuitId },
+      include: {
+        days: { orderBy: { dayNumber: "asc" } },
+        packages: true,
+        faqs: { orderBy: { order: "asc" } },
+        tags: true,
+        addOns: { where: { isActive: true }, orderBy: { createdAt: "asc" } },
+      },
+    });
+    if (!circuit) throw new ValidationError("Circuit not found.");
+
+    createData = {
+      title: circuit.title,
+      location: circuit.location,
+      bannerImages: circuit.bannerImages,
+      duration: circuit.duration,
+      bestTimeToVisit: circuit.bestTimeToVisit,
+      overview: circuit.overview,
+      inclusions: circuit.inclusions,
+      exclusions: circuit.exclusions,
+      tripType: circuit.tripType,
+      destinationId: circuit.destinationId,
+      highlights: circuit.highlights,
+      stayTransportImages: circuit.stayTransportImages,
+      packages: circuit.packages.map(({ title, price, tokenAmount }) => ({
+        title,
+        price: Number(price),
+        tokenAmount: Number(tokenAmount),
+      })),
+      faqs: circuit.faqs.map(({ question, answer, order }) => ({ question, answer, order })),
+      tripTags: circuit.tags.map(({ tag }) => tag),
+      addOns: circuit.addOns.map((addOn) => ({
+        title: addOn.title,
+        description: addOn.description,
+        imageUrl: addOn.imageUrl,
+        price: Number(addOn.price),
+        maxQuantityPerBooking: addOn.maxQuantityPerBooking,
+        maxQuantityPerSlot: addOn.maxQuantityPerSlot,
+        purchaseCutoffOffsetDays: addOn.purchaseCutoffOffsetDays,
+        isActive: addOn.isActive,
+      })),
+      itinerary: circuit.days.map((day) => ({
+        dayNumber: day.dayNumber,
+        title: day.title,
+        description: day.description ?? (Array.isArray(day.activities) ? day.activities.join('\n') : day.activities) ?? null,
+        todos: Array.isArray(day.todos)
+          ? day.todos
+          : Array.isArray(day.activities)
+          ? day.activities
+          : typeof day.activities === 'string'
+          ? day.activities.split('\n').map((item) => item.trim()).filter(Boolean)
+          : [],
+      })),
+      ...createData,
+    };
+  }
+
+  if (!createData.title) throw new ValidationError("Trip title is required.");
+  if (!createData.slug) createData.slug = `${generateSlug(createData.title)}-${Date.now()}`;
+  if (!createData.stayTransportImages) createData.stayTransportImages = [];
+  if (!createData.bannerImages) createData.bannerImages = [];
+  delete createData.galleryImages;
+
+  if (createData.slots && createData.slots.length > 0) {
+    for (const slot of createData.slots) {
+      if (!slot.startDate || !slot.endDate) {
+        throw new ValidationError("Every trip slot needs a start and end date.");
+      }
+      if (new Date(slot.endDate) <= new Date(slot.startDate)) {
+        throw new ValidationError("Every slot end date must be after its start date.");
+      }
     }
+    const start = new Date(createData.slots[0].startDate);
+    const end = new Date(createData.slots[0].endDate);
     const diffTime = Math.abs(end - start);
-    data.duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    createData.duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }
-  if (!data.duration) data.duration = 1;
+  if (!createData.duration) createData.duration = 1;
 
-  // price and tokenAmount are required Decimal columns — ensure they're set
-  if (data.price === undefined || data.price === null) data.price = 0;
-  if (data.tokenAmount === undefined || data.tokenAmount === null) data.tokenAmount = 0;
+  return tripRepo.create(createData);
+};
 
-  return tripRepo.create(data);
+export const createShareLink = async (id, expiresAt) => {
+  await getTripById(id, true);
+  const token = randomBytes(32).toString("base64url");
+  const parsedExpiry = expiresAt ? new Date(expiresAt) : null;
+  if (parsedExpiry && Number.isNaN(parsedExpiry.getTime())) {
+    throw new ValidationError("Invalid share link expiry.");
+  }
+  const trip = await tripRepo.update(id, {
+    shareTokenHash: hashShareToken(token),
+    shareTokenExpiresAt: parsedExpiry,
+  });
+  return { token, expiresAt: trip.shareTokenExpiresAt };
+};
+
+export const revokeShareLink = async (id) => {
+  await getTripById(id, true);
+  await tripRepo.update(id, { shareTokenHash: null, shareTokenExpiresAt: null });
 };
 
 export const updateTrip = async (id, data) => {
@@ -69,6 +177,7 @@ export const updateTrip = async (id, data) => {
       data.duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     }
   }
+  delete data.galleryImages;
   return tripRepo.update(id, data);
 };
 
@@ -76,7 +185,6 @@ export const deleteTrip = async (id) => {
   const trip = await getTripById(id, true);
   const contentUrls = [
     ...(trip.bannerImages || []),
-    ...(trip.galleryImages || []),
     ...(Array.isArray(trip.highlights) ? trip.highlights.map((item) => item?.imageUrl) : []),
     ...(Array.isArray(trip.stayTransportImages) ? trip.stayTransportImages.map((item) => item?.imageUrl) : []),
   ].filter(Boolean);
@@ -99,14 +207,6 @@ export const deleteBannerImage = async (tripId, imageUrl) => {
   // Update Database
   const newBanners = existingBanners.filter(url => url !== imageUrl);
   return tripRepo.update(tripId, { bannerImages: newBanners });
-};
-
-export const deleteGalleryImage = async (tripId, imageUrl) => {
-  const trip = await getTripById(tripId, true);
-  const galleryImages = trip.galleryImages || [];
-  if (!galleryImages.includes(imageUrl)) throw new Error("Image not found in trip");
-  await deleteFromCloudinary(imageUrl);
-  return tripRepo.update(tripId, { galleryImages: galleryImages.filter((url) => url !== imageUrl) });
 };
 
 export const uploadBannerImages = async (tripId, imageBuffers) => {

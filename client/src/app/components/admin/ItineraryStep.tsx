@@ -29,8 +29,8 @@ export function ItineraryStep({ control, register, errors }: ItineraryStepProps)
         </div>
         <Button
           type="button"
-          onClick={() => append({ day: `Day ${fields.length + 1}`, title: "", activities: "" })}
-          className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2"
+          onClick={() => append({ day: `Day ${fields.length + 1}`, title: "", description: "", todos: [] })}
+          className="w-full md:w-auto bg-[#781216] hover:bg-[#5a0d10] text-white flex items-center justify-center gap-2"
         >
           <Plus className="w-4 h-4" /> Add Day
         </Button>
@@ -85,24 +85,59 @@ export function ItineraryStep({ control, register, errors }: ItineraryStepProps)
                   )}
                 </div>
               </div>
-              <div>
-                <Label className="text-sm font-semibold">Activities</Label>
+              <div className="mt-3">
+                <Label className="text-sm font-semibold">Description</Label>
                 <Textarea
-                  {...register(`itinerary.${index}.activities`)}
-                  className="mt-1 min-h-[100px]"
-                  placeholder="Arrival & pickup from Guwahati Airport...&#10;Scenic 8-hr drive..."
+                  {...register(`itinerary.${index}.description`)}
+                  className="mt-1"
+                  rows={3}
+                  placeholder="What happens on this day..."
                 />
-                {(errors.itinerary as any)?.[index]?.activities && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {(errors.itinerary as any)[index].activities.message as string}
-                  </p>
-                )}
+              </div>
+              <div className="mt-4">
+                <Label className="text-sm font-semibold mb-2 block">Traveler-facing checklist (Optional)</Label>
+                {/* Checklist (todos) list */}
+                {(() => {
+                  const { fields: todoFields, append: appendTodo, remove: removeTodo } =
+                    useFieldArray({ control, name: `itinerary.${index}.todos` as any });
+                  return (
+                    <div className="space-y-2">
+                      {todoFields.map((act, actIdx) => (
+                        <div key={act.id} className="flex items-center gap-2">
+                          <Input
+                            {...register(`itinerary.${index}.todos.${actIdx}`)}
+                            placeholder={`todo ${actIdx + 1}`}
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeTodo(actIdx)}
+                            className="text-red-500 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        onClick={() => appendTodo('')}
+                        variant="outline"
+                        className="w-full mt-2 border-dashed border-2 py-2 text-gray-500 hover:text-gray-900 flex justify-center items-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" /> Add Item
+                      </Button>
+                    </div>
+                  );
+                })()}
+
               </div>
             </div>
           ))}
           <Button
             type="button"
-            onClick={() => append({ day: `Day ${fields.length + 1}`, title: "", activities: "" })}
+            onClick={() => append({ day: `Day ${fields.length + 1}`, title: "", description: "", todos: [] })}
             variant="outline"
             className="w-full mt-2 border-dashed border-2 py-6 text-gray-500 hover:text-gray-900 flex justify-center items-center gap-2"
           >

@@ -1,5 +1,26 @@
 import { prisma } from "../../prisma/client.js";
 
+const TRIP_FULL_INCLUDE = {
+  circuit: {
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      addOns: { where: { isActive: true }, orderBy: { createdAt: "asc" } },
+    },
+  },
+  faqs: { orderBy: { order: "asc" } },
+  tripTags: true,
+  packages: true,
+  addOns: { orderBy: { createdAt: "asc" } },
+  itinerary: {
+    orderBy: { dayNumber: "asc" },
+    include: { tasks: { orderBy: { createdAt: "asc" } } },
+  },
+  slots: { orderBy: [{ priority: "desc" }, { startDate: "asc" }] },
+  destination: true,
+};
+
 export const findAll = async (skip, take, where = {}, isAdmin = false) => {
   const [trips, total] = await Promise.all([
     prisma.trip.findMany({
@@ -16,14 +37,15 @@ export const findAll = async (skip, take, where = {}, isAdmin = false) => {
         bannerImages: true,
         duration: true,
         bestTimeToVisit: true,
-        price: true,
-        tokenAmount: true,
         tripType: true,
         isActive: true,
         isPublished: true,
         isFeatured: true,
         isSignature: true,
         signatureOrder: true,
+        isListed: true,
+        circuitId: true,
+        circuit: { select: { id: true, title: true, slug: true } },
         createdAt: true,
         destination: true,
         tripTags: true,
@@ -42,28 +64,21 @@ export const findById = async (whereObj, isAdmin = false) => {
   const filter = typeof whereObj === 'string' ? { id: whereObj } : whereObj;
   return prisma.trip.findFirst({
     where: filter,
-    include: {
-      faqs: true,
-      tripTags: true,
-      packages: true,
-      slots: {
-        orderBy: { startDate: 'asc' }
-      },
-      destination: true,
-    }
+    omit: { shareTokenHash: true },
+    include: TRIP_FULL_INCLUDE,
   });
 };
 
 export const create = async (data) => {
-  const { tripTags, faqs, packages, slots, ...rest } = data;
+  const { tripTags, faqs, packages, slots, itinerary, addOns, circuitId, destinationId, ...rest } = data;
   const payload = { ...rest };
+  
+  if (circuitId) payload.circuit = { connect: { id: circuitId } };
+  if (destinationId) payload.destination = { connect: { id: destinationId } };
   
   if (tripTags && Array.isArray(tripTags)) {
     payload.tripTags = {
-      connectOrCreate: tripTags.map(tag => ({
-        where: { tag },
-        create: { tag }
-      }))
+      connect: tripTags.map(tag => ({ tag }))
     };
   }
 
@@ -90,8 +105,8 @@ export const create = async (data) => {
   if (slots && Array.isArray(slots)) {
     payload.slots = {
       create: slots.map(slot => ({
-        startDate: new Date(slot.startDate),
-        endDate: new Date(slot.endDate),
+        startDate: slot.startDate ? new Date(slot.startDate) : null,
+        endDate: slot.endDate ? new Date(slot.endDate) : null,
         title: slot.title || null,
         priority: slot.priority ? parseInt(slot.priority, 10) : 0,
         capacity: parseInt(slot.capacity, 10),
@@ -100,13 +115,62 @@ export const create = async (data) => {
     };
   }
 
-  
-  return prisma.trip.create({ data: payload });
+  if (itinerary && Array.isArray(itinerary)) {
+    payload.itinerary = {
+      create: itinerary.map((day, index) => ({
+        dayNumber: Number(day.dayNumber ?? String(day.day || "").match(/\d+/)?.[0] ?? index + 1),
+        title: day.title,
+        description: day.description ?? (typeof day.activities === "string" ? day.activities : null),
+        todos: Array.isArray(day.todos)
+          ? day.todos
+          : Array.isArray(day.activities)
+            ? day.activities
+            : typeof day.activities === "string"
+              ? day.activities.split("\n").map((item) => item.trim()).filter(Boolean)
+              : [],
+        tasks: {
+          create: Array.isArray(day.tasks) ? day.tasks.map(task => ({
+            category: task.category,
+            title: task.title,
+            description: task.description || null,
+            config: task.config || {},
+            unitPrice: task.unitPrice ?? null,
+            quantityNeeded: task.quantityNeeded ?? null,
+            dueOffsetDays: task.dueOffsetDays ?? null,
+          })) : []
+        },
+      })),
+    };
+  }
+
+  if (addOns && Array.isArray(addOns)) {
+    payload.addOns = {
+      create: addOns.map((addOn) => ({
+        title: addOn.title,
+        description: addOn.description || null,
+        imageUrl: addOn.imageUrl || null,
+        price: Number(addOn.price),
+        maxQuantityPerBooking: addOn.maxQuantityPerBooking || null,
+        maxQuantityPerSlot: addOn.maxQuantityPerSlot || null,
+        purchaseCutoffOffsetDays: addOn.purchaseCutoffOffsetDays ?? null,
+        isActive: addOn.isActive ?? true,
+      })),
+    };
+  }
+
+  return prisma.trip.create({
+    data: payload,
+    omit: { shareTokenHash: true },
+    include: TRIP_FULL_INCLUDE,
+  });
 };
 
 export const update = async (id, data) => {
-  const { tripTags, faqs, packages, slots, ...rest } = data;
+  const { tripTags, faqs, packages, slots, itinerary, addOns, circuitId, destinationId, ...rest } = data;
   const payload = { ...rest };
+  
+  if (circuitId !== undefined) payload.circuit = circuitId ? { connect: { id: circuitId } } : { disconnect: true };
+  if (destinationId !== undefined) payload.destination = destinationId ? { connect: { id: destinationId } } : { disconnect: true };
   
   if (tripTags && Array.isArray(tripTags)) {
     // 1. Clear existing tags
@@ -199,15 +263,15 @@ export const update = async (id, data) => {
       upsert: slots.map(slot => ({
         where: { id: slot.id || "00000000-0000-0000-0000-000000000000" },
         update: {
-          startDate: new Date(slot.startDate),
-          endDate: new Date(slot.endDate),
+          startDate: slot.startDate ? new Date(slot.startDate) : null,
+          endDate: slot.endDate ? new Date(slot.endDate) : null,
           title: slot.title || null,
           priority: slot.priority ? parseInt(slot.priority, 10) : 0,
           capacity: parseInt(slot.capacity, 10)
         },
         create: {
-          startDate: new Date(slot.startDate),
-          endDate: new Date(slot.endDate),
+          startDate: slot.startDate ? new Date(slot.startDate) : null,
+          endDate: slot.endDate ? new Date(slot.endDate) : null,
           title: slot.title || null,
           priority: slot.priority ? parseInt(slot.priority, 10) : 0,
           capacity: parseInt(slot.capacity, 10),
@@ -217,10 +281,97 @@ export const update = async (id, data) => {
     };
   }
 
+  if (itinerary && Array.isArray(itinerary)) {
+    payload.itinerary = {
+      deleteMany: {},
+      create: itinerary.map((day, index) => ({
+        dayNumber: Number(day.dayNumber ?? String(day.day || "").match(/\d+/)?.[0] ?? index + 1),
+        title: day.title,
+        description: day.description ?? (typeof day.activities === "string" ? day.activities : null),
+        todos: Array.isArray(day.todos)
+          ? day.todos
+          : Array.isArray(day.activities)
+            ? day.activities
+            : typeof day.activities === "string"
+              ? day.activities.split("\n").map((item) => item.trim()).filter(Boolean)
+              : [],
+        tasks: {
+          create: Array.isArray(day.tasks) ? day.tasks.map(task => ({
+            category: task.category,
+            title: task.title,
+            description: task.description || null,
+            config: task.config || {},
+            unitPrice: task.unitPrice ?? null,
+            quantityNeeded: task.quantityNeeded ?? null,
+            dueOffsetDays: task.dueOffsetDays ?? null,
+          })) : []
+        },
+      })),
+    };
+  }
+
+  if (addOns && Array.isArray(addOns)) {
+    const existingAddOns = await prisma.addOn.findMany({
+      where: { tripId: id },
+      select: { id: true },
+    });
+    const existingAddOnIds = new Set(existingAddOns.map((addOn) => addOn.id));
+    const incomingAddOnIds = addOns.map((addOn) => addOn.id).filter(Boolean);
+
+    if (new Set(incomingAddOnIds).size !== incomingAddOnIds.length) {
+      throw new Error("Duplicate add-on IDs are not allowed");
+    }
+
+    if (incomingAddOnIds.some((addOnId) => !existingAddOnIds.has(addOnId))) {
+      throw new Error("One or more add-ons do not belong to this trip");
+    }
+
+    const addOnsToDelete = existingAddOns.filter((addOn) => !incomingAddOnIds.includes(addOn.id));
+    if (addOnsToDelete.length > 0) {
+      const purchasedAddOn = await prisma.bookingAddOn.findFirst({
+        where: { addOnId: { in: addOnsToDelete.map((addOn) => addOn.id) } },
+        select: { id: true },
+      });
+
+      if (purchasedAddOn) {
+        throw new Error("Cannot remove add-ons that are used in existing bookings");
+      }
+    }
+
+    payload.addOns = {
+      deleteMany: { id: { in: addOnsToDelete.map((addOn) => addOn.id) } },
+      upsert: addOns.map((addOn) => ({
+        where: { id: addOn.id || "00000000-0000-0000-0000-000000000000" },
+        update: {
+          title: addOn.title,
+          description: addOn.description || null,
+          imageUrl: addOn.imageUrl || null,
+          price: Number(addOn.price),
+          maxQuantityPerBooking: addOn.maxQuantityPerBooking || null,
+          maxQuantityPerSlot: addOn.maxQuantityPerSlot || null,
+          purchaseCutoffOffsetDays: addOn.purchaseCutoffOffsetDays ?? null,
+          isActive: addOn.isActive ?? true,
+        },
+        create: {
+          title: addOn.title,
+          description: addOn.description || null,
+          imageUrl: addOn.imageUrl || null,
+          price: Number(addOn.price),
+          maxQuantityPerBooking: addOn.maxQuantityPerBooking || null,
+          maxQuantityPerSlot: addOn.maxQuantityPerSlot || null,
+          purchaseCutoffOffsetDays: addOn.purchaseCutoffOffsetDays ?? null,
+          isActive: addOn.isActive ?? true,
+        },
+      })),
+    };
+  }
+
 
   return prisma.trip.update({
     where: { id },
     data: payload,
+    omit: { shareTokenHash: true },
+    include: TRIP_FULL_INCLUDE,
   });
 };
 
@@ -247,7 +398,6 @@ export const getFeaturedTrips = async () => {
       overview: true,
       location: true,
       duration: true,
-      price: true,
       isActive: true,
       isPublished: true,
       isFeatured: true,
@@ -278,7 +428,7 @@ export const getSignatureTrips = async () => {
       overview: true,
       location: true,
       duration: true,
-      price: true,
+      packages: true,
       bannerImages: true,
     },
   });

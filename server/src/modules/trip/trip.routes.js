@@ -25,6 +25,8 @@ router.put("/signature-collection", tripController.updateSignatureTrips);
 router.post("/", tripController.createTrip);
 router.put("/:id", tripController.updateTrip);
 router.delete("/:id", tripController.deleteTrip);
+router.post("/:id/share-link", tripController.createShareLink);
+router.delete("/:id/share-link", tripController.revokeShareLink);
 router.post(
   "/:id/banner-images",
   imageUploadMiddleware.array("banners", 10),
@@ -33,7 +35,7 @@ router.post(
 router.post("/:id/banner-upload-signature", tripController.createBannerUploadSignature);
 router.post("/:id/banner-images/attach", tripController.attachBannerImages);
 router.delete("/:id/banner-images", tripController.deleteBanner);
-router.delete("/:id/gallery-images", tripController.deleteGalleryImage);
+
 
 router.post(
   "/:id/highlights",

@@ -15,18 +15,45 @@ import {
   SidebarTrigger,
   SidebarInset,
 } from "../../components/ui/sidebar";
-import { LayoutDashboard, Map, MapPin, CalendarCheck, Users, Settings, LogOut, CreditCard, MessageSquare, Home, Tent, Star, Images } from "lucide-react";
+import {
+  LogOut,
+  Home,
+  MapPin,
+  Map,
+  CalendarRange,
+  ClipboardCheck,
+  CalendarCheck,
+  BookOpen,
+  CreditCard,
+  Star,
+  LayoutDashboard,
+  Receipt,
+  Image,
+  BarChart3,
+  Tent,
+} from "lucide-react";
 
-const navItems = [
-  { title: "Home", url: "/", icon: Home },
-  { title: "Destinations", url: "/dashboard/destinations", icon: MapPin },
-  { title: "Trips", url: "/dashboard/trips", icon: Map },
+const overviewItems = [
+  { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
+];
+
+const crmItems = [
+  { title: "Circuits", url: "/dashboard/circuits", icon: Map },
+  { title: "Trips & departures", url: "/dashboard/trips", icon: CalendarRange },
   { title: "Festivals", url: "/dashboard/festivals", icon: Tent },
   { title: "Bookings", url: "/dashboard/bookings", icon: CalendarCheck },
+  { title: "Operations", url: "/dashboard/operations", icon: ClipboardCheck },
+  { title: "Balance sheet", url: "/dashboard/ledger", icon: BookOpen },
   { title: "Payments", url: "/dashboard/payments", icon: CreditCard },
-  { title: "Inquiries", url: "/dashboard/inquiries", icon: MessageSquare },
+  { title: "Invoices", url: "/dashboard/invoices", icon: Receipt },
+];
+
+const websiteItems = [
+  { title: "Destinations", url: "/dashboard/destinations", icon: MapPin },
   { title: "Reviews", url: "/dashboard/reviews", icon: Star },
-  { title: "Landing Page", url: "/dashboard/landing-page", icon: Images },
+  { title: "Landing Page", url: "/dashboard/landing", icon: Image },
+  { title: "Public site", url: "/", icon: Home },
 ];
 
 export default function AdminLayout() {
@@ -46,18 +73,44 @@ export default function AdminLayout() {
     return <Navigate to="/" replace />;
   }
 
+  const renderItem = (item: { title: string; url: string; icon: any }) => {
+    const isActive = item.url === "/"
+      ? location.pathname === "/"
+      : item.url === "/dashboard"
+        ? location.pathname === "/dashboard"
+        : location.pathname.startsWith(item.url);
+    return (
+      <SidebarMenuItem key={item.title}>
+        <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
+          <Link to={item.url}>
+            <item.icon />
+            <span>{item.title}</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  };
+
   return (
     <SidebarProvider>
-      <Sidebar variant="inset" collapsible="icon" className="border-r border-gray-200">
+      <Sidebar
+        variant="inset"
+        collapsible="icon"
+        className="border-r border-gray-200"
+      >
         <SidebarHeader className="border-b border-gray-200 flex flex-row items-center justify-between">
           <div className="flex items-center gap-2 overflow-hidden">
-             <div className="size-8 rounded-md bg-[#781216] flex items-center justify-center shrink-0">
-               <span className="text-white font-bold text-lg leading-none">H</span>
-             </div>
-             <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden">
-               <span className="font-semibold text-sm">Hangover</span>
-               <span className="text-xs text-muted-foreground">Admin Portal</span>
-             </div>
+            <div className="size-8 rounded-md bg-[#781216] flex items-center justify-center shrink-0">
+              <span className="text-white font-bold text-lg leading-none">
+                H
+              </span>
+            </div>
+            <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden">
+              <span className="font-semibold text-sm">Hangover</span>
+              <span className="text-xs text-muted-foreground">
+                Admin Portal
+              </span>
+            </div>
           </div>
         </SidebarHeader>
         <SidebarContent>
@@ -65,32 +118,42 @@ export default function AdminLayout() {
             <SidebarGroupLabel>Menu</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {navItems.map((item) => {
-                  const isActive = item.url === "/" ? location.pathname === "/" : location.pathname.startsWith(item.url);
-                  return (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
-                        <Link to={item.url}>
-                          <item.icon />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
+                {overviewItems.map(renderItem)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup>
+            <SidebarGroupLabel>CRM</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {crmItems.map(renderItem)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup>
+            <SidebarGroupLabel>Website</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {websiteItems.map(renderItem)}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
         <div className="mt-auto p-4 border-t border-gray-200">
-           <SidebarMenu>
-             <SidebarMenuItem>
-                <SidebarMenuButton onClick={logout} tooltip="Log out" className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                  <LogOut />
-                  <span>Log out</span>
-                </SidebarMenuButton>
-             </SidebarMenuItem>
-           </SidebarMenu>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={logout}
+                tooltip="Log out"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <LogOut />
+                <span>Log out</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
         </div>
       </Sidebar>
       <SidebarInset className="bg-gray-50 flex flex-col flex-1 min-w-0 h-dvh md:h-screen overflow-hidden">

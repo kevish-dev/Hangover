@@ -31,9 +31,12 @@ export interface ApiActivity {
 
 export interface ApiItineraryDay {
   id?: string;
-  day: string;
+  day?: string;
+  dayNumber?: number;
   title: string;
-  activities: string;
+  description?: string | null;
+  todos?: string[];
+  activities?: string | string[];
 }
 
 export interface ApiItinerary {
@@ -61,8 +64,6 @@ export interface ApiTrip {
   inclusions: string[];
   exclusions: string[];
   stayTransportImages: ApiStayTransportItem[] | null;
-  price: string; // Decimal comes as string from Prisma
-  tokenAmount: string;
   capacity: number;
   filledSpots: number;
   startDate: string;
@@ -77,11 +78,25 @@ export interface ApiTrip {
   destination: ApiDestination | null;
   tripTags: ApiTripTag[];
   faqs: ApiFaq[];
-  itinerary?: any;
+  itinerary?: ApiItineraryDay[];
   createdAt: string;
   updatedAt: string;
   slots?: any[];
   packages?: any[];
+  addOns?: Array<{
+    id: string;
+    title: string;
+    description?: string | null;
+    imageUrl?: string | null;
+    price: string | number;
+    maxQuantityPerBooking?: number | null;
+    maxQuantityPerSlot?: number | null;
+    purchaseCutoffOffsetDays?: number | null;
+    isActive: boolean;
+  }>;
+  circuitId?: string | null;
+  circuit?: { id: string; title: string; slug: string } | null;
+  isListed?: boolean;
 }
 
 export interface ApiTripsResponse {
@@ -104,8 +119,10 @@ export async function fetchAllTrips(): Promise<ApiTrip[]> {
   return res.data.data;
 }
 
-export async function fetchTripBySlug(slug: string): Promise<ApiTrip> {
-  const res = await apiClient.get<ApiTrip>(`/trips/${slug}`);
+export async function fetchTripBySlug(slug: string, shareToken?: string | null): Promise<ApiTrip> {
+  const res = await apiClient.get<ApiTrip>(`/trips/${slug}`, {
+    params: shareToken ? { shareToken } : undefined,
+  });
   return res.data;
 }
 

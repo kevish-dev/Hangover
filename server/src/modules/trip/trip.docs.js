@@ -56,6 +56,7 @@ registry.registerPath({
           schema: z
             .object({
               title: z.string(),
+              circuitId: z.string().optional(),
               location: z.string(),
               duration: z.number().optional(),
               bestTimeToVisit: z.string(),
@@ -67,6 +68,7 @@ registry.registerPath({
               endDate: z.string().datetime(),
               tripType: z.string(),
               isPublished: z.boolean().optional(),
+              isListed: z.boolean().optional(),
               tripTags: z.array(z.string()).optional(),
               faqs: z
                 .array(
@@ -123,6 +125,7 @@ registry.registerPath({
             .object({
               title: z.string().optional(),
               isPublished: z.boolean().optional(),
+              isListed: z.boolean().optional(),
               tripTags: z.array(z.string()).optional(),
               faqs: z
                 .array(

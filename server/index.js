@@ -8,6 +8,7 @@ import { generateOpenApiDocument } from "./src/core/openapi/openapi.js";
 import authRoutes from "./src/modules/auth/auth.routes.js";
 import tripRoutes from "./src/modules/trip/trip.routes.js";
 import festivalRoutes from "./src/modules/festival/festival.routes.js";
+import circuitRoutes from "./src/modules/circuit/circuit.routes.js";
 import itineraryRoutes from "./src/modules/itinerary/itinerary.routes.js";
 import userRoutes from "./src/modules/user/user.routes.js";
 import bookingRoutes from "./src/modules/booking/booking.routes.js";
@@ -19,8 +20,16 @@ import reviewRoutes from "./src/modules/review/review.routes.js";
 import landingReasonRoutes from "./src/modules/landing-reason/landing-reason.routes.js";
 import landingTripTypeRoutes from "./src/modules/landing-trip-type/landing-trip-type.routes.js";
 import landingContentRoutes from "./src/modules/landing-content/landing-content.routes.js";
+import ledgerRoutes from "./src/modules/ledger/ledger.routes.js";
+import operationsRoutes from "./src/modules/operations/operations.routes.js";
+import invoiceRoutes from "./src/modules/invoice/invoice.routes.js";
+import analyticsRoutes from "./src/modules/analytics/analytics.routes.js";
+import siteSettingsRoutes from "./src/modules/site-settings/site-settings.routes.js";
 import { errorHandler } from "./src/core/errors/errorHandler.js";
 import { prisma } from "./src/prisma/client.js";
+import { startOperationsWorker } from "./src/workers/operations.worker.js";
+import { optionalAuth } from "./src/core/middlewares/auth.middleware.js";
+import { blockCustomerWritesDuringMaintenance } from "./src/core/middlewares/maintenance.middleware.js";
 const app = express();
 
 // Raw body parser for Razorpay webhook (must be before express.json)
@@ -43,10 +52,15 @@ app.use(
 
 app.use(cookieParser());
 
+// Resolve an existing session once so maintenance mode can exempt administrators
+// before any customer-facing route handles a write request.
+app.use("/api/v1", optionalAuth, blockCustomerWritesDuringMaintenance);
 
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/site-settings", siteSettingsRoutes);
 app.use("/api/v1/trips", tripRoutes);
 app.use("/api/v1/festivals", festivalRoutes);
+app.use("/api/v1/circuits", circuitRoutes);
 app.use("/api/v1/itineraries", itineraryRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/bookings", bookingRoutes);
@@ -58,6 +72,10 @@ app.use("/api/v1/reviews", reviewRoutes);
 app.use("/api/v1/landing-reasons", landingReasonRoutes);
 app.use("/api/v1/landing-trip-types", landingTripTypeRoutes);
 app.use("/api/v1/landing-content", landingContentRoutes);
+app.use("/api/v1/ledgers", ledgerRoutes);
+app.use("/api/v1/operations", operationsRoutes);
+app.use("/api/v1/invoices", invoiceRoutes);
+app.use("/api/v1/analytics", analyticsRoutes);
 
 app.get("/openapi.json", (req, res) => {
   res.json(generateOpenApiDocument());
@@ -78,7 +96,10 @@ const startServer = async () => {
   try {
     await prisma.$connect();
     console.log("Connected to database successfully");
-    
+
+    // Start the in-memory operations reminder worker
+    startOperationsWorker();
+
     app.listen(env.PORT, () => {
       console.log(`Server running on ${env.PORT}`);
     });

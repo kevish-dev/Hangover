@@ -256,7 +256,7 @@ export function HeroCarousel() {
           <img
             src={mediaImageUrl(slide.bannerImages, { width: 1920, fit: "fit" })}
             alt={slide.title}
-            fetchPriority="high"
+            fetchpriority="high"
             decoding="async"
             className="w-full h-full object-cover"
           />
@@ -375,14 +375,14 @@ export function HeroCarousel() {
                       fontSize: "0.88rem",
                     }}
                   >
-                    From ₹{slide.price.toLocaleString("en-IN")}
+                    From ₹{slide.price?.toLocaleString("en-IN") ?? "N/A"}
                   </div>
                 </div>
               </div>
 
               {/* Explore CTA */}
               <button
-                onClick={() => navigate(`/trips/${slide.slug}`)}
+                onClick={() => navigate(`/trips/${slide.id}`)}
                 className="group active:scale-95 transition-all duration-300 mt-8"
                 style={{
                   background: "#C8A96E",

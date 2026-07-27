@@ -8,6 +8,8 @@ import {
 } from "../../core/errors/errors.js";
 import crypto from "crypto";
 import { uploadSensitiveDocument, createAuthenticatedDeliveryUrl, deleteMediaAsset } from "../../core/services/upload.service.js";
+import { getBookingJourney } from "./booking-journey.js";
+import * as operationsService from "../operations/operations.service.js";
 
 const withSecureDocumentUrls = (booking) => {
   if (!booking) return booking;
@@ -58,6 +60,38 @@ export const uploadTravelerGovtId = async (userId, file) => {
 const toDecimal2 = (value) =>
   Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
+const getBookableAddOns = (item) =>
+  item?.addOns?.length ? item.addOns : item?.circuit?.addOns || [];
+
+const normalizeAddOnSelections = (addOns) => {
+  if (!Array.isArray(addOns)) return [];
+
+  const quantitiesById = new Map();
+  for (const addOn of addOns) {
+    if (!addOn?.addOnId) continue;
+    const quantity = Number(addOn.quantity ?? 1);
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      throw new ValidationError("Add-on quantity must be a positive whole number.");
+    }
+    quantitiesById.set(addOn.addOnId, (quantitiesById.get(addOn.addOnId) || 0) + quantity);
+  }
+
+  return Array.from(quantitiesById, ([addOnId, quantity]) => ({ addOnId, quantity }));
+};
+
+const generateBookingReference = async (prismaClient) => {
+  // nextval is atomic, unlike counting booking rows. The minimum width is
+  // four digits; larger values remain intact (for example H10000).
+  const rows = await prismaClient.$queryRaw`
+    SELECT nextval('"BookingReferenceSequence"') AS "sequence"
+  `;
+  const sequence = Number(rows[0]?.sequence);
+  if (!Number.isSafeInteger(sequence) || sequence < 1) {
+    throw new Error("Unable to generate a booking reference.");
+  }
+  return `H${String(sequence).padStart(4, "0")}`;
+};
+
 export const createBooking = async (userId, data) => {
   // 1. Verify user has a Government ID
   const user = await prisma.user.findUnique({
@@ -86,10 +120,10 @@ export const createBooking = async (userId, data) => {
 
   const slot = await prisma.slot.findUnique({ 
     where: { id: data.slotId },
-    include: { 
-      trip: { include: { packages: true } }, 
-      festival: { include: { packages: true } } 
-    } 
+    include: {
+      trip: { include: { packages: true, addOns: true, circuit: { include: { addOns: true } } } },
+      festival: { include: { packages: true, addOns: true, circuit: { include: { addOns: true } } } },
+    }
   });
   if (!slot) {
     throw new NotFoundError("Booking slot not found");
@@ -143,15 +177,72 @@ export const createBooking = async (userId, data) => {
   let selectedPackage = null;
   if (data.packageId) {
     selectedPackage = item.packages?.find(p => p.id === data.packageId);
-    if (!selectedPackage) {
-      throw new ValidationError("Selected package not found for this item.");
-    }
+  }
+  
+  if (!selectedPackage && item.packages && item.packages.length > 0) {
+    selectedPackage = item.packages[0];
   }
 
-  const itemPrice = selectedPackage ? Number(selectedPackage.price) : Number(item.price);
-  const itemToken = selectedPackage ? Number(selectedPackage.tokenAmount) : Number(item.tokenAmount);
+  if (!selectedPackage) {
+    throw new ValidationError("A package must be selected for this booking.");
+  }
 
-  const baseTotalAmount = itemPrice * numberOfTravelers;
+  const itemPrice = Number(selectedPackage.price);
+  const itemToken = Number(selectedPackage.tokenAmount);
+
+  let addOnsTotalCost = 0;
+  const bookingAddOnsData = [];
+  const bookableAddOns = getBookableAddOns(item);
+
+  for (const addonReq of normalizeAddOnSelections(data.addOns)) {
+      const addOnModel = bookableAddOns.find((addOn) => addOn.id === addonReq.addOnId);
+      if (!addOnModel || !addOnModel.isActive) {
+        throw new ValidationError("One or more selected add-ons are not available for this trip.");
+      }
+
+      const qty = addonReq.quantity;
+      if (addOnModel.maxQuantityPerBooking && qty > addOnModel.maxQuantityPerBooking) {
+        throw new ValidationError(`${addOnModel.title} is limited to ${addOnModel.maxQuantityPerBooking} per booking.`);
+      }
+      
+      if (addOnModel.maxQuantityPerSlot && slot) {
+        const bookedAddOns = await prisma.bookingAddOn.aggregate({
+          _sum: { quantity: true },
+          where: {
+            addOnId: addOnModel.id,
+            status: { notIn: ["CANCELLED", "REFUNDED"] },
+            booking: {
+              slotId: slot.id,
+              status: { not: "CANCELLED" }
+            }
+          }
+        });
+        
+        const alreadyBooked = bookedAddOns._sum.quantity || 0;
+        if (alreadyBooked + qty > addOnModel.maxQuantityPerSlot) {
+          throw new ValidationError(`${addOnModel.title} only has ${Math.max(0, addOnModel.maxQuantityPerSlot - alreadyBooked)} spots left for this departure.`);
+        }
+      }
+      if (addOnModel.purchaseCutoffOffsetDays != null && slot.startDate) {
+        const cutoff = new Date(slot.startDate).getTime() - addOnModel.purchaseCutoffOffsetDays * 86400000;
+        if (Date.now() > cutoff) {
+          throw new ValidationError(`${addOnModel.title} is no longer available for this departure.`);
+        }
+      }
+      const price = Number(addOnModel.price);
+      const totalAddOnPrice = price * qty;
+      addOnsTotalCost += totalAddOnPrice;
+
+      bookingAddOnsData.push({
+        addOnId: addOnModel.id,
+        quantity: qty,
+        unitPrice: price,
+        totalPrice: totalAddOnPrice,
+        status: "PENDING",
+      });
+  }
+
+  const baseTotalAmount = (itemPrice * numberOfTravelers) + addOnsTotalCost;
   const totalAmount = toDecimal2(baseTotalAmount + (baseTotalAmount * 0.05));
 
   const baseTokenAmount = itemToken * numberOfTravelers;
@@ -194,6 +285,7 @@ export const createBooking = async (userId, data) => {
         }
         return {
         fullName: t.fullName,
+        email: t.email || null,
         gender: t.gender,
         dateOfBirth: t.dateOfBirth ? new Date(t.dateOfBirth) : null,
         phone: t.phone,
@@ -231,7 +323,9 @@ export const createBooking = async (userId, data) => {
   }
 
   // Generate booking reference and complete payload for a new booking
-  bookingData.bookingReference = `HNG-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+  const customBookingId = await generateBookingReference(prisma);
+  bookingData.id = customBookingId;
+  bookingData.bookingReference = customBookingId;
   bookingData.userId = userId;
   bookingData.slotId = data.slotId;
   if (isTrip) {
@@ -247,7 +341,331 @@ export const createBooking = async (userId, data) => {
     bookingData.travelers = { create: travelersCreateData };
   }
 
-  return repo.createBooking(bookingData);
+  if (bookingAddOnsData.length > 0) {
+    bookingData.addOns = { create: bookingAddOnsData };
+  }
+
+  const booking = await repo.createBooking(bookingData);
+
+  // Auto-generate OperationalTasks from the circuit template (fire-and-forget in background)
+  operationsService.generateBookingOperations(booking, slot, data.addOns || []).catch(
+    (err) => console.error("[OpsGen] Failed to generate operations for booking", booking.id, err)
+  );
+
+  return booking;
+};
+
+export const adminCreateBooking = async (adminId, data) => {
+  if (!data.email) {
+    throw new ValidationError("Email is required for admin booking creation.");
+  }
+  
+  const email = data.email.toLowerCase().trim();
+  let user = await prisma.user.findUnique({
+    where: { email },
+    include: { profile: true },
+  });
+
+  if (user) {
+    const profileUpdate = {};
+    if (data.fullName) profileUpdate.fullName = data.fullName;
+    if (data.phone) profileUpdate.phone = data.phone;
+    if (data.gender) profileUpdate.gender = data.gender.toUpperCase();
+    if (data.dateOfBirth) profileUpdate.dateOfBirth = new Date(data.dateOfBirth);
+    if (data.govtIdAssetId) profileUpdate.govtIdAssetId = data.govtIdAssetId;
+    
+    if (Object.keys(profileUpdate).length > 0) {
+      if (user.profile) {
+        await prisma.userProfile.update({
+          where: { id: user.profile.id },
+          data: profileUpdate,
+        });
+      } else {
+        await prisma.userProfile.create({
+          data: { ...profileUpdate, userId: user.id }
+        });
+      }
+    }
+  } else {
+    user = await prisma.user.create({
+      data: {
+        email,
+        googleId: `admin_created_${crypto.randomUUID()}`,
+        role: "USER",
+        profile: {
+          create: {
+            fullName: data.fullName || null,
+            phone: data.phone || null,
+            gender: data.gender ? data.gender.toUpperCase() : null,
+            dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
+            govtIdAssetId: data.govtIdAssetId || null,
+          }
+        }
+      },
+      include: { profile: true }
+    });
+  }
+
+  if (!data.slotId) {
+    throw new ValidationError("Must provide a slotId to book.");
+  }
+
+  const slot = await prisma.slot.findUnique({ 
+    where: { id: data.slotId },
+    include: {
+      trip: { include: { packages: true, addOns: true, circuit: { include: { addOns: true } } } },
+      festival: { include: { packages: true, addOns: true, circuit: { include: { addOns: true } } } },
+    }
+  });
+  if (!slot) {
+    throw new NotFoundError("Booking slot not found");
+  }
+
+  const isTrip = !!slot.tripId;
+  const item = isTrip ? slot.trip : slot.festival;
+  if (!item) throw new NotFoundError("Booking item not found");
+  if (!item.isActive) throw new ValidationError("This item is no longer available.");
+
+  const numberOfTravelers = data.numberOfTravelers || 1;
+  const spotsLeft = slot.capacity - slot.filledSpots;
+  if (numberOfTravelers > spotsLeft) {
+    throw new ValidationError(`Only ${spotsLeft} spot(s) remaining.`);
+  }
+
+  let selectedPackage = null;
+  if (data.packageId) {
+    selectedPackage = item.packages?.find(p => p.id === data.packageId);
+  }
+  if (!selectedPackage && item.packages && item.packages.length > 0) {
+    selectedPackage = item.packages[0];
+  }
+  if (!selectedPackage) {
+    throw new ValidationError("A package must be selected.");
+  }
+
+  const itemPrice = Number(selectedPackage.price);
+  const itemToken = Number(selectedPackage.tokenAmount);
+
+  let addOnsTotalCost = 0;
+  const bookingAddOnsData = [];
+  const bookableAddOns = getBookableAddOns(item);
+
+  for (const addonReq of normalizeAddOnSelections(data.addOns)) {
+      const addOnModel = bookableAddOns.find((addOn) => addOn.id === addonReq.addOnId);
+      if (!addOnModel || !addOnModel.isActive) {
+        throw new ValidationError("One or more selected add-ons are not available.");
+      }
+      const qty = addonReq.quantity;
+      if (addOnModel.maxQuantityPerBooking && qty > addOnModel.maxQuantityPerBooking) {
+        throw new ValidationError(`${addOnModel.title} is limited to ${addOnModel.maxQuantityPerBooking} per booking.`);
+      }
+      if (addOnModel.maxQuantityPerSlot) {
+        const bookedAddOns = await prisma.bookingAddOn.aggregate({
+          _sum: { quantity: true },
+          where: {
+            addOnId: addOnModel.id,
+            status: { notIn: ["CANCELLED", "REFUNDED"] },
+            booking: { slotId: slot.id, status: { not: "CANCELLED" } },
+          },
+        });
+        const alreadyBooked = bookedAddOns._sum.quantity || 0;
+        if (alreadyBooked + qty > addOnModel.maxQuantityPerSlot) {
+          throw new ValidationError(`${addOnModel.title} only has ${Math.max(0, addOnModel.maxQuantityPerSlot - alreadyBooked)} spots left for this departure.`);
+        }
+      }
+      if (addOnModel.purchaseCutoffOffsetDays != null && slot.startDate) {
+        const cutoff = new Date(slot.startDate).getTime() - addOnModel.purchaseCutoffOffsetDays * 86400000;
+        if (Date.now() > cutoff) {
+          throw new ValidationError(`${addOnModel.title} is no longer available for this departure.`);
+        }
+      }
+      const price = Number(addOnModel.price);
+      const totalAddOnPrice = price * qty;
+      addOnsTotalCost += totalAddOnPrice;
+      bookingAddOnsData.push({
+        addOnId: addOnModel.id,
+        quantity: qty,
+        unitPrice: price,
+        totalPrice: totalAddOnPrice,
+        status: data.paymentAction === "MARK_PAID" ? "PAID" : "PENDING",
+      });
+  }
+
+  const baseTotalAmount = (itemPrice * numberOfTravelers) + addOnsTotalCost;
+  const totalAmount = toDecimal2(baseTotalAmount + (baseTotalAmount * 0.05));
+
+  const baseTokenAmount = itemToken * numberOfTravelers;
+  const tokenAmount = toDecimal2(baseTokenAmount + (baseTokenAmount * 0.05));
+
+  let initialPaymentType = data.initialPaymentType || "TOKEN";
+  if (tokenAmount === 0) initialPaymentType = "FULL";
+  const amountDue = initialPaymentType === "FULL" ? 0 : toDecimal2(totalAmount - tokenAmount);
+
+  const balanceDueDate = new Date(slot.startDate);
+  balanceDueDate.setDate(balanceDueDate.getDate() - 10);
+
+  let status = "PENDING";
+  let paymentStatus = "PENDING";
+  let amountPaid = 0;
+  let amountToPay = initialPaymentType === "FULL" ? totalAmount : tokenAmount;
+
+  if (data.paymentAction === "MARK_PAID") {
+    amountPaid = amountToPay;
+    paymentStatus = initialPaymentType === "FULL" ? "PAID" : "PARTIALLY_PAID";
+    status = "CONFIRMED";
+  }
+
+  const customBookingId = await generateBookingReference(prisma);
+
+  const bookingData = {
+    id: customBookingId,
+    bookingReference: customBookingId,
+    userId: user.id,
+    slotId: data.slotId,
+    numberOfTravelers,
+    initialPaymentType,
+    totalAmount,
+    tokenAmount,
+    amountDue,
+    amountPaid,
+    balanceDueDate,
+    specialRequests: data.specialRequests || null,
+    status,
+    paymentStatus,
+    source: "CATALOG",
+  };
+
+  if (isTrip) bookingData.tripId = slot.tripId;
+  else bookingData.festivalId = slot.festivalId;
+  if (selectedPackage) bookingData.packageId = selectedPackage.id;
+
+  if (bookingAddOnsData.length > 0) {
+    bookingData.addOns = { create: bookingAddOnsData };
+  }
+
+  const travelersCreateData = (data.additionalTravelers && Array.isArray(data.additionalTravelers) && data.additionalTravelers.length > 0)
+    ? await Promise.all(data.additionalTravelers.map(async (t) => {
+        if (t.aadhaarAssetId) {
+          const asset = await prisma.mediaAsset.findFirst({
+            where: {
+              id: t.aadhaarAssetId,
+              deliveryType: "AUTHENTICATED",
+              travelerGovtId: null,
+            },
+          });
+          if (!asset) throw new ValidationError("Invalid traveler government ID upload.");
+        }
+        return {
+          fullName: t.fullName,
+          email: t.email || null,
+          gender: t.gender,
+          dateOfBirth: t.dateOfBirth ? new Date(t.dateOfBirth) : null,
+          phone: t.phone,
+          aadhaar: t.aadhaarAssetId ? null : (t.aadhaar || null),
+          aadhaarAssetId: t.aadhaarAssetId || null,
+        };
+      }))
+    : [];
+
+  if (travelersCreateData.length > 0) {
+    bookingData.travelers = { create: travelersCreateData };
+  }
+
+  const booking = await prisma.$transaction(async (tx) => {
+    const newBooking = await tx.booking.create({ data: bookingData, include: { user: { include: { profile: true } }, package: true, trip: true, festival: true, slot: true } });
+
+    await tx.slot.update({
+      where: { id: slot.id },
+      data: { filledSpots: { increment: numberOfTravelers } },
+    });
+
+    if (data.paymentAction === "MARK_PAID") {
+      const payment = await tx.payment.create({
+        data: {
+          bookingId: newBooking.id,
+          type: initialPaymentType,
+          status: "SUCCESS",
+          amount: amountPaid,
+          currency: "INR",
+          razorpayOrderId: `OFFLINE_${crypto.randomUUID()}`,
+          idempotencyKey: `ADMIN_${newBooking.id}_${crypto.randomUUID()}`,
+          paidAt: new Date(),
+          paymentMethod: "OFFLINE",
+          notes: { adminId },
+        },
+      });
+
+      await tx.ledgerEntry.create({
+        data: {
+          type: "INCOME",
+          scope: isTrip ? "TRIP" : "FESTIVAL",
+          tripId: isTrip ? slot.tripId : null,
+          festivalId: isTrip ? null : slot.festivalId,
+          bookingId: newBooking.id,
+          paymentId: payment.id,
+          source: "MANUAL",
+          category: initialPaymentType === "FULL" ? "Full Payment" : "Token Payment",
+          amount: amountPaid,
+          description: "Payment collected offline/manually by admin",
+          isAutoGenerated: true,
+          createdById: adminId,
+        },
+      });
+    }
+
+    return newBooking;
+  });
+
+  operationsService.generateBookingOperations(booking, slot, data.addOns || []).catch(
+    (err) => console.error("[OpsGen] Failed to generate operations for admin booking", booking.id, err)
+  );
+
+  if (data.paymentAction === "MARK_PAID") {
+    import("../../core/services/email.service.js").then(({ sendBookingConfirmedEmail }) => {
+      sendBookingConfirmedEmail({
+        to: email,
+        name: data.fullName || email.split("@")[0],
+        bookingRef: booking.bookingReference,
+        tripTitle: item.title,
+        tripStartDate: slot.startDate,
+        tripEndDate: slot.endDate,
+        packageName: selectedPackage?.title,
+        travelersCount: numberOfTravelers,
+        amountPaid: amountPaid,
+        balanceAmount: booking.amountDue,
+        totalAmount: booking.totalAmount,
+        dueDate: booking.balanceDueDate,
+      }).catch(err => console.error("Failed to send booking confirmed email", err));
+    });
+  } else if (data.paymentAction === "SEND_LINK") {
+    import("../payment/payment.service.js").then(({ initiatePayment }) => {
+      initiatePayment(user.id, booking.id, initialPaymentType).then(() => {
+        import("../../core/services/email.service.js").then(({ sendPaymentReminderEmail }) => {
+           import("../../core/env/env.js").then((envModule) => {
+             const env = envModule.default;
+             const paymentLink = `${env.ORIGIN}/bookings/${booking.id}/pay-balance`;
+             sendPaymentReminderEmail({
+               to: email,
+               name: data.fullName || email.split("@")[0],
+               bookingRef: booking.bookingReference,
+               tripTitle: item.title,
+               tripStartDate: slot.startDate,
+               tripEndDate: slot.endDate,
+               packageName: selectedPackage?.title,
+               travelersCount: numberOfTravelers,
+               amountPaid: 0,
+               balanceAmount: amountToPay,
+               totalAmount: booking.totalAmount,
+               dueDate: booking.balanceDueDate,
+               paymentLink,
+             }).catch(err => console.error("Failed to send payment link email", err));
+           });
+        });
+      }).catch(err => console.error("Failed to initiate payment for admin booking", err));
+    });
+  }
+
+  return booking;
 };
 
 export const cancelBooking = async (bookingId, userId, reason) => {
@@ -256,30 +674,54 @@ export const cancelBooking = async (bookingId, userId, reason) => {
   if (booking.userId !== userId)
     throw new ForbiddenError("You can only cancel your own bookings.");
 
-  const cancellableStatuses = ["PENDING", "RESERVED"];
+  const cancellableStatuses = ["PENDING", "RESERVED", "CONFIRMED"];
   if (!cancellableStatuses.includes(booking.status)) {
     throw new ValidationError(
       `Booking cannot be cancelled in its current status: ${booking.status}.`,
     );
   }
 
-  const cancelledBooking = await repo.updateBooking(bookingId, {
-    status: "CANCELLED",
-    cancelledAt: new Date(),
-    cancelledBy: userId,
-    cancellationReason: reason || null,
+  const cancelledBooking = await prisma.$transaction(async (tx) => {
+    const updated = await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        status: "CANCELLED",
+        cancelledAt: new Date(),
+        cancelledBy: userId,
+        cancellationReason: reason || null,
+      },
+      include: {
+        slot: { include: { trip: true, festival: true } },
+        package: true,
+        addOns: { include: { addOn: true } },
+        travelers: { include: { aadhaarAsset: true } },
+        payments: { include: { refunds: true } },
+        user: { include: { profile: { include: { govtIdAsset: true } } } },
+      }
+    });
+
+    if (booking.slotId && (booking.status === "RESERVED" || booking.status === "CONFIRMED")) {
+      await tx.slot.update({
+        where: { id: booking.slotId },
+        data: {
+          filledSpots: Math.max(0, (booking.slot.filledSpots || 0) - booking.numberOfTravelers),
+        },
+      });
+    }
+    
+    return updated;
   });
 
   import("../../core/services/email.service.js")
     .then(({ sendBookingCancelledRefundedEmail }) => {
-      const item = booking.slot?.trip || booking.slot?.festival;
+      const journey = getBookingJourney(booking);
       return sendBookingCancelledRefundedEmail(booking.user?.email, {
         name: booking.user?.profile?.fullName || "Traveler",
         bookingRef: booking.bookingReference,
-        tripTitle: item?.title || "your trip",
+        tripTitle: journey.title,
         packageName: booking.package?.title,
-        tripStartDate: booking.slot?.startDate,
-        tripEndDate: booking.slot?.endDate,
+        tripStartDate: journey.startDate,
+        tripEndDate: journey.endDate,
         travelersCount: booking.numberOfTravelers,
         refundAmount: 0,
         reason: reason || "Cancelled by traveler",
@@ -392,24 +834,17 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
 
   // 1. Process refunds via Razorpay first (outside DB transaction)
   const refundsData = [];
+  const offlineRefundsData = [];
   let remainingRefundAmount = validRefundAmount;
-  const gatewayRefundableTotal = booking.payments
-    .filter((payment) => payment.razorpayPaymentId)
-    .reduce((sum, payment) => sum + Number(payment.amount), 0);
-
-  if (validRefundAmount > gatewayRefundableTotal) {
-    throw new ValidationError(
-      "The requested refund includes an offline payment. Process the offline portion separately before cancelling this booking.",
-    );
-  }
 
   for (const payment of booking.payments) {
     if (remainingRefundAmount <= 0) break;
 
+    const maxRefundForPayment = Number(payment.amount);
+    const amountToRefund = Math.min(remainingRefundAmount, maxRefundForPayment);
+    if (amountToRefund <= 0) continue;
+
     if (payment.razorpayPaymentId) {
-      const maxRefundForPayment = Number(payment.amount);
-      const amountToRefund = Math.min(remainingRefundAmount, maxRefundForPayment);
-      
       const amountPaise = Math.round(amountToRefund * 100);
       const rzpRefund = await razorpay.createRefund(
         payment.razorpayPaymentId,
@@ -421,13 +856,18 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
         rzpRefund,
         amountRefunded: amountToRefund
       });
-      remainingRefundAmount -= amountToRefund;
+    } else {
+      offlineRefundsData.push({
+        payment,
+        amountRefunded: amountToRefund
+      });
     }
+    remainingRefundAmount -= amountToRefund;
   }
 
   // 2. Perform DB updates in a transaction
   await prisma.$transaction(async (tx) => {
-    // Record refunds
+    // Record Razorpay refunds
     for (const { payment, rzpRefund, amountRefunded } of refundsData) {
       await tx.refund.create({
         data: {
@@ -439,6 +879,59 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
           initiatedBy: adminId,
           metadata: { razorpayRefund: rzpRefund },
         }
+      });
+
+      await tx.ledgerEntry.create({
+        data: {
+          type: "EXPENSE",
+          scope: booking.tripId ? "TRIP" : booking.festivalId ? "FESTIVAL" : "BOOKING",
+          tripId: booking.tripId,
+          festivalId: booking.festivalId,
+          bookingId: booking.id,
+          paymentId: payment.id,
+          source: "REFUND",
+          category: "Customer Refund",
+          amount: amountRefunded,
+          description: reason || `Refund for ${booking.bookingReference}`,
+          isAutoGenerated: true,
+        },
+      });
+
+      const isFullyRefunded = amountRefunded === Number(payment.amount);
+      if (isFullyRefunded) {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: "REFUNDED" }
+        });
+      }
+    }
+
+    // Record Offline refunds
+    for (const { payment, amountRefunded } of offlineRefundsData) {
+      await tx.refund.create({
+        data: {
+          paymentId: payment.id,
+          amount: amountRefunded,
+          status: "SUCCESS",
+          reason: reason || "Admin initiated cancellation and refund (Offline)",
+          initiatedBy: adminId,
+        }
+      });
+
+      await tx.ledgerEntry.create({
+        data: {
+          type: "EXPENSE",
+          scope: booking.tripId ? "TRIP" : booking.festivalId ? "FESTIVAL" : "BOOKING",
+          tripId: booking.tripId,
+          festivalId: booking.festivalId,
+          bookingId: booking.id,
+          paymentId: payment.id,
+          source: "REFUND",
+          category: "Customer Refund",
+          amount: amountRefunded,
+          description: reason || `Refund for ${booking.bookingReference} (Offline)`,
+          isAutoGenerated: true,
+        },
       });
 
       const isFullyRefunded = amountRefunded === Number(payment.amount);
@@ -484,15 +977,26 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
         }
       });
     }
+
+    // Cancel / Refund Add-ons
+    await tx.bookingAddOn.updateMany({
+      where: { bookingId: booking.id, status: "PENDING" },
+      data: { status: "CANCELLED" },
+    });
+    
+    await tx.bookingAddOn.updateMany({
+      where: { bookingId: booking.id, status: "PAID" },
+      data: { status: newPaymentStatus === "REFUNDED" || newPaymentStatus === "PARTIALLY_REFUNDED" ? "REFUNDED" : "CANCELLED" },
+    });
   });
 
   // Send Email (Fire and forget)
   import("../../core/services/email.service.js").then((emailService) => {
     if (emailService.sendBookingCancelledRefundedEmail) {
-      const item = booking.slot?.trip || booking.slot?.festival;
+      const journey = getBookingJourney(booking);
       emailService.sendBookingCancelledRefundedEmail(booking.user.email, {
         name: booking.user.profile?.fullName || "Traveler",
-        tripTitle: item?.title || "your trip",
+        tripTitle: journey.title,
         bookingRef: booking.bookingReference,
         refundAmount: validRefundAmount,
         totalPaid,
@@ -502,8 +1006,8 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
         reason: reason || "Admin initiated cancellation",
         refundReference: refundsData.map(({ rzpRefund }) => rzpRefund.id).filter(Boolean).join(", "),
         cancelledAt: new Date(),
-        tripStartDate: booking.slot?.startDate,
-        tripEndDate: booking.slot?.endDate,
+        tripStartDate: journey.startDate,
+        tripEndDate: journey.endDate,
         packageName: booking.package?.title,
         travelersCount: booking.numberOfTravelers,
       }).catch(err => console.error("Failed to send cancellation email:", err));
@@ -537,12 +1041,14 @@ export const finalizeBooking = async (bookingId) => {
     where: { id: booking.id },
     data: {
       status: "COMPLETED",
-      completedAt: new Date()
+      completedAt: new Date(),
+      reviewRequestedAt: new Date(),
     }
   });
 
   // 2. Send Review Email
-  const itemTitle = booking.slot.trip ? booking.slot.trip.title : booking.slot.festival?.title;
+  const journey = getBookingJourney(booking);
+  const itemTitle = journey.title;
   if (itemTitle && booking.user?.email) {
     const reviewLink = `${frontendUrl}/bookings/${booking.id}/review`;
     try {
@@ -551,10 +1057,10 @@ export const finalizeBooking = async (bookingId) => {
         name: booking.user.profile?.fullName || "Traveler",
         tripTitle: itemTitle,
         bookingRef: booking.bookingReference,
-        itemLocation: booking.slot.trip?.location || booking.slot.festival?.location,
+        itemLocation: journey.location,
         packageName: booking.package?.title,
-        tripStartDate: booking.slot?.startDate,
-        tripEndDate: booking.slot?.endDate,
+        tripStartDate: journey.startDate,
+        tripEndDate: journey.endDate,
         reviewLink,
       });
     } catch (err) {

@@ -59,6 +59,21 @@ registry.registerPath({
   summary: "Create a new festival",
   tags: ["Festivals"],
   security: [{ bearerAuth: [] }],
+  requestBody: {
+    content: {
+      "application/json": {
+        schema: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            circuitId: { type: "string", description: "Optional circuit ID to fork itinerary days from" },
+            isListed: { type: "boolean", default: true, description: "Whether the festival appears in public listings" },
+            isPublished: { type: "boolean", default: false },
+          }
+        }
+      }
+    }
+  },
   responses: {
     201: { description: "Festival created successfully" }
   }
@@ -73,6 +88,20 @@ registry.registerPath({
   parameters: [
     { name: "id", in: "path", required: true, schema: { type: "string" } }
   ],
+  requestBody: {
+    content: {
+      "application/json": {
+        schema: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            isListed: { type: "boolean", description: "Whether the festival appears in public listings" },
+            isPublished: { type: "boolean" },
+          }
+        }
+      }
+    }
+  },
   responses: {
     200: { description: "Festival updated successfully" }
   }

@@ -22,6 +22,9 @@ router.post("/", festivalController.createFestival);
 router.put("/:id", festivalController.updateFestival);
 router.delete("/:id", festivalController.deleteFestival);
 
+router.post("/:id/share-link", festivalController.createShareLink);
+router.delete("/:id/share-link", festivalController.revokeShareLink);
+
 router.post(
   "/:id/banner-images",
   imageUploadMiddleware.array("banners", 10),

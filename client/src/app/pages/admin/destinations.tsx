@@ -79,21 +79,30 @@ export default function AdminDestinationsPage() {
   const destinations = data?.data || [];
 
   return (
-    <div className="w-full">
-      <div className="flex flex-col items-stretch md:flex-row md:items-center justify-between mb-6 md:mb-8 gap-4">
-        <div className="min-w-0">
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <MapPin className="w-6 h-6 text-[#c8a96e]" />
-            Destinations
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Manage destinations and map trips to them.
-          </p>
+    <div className="mx-auto max-w-7xl space-y-12 pb-16 font-sans">
+      {/* Header */}
+      <header className="pt-8">
+        <span className="mb-2 block text-xs font-bold tracking-[0.1em] text-[#b59410] uppercase">
+          Management Hub
+        </span>
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+          <div className="space-y-1">
+            <h1 className="text-3xl font-medium tracking-tight text-gray-900">
+              Destinations
+            </h1>
+            <p className="text-sm text-gray-500">
+              Organize and manage your global travel offerings.
+            </p>
+          </div>
+          <button 
+            onClick={openCreateModal} 
+            className="inline-flex items-center gap-2 rounded-lg border border-[#b59410] bg-white px-6 py-2.5 text-sm font-semibold tracking-[0.1em] text-[#b59410] uppercase transition-all duration-200 hover:bg-[#b59410] hover:text-white"
+          >
+            <Plus className="h-4 w-4" />
+            Create Destination
+          </button>
         </div>
-        <Button onClick={openCreateModal} className="w-full md:w-auto bg-[#c8a96e] hover:bg-[#b8943a] text-white flex items-center justify-center gap-2">
-          <Plus className="w-4 h-4" /> Create Destination
-        </Button>
-      </div>
+      </header>
 
       <DestinationFormModal 
         open={isModalOpen} 
@@ -101,60 +110,77 @@ export default function AdminDestinationsPage() {
         destination={editingDestination} 
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
+      {/* Grid Layout */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
         {destinations.length === 0 ? (
-          <div className="col-span-full py-12 text-center bg-white border border-gray-200 border-dashed rounded-xl">
-            <p className="text-gray-500">No destinations found. Create your first destination above!</p>
+          <div 
+            onClick={openCreateModal}
+            className="col-span-full group flex cursor-pointer flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed border-gray-200 bg-white p-12 text-center transition-all hover:border-[#b59410] hover:bg-gray-50"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 transition-colors group-hover:bg-[#fcf8ef] group-hover:text-[#b59410]">
+              <Plus className="h-6 w-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-xs font-bold tracking-[0.1em] text-gray-500 uppercase transition-colors group-hover:text-[#b59410]">Add New Destination</h3>
+              <p className="text-sm text-gray-400">Click to start creating a new luxury travel offering.</p>
+            </div>
           </div>
         ) : (
           destinations.map((destination: any) => (
-            <div key={destination.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col group hover:shadow-md transition-shadow relative">
-              <div className="p-5 flex-1 flex flex-col">
-                {!destination.isPublished && (
-                  <div className="absolute top-3 right-3 px-2.5 py-1 bg-red-100 text-red-700 rounded text-xs font-bold uppercase tracking-wider">
-                    Draft
-                  </div>
-                )}
-                <h3 className="font-bold text-lg text-gray-900 leading-tight line-clamp-1 pr-14">{destination.name}</h3>
-                <div className="flex items-center gap-1.5 text-gray-500 text-sm mt-2">
-                  <Navigation className="w-4 h-4 shrink-0" />
-                  <span className="truncate">{destination.state}</span>
+            <div 
+              key={destination.id} 
+              className="flex h-full flex-col rounded-lg border border-gray-200 bg-white p-6 transition-all duration-300 hover:-translate-y-1 hover:border-[#b59410] hover:bg-[#fcfcfc]"
+            >
+              <div className="mb-4 flex flex-1 flex-col space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[20px] font-bold text-gray-900 line-clamp-1">{destination.name}</h3>
+                  {!destination.isPublished && (
+                    <span className="rounded bg-gray-100 px-2 py-0.5 text-[10px] font-semibold tracking-widest text-gray-500 uppercase">
+                      DRAFT
+                    </span>
+                  )}
                 </div>
-                
+                <div className="flex items-center gap-1.5 text-gray-500">
+                  <Navigation className="h-4 w-4 shrink-0" />
+                  <span className="text-sm truncate">{destination.state}</span>
+                </div>
                 {destination.subheading && (
-                  <p className="text-sm text-gray-600 mt-3 line-clamp-2">
+                  <p className="text-sm leading-relaxed text-gray-600 line-clamp-2">
                     {destination.subheading}
                   </p>
                 )}
-
-                <div className="mt-4 text-sm">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-100 text-gray-700 font-medium">
-                    {destination.trips?.length || 0} {destination.trips?.length === 1 ? 'Trip' : 'Trips'} Linked
+                <div className="pt-2">
+                  <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-[11px] font-medium text-gray-600">
+                    {destination.circuits?.length || 0} {destination.circuits?.length === 1 ? 'Circuit' : 'Circuits'} Linked
                   </span>
                 </div>
-                
-                <div className="mt-auto pt-4 flex flex-wrap items-center justify-start md:justify-end gap-3 md:gap-2 border-t border-gray-100 mt-6">
+              </div>
+
+              <div className="mt-6 flex items-center justify-between border-t border-gray-100 pt-4">
+                <div className="flex items-center gap-4">
                   <button 
                     onClick={() => handleTogglePublish(destination)}
-                    className={`text-sm font-medium transition-colors flex items-center gap-1 ${destination.isPublished ? 'text-gray-500 hover:text-orange-600' : 'text-gray-500 hover:text-green-600'}`}
+                    className={`flex items-center gap-1 text-sm font-medium transition-colors ${destination.isPublished ? 'text-gray-500 hover:text-orange-600' : 'text-gray-500 hover:text-[#b59410]'}`}
                   >
-                    {destination.isPublished ? <><EyeOff className="w-3.5 h-3.5" /> Unpublish</> : <><Eye className="w-3.5 h-3.5" /> Publish</>}
+                    {destination.isPublished ? (
+                      <><EyeOff className="h-4 w-4" /> Unpublish</>
+                    ) : (
+                      <><Eye className="h-4 w-4" /> Publish</>
+                    )}
                   </button>
-                  <div className="hidden md:block w-px h-3 bg-gray-300 mx-1" />
                   <button 
                     onClick={() => openEditModal(destination)}
-                    className="text-sm font-medium text-gray-500 hover:text-[#c8a96e] transition-colors flex items-center gap-1"
+                    className="flex items-center gap-1 text-sm font-medium text-gray-500 transition-colors hover:text-[#b59410]"
                   >
-                    <Edit2 className="w-3.5 h-3.5" /> Edit
-                  </button>
-                  <div className="hidden md:block w-px h-3 bg-gray-300 mx-1" />
-                  <button 
-                    onClick={() => handleDelete(destination.id)}
-                    className="text-sm font-medium text-gray-500 hover:text-red-600 transition-colors flex items-center gap-1"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                    <Edit2 className="h-4 w-4" /> Edit
                   </button>
                 </div>
+                <button 
+                  onClick={() => handleDelete(destination.id)}
+                  className="flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-red-600 transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" /> Delete
+                </button>
               </div>
             </div>
           ))

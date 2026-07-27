@@ -2,11 +2,7 @@ import * as inquiryService from "./inquiry.service.js";
 
 export const createInquiry = async (req, res, next) => {
   try {
-    const data = req.body;
-    // If the user is authenticated, associate the inquiry with them
-    if (req.user) {
-      data.userId = req.user.id;
-    }
+    const data = req.user ? { ...req.body, userId: req.user.id } : req.body;
     const inquiry = await inquiryService.createInquiry(data);
     res.status(201).json(inquiry);
   } catch (error) {

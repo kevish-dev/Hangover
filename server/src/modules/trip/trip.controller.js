@@ -15,12 +15,30 @@ export const getTripById = async (req, res, next) => {
   try {
     const { adminView } = req.query;
     const isAdmin = req.user?.role === "ADMIN" && adminView === "true";
-    const trip = await tripService.getTripById(req.params.id, isAdmin);
+    const trip = await tripService.getTripById(req.params.id, isAdmin, req.query.shareToken);
     res.status(200).json(trip);
   } catch (error) {
     if (error.message === "Trip not found") {
       return res.status(404).json({ message: "Trip not found" });
     }
+    next(error);
+  }
+};
+
+export const createShareLink = async (req, res, next) => {
+  try {
+    const result = await tripService.createShareLink(req.params.id, req.body?.expiresAt);
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const revokeShareLink = async (req, res, next) => {
+  try {
+    await tripService.revokeShareLink(req.params.id);
+    res.status(204).end();
+  } catch (error) {
     next(error);
   }
 };
@@ -102,19 +120,7 @@ export const deleteBanner = async (req, res, next) => {
   }
 };
 
-export const deleteGalleryImage = async (req, res, next) => {
-  try {
-    const { imageUrl } = req.body;
-    if (!imageUrl) return res.status(400).json({ message: "imageUrl is required" });
-    const trip = await tripService.deleteGalleryImage(req.params.id, imageUrl);
-    res.status(200).json({ message: "Gallery image deleted successfully", trip });
-  } catch (error) {
-    if (error.message === "Image not found in trip") {
-      return res.status(404).json({ message: error.message });
-    }
-    next(error);
-  }
-};
+
 
 export const syncHighlights = async (req, res, next) => {
   try {

@@ -1,7 +1,8 @@
+import { prisma } from "../../prisma/client.js";
 import * as festivalRepo from "./festival.repository.js";
 import { uploadToCloudinary, uploadPublicVideo, deleteFromCloudinary, deleteFestivalAssets, createDirectImageUploadSignature, isExpectedPublicImageUrl } from "../../core/services/upload.service.js";
 import { ValidationError } from "../../core/errors/errors.js";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash, randomBytes } from "crypto";
 
 const generateSlug = (title) => {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
@@ -11,7 +12,7 @@ export const getFestivals = async (page = 1, limit = 10, isAdmin = false) => {
   const skip = (page - 1) * limit;
   const take = parseInt(limit, 10);
   
-  const where = isAdmin ? {} : { isPublished: true };
+  const where = isAdmin ? {} : { isPublished: true, isListed: true };
 
   const { festivals, total } = await festivalRepo.findAll(skip, take, where, isAdmin);
 
@@ -33,6 +34,11 @@ export const getFestivalById = async (id, isAdmin = false) => {
   const where = isAdmin ? { [idField]: id } : { [idField]: id, isPublished: true };
   const festival = await festivalRepo.findById(where, isAdmin);
   if (!festival) throw new Error("Festival not found");
+  // Circuit add-ons are available to checkout when this festival has no
+  // festival-specific add-ons of its own.
+  if ((!festival.addOns || festival.addOns.length === 0) && festival.circuit?.addOns?.length) {
+    festival.addOns = festival.circuit.addOns;
+  }
   return festival;
 };
 
@@ -53,11 +59,31 @@ export const createFestival = async (data) => {
   }
   if (!data.duration) data.duration = 1;
 
-  // price and tokenAmount are required Decimal columns — ensure they're set
-  if (data.price === undefined || data.price === null) data.price = 0;
-  if (data.tokenAmount === undefined || data.tokenAmount === null) data.tokenAmount = 0;
 
-  return festivalRepo.create(data);
+
+  const festival = await festivalRepo.create(data);
+
+  // The create form already sends a parsed itinerary when it is forked from a
+  // circuit. Only clone the circuit days for older callers that send none.
+  if (data.circuitId && (!Array.isArray(data.itinerary) || data.itinerary.length === 0)) {
+    const circuit = await prisma.circuit.findUnique({
+      where: { id: data.circuitId },
+      include: { days: true }
+    });
+    
+    if (circuit && circuit.days.length > 0) {
+      const itineraryDays = circuit.days.map(day => ({
+        festivalId: festival.id,
+        dayNumber: day.dayNumber,
+        title: day.title,
+        description: day.description,
+        todos: day.todos,
+      }));
+      await prisma.itineraryDay.createMany({ data: itineraryDays });
+    }
+  }
+
+  return festival;
 };
 
 export const updateFestival = async (id, data) => {
@@ -76,7 +102,6 @@ export const deleteFestival = async (id) => {
   const festival = await getFestivalById(id, true);
   const imageUrls = [
     ...(festival.bannerImages || []),
-    ...(festival.galleryImages || []),
     ...(Array.isArray(festival.highlights) ? festival.highlights.map((item) => item?.imageUrl) : []),
     ...(Array.isArray(festival.stayTransportImages) ? festival.stayTransportImages.map((item) => item?.imageUrl) : []),
   ].filter(Boolean);
@@ -249,6 +274,26 @@ export const deleteVideo = async (festivalId) => {
 // ============ V2 apis for User ====================
 
 export const getFeaturedFestivals = async () => {
-  const data = await festivalRepo.getFeaturedFestivals();
-  return { data };
-}
+  return festivalRepo.getFeaturedFestivals();
+};
+
+const hashShareToken = (token) => createHash("sha256").update(token).digest("hex");
+
+export const createShareLink = async (id, expiresAt) => {
+  await getFestivalById(id, true);
+  const token = randomBytes(32).toString("base64url");
+  const parsedExpiry = expiresAt ? new Date(expiresAt) : null;
+  if (parsedExpiry && Number.isNaN(parsedExpiry.getTime())) {
+    throw new ValidationError("Invalid share link expiry.");
+  }
+  const festival = await festivalRepo.update(id, {
+    shareTokenHash: hashShareToken(token),
+    shareTokenExpiresAt: parsedExpiry,
+  });
+  return { token, expiresAt: festival.shareTokenExpiresAt };
+};
+
+export const revokeShareLink = async (id) => {
+  await getFestivalById(id, true);
+  await festivalRepo.update(id, { shareTokenHash: null, shareTokenExpiresAt: null });
+};

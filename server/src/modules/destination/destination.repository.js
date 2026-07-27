@@ -1,8 +1,7 @@
 import { prisma } from "../../prisma/client.js";
 
 export const findAll = async (skip, take, where = {}, isAdmin = false) => {
-  const tripInclude = isAdmin ? true : { where: { isPublished: true } };
-  const festInclude = isAdmin ? true : { where: { isPublished: true } };
+  const circuitInclude = isAdmin ? true : { where: { isActive: true } };
   
   const [destinations, total] = await Promise.all([
     prisma.destination.findMany({
@@ -11,8 +10,7 @@ export const findAll = async (skip, take, where = {}, isAdmin = false) => {
       take,
       orderBy: { createdAt: "desc" },
       include: {
-        trips: tripInclude,
-        festivals: festInclude
+        circuits: circuitInclude
       }
     }),
     prisma.destination.count({ where }),
@@ -22,38 +20,30 @@ export const findAll = async (skip, take, where = {}, isAdmin = false) => {
 
 export const findById = async (whereObj, isAdmin = false) => {
   const filter = typeof whereObj === 'string' ? { id: whereObj } : whereObj;
-  const tripInclude = isAdmin ? true : { where: { isPublished: true } };
-  const festInclude = isAdmin ? true : { where: { isPublished: true } };
+  const circuitInclude = isAdmin ? true : { where: { isActive: true } };
   
   return prisma.destination.findFirst({
     where: filter,
     include: {
-      trips: tripInclude,
-      festivals: festInclude,
+      circuits: circuitInclude
     }
   });
 };
 
 export const create = async (data) => {
-  const { tripIds, festivalIds, ...rest } = data;
+  const { circuitIds, ...rest } = data;
   const payload = { ...rest };
-  if (tripIds && tripIds.length > 0) {
-    payload.trips = { connect: tripIds.map(id => ({ id })) };
-  }
-  if (festivalIds && festivalIds.length > 0) {
-    payload.festivals = { connect: festivalIds.map(id => ({ id })) };
+  if (circuitIds && circuitIds.length > 0) {
+    payload.circuits = { connect: circuitIds.map(id => ({ id })) };
   }
   return prisma.destination.create({ data: payload });
 };
 
 export const update = async (id, data) => {
-  const { tripIds, festivalIds, ...rest } = data;
+  const { circuitIds, ...rest } = data;
   const payload = { ...rest };
-  if (tripIds) {
-    payload.trips = { set: tripIds.map(id => ({ id })) };
-  }
-  if (festivalIds) {
-    payload.festivals = { set: festivalIds.map(id => ({ id })) };
+  if (circuitIds) {
+    payload.circuits = { set: circuitIds.map(id => ({ id })) };
   }
   return prisma.destination.update({
     where: { id },
@@ -65,4 +55,27 @@ export const remove = async (id) => {
   return prisma.destination.delete({
     where: { id },
   });
+};
+
+export const linkExistingEntities = async (destinationId, circuitIds) => {
+  if (!circuitIds || circuitIds.length === 0) return { updatedTrips: 0, updatedFestivals: 0 };
+  
+  const updatedTrips = await prisma.trip.updateMany({
+    where: {
+      circuitId: { in: circuitIds }
+    },
+    data: { destinationId }
+  });
+
+  const updatedFestivals = await prisma.festival.updateMany({
+    where: {
+      circuitId: { in: circuitIds }
+    },
+    data: { destinationId }
+  });
+
+  return {
+    updatedTrips: updatedTrips.count,
+    updatedFestivals: updatedFestivals.count
+  };
 };

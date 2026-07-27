@@ -61,3 +61,4 @@ export function getErrorMessage(error: unknown, fallback = "Something went wrong
 export function showErrorToast(error: unknown, fallback?: string, description?: string) {
   return toast.error(getErrorMessage(error, fallback), description ? { description } : undefined);
 }
+

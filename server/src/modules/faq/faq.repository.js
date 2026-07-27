@@ -1,8 +1,8 @@
 import { prisma } from "../../prisma/client.js";
 
-export const findAllByTripId = async (tripId) => {
+export const findAllByParent = async (whereCondition) => {
   return prisma.fAQ.findMany({
-    where: { tripId },
+    where: whereCondition,
     orderBy: { order: "asc" },
   });
 };
@@ -13,11 +13,11 @@ export const findById = async (id) => {
   });
 };
 
-export const create = async (tripId, data) => {
+export const create = async (parentRelation, data) => {
   return prisma.fAQ.create({
     data: {
       ...data,
-      tripId,
+      ...parentRelation,
     },
   });
 };

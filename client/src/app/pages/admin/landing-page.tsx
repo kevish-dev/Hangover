@@ -19,20 +19,23 @@ export default function AdminLandingPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin", "trips"],
+    // Keep this key distinct from the trip-management query. That query caches
+    // the full paginated response, while this one caches only the trip array.
+    queryKey: ["admin", "trips", "signature-collection-options"],
     queryFn: async () => {
       const response = await apiClient.get("/trips?adminView=true&limit=200");
       return response.data.data as ApiTrip[];
     },
   });
 
-  const trips = data ?? [];
+  // Do not let malformed or legacy cached data take down the entire route.
+  const trips = Array.isArray(data) ? data : [];
   const selectedTrips = useMemo(
     () => selectedIds.map((id) => trips.find((trip) => trip.id === id)).filter(Boolean) as ApiTrip[],
     [selectedIds, trips]
   );
   const eligibleTrips = useMemo(
-    () => trips?.filter((trip) => trip.isActive && trip.isPublished && trip.bannerImages?.length > 0),
+    () => trips.filter((trip) => trip.isActive && trip.isPublished && trip.bannerImages?.length > 0),
     [trips]
   );
 
@@ -117,7 +120,7 @@ export default function AdminLandingPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="font-medium text-sm text-gray-900 truncate">{trip.title}</p>
-                  <p className="text-xs text-gray-500 truncate">{trip.location} · {formatPrice(trip.price)}</p>
+                  <p className="text-xs text-gray-500 truncate">{trip.location} · {formatPrice(trip.packages?.[0]?.price || 0)}</p>
                 </div>
                 <div className="flex w-full md:w-auto items-center justify-end gap-1 shrink-0">
                   <button type="button" onClick={() => moveTrip(index, -1)} disabled={index === 0} className="p-1.5 text-gray-500 hover:text-[#781216] disabled:opacity-30" aria-label={`Move ${trip.title} up`}><ArrowUp className="w-4 h-4" /></button>
@@ -147,7 +150,7 @@ export default function AdminLandingPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm text-gray-900 truncate">{trip.title}</p>
-                    <p className="text-xs text-gray-500 flex items-center gap-1 truncate"><MapPin className="w-3 h-3 shrink-0" />{trip.location} · {formatPrice(trip.price)}</p>
+                    <p className="text-xs text-gray-500 flex items-center gap-1 truncate"><MapPin className="w-3 h-3 shrink-0" />{trip.location} · {formatPrice(trip.packages?.[0]?.price || 0)}</p>
                   </div>
                 </button>
               );
@@ -242,7 +245,9 @@ function LandingReasonsManager() {
     try {
       const payload = new FormData();
       payload.append("image", file);
-      const response = await apiClient.post("/landing-reasons/image", payload);
+      const response = await apiClient.post("/landing-reasons/image", payload, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       setForm((current) => ({ ...current, imageUrl: response.data.imageUrl }));
       toast.success("Panel image uploaded");
     } catch (error: any) {
@@ -380,7 +385,9 @@ function LandingTripTypesManager() {
     try {
       const payload = new FormData();
       payload.append("image", file);
-      const response = await apiClient.post("/landing-trip-types/image", payload);
+      const response = await apiClient.post("/landing-trip-types/image", payload, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       setForm((current) => ({ ...current, imageUrl: response.data.imageUrl }));
       toast.success("Trip type image uploaded");
     } catch (error: any) { toast.error(error?.response?.data?.message || "Failed to upload the image"); }

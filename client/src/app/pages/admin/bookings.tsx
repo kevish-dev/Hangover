@@ -1,22 +1,24 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../lib/axios";
-import { CalendarCheck, IndianRupee, Loader2, Bell, X, User, MapPin, Mail, Phone, Image as ImageIcon, MoreVertical, Search, ArrowUpDown, Filter, AlertCircle } from "lucide-react";
+import { CalendarCheck, IndianRupee, Loader2, Bell, X, User, MapPin, Mail, Phone, Image as ImageIcon, MoreVertical, Search, ArrowUpDown, Filter, AlertCircle, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { finalizeBooking } from "../../../lib/bookingApi";
 import { useMutation } from "@tanstack/react-query";
+import CreateBookingModal from "../../components/admin/CreateBookingModal";
+import { useNavigate } from "react-router";
 
 function BookingStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    PENDING: "bg-yellow-100 text-yellow-700",
-    RESERVED: "bg-blue-100 text-blue-700",
-    CONFIRMED: "bg-green-100 text-green-700",
-    CANCELLED: "bg-red-100 text-red-700",
-    COMPLETED: "bg-purple-100 text-purple-700",
+    PENDING: "bg-yellow-50 text-yellow-700 border border-yellow-200/60",
+    RESERVED: "bg-blue-50 text-blue-700 border border-blue-200/60",
+    CONFIRMED: "bg-green-50 text-green-700 border border-green-200/60",
+    CANCELLED: "bg-red-50 text-red-700 border border-red-200/60",
+    COMPLETED: "bg-purple-50 text-purple-700 border border-purple-200/60",
   };
   return (
-    <span className={`px-2.5 py-1 rounded text-xs font-semibold tracking-wider ${map[status] ?? "bg-gray-100 text-gray-600"}`}>
+    <span className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase ${map[status] ?? "bg-gray-50 text-gray-600 border border-gray-200/60"}`}>
       {status}
     </span>
   );
@@ -24,14 +26,14 @@ function BookingStatusBadge({ status }: { status: string }) {
 
 function PaymentStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    PAID: "bg-green-100 text-green-700",
-    PARTIALLY_PAID: "bg-blue-100 text-blue-700",
-    PENDING: "bg-yellow-100 text-yellow-700",
-    REFUNDED: "bg-purple-100 text-purple-700",
-    FAILED: "bg-red-100 text-red-700",
+    PAID: "bg-green-50 text-green-700 border border-green-200/60",
+    PARTIALLY_PAID: "bg-blue-50 text-blue-700 border border-blue-200/60",
+    PENDING: "bg-yellow-50 text-yellow-700 border border-yellow-200/60",
+    REFUNDED: "bg-purple-50 text-purple-700 border border-purple-200/60",
+    FAILED: "bg-red-50 text-red-700 border border-red-200/60",
   };
   return (
-    <span className={`px-2.5 py-1 rounded text-xs font-semibold tracking-wider ${map[status] ?? "bg-gray-100 text-gray-600"}`}>
+    <span className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase ${map[status] ?? "bg-gray-50 text-gray-600 border border-gray-200/60"}`}>
       {status.replace("_", " ")}
     </span>
   );
@@ -192,8 +194,10 @@ function ConfirmCancelModal({ booking, onConfirm, onClose }: { booking: any, onC
 
 export default function AdminBookingsPage() {
   const queryClient = useQueryClient();
-  const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
+  const navigate = useNavigate();
+
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
@@ -247,9 +251,13 @@ export default function AdminBookingsPage() {
   };
 
   const handleFinalize = (bookingId: string) => {
-    if (window.confirm("Are you sure you want to mark this trip as COMPLETED and send a review email to the user?")) {
-      finalizeMutation.mutate(bookingId);
-    }
+    toast("Finalize this trip?", {
+      description: "Are you sure you want to mark this trip as COMPLETED and send a review email to the user?",
+      action: {
+        label: "Confirm",
+        onClick: () => finalizeMutation.mutate(bookingId),
+      },
+    });
   };
 
   const allBookings = data?.data || [];
@@ -271,7 +279,9 @@ export default function AdminBookingsPage() {
         b.user?.profile?.fullName?.toLowerCase().includes(q) ||
         b.user?.email?.toLowerCase().includes(q) ||
         b.trip?.title?.toLowerCase().includes(q) ||
-        b.festival?.title?.toLowerCase().includes(q)
+        b.festival?.title?.toLowerCase().includes(q) ||
+        b.customTrip?.title?.toLowerCase().includes(q) ||
+        b.customTrip?.reference?.toLowerCase().includes(q)
       );
     }
 
@@ -308,8 +318,14 @@ export default function AdminBookingsPage() {
           </p>
         </div>
 
-        {/* Toolbar */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full md:w-auto">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full md:w-auto">
+            <button 
+              onClick={() => setShowCreateModal(true)}
+              className="px-4 py-2 bg-[#c8a96e] hover:bg-[#b09561] text-white rounded-full text-base md:text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Create Booking
+            </button>
           <div className="relative w-full md:w-auto">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input 
@@ -317,7 +333,7 @@ export default function AdminBookingsPage() {
               placeholder="Search by name, ref, trip/festival..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e] focus:border-transparent w-full md:w-64"
+              className="pl-9 pr-4 py-2 bg-white border border-gray-200/60 rounded-full text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/50 focus:border-[#c8a96e] w-full md:w-64 transition-all shadow-sm"
             />
           </div>
 
@@ -326,7 +342,7 @@ export default function AdminBookingsPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-base md:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#c8a96e] w-full md:w-auto"
+              className="px-3 py-2 bg-white border border-gray-200/60 rounded-full text-base md:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/50 focus:border-[#c8a96e] w-full md:w-auto transition-all shadow-sm"
             >
               <option value="ALL">All Status</option>
               <option value="CONFIRMED">Confirmed</option>
@@ -338,7 +354,7 @@ export default function AdminBookingsPage() {
             <select
               value={sortBy}
               onChange={(e: any) => setSortBy(e.target.value)}
-              className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-base md:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#c8a96e] w-full md:w-auto"
+              className="px-3 py-2 bg-white border border-gray-200/60 rounded-full text-base md:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/50 focus:border-[#c8a96e] w-full md:w-auto transition-all shadow-sm"
             >
               <option value="date_desc">Newest First</option>
               <option value="date_asc">Oldest First</option>
@@ -358,13 +374,13 @@ export default function AdminBookingsPage() {
           processedBookings.map((b: any) => (
             <article
               key={b.id}
-              onClick={() => setSelectedBooking(b)}
+              onClick={() => navigate(`/dashboard/bookings/${b.id}`)}
               className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-mono text-xs font-semibold text-[#781216]">{b.bookingReference}</p>
-                  <h2 className="mt-1 break-words text-sm font-semibold text-gray-900">{b.trip?.title || b.festival?.title}</h2>
+                  <h2 className="mt-1 break-words text-sm font-semibold text-gray-900">{b.customTrip?.title || b.trip?.title || b.festival?.title}</h2>
                 </div>
                 <div onClick={(event) => event.stopPropagation()} className="shrink-0">
                   <ActionMenu
@@ -410,27 +426,25 @@ export default function AdminBookingsPage() {
         )}
       </div>
 
-      <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto min-h-[400px]">
+      <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200">
+        <div className="w-full min-h-[400px]">
           <table className="w-full text-sm text-left">
-            <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-medium">
+            <thead className="border-b border-gray-100 text-gray-500 font-medium text-xs tracking-wider uppercase">
               <tr>
-                <th className="px-6 py-4">Reference</th>
-                <th className="px-6 py-4">Item</th>
-                <th className="px-6 py-4">User</th>
-                <th className="px-6 py-4 text-center">Travelers</th>
-                <th className="px-6 py-4">Booking Status</th>
-                <th className="px-6 py-4">Payment Status</th>
-                <th className="px-6 py-4">Total Amount</th>
-                <th className="px-6 py-4">Amount Received</th>
-                <th className="px-6 py-4">Date</th>
-                <th className="px-6 py-4 text-center">Actions</th>
+                <th className="px-4 py-4">Ref</th>
+                <th className="px-4 py-4">Item</th>
+                <th className="px-4 py-4">User</th>
+                <th className="px-4 py-4 text-center">Pax</th>
+                <th className="px-4 py-4">Status</th>
+                <th className="px-4 py-4">Financials</th>
+                <th className="px-4 py-4">Date</th>
+                <th className="px-4 py-4 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {processedBookings.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                     No bookings found matching your criteria.
                   </td>
                 </tr>
@@ -438,44 +452,44 @@ export default function AdminBookingsPage() {
                 processedBookings.map((b: any) => (
                   <tr 
                     key={b.id} 
-                    className="hover:bg-gray-50 transition-colors cursor-pointer"
-                    onClick={() => setSelectedBooking(b)}
+                    className="hover:bg-[#fbf7ed]/50 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/dashboard/bookings/${b.id}`)}
                   >
-                    <td className="px-6 py-4 font-mono font-medium text-gray-900">
+                    <td className="px-4 py-4 font-mono font-medium text-gray-900 text-xs">
                       {b.bookingReference}
                     </td>
-                    <td className="px-6 py-4 text-gray-700 max-w-[200px] truncate">
-                      {b.trip?.title || b.festival?.title}
+                    <td className="px-4 py-4 text-gray-700 max-w-[150px] truncate text-sm">
+                      {b.customTrip?.title || b.trip?.title || b.festival?.title}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-gray-900 font-medium">{b.user?.profile?.fullName || "N/A"}</div>
-                      <div className="text-gray-500 text-xs">{b.user?.email}</div>
+                    <td className="px-4 py-4">
+                      <div className="text-gray-900 font-medium truncate max-w-[140px] text-sm">{b.user?.profile?.fullName || "N/A"}</div>
+                      <div className="text-gray-500 text-xs truncate max-w-[140px]">{b.user?.email}</div>
                     </td>
-                    <td className="px-6 py-4 text-center text-gray-900">
+                    <td className="px-4 py-4 text-center text-gray-900 text-sm">
                       {b.numberOfTravelers}
                     </td>
-                    <td className="px-6 py-4">
-                      <BookingStatusBadge status={b.status} />
-                    </td>
-                    <td className="px-6 py-4">
-                      <PaymentStatusBadge status={b.paymentStatus} />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900 flex items-center gap-1">
-                        <IndianRupee className="w-3.5 h-3.5 text-gray-500" />
-                        {Number(b.totalAmount).toLocaleString("en-IN")}
+                    <td className="px-4 py-4">
+                      <div className="flex flex-col gap-1.5 items-start">
+                        <BookingStatusBadge status={b.status} />
+                        <PaymentStatusBadge status={b.paymentStatus} />
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-green-600 flex items-center gap-1">
-                        <IndianRupee className="w-3.5 h-3.5 text-green-500" />
-                        {Number(b.amountPaid || 0).toLocaleString("en-IN")}
+                    <td className="px-4 py-4">
+                      <div className="flex flex-col gap-1">
+                        <div className="font-medium text-gray-900 flex items-center gap-1 text-sm">
+                          <IndianRupee className="w-3.5 h-3.5 text-gray-500" />
+                          {Number(b.totalAmount).toLocaleString("en-IN")}
+                        </div>
+                        <div className="font-medium text-green-600 flex items-center gap-0.5 text-xs">
+                          Paid: <IndianRupee className="w-3 h-3 text-green-500" />
+                          {Number(b.amountPaid || 0).toLocaleString("en-IN")}
+                        </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-gray-500 text-xs whitespace-nowrap">
-                      {format(new Date(b.createdAt), "MMM d, yyyy HH:mm")}
+                    <td className="px-4 py-4 text-gray-500 text-xs whitespace-nowrap">
+                      {format(new Date(b.createdAt), "MMM d, yyyy")}
                     </td>
-                    <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-4 text-center" onClick={(e) => e.stopPropagation()}>
                       <ActionMenu 
                         booking={b} 
                         onRemind={() => handleRemind(b.id)} 
@@ -499,205 +513,16 @@ export default function AdminBookingsPage() {
         />
       )}
 
-      {selectedBooking && (
-        <div role="dialog" aria-modal="true" aria-label="Booking details" className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedBooking(null)}>
-          <div 
-            className="bg-white rounded-none md:rounded-xl shadow-xl w-full max-w-4xl h-dvh md:h-auto max-h-dvh md:max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-4 md:px-6 py-4 flex items-start md:items-center justify-between gap-3 z-10">
-              <h2 className="min-w-0 break-words text-base md:text-lg font-bold text-gray-900">
-                Booking Details - <span className="font-mono text-[#c8a96e]">{selectedBooking.bookingReference}</span>
-              </h2>
-              <button
-                aria-label="Close booking details"
-                onClick={() => setSelectedBooking(null)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center hover:bg-gray-100 rounded-full transition-colors text-gray-500"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-              {/* Left Column */}
-              <div className="space-y-5 md:space-y-8">
-                {/* User Profile */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <User className="w-4 h-4 text-[#781216]" /> Primary Traveler
-                  </h3>
-                  <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                    <div className="admin-booking-detail-grid grid grid-cols-3 gap-2 text-sm">
-                      <span className="text-gray-500">Name:</span>
-                      <span className="col-span-2 font-medium text-gray-900">{selectedBooking.user?.profile?.fullName || "N/A"}</span>
-                      
-                      <span className="text-gray-500">Email:</span>
-                      <span className="col-span-2 text-gray-900">{selectedBooking.user?.email || "N/A"}</span>
-                      
-                      <span className="text-gray-500">Phone:</span>
-                      <span className="col-span-2 text-gray-900">{selectedBooking.user?.profile?.phone || "N/A"}</span>
-                      
-                      <span className="text-gray-500">Address:</span>
-                      <span className="col-span-2 text-gray-900">{selectedBooking.user?.profile?.addressLine1 || "N/A"}</span>
 
-                      <span className="text-gray-500">Gender:</span>
-                      <span className="col-span-2 text-gray-900">{selectedBooking.user?.profile?.gender || "N/A"}</span>
 
-                      <span className="text-gray-500">DOB:</span>
-                      <span className="col-span-2 text-gray-900">
-                        {selectedBooking.user?.profile?.dateOfBirth ? format(new Date(selectedBooking.user.profile.dateOfBirth), "PP") : "N/A"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Govt ID */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <ImageIcon className="w-4 h-4 text-[#781216]" /> Government ID
-                  </h3>
-                  {selectedBooking.user?.profile?.govtIdImageUrl ? (
-                    selectedBooking.user.profile.govtIdMimeType === "application/pdf" ? (
-                      <a href={selectedBooking.user.profile.govtIdImageUrl} target="_blank" rel="noreferrer" className="block text-sm text-[#781216] underline">View Government ID PDF</a>
-                    ) : (
-                    <a 
-                      href={selectedBooking.user.profile.govtIdImageUrl} 
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="block border-2 border-dashed border-gray-300 rounded-lg overflow-hidden hover:border-[#781216] transition-colors"
-                    >
-                      <img 
-                        src={selectedBooking.user.profile.govtIdImageUrl} 
-                        alt="Govt ID" 
-                        className="w-full h-48 object-cover"
-                      />
-                    </a>
-                    )
-                  ) : (
-                    <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-500 text-center">
-                      No Government ID provided.
-                    </div>
-                  )}
-                </div>
-
-                {/* Other Travelers */}
-                {selectedBooking.travelers && selectedBooking.travelers.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                      <User className="w-4 h-4 text-[#781216]" /> Other Travelers
-                    </h3>
-                    <div className="space-y-3">
-                      {selectedBooking.travelers.map((traveler: any, idx: number) => (
-                        <div key={traveler.id || idx} className="bg-gray-50 p-4 rounded-lg text-sm">
-                          <div className="font-medium text-gray-900 mb-2">Traveler {idx + 1}: {traveler.fullName}</div>
-                          <div className="admin-booking-detail-grid grid grid-cols-3 gap-2">
-                            <span className="text-gray-500">Gender:</span>
-                            <span className="col-span-2 text-gray-900">{traveler.gender || "N/A"}</span>
-                            
-                            <span className="text-gray-500">DOB:</span>
-                            <span className="col-span-2 text-gray-900">
-                              {traveler.dateOfBirth ? format(new Date(traveler.dateOfBirth), "PP") : "N/A"}
-                            </span>
-                            
-                            <span className="text-gray-500">Phone:</span>
-                            <span className="col-span-2 text-gray-900">{traveler.phone || "N/A"}</span>
-                            
-                            <span className="text-gray-500">Aadhaar:</span>
-                            <span className="col-span-2 text-gray-900">
-                              {traveler.aadhaar ? (
-                                <a href={traveler.aadhaar} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
-                                  View Document
-                                </a>
-                              ) : "N/A"}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Right Column */}
-              <div className="space-y-5 md:space-y-8">
-                {/* Item Details */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-[#781216]" /> Item Details
-                  </h3>
-                  <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                    <div className="admin-booking-detail-grid grid grid-cols-3 gap-2 text-sm">
-                      <span className="text-gray-500">Item:</span>
-                      <span className="col-span-2 font-medium text-gray-900">{selectedBooking.trip?.title || selectedBooking.festival?.title || "N/A"}</span>
-                      
-                      <span className="text-gray-500">Package:</span>
-                      <span className="col-span-2 text-gray-900">{selectedBooking.package?.title || "No Package"}</span>
-                      
-                      <span className="text-gray-500">Slot:</span>
-                      <span className="col-span-2 text-gray-900">
-                        {selectedBooking.slot 
-                          ? `${format(new Date(selectedBooking.slot.startDate), "PP")} - ${format(new Date(selectedBooking.slot.endDate), "PP")}`
-                          : "No Slot Selected"}
-                      </span>
-
-                      <span className="text-gray-500">Travelers:</span>
-                      <span className="col-span-2 text-gray-900">{selectedBooking.numberOfTravelers} Person(s)</span>
-                      
-                      <span className="text-gray-500">Booked On:</span>
-                      <span className="col-span-2 text-gray-900">{format(new Date(selectedBooking.createdAt), "PPp")}</span>
-
-                      <span className="text-gray-500">Status:</span>
-                      <span className="col-span-2"><BookingStatusBadge status={selectedBooking.status} /></span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Payment Breakdown */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <IndianRupee className="w-4 h-4 text-[#781216]" /> Payment Breakdown
-                  </h3>
-                  <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                    <div className="admin-booking-detail-grid grid grid-cols-3 gap-2 text-sm">
-                      <span className="text-gray-500">Total Amount:</span>
-                      <span className="col-span-2 font-medium text-gray-900">₹{Number(selectedBooking.totalAmount).toLocaleString("en-IN")}</span>
-                      
-                      <span className="text-gray-500">Amount Paid:</span>
-                      <span className="col-span-2 text-green-600 font-medium">₹{Number(selectedBooking.amountPaid).toLocaleString("en-IN")}</span>
-                      
-                      <span className="text-gray-500">Balance Due:</span>
-                      <span className="col-span-2 text-red-600 font-medium">₹{Number(selectedBooking.amountDue).toLocaleString("en-IN")}</span>
-
-                      <span className="text-gray-500">Status:</span>
-                      <span className="col-span-2"><PaymentStatusBadge status={selectedBooking.paymentStatus} /></span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Special Requests */}
-                {selectedBooking.specialRequests && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4">
-                      Special Requests
-                    </h3>
-                    <div className="bg-yellow-50 text-yellow-800 p-4 rounded-lg text-sm whitespace-pre-wrap">
-                      {selectedBooking.specialRequests}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <div className="bg-gray-50 border-t border-gray-100 p-4 text-right sticky bottom-0 z-10">
-              <button 
-                onClick={() => setSelectedBooking(null)}
-                className="w-full md:w-auto min-h-10 px-4 py-2 bg-gray-200 text-gray-800 font-medium rounded-lg hover:bg-gray-300 transition-colors text-sm"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+      {showCreateModal && (
+        <CreateBookingModal 
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => {
+            setShowCreateModal(false);
+            queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
+          }}
+        />
       )}
       <style>{`
         @media (max-width: 767px) {

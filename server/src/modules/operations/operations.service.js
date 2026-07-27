@@ -1,0 +1,313 @@
+import { prisma } from "../../prisma/client.js";
+
+/** Generate OperationalTasks for a new booking. Expenses enter the ledger when paid. */
+export const generateBookingOperations = async (booking, slot, chosenAddOns = []) => {
+  // Determine the circuit this booking belongs to (via trip or festival)
+  const isTrip = !!slot.tripId;
+  let circuitId = null;
+  let circuitReminderDays = 3;
+
+  if (isTrip && slot.trip) {
+    circuitId = slot.trip.circuitId;
+  } else if (!isTrip && slot.festival) {
+    circuitId = slot.festival.circuitId;
+  }
+
+  const opsToCreate = [];
+
+  if (circuitId) {
+    const circuit = await prisma.circuit.findUnique({
+      where: { id: circuitId },
+      include: { days: { include: { tasks: true } } }
+    });
+
+    if (circuit) {
+      circuitReminderDays = circuit.operationsReminderDays ?? 3;
+
+      for (const day of circuit.days) {
+        for (const task of day.tasks) {
+          // Calculate dueAt: slot start - dueOffsetDays
+          const dueAt = task.dueOffsetDays != null && slot.startDate
+            ? new Date(new Date(slot.startDate).getTime() - task.dueOffsetDays * 86400000)
+            : null;
+
+          opsToCreate.push({
+            bookingId: booking.id,
+            sourceTemplateId: task.id,
+            category: task.category,
+            title: task.title,
+            description: task.description,
+            config: task.config ?? {},
+            unitPrice: task.unitPrice ?? null,
+            quantityNeeded: task.quantityNeeded ?? null,
+            dueAt,
+          });
+        }
+      }
+    }
+  }
+
+  // Also check for tasks directly on the Trip or Festival's Itinerary Days
+  const itineraryDays = await prisma.itineraryDay.findMany({
+    where: {
+      OR: [
+        isTrip && slot.trip ? { tripId: slot.trip.id } : null,
+        !isTrip && slot.festival ? { festivalId: slot.festival.id } : null
+      ].filter(Boolean)
+    },
+    include: { tasks: true }
+  });
+
+  for (const day of itineraryDays) {
+    for (const task of day.tasks) {
+      const dueAt = task.dueOffsetDays != null && slot.startDate
+        ? new Date(new Date(slot.startDate).getTime() - task.dueOffsetDays * 86400000)
+        : null;
+
+      opsToCreate.push({
+        bookingId: booking.id,
+        itineraryDayId: day.id,
+        sourceTemplateId: task.id,
+        category: task.category,
+        title: task.title,
+        description: task.description,
+        config: task.config ?? {},
+        unitPrice: task.unitPrice ?? null,
+        quantityNeeded: task.quantityNeeded ?? null,
+        dueAt,
+      });
+    }
+  }
+
+  // Generate an ops task for each add-on chosen by the user
+  for (const chosenAddon of chosenAddOns) {
+    if (!chosenAddon.addOnId) continue;
+    const addOn = await prisma.addOn.findUnique({ where: { id: chosenAddon.addOnId } });
+    if (!addOn) continue;
+
+    opsToCreate.push({
+      bookingId: booking.id,
+      addOnId: addOn.id,
+      category: "GENERAL",
+      title: `Fulfill Add-on: ${addOn.title}`,
+      description: addOn.description || null,
+      config: {},
+      dueAt: slot.startDate ?? null,
+    });
+  }
+
+  if (opsToCreate.length === 0) return;
+
+  // Create all ops tasks
+  await prisma.operationalTask.createMany({ data: opsToCreate });
+
+};
+
+const TASK_INCLUDE = {
+  booking: {
+    select: {
+      id: true,
+      bookingReference: true,
+      status: true,
+      paymentStatus: true,
+      tripId: true,
+      festivalId: true,
+      user: { select: { email: true, profile: { select: { fullName: true } } } },
+      slot: { select: { id: true, title: true, startDate: true, endDate: true } },
+      trip: { select: { id: true, title: true } },
+      festival: { select: { id: true, title: true } },
+    },
+  },
+  itineraryDay: { select: { id: true, dayNumber: true, title: true } },
+};
+
+export const listOperationalTasks = async (query = {}) => {
+  const where = {};
+  if (query.status) where.status = query.status;
+  if (query.category) where.category = query.category;
+  if (query.bookingId) where.bookingId = query.bookingId;
+  if (query.tripId) where.booking = { tripId: query.tripId };
+  if (query.search) {
+    where.OR = [
+      { title: { contains: query.search, mode: "insensitive" } },
+      { booking: { bookingReference: { contains: query.search, mode: "insensitive" } } },
+      { booking: { trip: { title: { contains: query.search, mode: "insensitive" } } } },
+      { booking: { festival: { title: { contains: query.search, mode: "insensitive" } } } },
+    ];
+  }
+  const limit = Math.min(Math.max(Number(query.limit) || 200, 1), 500);
+  return prisma.operationalTask.findMany({
+    where,
+    include: TASK_INCLUDE,
+    orderBy: [{ dueAt: "asc" }, { createdAt: "asc" }],
+    take: limit,
+  });
+};
+
+export const updateOperationalTask = async (taskId, input) => {
+  const allowed = [
+    "status",
+    "title",
+    "description",
+    "dueAt",
+    "assigneeId",
+    "unitPrice",
+    "quantityNeeded",
+    "quantityAcquired",
+  ];
+  const data = Object.fromEntries(
+    allowed.filter((key) => input[key] !== undefined).map((key) => [key, input[key]]),
+  );
+  if (data.status && !["PENDING", "IN_PROGRESS", "DONE", "CANCELLED", "BLOCKED"].includes(data.status)) {
+    const error = new Error("Invalid operational task status");
+    error.statusCode = 400;
+    throw error;
+  }
+  for (const field of ["unitPrice"]) {
+    if (data[field] !== undefined && data[field] !== null) {
+      data[field] = Number(data[field]);
+      if (!Number.isFinite(data[field]) || data[field] < 0) {
+        const error = new Error(`${field} must be zero or greater`);
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+  }
+  for (const field of ["quantityNeeded", "quantityAcquired"]) {
+    if (data[field] !== undefined && data[field] !== null) {
+      data[field] = parseInt(data[field], 10);
+      if (!Number.isFinite(data[field]) || data[field] < 0) {
+        const error = new Error(`${field} must be a positive integer`);
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+  }
+  if (data.dueAt !== undefined) data.dueAt = data.dueAt ? new Date(data.dueAt) : null;
+
+
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.operationalTask.findUnique({
+      where: { id: taskId },
+      include: { booking: { select: { id: true, tripId: true, festivalId: true } } },
+    });
+    if (!current) {
+      const error = new Error("Operational task not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const unitPrice = data.unitPrice !== undefined ? data.unitPrice : (current.unitPrice != null ? Number(current.unitPrice) : null);
+    const quantityNeeded = data.quantityNeeded !== undefined ? data.quantityNeeded : current.quantityNeeded;
+    const quantityAcquired = data.quantityAcquired !== undefined ? data.quantityAcquired : current.quantityAcquired;
+
+    // Auto-complete if acquired reaches needed
+    if (unitPrice != null && quantityNeeded != null && quantityAcquired != null && quantityNeeded > 0 && quantityAcquired >= quantityNeeded) {
+      data.status = "DONE";
+    }
+
+    // Resolve completedAt based on final status
+    const finalStatus = data.status || current.status;
+    if (finalStatus === "DONE") data.completedAt = new Date();
+    else if (data.status && data.status !== "DONE") data.completedAt = null;
+
+    const updated = await tx.operationalTask.update({ where: { id: taskId }, data });
+
+    // Auto-generate ledger entry: unitPrice × quantityAcquired = cost incurred so far
+    if (data.quantityAcquired !== undefined || data.unitPrice !== undefined) {
+      const finalUnitPrice = data.unitPrice !== undefined ? data.unitPrice : (current.unitPrice != null ? Number(current.unitPrice) : null);
+      const finalQtyAcquired = data.quantityAcquired !== undefined ? data.quantityAcquired : current.quantityAcquired;
+      const ledgerAmount = finalUnitPrice != null && finalQtyAcquired != null
+        ? Number(finalUnitPrice) * Number(finalQtyAcquired)
+        : null;
+
+      const existingEntry = await tx.ledgerEntry.findFirst({
+        where: { operationalTaskId: taskId, source: "OPERATIONAL_TASK" },
+      });
+
+      if (ledgerAmount != null && ledgerAmount > 0) {
+        const ledgerData = {
+          type: "EXPENSE",
+          scope: current.booking.tripId ? "TRIP" : current.booking.festivalId ? "FESTIVAL" : "BOOKING",
+          tripId: current.booking.tripId,
+          festivalId: current.booking.festivalId,
+          bookingId: current.booking.id,
+          operationalTaskId: taskId,
+          source: "OPERATIONAL_TASK",
+          category: updated.category,
+          amount: ledgerAmount,
+          description: updated.title,
+          isAutoGenerated: true,
+          entryDate: new Date(),
+        };
+        if (existingEntry) await tx.ledgerEntry.update({ where: { id: existingEntry.id }, data: ledgerData });
+        else await tx.ledgerEntry.create({ data: ledgerData });
+      } else if (existingEntry) {
+        await tx.ledgerEntry.delete({ where: { id: existingEntry.id } });
+      }
+    }
+
+    return tx.operationalTask.findUnique({ where: { id: taskId }, include: TASK_INCLUDE });
+  });
+};
+
+export const createOperationalTask = async (bookingId, data) => {
+  const allowed = [
+    "title",
+    "description",
+    "category",
+    "dueAt",
+    "unitPrice",
+    "quantityNeeded",
+    "quantityAcquired",
+  ];
+  const payload = Object.fromEntries(
+    allowed.filter((key) => data[key] !== undefined).map((key) => [key, data[key]]),
+  );
+
+  if (!payload.title || !payload.category) {
+    const error = new Error("Title and category are required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (payload.unitPrice !== undefined && payload.unitPrice !== null) {
+    payload.unitPrice = Number(payload.unitPrice);
+  }
+  if (payload.quantityNeeded !== undefined && payload.quantityNeeded !== null) {
+    payload.quantityNeeded = parseInt(payload.quantityNeeded, 10);
+  }
+  if (payload.quantityAcquired !== undefined && payload.quantityAcquired !== null) {
+    payload.quantityAcquired = parseInt(payload.quantityAcquired, 10);
+  }
+
+  if (payload.dueAt) {
+    payload.dueAt = new Date(payload.dueAt);
+  }
+
+  return prisma.operationalTask.create({
+    data: {
+      ...payload,
+      booking: { connect: { id: bookingId } },
+    },
+    include: TASK_INCLUDE,
+  });
+};
+
+export const deleteOperationalTask = async (taskId) => {
+  return prisma.$transaction(async (tx) => {
+    const task = await tx.operationalTask.findUnique({ where: { id: taskId } });
+    if (!task) {
+      const error = new Error("Operational task not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // Delete auto-generated ledger entries
+    await tx.ledgerEntry.deleteMany({
+      where: { operationalTaskId: taskId, source: "OPERATIONAL_TASK" },
+    });
+
+    return tx.operationalTask.delete({ where: { id: taskId } });
+  });
+};

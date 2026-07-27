@@ -31,9 +31,12 @@ export interface ApiActivity {
 
 export interface ApiItineraryDay {
   id?: string;
-  day: string;
+  day?: string;
+  dayNumber?: number;
   title: string;
-  activities: string;
+  description?: string | null;
+  todos?: string[];
+  activities?: string | string[];
 }
 
 export interface ApiItinerary {
@@ -70,8 +73,9 @@ export interface ApiFestival {
   inclusions: string[];
   exclusions: string[];
   stayTransportImages: ApiStayTransportItem[] | null;
-  price: string; // Decimal comes as string from Prisma
-  tokenAmount: string;
+  price?: string; // Decimal comes as string from Prisma
+  tokenAmount?: string;
+  packages?: any[];
   isActive: boolean;
   isPublished: boolean;
   isFeatured: boolean;
@@ -79,8 +83,19 @@ export interface ApiFestival {
   destination: ApiDestination | null;
   tags: ApiTag[];
   faqs: ApiFaq[];
+  addOns?: Array<{
+    id: string;
+    title: string;
+    description?: string | null;
+    imageUrl?: string | null;
+    price: string | number;
+    maxQuantityPerBooking?: number | null;
+    maxQuantityPerSlot?: number | null;
+    purchaseCutoffOffsetDays?: number | null;
+    isActive: boolean;
+  }>;
   slots: ApiSlot[];
-  itinerary?: any;
+  itinerary?: ApiItineraryDay[];
   createdAt: string;
   updatedAt: string;
 }

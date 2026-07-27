@@ -18,8 +18,8 @@ interface SignatureTrip {
   overview: string;
   location: string;
   duration: number;
-  price: string | number;
   bannerImages: string[];
+  packages?: any[];
 }
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
@@ -139,7 +139,7 @@ export function SignatureDestinations() {
                 <button
                   key={trip.id}
                   type="button"
-                  onClick={() => navigate(`/trips/${trip.slug}`)}
+                  onClick={() => navigate(`/trips/${trip.id}`)}
                   style={{
                     width: "100%",
                     border: "none",
@@ -180,7 +180,7 @@ export function SignatureDestinations() {
                   </div>
                   <div style={{ textAlign: "right" }} className="hidden sm:block">
                     <span style={{ display: "block", color: "#b8943a", fontSize: "0.82rem", fontWeight: 500 }}>
-                      {formatPrice(trip.price)}
+                      {formatPrice(trip.packages?.[0]?.price || 0)}
                     </span>
                     <span style={{ display: "block", color: "rgba(30,26,20,0.55)", fontSize: "0.65rem", fontWeight: 400, letterSpacing: "0.08em", marginTop: "3px" }}>
                       {trip.duration} {trip.duration === 1 ? "night" : "nights"}

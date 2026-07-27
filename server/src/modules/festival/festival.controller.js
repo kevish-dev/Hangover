@@ -161,3 +161,21 @@ export const getFeaturedFestivals = async (req, res, next) => {
     next(error);
   }
 }
+
+export const createShareLink = async (req, res, next) => {
+  try {
+    const result = await festivalService.createShareLink(req.params.id, req.body?.expiresAt);
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const revokeShareLink = async (req, res, next) => {
+  try {
+    await festivalService.revokeShareLink(req.params.id);
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+};
