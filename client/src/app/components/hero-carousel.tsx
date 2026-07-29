@@ -13,7 +13,8 @@ interface FeaturedTrip {
   overview?: string;
   location: string;
   duration: number;
-  price: number;
+  price?: number;
+  packages?: Array<{ price: string | number }>;
   bannerImages: string; // first banner image URL
 }
 
@@ -33,6 +34,22 @@ const FALLBACK_TRIPS: FeaturedTrip[] = [
   },
 ];
 
+function withStartingPrice(trip: FeaturedTrip): FeaturedTrip {
+  const packagePrices = (trip.packages || [])
+    .map((pkg) => Number(pkg.price))
+    .filter((price) => Number.isFinite(price) && price >= 0);
+
+  return {
+    ...trip,
+    price:
+      typeof trip.price === "number" && Number.isFinite(trip.price)
+        ? trip.price
+        : packagePrices.length > 0
+          ? Math.min(...packagePrices)
+          : undefined,
+  };
+}
+
 export function HeroCarousel() {
   const [trips, setTrips] = useState<FeaturedTrip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,7 +67,7 @@ export function HeroCarousel() {
         });
         const data = res.data?.result?.data;
         if (!cancelled && Array.isArray(data) && data.length > 0) {
-          setTrips(data);
+          setTrips(data.map(withStartingPrice));
         } else if (!cancelled) {
           setTrips(FALLBACK_TRIPS);
         }
