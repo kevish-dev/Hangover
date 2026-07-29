@@ -6,7 +6,7 @@ import {
   CardTitle,
   CardDescription,
 } from "../../components/ui/card";
-import { DollarSign, Users, Activity, Star, Loader2 } from "lucide-react";
+import { IndianRupee, Users, Activity, Star, Loader2 } from "lucide-react";
 import {
   AreaChart,
   Area,
@@ -30,6 +30,14 @@ const COLORS = ['#781216', '#a43238', '#cf666a', '#e8a1a3', '#fca5a5'];
 const REVENUE_COLOR = "#10b981"; // emerald 500
 const COST_COLOR = "#ef4444"; // red 500
 const CASHFLOW_COLOR = "#3b82f6"; // blue 500
+const formatINR = (value: number) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(value);
+const formatCompactINR = (value: number) =>
+  `₹${(value / 1000).toLocaleString("en-IN", { maximumFractionDigits: 1 })}k`;
 
 export default function Analytics() {
   const [timeframe, setTimeframe] = useState("1M");
@@ -38,7 +46,7 @@ export default function Analytics() {
 
   const calculateKPIs = () => {
     if (!currentData) {
-       return { rev: "$0", cash: "$0", trav: "0", rate: "0.0", p_rev: "", p_cash: "", p_trav: "", p_rate: "0" };
+       return { rev: "₹0", cash: "₹0", trav: "0", rate: "0.0", p_rev: "", p_cash: "", p_trav: "", p_rate: "0" };
     }
 
     const totalRev = currentData.revenueVsCost.reduce((sum, item) => sum + item.revenue, 0);
@@ -54,11 +62,9 @@ export default function Analytics() {
       ? (validRatings.reduce((sum, r) => sum + r.rating, 0) / validRatings.length).toFixed(1)
       : "0.0";
 
-    const formatCurrency = (val: number) => `$${val.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-    
     return {
-      rev: formatCurrency(totalRev),
-      cash: (netCash > 0 ? "+" : "") + formatCurrency(netCash),
+      rev: formatINR(totalRev),
+      cash: (netCash > 0 ? "+" : "") + formatINR(netCash),
       trav: totalTrav.toLocaleString(),
       rate: avgRating,
       p_rev: "For selected period",
@@ -117,7 +123,7 @@ export default function Analytics() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <IndianRupee className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{kpis.rev}</div>
@@ -188,9 +194,9 @@ export default function Analytics() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} dy={10} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} tickFormatter={(value) => `$${value / 1000}k`} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} tickFormatter={formatCompactINR} />
                     <Tooltip 
-                      formatter={(value) => [`$${(value as number).toLocaleString()}`, undefined]}
+                      formatter={(value) => [formatINR(Number(value)), undefined]}
                       contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     />
                     <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
@@ -227,7 +233,7 @@ export default function Analytics() {
                         ))}
                       </Pie>
                       <Tooltip 
-                        formatter={(value) => [`$${(value as number).toLocaleString()}`, undefined]} 
+                        formatter={(value) => [formatINR(Number(value)), undefined]}
                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                       />
                       <Legend iconType="circle" layout="horizontal" verticalAlign="bottom" />
@@ -249,10 +255,10 @@ export default function Analytics() {
                   <BarChart data={currentData.cashflow} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} dy={10} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} tickFormatter={(value) => `$${value / 1000}k`} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} tickFormatter={formatCompactINR} />
                     <Tooltip 
                       cursor={{fill: '#f3f4f6'}}
-                      formatter={(value) => [`$${(value as number).toLocaleString()}`, 'Cashflow']}
+                      formatter={(value) => [formatINR(Number(value)), 'Cashflow']}
                       contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     />
                     <Bar dataKey="amount" fill={CASHFLOW_COLOR} radius={[4, 4, 0, 0]} />

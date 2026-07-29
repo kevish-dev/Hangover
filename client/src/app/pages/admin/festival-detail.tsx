@@ -25,7 +25,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   CalendarClock,
-  CircleDollarSign,
   ArrowUpRight,
   ArrowDownRight,
   WalletCards,
@@ -511,7 +510,7 @@ function OperationsTab({ festivalId }: { festivalId: string }) {
           { label: "Open Tasks", value: openTasks.length, icon: SlidersHorizontal, color: "text-blue-700 bg-blue-50" },
           { label: "Overdue", value: overdue.length, icon: AlertTriangle, color: overdue.length > 0 ? "text-red-700 bg-red-50" : "text-gray-500 bg-gray-100" },
           { label: "Total Tasks", value: tasks.length, icon: CheckCircle2, color: "text-gray-700 bg-gray-100" },
-          { label: "Spent", value: money(totalSpend), icon: CircleDollarSign, color: "text-[#781216] bg-red-50" },
+          { label: "Spent", value: money(totalSpend), icon: IndianRupee, color: "text-[#781216] bg-red-50" },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-2 ${s.color.split(" ").slice(1).join(" ")}`}>
