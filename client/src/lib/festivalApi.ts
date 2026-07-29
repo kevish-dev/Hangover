@@ -112,9 +112,7 @@ export interface ApiFestivalsResponse {
 
 export interface ApiFeaturedFestivalsResponse {
   message: string;
-  result: {
-    data: ApiFestival[];
-  };
+  result: ApiFestival[];
 }
 
 // ── Fetch functions ───────────────────────────────────────────────
@@ -134,7 +132,7 @@ export async function fetchFestivalBySlug(slug: string): Promise<ApiFestival> {
 
 export async function fetchFeaturedFestivals(): Promise<ApiFestival[]> {
   const res = await apiClient.get<ApiFeaturedFestivalsResponse>("/festivals/featured");
-  return res.data.result.data;
+  return res.data.result;
 }
 
 // ── Formatting helpers ────────────────────────────────────────────
