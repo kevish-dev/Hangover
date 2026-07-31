@@ -372,7 +372,9 @@ model Festival {
 model Destination {
   id          String     @id @default(uuid())
   name        String
-  state       String
+  // Retained for the public catalogue; CRM destinations may be country/city
+  // level records where a state is not meaningful.
+  state       String?
   subheading  String?
   isPublished Boolean    @default(false)
   createdAt   DateTime   @default(now())
@@ -382,6 +384,221 @@ model Destination {
   circuits    Circuit[]
 
   @@index([isPublished])
+}
+
+model CrmDestination {
+  id                String             @id @default(uuid())
+  name              String             @unique
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  places            Place[]
+  stayLocations     StayLocation[]
+  transferLocations TransferLocation[]
+  trips             CrmTrip[]
+
+}
+
+// =====================================================================
+// CRM ITINERARY FOUNDATION
+// =====================================================================
+// These models intentionally live alongside the catalogue Trip models above.
+// A catalogue trip has booking, slot and publishing concerns; a CRM trip is a
+// reusable itinerary workspace that will later be consumed by quotations,
+// costing, contracts and vouchers. Keeping them separate prevents a CRM draft
+// from being forced to satisfy public-catalogue fields such as price and slug.
+
+model Place {
+  id            String     @id @default(uuid())
+  destinationId String
+  destination   CrmDestination @relation(fields: [destinationId], references: [id], onDelete: Restrict)
+  name          String
+  description   String?
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  itineraryDays CrmTripItineraryDayPlace[]
+
+  @@unique([destinationId, name])
+  @@index([destinationId, isActive])
+}
+
+model StayLocation {
+  id            String     @id @default(uuid())
+  destinationId String
+  destination   CrmDestination @relation(fields: [destinationId], references: [id], onDelete: Restrict)
+  name          String
+  description   String?
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  properties    Property[]
+  itineraryDays CrmTripItineraryDay[]
+
+  @@unique([destinationId, name])
+  @@index([destinationId, isActive])
+}
+
+model Property {
+  id             String       @id @default(uuid())
+  stayLocationId String
+  stayLocation   StayLocation @relation(fields: [stayLocationId], references: [id], onDelete: Restrict)
+  name           String
+  address        String?
+  description    String?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  itineraryDays  CrmTripItineraryDay[]
+
+  @@unique([stayLocationId, name])
+  @@index([stayLocationId, isActive])
+}
+
+// Transfer locations are reusable, destination-scoped endpoints for drop-offs
+// and future pickup/transport workflows.
+model TransferLocation {
+  id            String     @id @default(uuid())
+  destinationId String
+  destination   CrmDestination @relation(fields: [destinationId], references: [id], onDelete: Restrict)
+  name          String
+  description   String?
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  dropOffDays   CrmTripItineraryDay[] @relation("CrmDropOffLocation")
+
+  @@unique([destinationId, name])
+  @@index([destinationId, isActive])
+}
+
+model CrmTrip {
+  id                   String     @id @default(uuid())
+  name                 String
+  numberOfNights       Int
+  totalAmount          Decimal?   @db.Decimal(10, 2)
+  tokenAmount          Decimal?   @db.Decimal(10, 2)
+  destinationId        String
+  destination          CrmDestination @relation(fields: [destinationId], references: [id], onDelete: Restrict)
+  airportPickupEnabled Boolean    @default(false)
+  airportDropEnabled   Boolean    @default(false)
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+  itineraryDays        CrmTripItineraryDay[]
+  inclusions           CrmTripInclusion[]
+  commonInclusions     CrmTripCommonInclusion[]
+  bookings             Booking[]
+
+  @@index([destinationId])
+  @@index([createdAt])
+}
+
+// Per-trip common inclusions. Meals remain itinerary-driven, so breakfast and
+// dinner counts are synchronized from day-level meal selections rather than
+// manually overridden here.
+model CrmTripCommonInclusion {
+  id           String                 @id @default(uuid())
+  tripId       String
+  trip         CrmTrip                @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  key          CrmCommonInclusionKey
+  numberOfDays Int?
+  isIncluded   Boolean?
+  vehicleType  CrmVehicleType?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  @@unique([tripId, key])
+  @@index([tripId])
+}
+
+model CrmTripItineraryDay {
+  id                  String            @id @default(uuid())
+  tripId              String
+  trip                CrmTrip           @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  dayNumber           Int
+  stayLocationId      String?
+  stayLocation        StayLocation?     @relation(fields: [stayLocationId], references: [id], onDelete: Restrict)
+  propertyId          String?
+  property            Property?         @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  breakfast           Boolean           @default(false)
+  lunch               Boolean           @default(false)
+  dinner              Boolean           @default(false)
+  notes               String?
+  isDropOff           Boolean           @default(false)
+  dropOffLocationId   String?
+  dropOffLocation     TransferLocation? @relation("CrmDropOffLocation", fields: [dropOffLocationId], references: [id], onDelete: Restrict)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  visitingPlaces      CrmTripItineraryDayPlace[]
+  activities          CrmTripItineraryDayActivity[]
+  inclusions          CrmTripInclusion[]
+  commonInclusions    CrmTripItineraryDayCommonInclusion[]
+
+  @@unique([tripId, dayNumber])
+  @@index([tripId])
+  @@index([stayLocationId])
+  @@index([propertyId])
+  @@index([dropOffLocationId])
+}
+
+// Day-level operational inclusions such as permits, a bonfire or a guide.
+// They are separate records so a day can opt into any combination without
+// storing an array or JSON blob.
+model CrmTripItineraryDayCommonInclusion {
+  id             String              @id @default(uuid())
+  itineraryDayId String
+  itineraryDay   CrmTripItineraryDay @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+  key            CrmCommonInclusionKey
+  createdAt      DateTime            @default(now())
+
+  @@unique([itineraryDayId, key])
+  @@index([itineraryDayId])
+}
+
+model CrmTripItineraryDayPlace {
+  id           String                @id @default(uuid())
+  itineraryDayId String
+  itineraryDay CrmTripItineraryDay   @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+  placeId      String
+  place        Place                 @relation(fields: [placeId], references: [id], onDelete: Restrict)
+  displayOrder Int                   @default(0)
+  createdAt    DateTime              @default(now())
+
+  @@unique([itineraryDayId, placeId])
+  @@index([itineraryDayId, displayOrder])
+  @@index([placeId])
+}
+
+model CrmTripItineraryDayActivity {
+  id             String              @id @default(uuid())
+  itineraryDayId String
+  itineraryDay   CrmTripItineraryDay @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  displayOrder   Int                 @default(0)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([itineraryDayId, displayOrder])
+}
+
+model CrmTripInclusion {
+  id             String               @id @default(uuid())
+  tripId         String
+  trip           CrmTrip              @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  itineraryDayId String?
+  itineraryDay   CrmTripItineraryDay? @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+  type           CrmInclusionType
+  sourceKey      String
+  title          String
+  description    String?
+  displayOrder   Int                  @default(0)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@unique([tripId, sourceKey])
+  @@index([tripId, displayOrder])
+  @@index([itineraryDayId])
+  @@index([type])
 }
 
 model Package {
@@ -460,6 +677,8 @@ model Booking {
   travelers          Traveler[]
   trip               Trip?             @relation(fields: [tripId], references: [id], onDelete: Cascade)
   tripId             String?
+  crmTrip            CrmTrip?          @relation(fields: [crmTripId], references: [id], onDelete: Restrict)
+  crmTripId          String?
   festival           Festival?         @relation(fields: [festivalId], references: [id], onDelete: Cascade)
   festivalId         String?
   review             Review?
@@ -475,6 +694,7 @@ model Booking {
   @@index([status])
   @@index([paymentStatus])
   @@index([balanceDueDate])
+  @@index([crmTripId])
 }
 
 model Traveler {
@@ -912,6 +1132,7 @@ enum BookingStatus {
 
 enum BookingSource {
   CATALOG
+  CRM
 }
 
 enum PaymentStatus {
@@ -1114,4 +1335,35 @@ enum InvoiceStatus {
   SENT
   PAID
   CANCELLED
+}
+
+enum CrmInclusionType {
+  ACCOMMODATION
+  MEAL
+  SIGHTSEEING
+  ACTIVITY
+  HOTEL_STAY
+  AIRPORT_PICKUP
+  AIRPORT_DROP
+  DROP_OFF_TRANSFER
+  COMMON
+}
+
+enum CrmCommonInclusionKey {
+  BREAKFAST
+  DINNER
+  ILP_AND_PERMITS
+  TRAVEL
+  VEHICLE_TYPE
+  BBQ
+  BONFIRE
+  TRIP_GUIDE
+  FIRST_AID_KIT
+}
+
+enum CrmVehicleType {
+  SEDAN
+  SUV
+  INNOVA
+  TRAVELLER
 }

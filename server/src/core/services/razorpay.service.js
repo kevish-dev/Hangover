@@ -23,6 +23,19 @@ export const createOrder = async (amountPaise, currency = "INR", receipt, notes 
   });
 };
 
+export const createHostedPaymentLink = async ({ amountPaise, referenceId, customer, notes = {} }) => {
+  return razorpay.paymentLink.create({
+    amount: amountPaise,
+    currency: "INR",
+    reference_id: referenceId,
+    description: "CRM trip installment payment",
+    customer: { name: customer.name, email: customer.email, contact: customer.phone || undefined },
+    notify: { sms: false, email: false },
+    reminder_enable: true,
+    notes,
+  });
+};
+
 /**
  * Verify Razorpay webhook signature
  * @param {string|Buffer} rawBody - Raw request body (must not be parsed)

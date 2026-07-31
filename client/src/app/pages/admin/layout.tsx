@@ -20,6 +20,7 @@ import {
   Home,
   MapPin,
   Map,
+  Database,
   CalendarRange,
   ClipboardCheck,
   CalendarCheck,
@@ -39,6 +40,8 @@ const overviewItems = [
 ];
 
 const crmItems = [
+  { title: "Master data", url: "/dashboard/crm-master-data", icon: Database },
+  { title: "Itinerary trips", url: "/dashboard/crm-trips", icon: MapPin },
   { title: "Circuits", url: "/dashboard/circuits", icon: Map },
   { title: "Trips & departures", url: "/dashboard/trips", icon: CalendarRange },
   { title: "Festivals", url: "/dashboard/festivals", icon: Tent },

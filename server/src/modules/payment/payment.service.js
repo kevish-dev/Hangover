@@ -562,6 +562,7 @@ export const handleWebhook = async (rawBody, signature, webhookEventId) => {
   const eventType = payload.event;
   const entityId =
     payload.payload?.payment?.entity?.id ||
+    payload.payload?.payment_link?.entity?.id ||
     payload.payload?.refund?.entity?.id ||
     payload.payload?.order?.entity?.id;
   const payloadDigest = crypto.createHash("sha256").update(rawBody).digest("hex");
@@ -589,6 +590,16 @@ export const handleWebhook = async (rawBody, signature, webhookEventId) => {
   try {
     // 4. Route by event type
     switch (eventType) {
+      case "payment_link.paid": {
+        const paymentLink = payload.payload?.payment_link?.entity;
+        const hostedPayment = payload.payload?.payment?.entity;
+        if (paymentLink?.id) {
+          const { captureHostedCrmPayment } = await import("../crm-trip/crm-booking.service.js");
+          await captureHostedCrmPayment({ paymentLinkId: paymentLink.id, razorpayPayment: hostedPayment });
+        }
+        break;
+      }
+
       case "payment.captured": {
         /**
          * This is the critical safety net.
