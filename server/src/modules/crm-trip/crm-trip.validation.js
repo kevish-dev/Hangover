@@ -1,6 +1,30 @@
 import { z } from "zod";
 
 const nullableId = z.string().uuid().nullable();
+const packageSchema = z.object({ title: z.string().trim().min(1).max(200), price: z.number().min(0), tokenAmount: z.number().min(0) }).refine((item) => item.tokenAmount <= item.price, { message: "Package token cannot exceed its price", path: ["tokenAmount"] });
+const addOnSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(2000).nullable().optional(),
+  imageUrl: z.string().url().nullable().optional(),
+  price: z.number().positive(),
+  maxQuantityPerBooking: z.number().int().positive().nullable().optional(),
+  maxQuantityPerSlot: z.number().int().positive().nullable().optional(),
+  purchaseCutoffOffsetDays: z.number().int().nonnegative().nullable().optional(),
+  isActive: z.boolean().default(true),
+});
+const setupDaySchema = z.object({
+  stayLocationId: nullableId.optional(),
+  propertyId: nullableId.optional(),
+  placeIds: z.array(z.string().uuid()).max(100).default([]),
+  breakfast: z.boolean().default(false),
+  lunch: z.boolean().default(false),
+  dinner: z.boolean().default(false),
+  notes: z.string().trim().max(5000).nullable().optional(),
+  isDropOff: z.boolean().default(false),
+  dropOffLocationId: nullableId.optional(),
+  activities: z.array(z.object({ name: z.string().trim().min(1).max(300), description: z.string().trim().max(2000).nullable().optional() })).max(100).default([]),
+  commonInclusions: z.array(z.enum(["ILP_AND_PERMITS", "BBQ", "BONFIRE", "TRIP_GUIDE"])).max(4).default([]),
+});
 
 const crmTripFields = z.object({
   name: z.string().trim().min(1).max(300),
@@ -10,6 +34,17 @@ const crmTripFields = z.object({
   destinationId: z.string().uuid(),
   airportPickupEnabled: z.boolean().default(false),
   airportDropEnabled: z.boolean().default(false),
+  packages: z.array(packageSchema).max(30).default([]),
+  addOns: z.array(addOnSchema).max(50).default([]),
+  days: z.array(setupDaySchema).max(366).optional(),
+  manualInclusions: z.array(z.object({ title: z.string().trim().min(1).max(300), description: z.string().trim().max(2000).nullable().optional() })).max(100).default([]),
+  exclusions: z.array(z.string().trim().min(1).max(300)).max(100).default([]),
+  websiteOverview: z.string().trim().max(20000).nullable().optional(),
+  websiteFaqs: z.array(z.object({ question: z.string().trim().min(1).max(500), answer: z.string().trim().min(1).max(5000) })).max(100).default([]),
+  websiteTags: z.array(z.string().trim().min(1).max(100)).max(50).default([]),
+  websiteBannerImages: z.array(z.string().url()).max(20).default([]),
+  websiteStayTransportImages: z.array(z.string().url()).max(20).default([]),
+  websiteHighlights: z.array(z.string().trim().min(1).max(500)).max(50).default([]),
 });
 
 export const createCrmTripSchema = crmTripFields.refine((data) => data.tokenAmount <= data.totalAmount, { message: "Token amount cannot exceed the total amount", path: ["tokenAmount"] });

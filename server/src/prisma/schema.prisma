@@ -391,7 +391,6 @@ model CrmDestination {
   name              String             @unique
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
-  places            Place[]
   stayLocations     StayLocation[]
   transferLocations TransferLocation[]
   trips             CrmTrip[]
@@ -408,18 +407,18 @@ model CrmDestination {
 // from being forced to satisfy public-catalogue fields such as price and slug.
 
 model Place {
-  id            String     @id @default(uuid())
-  destinationId String
-  destination   CrmDestination @relation(fields: [destinationId], references: [id], onDelete: Restrict)
-  name          String
-  description   String?
-  isActive      Boolean    @default(true)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  itineraryDays CrmTripItineraryDayPlace[]
+  id             String       @id @default(uuid())
+  stayLocationId String
+  stayLocation   StayLocation @relation(fields: [stayLocationId], references: [id], onDelete: Restrict)
+  name           String
+  description    String?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  itineraryDays  CrmTripItineraryDayPlace[]
 
-  @@unique([destinationId, name])
-  @@index([destinationId, isActive])
+  @@unique([stayLocationId, name])
+  @@index([stayLocationId, isActive])
 }
 
 model StayLocation {
@@ -432,6 +431,7 @@ model StayLocation {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
   properties    Property[]
+  places        Place[]
   itineraryDays CrmTripItineraryDay[]
 
   @@unique([destinationId, name])
@@ -481,12 +481,21 @@ model CrmTrip {
   destination          CrmDestination @relation(fields: [destinationId], references: [id], onDelete: Restrict)
   airportPickupEnabled Boolean    @default(false)
   airportDropEnabled   Boolean    @default(false)
+  exclusions           String[]   @default([])
+  websiteOverview      String?
+  websiteFaqs          Json       @default("[]")
+  websiteTags          String[]   @default([])
+  websiteBannerImages  String[]   @default([])
+  websiteStayTransportImages String[] @default([])
+  websiteHighlights    Json       @default("[]")
   createdAt            DateTime   @default(now())
   updatedAt            DateTime   @updatedAt
   itineraryDays        CrmTripItineraryDay[]
   inclusions           CrmTripInclusion[]
   commonInclusions     CrmTripCommonInclusion[]
   bookings             Booking[]
+  packages             Package[]
+  addOns               AddOn[]
 
   @@index([destinationId])
   @@index([createdAt])
@@ -592,6 +601,7 @@ model CrmTripInclusion {
   title          String
   description    String?
   displayOrder   Int                  @default(0)
+  isManual       Boolean              @default(false)
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
 
@@ -606,6 +616,7 @@ model Package {
   circuitId   String?
   tripId      String?
   festivalId  String?
+  crmTripId   String?
   title       String
   price       Decimal   @db.Decimal(10, 2)
   tokenAmount Decimal   @db.Decimal(10, 2)
@@ -615,10 +626,12 @@ model Package {
   circuit     Circuit?  @relation(fields: [circuitId], references: [id], onDelete: Cascade)
   festival    Festival? @relation(fields: [festivalId], references: [id], onDelete: Cascade)
   trip        Trip?     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  crmTrip     CrmTrip?  @relation(fields: [crmTripId], references: [id], onDelete: Cascade)
 
   @@index([circuitId])
   @@index([tripId])
   @@index([festivalId])
+  @@index([crmTripId])
 }
 
 model Slot {
@@ -856,6 +869,8 @@ model AddOn {
   trip                     Trip?          @relation(fields: [tripId], references: [id], onDelete: Cascade)
   festivalId               String?
   festival                 Festival?      @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  crmTripId                String?
+  crmTrip                  CrmTrip?       @relation(fields: [crmTripId], references: [id], onDelete: Cascade)
   title                    String
   description              String?
   imageUrl                 String?
@@ -871,6 +886,7 @@ model AddOn {
   @@index([circuitId])
   @@index([tripId])
   @@index([festivalId])
+  @@index([crmTripId])
   @@index([isActive])
 }
 

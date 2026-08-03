@@ -74,8 +74,8 @@ export const regenerateInclusions = async (tx, tripId) => {
     description: null,
     displayOrder: 0,
   }];
-  if (trip.airportPickupEnabled) inclusions.push({ type: "AIRPORT_PICKUP", sourceKey: "airport-pickup", title: "Airport pickup", description: null, displayOrder: inclusions.length });
-  if (trip.airportDropEnabled) inclusions.push({ type: "AIRPORT_DROP", sourceKey: "airport-drop", title: "Airport drop", description: null, displayOrder: inclusions.length });
+  if (trip.airportPickupEnabled) inclusions.push({ type: "AIRPORT_PICKUP", sourceKey: "airport-pickup", title: "Pickup transfer", description: null, displayOrder: inclusions.length });
+  if (trip.airportDropEnabled) inclusions.push({ type: "AIRPORT_DROP", sourceKey: "airport-drop", title: "Drop transfer", description: null, displayOrder: inclusions.length });
 
   const breakfastDays = trip.itineraryDays.filter((day) => day.breakfast).length;
   const dinnerDays = trip.itineraryDays.filter((day) => day.dinner).length;
@@ -119,7 +119,7 @@ export const regenerateInclusions = async (tx, tripId) => {
       inclusions.push({ type: "COMMON", itineraryDayId: day.id, sourceKey: `${dayPrefix}:common:${common.key.toLowerCase()}`, title: `${DAY_COMMON_INCLUSION_LABELS[common.key]} - Day ${day.dayNumber}`, description: null, displayOrder: inclusions.length });
     }
   }
-  await tx.crmTripInclusion.deleteMany({ where: { tripId } });
+  await tx.crmTripInclusion.deleteMany({ where: { tripId, isManual: false } });
   await tx.crmTripInclusion.createMany({ data: inclusions.map((item) => ({ ...item, tripId })) });
   return inclusions.length;
 };
@@ -150,34 +150,58 @@ export const createTrip = async (data) => {
   const destination = await prisma.crmDestination.findUnique({ where: { id: data.destinationId }, select: { id: true } });
   if (!destination) throw new ValidationError("Destination does not exist");
   const trip = await prisma.$transaction(async (tx) => {
-    const created = await repository.create(data, tx);
-    await tx.crmTripItineraryDay.createMany({ data: Array.from({ length: data.numberOfNights + 1 }, (_, index) => ({ tripId: created.id, dayNumber: index + 1 })) });
+    const { days, packages, addOns, manualInclusions, ...tripData } = data;
+    if (days?.length && days.length !== data.numberOfNights + 1) throw new ValidationError("Configure one itinerary day for each trip day");
+    const created = await repository.create({ ...tripData, packages: { create: packages }, addOns: { create: addOns } }, tx);
+    const configuredDays = days || Array.from({ length: data.numberOfNights + 1 }, () => ({}));
+    for (const [index, input] of configuredDays.entries()) {
+      const { placeIds = [], activities = [], commonInclusions = [], ...dayData } = input;
+      await assertDestinationReferences(tx, created, dayData);
+      if (placeIds.length) {
+        if (!dayData.stayLocationId) throw new ValidationError("Choose a stay location before selecting visiting places");
+        const matches = await tx.place.count({ where: { id: { in: placeIds }, stayLocationId: dayData.stayLocationId } });
+        if (matches !== placeIds.length) throw new ValidationError("Every visiting place must belong to the selected stay location");
+      }
+      await tx.crmTripItineraryDay.create({
+        data: {
+          tripId: created.id,
+          dayNumber: index + 1,
+          ...dayData,
+          visitingPlaces: placeIds.length ? { create: placeIds.map((placeId, displayOrder) => ({ placeId, displayOrder })) } : undefined,
+          activities: activities.length ? { create: activities.map((activity, displayOrder) => ({ ...activity, displayOrder })) } : undefined,
+          commonInclusions: commonInclusions.length ? { create: commonInclusions.map((key) => ({ key })) } : undefined,
+        },
+      });
+    }
     await tx.crmTripCommonInclusion.createMany({ data: COMMON_INCLUSION_DEFAULTS(data.numberOfNights).map((item) => ({ ...item, tripId: created.id })) });
     await regenerateInclusions(tx, created.id);
+    if (manualInclusions.length) await tx.crmTripInclusion.createMany({ data: manualInclusions.map((item, index) => ({ tripId: created.id, type: "COMMON", sourceKey: `manual:${index}:${item.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, title: item.title, description: item.description || null, displayOrder: 1000 + index, isManual: true })) });
     return created;
   });
   return getTrip(trip.id);
 };
 
 export const updateTrip = async (id, changes) => {
+  const { days, packages, addOns, manualInclusions, ...tripChanges } = changes;
   await prisma.$transaction(async (tx) => {
     const trip = await repository.findById(id, tx);
     if (!trip) throw new NotFoundError("CRM trip not found");
-    const nextTotal = changes.totalAmount ?? Number(trip.totalAmount);
-    const nextToken = changes.tokenAmount ?? Number(trip.tokenAmount);
+    const nextTotal = tripChanges.totalAmount ?? Number(trip.totalAmount);
+    const nextToken = tripChanges.tokenAmount ?? Number(trip.tokenAmount);
     if (Number.isFinite(nextTotal) && Number.isFinite(nextToken) && nextToken > nextTotal) {
       throw new ValidationError("Token amount cannot exceed the total amount");
     }
-    if ((changes.totalAmount !== undefined || changes.tokenAmount !== undefined) && await tx.booking.count({ where: { crmTripId: id } })) {
+    const hasBookings = await tx.booking.count({ where: { crmTripId: id } });
+    if ((tripChanges.totalAmount !== undefined || tripChanges.tokenAmount !== undefined || packages !== undefined || addOns !== undefined) && hasBookings) {
       throw new ValidationError("Pricing cannot be changed after CRM bookings have been created");
     }
-    if (changes.destinationId && changes.destinationId !== trip.destinationId) {
-      const destination = await tx.crmDestination.findUnique({ where: { id: changes.destinationId }, select: { id: true } });
+    if (tripChanges.destinationId && tripChanges.destinationId !== trip.destinationId) {
+      const destination = await tx.crmDestination.findUnique({ where: { id: tripChanges.destinationId }, select: { id: true } });
       if (!destination) throw new ValidationError("Destination does not exist");
       if (trip.itineraryDays.some(configuredDay)) throw new ValidationError("Clear itinerary master-data selections before changing the destination");
     }
-    if (changes.numberOfNights !== undefined && changes.numberOfNights !== trip.numberOfNights) {
-      const targetDays = changes.numberOfNights + 1;
+    if (tripChanges.numberOfNights !== undefined && tripChanges.numberOfNights !== trip.numberOfNights && days === undefined) {
+      const targetDays = tripChanges.numberOfNights + 1;
       if (targetDays < trip.itineraryDays.length) {
         const removedDays = trip.itineraryDays.filter((day) => day.dayNumber > targetDays);
         if (removedDays.some(configuredDay)) throw new ValidationError("Cannot reduce nights while removed itinerary days contain selections");
@@ -186,7 +210,31 @@ export const updateTrip = async (id, changes) => {
         await tx.crmTripItineraryDay.createMany({ data: Array.from({ length: targetDays - trip.itineraryDays.length }, (_, index) => ({ tripId: id, dayNumber: trip.itineraryDays.length + index + 1 })) });
       }
     }
-    await repository.update(id, changes, tx);
+    if (days !== undefined) {
+      const targetDays = (tripChanges.numberOfNights ?? trip.numberOfNights) + 1;
+      if (days.length !== targetDays) throw new ValidationError("Configure one itinerary day for each trip day");
+      await tx.crmTripItineraryDay.deleteMany({ where: { tripId: id } });
+      const updatedTrip = { ...trip, destinationId: tripChanges.destinationId ?? trip.destinationId };
+      for (const [index, input] of days.entries()) {
+        const { placeIds = [], activities = [], commonInclusions = [], ...dayData } = input;
+        await assertDestinationReferences(tx, updatedTrip, dayData);
+        if (placeIds.length) {
+          if (!dayData.stayLocationId) throw new ValidationError("Choose a stay location before selecting visiting places");
+          const matches = await tx.place.count({ where: { id: { in: placeIds }, stayLocationId: dayData.stayLocationId } });
+          if (matches !== placeIds.length) throw new ValidationError("Every visiting place must belong to the selected stay location");
+        }
+        await tx.crmTripItineraryDay.create({ data: { tripId: id, dayNumber: index + 1, ...dayData, visitingPlaces: placeIds.length ? { create: placeIds.map((placeId, displayOrder) => ({ placeId, displayOrder })) } : undefined, activities: activities.length ? { create: activities.map((activity, displayOrder) => ({ ...activity, displayOrder })) } : undefined, commonInclusions: commonInclusions.length ? { create: commonInclusions.map((key) => ({ key })) } : undefined } });
+      }
+    }
+    if (packages !== undefined) {
+      await tx.package.deleteMany({ where: { crmTripId: id } });
+      if (packages.length) await tx.package.createMany({ data: packages.map((item) => ({ ...item, crmTripId: id })) });
+    }
+    if (addOns !== undefined) {
+      await tx.addOn.deleteMany({ where: { crmTripId: id } });
+      if (addOns.length) await tx.addOn.createMany({ data: addOns.map((item) => ({ ...item, crmTripId: id })) });
+    }
+    await repository.update(id, tripChanges, tx);
     await regenerateInclusions(tx, id);
   });
   return getTrip(id);
@@ -204,6 +252,9 @@ export const updateDay = async (dayId, changes) => {
     const values = { ...day, ...changes };
     if (changes.stayLocationId === null && changes.propertyId === undefined) values.propertyId = null;
     await assertDestinationReferences(tx, day.trip, values);
+    if (changes.stayLocationId !== undefined && changes.stayLocationId !== day.stayLocationId) {
+      await tx.crmTripItineraryDayPlace.deleteMany({ where: { itineraryDayId: dayId } });
+    }
     await tx.crmTripItineraryDay.update({ where: { id: dayId }, data: { ...changes, ...(values.propertyId === null ? { propertyId: null } : {}) } });
     await regenerateInclusions(tx, day.tripId);
   });
@@ -247,8 +298,9 @@ export const replacePlaces = async (dayId, placeIds) => {
     const day = await repository.findDayById(dayId, tx);
     if (!day) throw new NotFoundError("Itinerary day not found");
     if (placeIds.length) {
-      const matches = await tx.place.findMany({ where: { id: { in: placeIds }, destinationId: day.trip.destinationId }, select: { id: true } });
-      if (matches.length !== placeIds.length) throw new ValidationError("Every visiting place must belong to the trip destination");
+      if (!day.stayLocationId) throw new ValidationError("Choose a stay location before selecting visiting places");
+      const matches = await tx.place.findMany({ where: { id: { in: placeIds }, stayLocationId: day.stayLocationId }, select: { id: true } });
+      if (matches.length !== placeIds.length) throw new ValidationError("Every visiting place must belong to the selected stay location");
     }
     await tx.crmTripItineraryDayPlace.deleteMany({ where: { itineraryDayId: dayId } });
     if (placeIds.length) await tx.crmTripItineraryDayPlace.createMany({ data: placeIds.map((placeId, displayOrder) => ({ itineraryDayId: dayId, placeId, displayOrder })) });

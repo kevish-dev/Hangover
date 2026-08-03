@@ -15,6 +15,8 @@ export const CRM_TRIP_INCLUDE = {
   },
   inclusions: { orderBy: { displayOrder: "asc" } },
   commonInclusions: { orderBy: { key: "asc" } },
+  packages: { orderBy: { createdAt: "asc" } },
+  addOns: { orderBy: { createdAt: "asc" } },
 };
 
 export const findMany = async ({ skip, take, where }) => {

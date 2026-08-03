@@ -1,6 +1,6 @@
 import { FormEvent, type ReactNode, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit2, Loader2, MapPin, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Building2, ChevronRight, Edit2, Loader2, MapPin, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "../../../lib/axios";
 import { Button } from "../../components/ui/button";
@@ -8,145 +8,64 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../componen
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 
-type MasterKind = "destination" | "place" | "stay-location" | "property" | "transfer-location";
-type MasterItem = Record<string, any>;
-
-const config: Record<MasterKind, { label: string; singular: string; endpoint: string; owner?: "destinationId" | "stayLocationId" }> = {
-  destination: { label: "Destinations", singular: "Destination", endpoint: "/crm-destinations" },
-  place: { label: "Visiting places", singular: "Visiting place", endpoint: "/places", owner: "destinationId" },
-  "stay-location": { label: "Stay locations", singular: "Stay location", endpoint: "/stay-locations", owner: "destinationId" },
-  property: { label: "Properties", singular: "Property", endpoint: "/properties", owner: "stayLocationId" },
-  "transfer-location": { label: "Transfer locations", singular: "Transfer location", endpoint: "/transfer-locations", owner: "destinationId" },
+type Destination = { id: string; name: string };
+type Stay = { id: string; name: string; description?: string | null; isActive: boolean; _count?: { properties: number; places: number } };
+type Item = { id: string; name: string; description?: string | null; address?: string | null; isActive: boolean };
+type Kind = "destination" | "stay" | "property" | "place" | "transfer";
+const info: Record<Kind, { singular: string; endpoint: string }> = {
+  destination: { singular: "Destination", endpoint: "/crm-destinations" },
+  stay: { singular: "Stay location", endpoint: "/stay-locations" },
+  property: { singular: "Property", endpoint: "/properties" },
+  place: { singular: "Visiting place", endpoint: "/places" },
+  transfer: { singular: "Transfer location", endpoint: "/transfer-locations" },
 };
-
-const getError = (error: any, fallback: string) => error?.response?.data?.message || fallback;
+const errorMessage = (error: any, fallback: string) => error?.response?.data?.message || fallback;
 
 export default function CrmMasterDataPage() {
   const queryClient = useQueryClient();
-  const [kind, setKind] = useState<MasterKind>("destination");
-  const [editing, setEditing] = useState<MasterItem | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const current = config[kind];
-
-  const destinationsQuery = useQuery({
-    queryKey: ["crm", "destinations"],
-    queryFn: async () => (await apiClient.get("/crm-destinations", { params: { limit: 200 } })).data.data as MasterItem[],
-  });
-  const staysQuery = useQuery({
-    queryKey: ["crm", "stay-locations"],
-    queryFn: async () => (await apiClient.get("/stay-locations", { params: { limit: 200 } })).data.data as MasterItem[],
-    enabled: kind === "property" || dialogOpen,
-  });
-  const recordsQuery = useQuery({
-    queryKey: ["crm", kind],
-    queryFn: async () => {
-      const params = { limit: 200 };
-      const response = await apiClient.get(current.endpoint, { params });
-      return response.data.data as MasterItem[];
-    },
-  });
-
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ["crm", kind] });
-    if (kind === "destination") queryClient.invalidateQueries({ queryKey: ["crm", "destinations"] });
-    if (kind === "stay-location") queryClient.invalidateQueries({ queryKey: ["crm", "stay-locations"] });
-  };
-
-  const remove = async (item: MasterItem) => {
-    if (!window.confirm(`Delete ${item.name}? Related records prevent unsafe deletions.`)) return;
-    try {
-      await apiClient.delete(`${current.endpoint}/${item.id}`);
-      toast.success(`${current.singular} deleted`);
-      invalidate();
-    } catch (error) {
-      toast.error(getError(error, `Could not delete ${current.singular.toLowerCase()}`));
-    }
-  };
-
+  const [destination, setDestination] = useState<Destination | null>(null);
+  const [stay, setStay] = useState<Stay | null>(null);
+  const [tab, setTab] = useState<"property" | "place">("property");
+  const [dialog, setDialog] = useState<{ kind: Kind; item?: any } | null>(null);
+  const destinationsQuery = useQuery({ queryKey: ["crm", "destinations"], queryFn: async () => (await apiClient.get("/crm-destinations", { params: { limit: 200 } })).data.data as Destination[] });
+  const staysQuery = useQuery({ queryKey: ["crm", "stays", destination?.id], queryFn: async () => (await apiClient.get("/stay-locations", { params: { destinationId: destination!.id, limit: 200 } })).data.data as Stay[], enabled: Boolean(destination) });
+  const propertiesQuery = useQuery({ queryKey: ["crm", "properties", stay?.id], queryFn: async () => (await apiClient.get("/properties", { params: { stayLocationId: stay!.id, limit: 200 } })).data.data as Item[], enabled: Boolean(stay) });
+  const placesQuery = useQuery({ queryKey: ["crm", "places", stay?.id], queryFn: async () => (await apiClient.get("/places", { params: { stayLocationId: stay!.id, limit: 200 } })).data.data as Item[], enabled: Boolean(stay) });
   const destinations = destinationsQuery.data || [];
-  const stays = staysQuery.data || [];
-  const records = recordsQuery.data || [];
-
-  return (
-    <div className="mx-auto max-w-7xl space-y-6 pb-12">
-      <header className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#b59410]">CRM foundation</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-gray-900">Master data</h1>
-          <p className="mt-2 text-sm text-gray-500">Build reusable destinations, visiting places, stays, properties and transfer locations before creating an itinerary.</p>
-        </div>
-        <Button onClick={() => { setEditing(null); setDialogOpen(true); }} className="bg-[#781216] text-white hover:bg-[#5f0e11]">
-          <Plus className="mr-2 h-4 w-4" /> Add {current.singular}
-        </Button>
-      </header>
-
-      <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-white p-2">
-        {(Object.keys(config) as MasterKind[]).map((key) => (
-          <button key={key} type="button" onClick={() => setKind(key)} className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${kind === key ? "bg-[#781216] text-white" : "text-gray-600 hover:bg-gray-100"}`}>
-            {config[key].label}
-          </button>
-        ))}
-      </div>
-
-      {recordsQuery.isLoading ? <div className="py-16 text-center text-gray-500"><Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />Loading {current.label.toLowerCase()}…</div> : (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="px-5 py-3">Name</th><th className="hidden px-5 py-3 md:table-cell">Parent</th><th className="hidden px-5 py-3 lg:table-cell">Details</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
-            <tbody className="divide-y divide-gray-100">
-              {records.map((item) => {
-                const parent = item.destination?.name || item.stayLocation?.name || "—";
-                const details = item.description || item.address || "—";
-                return <tr key={item.id} className="hover:bg-gray-50/70"><td className="px-5 py-4 font-semibold text-gray-900"><span className="mr-2 inline-block h-2 w-2 rounded-full bg-emerald-500" />{item.name}</td><td className="hidden px-5 py-4 text-gray-600 md:table-cell">{parent}</td><td className="hidden max-w-sm truncate px-5 py-4 text-gray-500 lg:table-cell">{details}</td><td className="px-5 py-4"><div className="flex justify-end gap-1"><Button variant="ghost" size="icon" onClick={() => { setEditing(item); setDialogOpen(true); }} aria-label={`Edit ${item.name}`}><Edit2 className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => remove(item)} aria-label={`Delete ${item.name}`}><Trash2 className="h-4 w-4" /></Button></div></td></tr>;
-              })}
-              {!records.length && <tr><td colSpan={4} className="px-5 py-14 text-center text-gray-500"><MapPin className="mx-auto mb-3 h-6 w-6 text-gray-300" />No {current.label.toLowerCase()} yet.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <MasterDialog kind={kind} item={editing} open={dialogOpen} onOpenChange={setDialogOpen} destinations={destinations} stays={stays} onSaved={invalidate} />
-    </div>
-  );
-}
-
-function MasterDialog({ kind, item, open, onOpenChange, destinations, stays, onSaved }: { kind: MasterKind; item: MasterItem | null; open: boolean; onOpenChange: (value: boolean) => void; destinations: MasterItem[]; stays: MasterItem[]; onSaved: () => void }) {
-  const current = config[kind];
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<Record<string, any>>({});
-
-  useEffect(() => {
-    setForm(item ? { ...item, description: item.description || "", address: item.address || "" } : { name: "", description: "", address: "", destinationId: "", stayLocationId: "", isActive: true });
-  }, [item, kind, open]);
-
-  const title = item ? `Edit ${current.singular}` : `New ${current.singular}`;
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    const payload: Record<string, any> = { name: form.name.trim() };
-    if (kind === "destination") Object.assign(payload, { name: form.name.trim() });
-    else {
-      if (current.owner) payload[current.owner] = form[current.owner];
-      payload.description = form.description.trim() || null;
-      payload.isActive = Boolean(form.isActive);
-      if (kind === "property") payload.address = form.address.trim() || null;
-    }
-    setSaving(true);
-    try {
-      if (item) await apiClient.patch(`${current.endpoint}/${item.id}`, payload);
-      else await apiClient.post(current.endpoint, payload);
-      toast.success(`${current.singular} ${item ? "updated" : "created"}`);
-      onSaved(); onOpenChange(false);
-    } catch (error) { toast.error(getError(error, `Could not save ${current.singular.toLowerCase()}`)); } finally { setSaving(false); }
+  const invalidate = (kind: Kind) => {
+    if (kind === "destination") queryClient.invalidateQueries({ queryKey: ["crm", "destinations"] });
+    if (kind === "stay") queryClient.invalidateQueries({ queryKey: ["crm", "stays", destination?.id] });
+    if (kind === "property") queryClient.invalidateQueries({ queryKey: ["crm", "properties", stay?.id] });
+    if (kind === "place") queryClient.invalidateQueries({ queryKey: ["crm", "places", stay?.id] });
+    if (kind === "transfer") queryClient.invalidateQueries({ queryKey: ["crm", "transfers", destination?.id] });
+  };
+  const remove = async (kind: Kind, item: Item) => {
+    if (!window.confirm(`Delete ${item.name}? Related records prevent unsafe deletions.`)) return;
+    try { await apiClient.delete(`${info[kind].endpoint}/${item.id}`); toast.success(`${info[kind].singular} deleted`); invalidate(kind); }
+    catch (error) { toast.error(errorMessage(error, `Could not delete ${info[kind].singular.toLowerCase()}`)); }
   };
 
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg"><DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader><form onSubmit={submit} className="space-y-4">
-    <Field label="Name"><Input required value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={`Enter ${current.singular.toLowerCase()} name`} /></Field>
-    {current.owner === "destinationId" && <Field label="Destination"><select required className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm" value={form.destinationId || ""} onChange={(e) => setForm({ ...form, destinationId: e.target.value })}><option value="">Select destination</option>{destinations.map((destination) => <option key={destination.id} value={destination.id}>{destination.name}</option>)}</select></Field>}
-    {current.owner === "stayLocationId" && <Field label="Stay location"><select required className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm" value={form.stayLocationId || ""} onChange={(e) => setForm({ ...form, stayLocationId: e.target.value })}><option value="">Select stay location</option>{stays.map((stay) => <option key={stay.id} value={stay.id}>{stay.name}{stay.destination ? ` — ${stay.destination.name}` : ""}</option>)}</select></Field>}
-    {kind === "property" && <Field label="Address (optional)"><Input value={form.address || ""} onChange={(e) => setForm({ ...form, address: e.target.value })} /></Field>}
-    {kind !== "destination" && <><Field label="Description (optional)"><Textarea value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} /></Field><Check label="Active and selectable" checked={form.isActive !== false} onChange={(value) => setForm({ ...form, isActive: value })} /></>}
-    <div className="flex justify-end gap-2 pt-3"><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button disabled={saving} className="bg-[#781216] text-white hover:bg-[#5f0e11]">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{item ? "Save changes" : `Create ${current.singular}`}</Button></div>
-  </form></DialogContent></Dialog>;
+  if (!destination) return <div className="mx-auto max-w-7xl space-y-6 pb-12"><header className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#b59410]">CRM foundation</p><h1 className="mt-1 text-3xl font-bold tracking-tight text-gray-900">Master data</h1><p className="mt-2 text-sm text-gray-500">Choose a destination, then manage its stay locations, properties and visiting places in context.</p></div><Button onClick={() => setDialog({ kind: "destination" })} className="bg-[#781216] text-white hover:bg-[#5f0e11]"><Plus className="mr-2 h-4 w-4" />Add destination</Button></header>{destinationsQuery.isLoading ? <Loading label="destinations" /> : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{destinations.map((item) => <button key={item.id} onClick={() => setDestination(item)} className="group rounded-xl border border-gray-200 bg-white p-5 text-left shadow-sm transition hover:border-[#b59410] hover:shadow-md"><MapPin className="h-6 w-6 text-[#b59410]" /><h2 className="mt-5 text-lg font-bold text-gray-900">{item.name}</h2><p className="mt-1 text-sm text-gray-500">Manage stay locations</p></button>)}{!destinations.length && <Empty label="destinations" />}</div>}<MasterDialog dialog={dialog} destination={null} stay={null} stays={[]} onClose={() => setDialog(null)} onSaved={() => dialog && invalidate(dialog.kind)} /></div>;
+
+  if (!stay) return <div className="mx-auto max-w-7xl space-y-7 pb-12"><button type="button" onClick={() => setDestination(null)} className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-[#781216]"><ArrowLeft className="h-4 w-4" />All destinations</button><section className="overflow-hidden rounded-2xl bg-[#171b2c] px-6 py-7 text-white shadow-sm md:px-8"><div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-[#d6af31]">CRM master data · {destination.name}</p><h1 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">Stay locations</h1><p className="mt-2 max-w-xl text-sm text-slate-300">Choose where the group stays. Each location owns its properties and the visiting places around it.</p></div><Button onClick={() => setDialog({ kind: "stay" })} className="bg-[#d6af31] text-[#171b2c] hover:bg-[#e7c552]"><Plus className="mr-2 h-4 w-4" />Add stay location</Button></div></section>{staysQuery.isLoading ? <Loading label="stay locations" /> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{(staysQuery.data || []).map((item) => { const legacy = item.name === "Imported visiting places"; return <article key={item.id} className={`group relative overflow-hidden rounded-2xl border bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${legacy ? "border-amber-300" : "border-gray-200"}`}><button onClick={() => setStay(item)} className="block w-full p-5 text-left"><div className="flex items-start justify-between gap-3"><div className={`flex h-11 w-11 items-center justify-center rounded-xl ${legacy ? "bg-amber-100 text-amber-800" : "bg-[#fcf4e7] text-[#b28b0f]"}`}><Building2 className="h-5 w-5" /></div><ChevronRight className="mt-2 h-4 w-4 text-gray-400 transition group-hover:translate-x-1 group-hover:text-[#781216]" /></div><p className={`mt-6 text-xs font-bold uppercase tracking-[0.14em] ${legacy ? "text-amber-700" : "text-gray-400"}`}>{legacy ? "Legacy cleanup" : "Stay location"}</p><h2 className="mt-1 text-xl font-bold text-gray-900">{legacy ? "Unassigned visiting places" : item.name}</h2><p className="mt-2 min-h-10 text-sm leading-relaxed text-gray-500">{legacy ? "Older places need to be moved to their real stay location." : item.description || "Open to manage the properties and places for this stay."}</p><div className="mt-5 flex gap-2"><span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">{item._count?.properties || 0} properties</span><span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">{item._count?.places || 0} places</span></div></button><CardActions onEdit={() => setDialog({ kind: "stay", item })} onDelete={() => remove("stay", item)} /></article>; })}{!(staysQuery.data || []).length && <Empty label="stay locations" />}</div>}<MasterDialog dialog={dialog} destination={destination} stay={null} stays={staysQuery.data || []} onClose={() => setDialog(null)} onSaved={() => dialog && invalidate(dialog.kind)} /></div>;
+
+  const currentItems = tab === "property" ? propertiesQuery.data || [] : placesQuery.data || [];
+  const currentLoading = tab === "property" ? propertiesQuery.isLoading : placesQuery.isLoading;
+  const legacyStay = stay.name === "Imported visiting places";
+  return <div className="mx-auto max-w-7xl space-y-6 pb-12"><button type="button" onClick={() => setStay(null)} className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-[#781216]"><ArrowLeft className="h-4 w-4" />{destination.name} stay locations</button><header className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#b59410]">{destination.name}</p><h1 className="mt-1 text-3xl font-bold tracking-tight text-gray-900">{legacyStay ? "Unassigned visiting places" : stay.name}</h1><p className="mt-2 text-sm text-gray-500">{legacyStay ? "Move each legacy place into its actual stay location, then this temporary group can be deleted." : "Manage the property and visiting-place masters for this stay location."}</p></div><Button onClick={() => setDialog({ kind: tab })} className="bg-[#781216] text-white hover:bg-[#5f0e11]"><Plus className="mr-2 h-4 w-4" />Add {info[tab].singular.toLowerCase()}</Button></header><div className="flex gap-2 border-b border-gray-200"><Tab active={tab === "property"} onClick={() => setTab("property")}>Properties</Tab><Tab active={tab === "place"} onClick={() => setTab("place")}>Visiting places</Tab></div>{currentLoading ? <Loading label={tab === "property" ? "properties" : "visiting places"} /> : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{currentItems.map((item) => <article key={item.id} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><h2 className="text-lg font-bold text-gray-900">{item.name}</h2>{item.address && <p className="mt-2 text-sm text-gray-600">{item.address}</p>}{item.description && <p className="mt-2 text-sm text-gray-500">{item.description}</p>}<CardActions onEdit={() => setDialog({ kind: tab, item })} onDelete={() => remove(tab, item)} /></article>)}{!currentItems.length && <Empty label={tab === "property" ? "properties" : "visiting places"} />}</div>}<MasterDialog dialog={dialog} destination={destination} stay={stay} stays={staysQuery.data || []} onClose={() => setDialog(null)} onSaved={() => dialog && invalidate(dialog.kind)} /></div>;
 }
 
+function MasterDialog({ dialog, destination, stay, stays, onClose, onSaved }: { dialog: { kind: Kind; item?: any } | null; destination: Destination | null; stay: Stay | null; stays: Stay[]; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({ name: "", description: "", address: "", isActive: true, stayLocationId: "" }); const [saving, setSaving] = useState(false);
+  useEffect(() => { setForm(dialog?.item ? { name: dialog.item.name, description: dialog.item.description || "", address: dialog.item.address || "", isActive: dialog.item.isActive !== false, stayLocationId: "" } : { name: "", description: "", address: "", isActive: true, stayLocationId: "" }); }, [dialog]);
+  if (!dialog) return null; const { kind, item } = dialog; const meta = info[kind];
+  const movingLegacyPlace = kind === "place" && Boolean(item) && stay?.name === "Imported visiting places";
+  const submit = async (event: FormEvent) => { event.preventDefault(); const payload: Record<string, any> = { name: form.name.trim() }; if (kind === "stay" || kind === "transfer") payload.destinationId = destination?.id; if (kind === "property" || kind === "place") payload.stayLocationId = movingLegacyPlace ? form.stayLocationId : stay?.id; if (kind !== "destination") { payload.description = form.description.trim() || null; payload.isActive = form.isActive; } if (kind === "property") payload.address = form.address.trim() || null; if (movingLegacyPlace && !payload.stayLocationId) return toast.error("Choose the stay location this visiting place belongs to"); setSaving(true); try { if (item) await apiClient.patch(`${meta.endpoint}/${item.id}`, payload); else await apiClient.post(meta.endpoint, payload); toast.success(`${meta.singular} ${item ? "updated" : "created"}`); onSaved(); onClose(); } catch (error) { toast.error(errorMessage(error, `Could not save ${meta.singular.toLowerCase()}`)); } finally { setSaving(false); } };
+  return <Dialog open onOpenChange={(value) => { if (!value) onClose(); }}><DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>{movingLegacyPlace ? "Place this visiting place" : item ? `Edit ${meta.singular}` : `New ${meta.singular}`}</DialogTitle></DialogHeader><form className="space-y-4" onSubmit={submit}><Field label="Name"><Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>{movingLegacyPlace && <Field label="Move to stay location"><select required className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm" value={form.stayLocationId} onChange={(event) => setForm({ ...form, stayLocationId: event.target.value })}><option value="">Select stay location</option>{stays.filter((option) => option.id !== stay?.id).map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</select></Field>}{kind === "property" && <Field label="Address (optional)"><Input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></Field>}{kind !== "destination" && <><Field label="Description (optional)"><Textarea rows={3} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field><label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />Active and selectable</label></>}<div className="flex justify-end gap-2 pt-2"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button disabled={saving} className="bg-[#781216] text-white hover:bg-[#5f0e11]">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{movingLegacyPlace ? "Move place" : item ? "Save changes" : `Create ${meta.singular}`}</Button></div></form></DialogContent></Dialog>;
+}
+
+function CardActions({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) { return <div className="mt-5 flex justify-end gap-1 border-t pt-3"><Button variant="ghost" size="icon" onClick={onEdit}><Edit2 className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={onDelete}><Trash2 className="h-4 w-4" /></Button></div>; }
+function Tab({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) { return <button type="button" onClick={onClick} className={`border-b-2 px-4 py-3 text-sm font-semibold ${active ? "border-[#781216] text-[#781216]" : "border-transparent text-gray-500 hover:text-gray-800"}`}>{children}</button>; }
 function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block space-y-1.5"><span className="text-sm font-medium text-gray-700">{label}</span>{children}</label>; }
-function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) { return <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />{label}</label>; }
+function Loading({ label }: { label: string }) { return <div className="py-16 text-center text-gray-500"><Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />Loading {label}…</div>; }
+function Empty({ label }: { label: string }) { return <div className="col-span-full rounded-xl border-2 border-dashed border-gray-200 bg-white py-14 text-center text-sm text-gray-500">No {label} yet.</div>; }
