@@ -25,9 +25,9 @@ import { apiClient, API_URL } from "../../lib/axios";
 import { useAuth } from "../../contexts/AuthContext";
 import { SiteFooter } from "../components/site-footer";
 import { toast } from "sonner";
-import { useQuery } from "@tanstack/react-query";
 import { getMyProfile } from "../../lib/profileApi";
 import { mediaImageUrl } from "../../lib/media";
+import PaymentModal from "../components/PaymentModal";
 import { getErrorMessage } from "../../lib/errors";
 
 // Razorpay is loaded as a static <script> in index.html
@@ -594,6 +594,12 @@ export default function BookingPage() {
     amountPaid: number;
     paymentType: string;
   } | null>(null);
+  const [paymentModalData, setPaymentModalData] = useState<{
+    bookingId: string;
+    bookingReference: string;
+    amount: number;
+    paymentType: "TOKEN" | "FULL";
+  } | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -812,16 +818,35 @@ export default function BookingPage() {
         initialPaymentType,
       } = bookingRes.data;
 
-      // 4. Initiate Razorpay payment — TOKEN or FULL based on backend decision
-      const paymentType = initialPaymentType; // "TOKEN" or "FULL"
+      const paymentType = initialPaymentType || "TOKEN";
+      const payAmount = paymentType === "TOKEN" ? Math.round(totalPrice * 0.2) : Math.round(totalPrice);
+
+      setPaymentModalData({
+        bookingId,
+        bookingReference,
+        amount: payAmount,
+        paymentType,
+      });
+    } catch (err: any) {
+      toast.error(getErrorMessage(err, "Booking creation failed"));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const triggerRazorpayForBooking = async (
+    bookingId: string,
+    bookingReference: string,
+    paymentType: "TOKEN" | "FULL"
+  ) => {
+    setIsSubmitting(true);
+    try {
       const initiateRes = await apiClient.post("/payments/initiate", {
         bookingId,
         type: paymentType,
       });
-      const { razorpayOrderId, razorpayKeyId, amount, currency } =
-        initiateRes.data;
+      const { razorpayOrderId, razorpayKeyId, amount, currency } = initiateRes.data;
 
-      // 4. Open Razorpay checkout (SDK already loaded in index.html)
       await new Promise<void>((resolve, reject) => {
         const options = {
           key: razorpayKeyId,
@@ -834,9 +859,7 @@ export default function BookingPage() {
             email: primaryEmail,
             contact: primaryPhone,
           },
-          theme: {
-            color: "#781216",
-          },
+          theme: { color: "#781216" },
           modal: {
             ondismiss: async () => {
               reject(new Error("Payment cancelled. You can try again."));
@@ -847,7 +870,6 @@ export default function BookingPage() {
             razorpay_payment_id: string;
             razorpay_signature: string;
           }) => {
-            // Immediately show verifying screen — don't make the user wait on this modal
             setBookingStep("verifying");
             setPendingVerify({
               razorpayOrderId: response.razorpay_order_id,
@@ -861,9 +883,7 @@ export default function BookingPage() {
           },
         };
 
-        const rzp = new Razorpay(options);
-
-        // Listen for failed attempts within the modal (user can still retry after this)
+        const rzp = new (window as any).Razorpay(options);
         rzp.on("payment.failed", async function (response: any) {
           try {
             await apiClient.post("/payments/failed", {
@@ -873,7 +893,7 @@ export default function BookingPage() {
               code: response.error.code,
             });
           } catch (e) {
-            // Ignore if the backend call fails, the webhook might catch it anyway
+            // Ignore
           }
           toast.error(`Payment failed: ${response.error.description}`);
         });
@@ -886,7 +906,7 @@ export default function BookingPage() {
       toast.error(msg, { id: "booking-submit-error" });
       setBookingStep("form");
     } finally {
-      setSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -3375,6 +3395,33 @@ export default function BookingPage() {
           }
         }
       `}</style>
+      {paymentModalData && (
+        <PaymentModal
+          isOpen={Boolean(paymentModalData)}
+          onClose={() => setPaymentModalData(null)}
+          bookingId={paymentModalData.bookingId}
+          amount={paymentModalData.amount}
+          paymentType={paymentModalData.paymentType}
+          itemTitle={trip?.title}
+          onSuccess={(utrSubmitted) => {
+            const data = paymentModalData;
+            setPaymentModalData(null);
+            if (utrSubmitted) {
+              setSuccessData({
+                bookingReference: data.bookingReference,
+                amountPaid: data.amount,
+                paymentType: data.paymentType,
+              });
+              setBookingStep("success");
+            }
+          }}
+          onTriggerRazorpay={() => {
+            const data = paymentModalData;
+            setPaymentModalData(null);
+            triggerRazorpayForBooking(data.bookingId, data.bookingReference, data.paymentType);
+          }}
+        />
+      )}
     </div>
   );
 }

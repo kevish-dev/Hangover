@@ -15,9 +15,11 @@ import {
   UserRound,
   WalletCards,
   X,
+  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ApiPayment, paymentApi } from "../../../lib/paymentApi";
+import AdminVerifyPaymentModal from "../../components/admin/AdminVerifyPaymentModal";
 
 const currencyFormatter = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -72,6 +74,7 @@ const statusStyles: Record<string, string> = {
   FAILED: "border-red-200 bg-red-50 text-red-700",
   CANCELLED: "border-slate-200 bg-slate-100 text-slate-600",
   PENDING: "border-amber-200 bg-amber-50 text-amber-700",
+  PENDING_VERIFICATION: "border-amber-300 bg-amber-100 text-amber-900 font-bold",
   CREATED: "border-blue-200 bg-blue-50 text-blue-700",
 };
 
@@ -261,6 +264,7 @@ function PaymentDetailsModal({ payment, onClose }: { payment: ApiPayment; onClos
 
 export default function AdminPaymentsPage() {
   const [selectedPayment, setSelectedPayment] = useState<ApiPayment | null>(null);
+  const [verifyPayment, setVerifyPayment] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [sortBy, setSortBy] = useState("date_desc");
@@ -500,7 +504,21 @@ export default function AdminPaymentsPage() {
                       <p className="mt-1 text-xs text-gray-500">{payment.paymentMethod?.toUpperCase() || "Method unavailable"}</p>
                     </td>
                     <td className="px-5 py-4 text-right"><p className="whitespace-nowrap text-base font-bold text-gray-950">{formatCurrency(payment.amount)}</p><p className="mt-1 text-xs text-gray-500">of {formatCurrency(payment.booking.totalAmount)}</p></td>
-                    <td className="px-5 py-4"><StatusBadge status={payment.status} /></td>
+                    <td className="px-5 py-4">
+                      <StatusBadge status={payment.status} />
+                      {payment.status === "PENDING_VERIFICATION" && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setVerifyPayment(payment);
+                          }}
+                          className="mt-1 flex items-center gap-1 rounded bg-amber-600 px-2 py-1 text-xs font-bold text-white hover:bg-amber-700"
+                        >
+                          <ShieldCheck className="h-3 w-3" /> Verify
+                        </button>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-5 py-4"><p className="text-sm font-medium text-gray-800">{formatDate(payment.paidAt || payment.createdAt, "MMM d, yyyy")}</p><p className="mt-1 text-xs text-gray-500">{formatDate(payment.paidAt || payment.createdAt, "h:mm a")}</p></td>
                   </tr>
                 );
@@ -511,6 +529,16 @@ export default function AdminPaymentsPage() {
       </div>
 
       {selectedPayment && <PaymentDetailsModal payment={selectedPayment} onClose={() => setSelectedPayment(null)} />}
+      {verifyPayment && (
+        <AdminVerifyPaymentModal
+          payment={verifyPayment}
+          onClose={() => setVerifyPayment(null)}
+          onSuccess={() => {
+            setVerifyPayment(null);
+            refetch();
+          }}
+        />
+      )}
     </div>
   );
 }

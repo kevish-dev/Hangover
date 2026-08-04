@@ -1,5 +1,72 @@
 import { prisma } from "../../prisma/client.js";
 
+const addUtcDays = (date, days) => {
+  const value = new Date(date);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value;
+};
+
+const crmTaskTitle = (title, booking) => {
+  const customer = booking.user?.profile?.fullName || booking.user?.email || "Customer";
+  return `${title} · ${booking.bookingReference} · ${customer}`;
+};
+
+/** Fork CRM itinerary services into independently completable booking operations. */
+export const generateCrmBookingOperations = async (booking, crmTripSlot) => {
+  const trip = await prisma.crmTrip.findUnique({
+    where: { id: booking.crmTripId },
+    include: {
+      itineraryDays: {
+        orderBy: { dayNumber: "asc" },
+        include: {
+          stayLocation: true,
+          property: true,
+          dropOffLocation: true,
+          activities: true,
+          commonInclusions: true,
+        },
+      },
+    },
+  });
+  if (!trip || !crmTripSlot.startDate) return;
+
+  const tasks = [];
+  const addTask = (day, sourceKey, category, title, description = null, quantityNeeded = 1) => {
+    tasks.push({
+      bookingId: booking.id,
+      crmItineraryDayId: day?.id || null,
+      crmSourceKey: sourceKey,
+      category,
+      title: crmTaskTitle(title, booking),
+      description,
+      config: { crmGenerated: true, sourceKey },
+      quantityNeeded,
+      dueAt: addUtcDays(crmTripSlot.startDate, (day?.dayNumber || 1) - 1),
+    });
+  };
+
+  if (trip.airportPickupEnabled) addTask(trip.itineraryDays[0], "airport-pickup", "TRANSPORT", "Arrange airport pickup");
+  for (const day of trip.itineraryDays) {
+    if (day.property || day.stayLocation) {
+      const accommodation = day.property?.name || day.stayLocation?.name;
+      addTask(day, "stay", "HOTEL", `Book stay${accommodation ? `: ${accommodation}` : ""}`, accommodation || null);
+    }
+    for (const meal of ["breakfast", "lunch", "dinner"]) {
+      if (day[meal]) addTask(day, `meal:${meal}`, "VENDOR", `Arrange ${meal}`);
+    }
+    if (day.transportEnabled) addTask(day, "transport", "TRANSPORT", "Arrange transport", day.transportText || null);
+    if (day.isDropOff) addTask(day, "drop-off", "TRANSPORT", `Arrange drop-off${day.dropOffLocation?.name ? `: ${day.dropOffLocation.name}` : ""}`, day.dropOffLocation?.name || null);
+    for (const activity of day.activities) addTask(day, `activity:${activity.id}`, "ACTIVITY", `Arrange activity: ${activity.name}`, activity.description || null);
+    for (const inclusion of day.commonInclusions) {
+      const isPermit = inclusion.key === "ILP_AND_PERMITS";
+      const label = { ILP_AND_PERMITS: "Arrange ILP and permits", BBQ: "Arrange BBQ", BONFIRE: "Arrange bonfire", TRIP_GUIDE: "Arrange trip guide" }[inclusion.key];
+      addTask(day, `inclusion:${inclusion.key}`, isPermit ? "PERMIT" : "VENDOR", label);
+    }
+  }
+  if (trip.airportDropEnabled) addTask(trip.itineraryDays.at(-1), "airport-drop", "TRANSPORT", "Arrange airport drop");
+  if (tasks.length) await prisma.operationalTask.createMany({ data: tasks });
+};
+
 /** Generate OperationalTasks for a new booking. Expenses enter the ledger when paid. */
 export const generateBookingOperations = async (booking, slot, chosenAddOns = []) => {
   // Determine the circuit this booking belongs to (via trip or festival)
@@ -111,14 +178,19 @@ const TASK_INCLUDE = {
       status: true,
       paymentStatus: true,
       tripId: true,
+      crmTripId: true,
+      crmTripSlotId: true,
       festivalId: true,
       user: { select: { email: true, profile: { select: { fullName: true } } } },
       slot: { select: { id: true, title: true, startDate: true, endDate: true } },
+      crmTripSlot: { select: { id: true, title: true, startDate: true, endDate: true } },
       trip: { select: { id: true, title: true } },
+      crmTrip: { select: { id: true, name: true } },
       festival: { select: { id: true, title: true } },
     },
   },
   itineraryDay: { select: { id: true, dayNumber: true, title: true } },
+  crmItineraryDay: { select: { id: true, dayNumber: true } },
 };
 
 export const listOperationalTasks = async (query = {}) => {
@@ -127,11 +199,14 @@ export const listOperationalTasks = async (query = {}) => {
   if (query.category) where.category = query.category;
   if (query.bookingId) where.bookingId = query.bookingId;
   if (query.tripId) where.booking = { tripId: query.tripId };
+  if (query.crmTripId) where.booking = { ...(where.booking || {}), crmTripId: query.crmTripId };
+  if (query.crmTripSlotId) where.booking = { ...(where.booking || {}), crmTripSlotId: query.crmTripSlotId };
   if (query.search) {
     where.OR = [
       { title: { contains: query.search, mode: "insensitive" } },
       { booking: { bookingReference: { contains: query.search, mode: "insensitive" } } },
       { booking: { trip: { title: { contains: query.search, mode: "insensitive" } } } },
+      { booking: { crmTrip: { name: { contains: query.search, mode: "insensitive" } } } },
       { booking: { festival: { title: { contains: query.search, mode: "insensitive" } } } },
     ];
   }

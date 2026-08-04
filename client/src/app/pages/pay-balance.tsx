@@ -27,6 +27,7 @@ import {
 import { toast } from "sonner";
 import { apiClient, API_URL } from "../../lib/axios";
 import { useAuth } from "../../contexts/AuthContext";
+import PaymentModal from "../components/PaymentModal";
 
 type PaymentStep = "form" | "verifying" | "success" | "failed";
 
@@ -252,6 +253,7 @@ export default function PayBalancePage() {
     }
   }, [paymentStep]);
 
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const item = booking?.customTrip || booking?.trip || booking?.festival || booking?.slot?.trip || booking?.slot?.festival;
   const isCustom = booking?.source === "CUSTOM" || Boolean(booking?.customTrip);
   const isFestival = Boolean(booking?.festival || booking?.slot?.festival);
@@ -473,8 +475,8 @@ export default function PayBalancePage() {
               {paymentError && <div role="alert" style={{ display: "flex", gap: 8, padding: "10px 12px", borderRadius: 8, background: "rgba(192,57,43,0.07)", color: "#a93226", fontSize: "0.64rem", lineHeight: 1.55, marginBottom: 14 }}><AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} /> {paymentError}</div>}
 
               {isEligible ? (
-                <button type="button" onClick={handlePayBalance} disabled={processing} aria-busy={processing} style={{ width: "100%", minHeight: 54, border: "none", borderRadius: 9, background: processing ? "rgba(120,18,22,0.66)" : "#781216", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, fontFamily: "'Poppins', sans-serif", fontSize: "0.77rem", fontWeight: 600, letterSpacing: "0.04em", cursor: processing ? "wait" : "pointer", boxShadow: "0 10px 25px rgba(120,18,22,0.2)", transition: "transform 0.2s ease, background 0.2s ease" }}>
-                  {processing ? <><Loader2 size={17} className="animate-spin" /> Opening secure checkout…</> : <>Pay {formatCurrency(displayAmount)} <ArrowRight size={16} /></>}
+                <button type="button" onClick={() => setShowPaymentModal(true)} disabled={processing} aria-busy={processing} style={{ width: "100%", minHeight: 54, border: "none", borderRadius: 9, background: processing ? "rgba(120,18,22,0.66)" : "#781216", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, fontFamily: "'Poppins', sans-serif", fontSize: "0.77rem", fontWeight: 600, letterSpacing: "0.04em", cursor: processing ? "wait" : "pointer", boxShadow: "0 10px 25px rgba(120,18,22,0.2)", transition: "transform 0.2s ease, background 0.2s ease" }}>
+                  {processing ? <><Loader2 size={17} className="animate-spin" /> Processing…</> : <>Pay {formatCurrency(displayAmount)} <ArrowRight size={16} /></>}
                 </button>
               ) : (
                 <div style={{ padding: "15px", borderRadius: 9, background: amountDue <= 0 ? "rgba(34,139,34,0.07)" : "rgba(184,148,58,0.08)", border: `1px solid ${amountDue <= 0 ? "rgba(34,139,34,0.16)" : "rgba(184,148,58,0.2)"}` }}>
@@ -501,6 +503,29 @@ export default function PayBalancePage() {
         <span>© {new Date().getFullYear()} Hangover Trails · Secure booking payments</span>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}><IndianRupee size={12} /> All amounts shown in INR · Taxes included</div>
       </footer>
+
+      {showPaymentModal && booking && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          bookingId={booking.id}
+          amount={displayAmount}
+          paymentType={isInitialPayment ? (booking.initialPaymentType || "FULL") : "BALANCE"}
+          itemTitle={item?.title}
+          onSuccess={(utrSubmitted) => {
+            setShowPaymentModal(false);
+            if (utrSubmitted) {
+              setPaymentStep("success");
+            } else {
+              refetch();
+            }
+          }}
+          onTriggerRazorpay={() => {
+            setShowPaymentModal(false);
+            handlePayBalance();
+          }}
+        />
+      )}
     </div>
   );
 }

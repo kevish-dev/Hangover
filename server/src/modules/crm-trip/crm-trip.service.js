@@ -23,6 +23,50 @@ const DAY_COMMON_INCLUSION_LABELS = {
 
 const configuredDay = (day) => day.stayLocationId || day.propertyId || day.breakfast || day.lunch || day.dinner || day.notes || day.isDropOff || day.dropOffLocationId || day.visitingPlaces.length || day.activities.length;
 
+const validateDepartureSlots = (slots, numberOfNights) => {
+  if (!slots?.length) throw new ValidationError("At least one dated departure slot is required");
+  const expectedDays = numberOfNights + 1;
+  for (const slot of slots) {
+    const start = new Date(slot.startDate);
+    const end = new Date(slot.endDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) throw new ValidationError("Every departure needs a valid start and end date");
+    const inclusiveDays = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+    if (inclusiveDays !== expectedDays) {
+      throw new ValidationError(`Each departure must cover exactly ${expectedDays} calendar days for this itinerary`);
+    }
+  }
+};
+
+const syncDepartureSlots = async (tx, tripId, slots, numberOfNights) => {
+  validateDepartureSlots(slots, numberOfNights);
+  const existing = await tx.crmTripSlot.findMany({
+    where: { crmTripId: tripId },
+    include: { _count: { select: { bookings: true } } },
+  });
+  const existingById = new Map(existing.map((slot) => [slot.id, slot]));
+  const submittedIds = new Set(slots.flatMap((slot) => slot.id ? [slot.id] : []));
+  if (submittedIds.size !== slots.filter((slot) => slot.id).length) throw new ValidationError("A departure slot can only be submitted once");
+
+  for (const slot of slots) {
+    const data = { startDate: new Date(slot.startDate), endDate: new Date(slot.endDate), capacity: slot.capacity, title: slot.title || null, priority: slot.priority || 0 };
+    if (!slot.id) {
+      await tx.crmTripSlot.create({ data: { ...data, crmTripId: tripId } });
+      continue;
+    }
+    const current = existingById.get(slot.id);
+    if (!current) throw new ValidationError("A submitted departure does not belong to this CRM trip");
+    if (slot.capacity < current.filledSpots) throw new ValidationError("A departure capacity cannot be below its booked traveler count");
+    const datesChanged = current.startDate?.getTime() !== data.startDate.getTime() || current.endDate?.getTime() !== data.endDate.getTime();
+    if (current._count.bookings && datesChanged) throw new ValidationError("Departure dates cannot be changed after bookings exist");
+    await tx.crmTripSlot.update({ where: { id: current.id }, data });
+  }
+  for (const slot of existing) {
+    if (submittedIds.has(slot.id)) continue;
+    if (slot._count.bookings) throw new ValidationError("A departure with bookings cannot be deleted");
+    await tx.crmTripSlot.delete({ where: { id: slot.id } });
+  }
+};
+
 const assertDestinationReferences = async (tx, trip, values) => {
   const { stayLocationId, propertyId, dropOffLocationId } = values;
   let stayLocation = null;
@@ -115,6 +159,11 @@ export const regenerateInclusions = async (tx, tripId) => {
       title: `Drop-off transfer - Day ${day.dayNumber}`,
       description: day.dropOffLocation.name, displayOrder: inclusions.length,
     });
+    if (day.transportEnabled) inclusions.push({
+      type: "TRANSPORT", itineraryDayId: day.id, sourceKey: `${dayPrefix}:transport`,
+      title: `Transport - Day ${day.dayNumber}`,
+      description: day.transportText || "Transport provided", displayOrder: inclusions.length,
+    });
     for (const common of day.commonInclusions) {
       inclusions.push({ type: "COMMON", itineraryDayId: day.id, sourceKey: `${dayPrefix}:common:${common.key.toLowerCase()}`, title: `${DAY_COMMON_INCLUSION_LABELS[common.key]} - Day ${day.dayNumber}`, description: null, displayOrder: inclusions.length });
     }
@@ -149,10 +198,11 @@ export const getItineraryDay = async (id) => {
 export const createTrip = async (data) => {
   const destination = await prisma.crmDestination.findUnique({ where: { id: data.destinationId }, select: { id: true } });
   if (!destination) throw new ValidationError("Destination does not exist");
+  validateDepartureSlots(data.slots, data.numberOfNights);
   const trip = await prisma.$transaction(async (tx) => {
-    const { days, packages, addOns, manualInclusions, ...tripData } = data;
+    const { days, packages, addOns, manualInclusions, slots, websiteTagIds, ...tripData } = data;
     if (days?.length && days.length !== data.numberOfNights + 1) throw new ValidationError("Configure one itinerary day for each trip day");
-    const created = await repository.create({ ...tripData, packages: { create: packages }, addOns: { create: addOns } }, tx);
+    const created = await repository.create({ ...tripData, packages: { create: packages }, addOns: { create: addOns }, slots: { create: slots }, websiteTags: websiteTagIds ? { connect: websiteTagIds.map(id => ({ id })) } : undefined }, tx);
     const configuredDays = days || Array.from({ length: data.numberOfNights + 1 }, () => ({}));
     for (const [index, input] of configuredDays.entries()) {
       const { placeIds = [], activities = [], commonInclusions = [], ...dayData } = input;
@@ -175,14 +225,17 @@ export const createTrip = async (data) => {
     }
     await tx.crmTripCommonInclusion.createMany({ data: COMMON_INCLUSION_DEFAULTS(data.numberOfNights).map((item) => ({ ...item, tripId: created.id })) });
     await regenerateInclusions(tx, created.id);
-    if (manualInclusions.length) await tx.crmTripInclusion.createMany({ data: manualInclusions.map((item, index) => ({ tripId: created.id, type: "COMMON", sourceKey: `manual:${index}:${item.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, title: item.title, description: item.description || null, displayOrder: 1000 + index, isManual: true })) });
+    if (manualInclusions && manualInclusions.length) {
+      await tx.crmTripInclusion.deleteMany({ where: { tripId: created.id } });
+      await tx.crmTripInclusion.createMany({ data: manualInclusions.map((item, index) => ({ tripId: created.id, type: "COMMON", sourceKey: `manual:${index}:${item.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, title: item.title, description: item.description || null, displayOrder: index, isManual: true })) });
+    }
     return created;
   });
   return getTrip(trip.id);
 };
 
 export const updateTrip = async (id, changes) => {
-  const { days, packages, addOns, manualInclusions, ...tripChanges } = changes;
+  const { days, packages, addOns, manualInclusions, slots, websiteTagIds, ...tripChanges } = changes;
   await prisma.$transaction(async (tx) => {
     const trip = await repository.findById(id, tx);
     if (!trip) throw new NotFoundError("CRM trip not found");
@@ -201,6 +254,9 @@ export const updateTrip = async (id, changes) => {
       if (trip.itineraryDays.some(configuredDay)) throw new ValidationError("Clear itinerary master-data selections before changing the destination");
     }
     if (tripChanges.numberOfNights !== undefined && tripChanges.numberOfNights !== trip.numberOfNights && days === undefined) {
+      if (slots === undefined && trip.slots.length) {
+        throw new ValidationError("Update the dated departure slots when changing the itinerary duration");
+      }
       const targetDays = tripChanges.numberOfNights + 1;
       if (targetDays < trip.itineraryDays.length) {
         const removedDays = trip.itineraryDays.filter((day) => day.dayNumber > targetDays);
@@ -234,14 +290,28 @@ export const updateTrip = async (id, changes) => {
       await tx.addOn.deleteMany({ where: { crmTripId: id } });
       if (addOns.length) await tx.addOn.createMany({ data: addOns.map((item) => ({ ...item, crmTripId: id })) });
     }
+    if (slots !== undefined) await syncDepartureSlots(tx, id, slots, tripChanges.numberOfNights ?? trip.numberOfNights);
+    if (websiteTagIds !== undefined) {
+      tripChanges.websiteTags = { set: websiteTagIds.map(id => ({ id })) };
+    }
     await repository.update(id, tripChanges, tx);
     await regenerateInclusions(tx, id);
+    if (manualInclusions !== undefined) {
+      await tx.crmTripInclusion.deleteMany({ where: { tripId: id } });
+      if (manualInclusions.length) {
+        await tx.crmTripInclusion.createMany({ data: manualInclusions.map((item, index) => ({ tripId: id, type: "COMMON", sourceKey: `manual:${index}:${item.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, title: item.title, description: item.description || null, displayOrder: index, isManual: true })) });
+      }
+    }
   });
   return getTrip(id);
 };
 
 export const deleteTrip = async (id) => {
   await getTrip(id);
+  await prisma.booking.updateMany({
+    where: { crmTripId: id },
+    data: { crmTripId: null },
+  });
   return repository.remove(id);
 };
 
@@ -381,4 +451,39 @@ export const manuallyRegenerateInclusions = async (tripId) => {
     await regenerateInclusions(tx, tripId);
   });
   return getTrip(tripId);
+};
+
+export const getOperationsCalendar = async (tripId, requestedSlotId) => {
+  const trip = await prisma.crmTrip.findUnique({
+    where: { id: tripId },
+    select: {
+      id: true,
+      name: true,
+      operationsReminderDays: true,
+      slots: { orderBy: { startDate: "asc" }, include: { _count: { select: { bookings: true } } } },
+    },
+  });
+  if (!trip) throw new NotFoundError("CRM trip not found");
+  const datedSlots = trip.slots.filter((item) => item.startDate && item.endDate);
+  const slot = requestedSlotId ? datedSlots.find((item) => item.id === requestedSlotId) : datedSlots[0];
+  if (!slot) throw new ValidationError("Choose a valid departure slot for this CRM trip");
+  const bookings = await prisma.booking.findMany({
+    where: { crmTripId: tripId, crmTripSlotId: slot.id, source: "CRM" },
+    select: {
+      id: true,
+      bookingReference: true,
+      numberOfTravelers: true,
+      user: { select: { email: true, profile: { select: { fullName: true } } } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  const tasks = await prisma.operationalTask.findMany({
+    where: { booking: { crmTripId: tripId, crmTripSlotId: slot.id } },
+    include: {
+      booking: { select: { id: true, bookingReference: true, user: { select: { email: true, profile: { select: { fullName: true } } } } } },
+      crmItineraryDay: { select: { id: true, dayNumber: true } },
+    },
+    orderBy: [{ dueAt: "asc" }, { createdAt: "asc" }],
+  });
+  return { trip, slots: datedSlots, slot, bookings, tasks };
 };

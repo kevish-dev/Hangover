@@ -31,6 +31,7 @@ type Task = {
     bookingReference: string;
     status: string;
     trip?: { id: string; title: string } | null;
+    crmTrip?: { id: string; name: string } | null;
     festival?: { id: string; title: string } | null;
   };
 };
@@ -151,6 +152,7 @@ export default function AdminOperationsPage() {
         task.title,
         task.booking?.bookingReference,
         task.booking?.trip?.title,
+        task.booking?.crmTrip?.name,
         task.booking?.festival?.title,
         task.booking?.user?.profile?.fullName,
       ]

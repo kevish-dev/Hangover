@@ -8,6 +8,7 @@ export const deleteTrip = async (req, res, next) => { try { await service.delete
 export const regenerateInclusions = async (req, res, next) => { try { res.json(await service.manuallyRegenerateInclusions(req.params.id)); } catch (error) { next(error); } };
 export const getItinerary = async (req, res, next) => { try { res.json((await service.getTrip(req.params.id)).itineraryDays); } catch (error) { next(error); } };
 export const getInclusions = async (req, res, next) => { try { res.json((await service.getTrip(req.params.id)).inclusions); } catch (error) { next(error); } };
+export const getOperationsCalendar = async (req, res, next) => { try { res.json(await service.getOperationsCalendar(req.params.id, req.query.slotId)); } catch (error) { next(error); } };
 
 export const getDay = async (req, res, next) => { try { res.json(await service.getItineraryDay(req.params.id)); } catch (error) { next(error); } };
 export const createDay = async (req, res, next) => { try { res.status(201).json(await service.createItineraryDay(req.params.tripId, req.body)); } catch (error) { next(error); } };

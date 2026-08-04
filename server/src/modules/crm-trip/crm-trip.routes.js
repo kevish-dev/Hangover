@@ -19,6 +19,7 @@ router.patch("/:id", validate(updateCrmTripSchema), controller.updateTrip);
 router.delete("/:id", controller.deleteTrip);
 router.get("/:id/itinerary", controller.getItinerary);
 router.get("/:id/inclusions", controller.getInclusions);
+router.get("/:id/operations", controller.getOperationsCalendar);
 router.post("/:id/regenerate-inclusions", controller.regenerateInclusions);
 router.get("/:id/bookings", bookingController.list);
 router.post("/:id/bookings", bookingController.create);

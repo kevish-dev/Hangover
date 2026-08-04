@@ -17,6 +17,8 @@ export const CRM_TRIP_INCLUDE = {
   commonInclusions: { orderBy: { key: "asc" } },
   packages: { orderBy: { createdAt: "asc" } },
   addOns: { orderBy: { createdAt: "asc" } },
+  slots: { orderBy: { startDate: "asc" }, include: { _count: { select: { bookings: true } } } },
+  websiteTags: true,
 };
 
 export const findMany = async ({ skip, take, where }) => {
@@ -26,7 +28,7 @@ export const findMany = async ({ skip, take, where }) => {
       skip,
       take,
       orderBy: { createdAt: "desc" },
-      include: { destination: true, _count: { select: { itineraryDays: true, inclusions: true } } },
+      include: { destination: true, _count: { select: { itineraryDays: true, inclusions: true, bookings: true } } },
     }),
     prisma.crmTrip.count({ where }),
   ]);

@@ -21,7 +21,7 @@ async function scanAndNotify() {
   // Fetch tasks that are not yet DONE / CANCELLED and have a dueAt set
   const urgentTasks = await prisma.operationalTask.findMany({
     where: {
-      status: { in: ["PENDING", "IN_PROGRESS"] },
+      status: { in: ["PENDING", "IN_PROGRESS", "BLOCKED"] },
       dueAt: { not: null },
     },
     include: {
@@ -33,6 +33,7 @@ async function scanAndNotify() {
               festival: { include: { circuit: true } },
             },
           },
+          crmTrip: { select: { operationsReminderDays: true } },
         },
       },
     },
@@ -56,7 +57,7 @@ async function scanAndNotify() {
     const circuit =
       task.booking?.slot?.trip?.circuit ??
       task.booking?.slot?.festival?.circuit;
-    const reminderDays = circuit?.operationsReminderDays ?? 3;
+    const reminderDays = task.booking?.crmTrip?.operationsReminderDays ?? circuit?.operationsReminderDays ?? 3;
 
     if (daysTillDue > reminderDays) continue; // still comfortable — skip
 

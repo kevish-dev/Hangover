@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { prisma } from "../../prisma/client.js";
 import { createHostedPaymentLink } from "../../core/services/razorpay.service.js";
 import { NotFoundError, ValidationError } from "../../core/errors/errors.js";
+import { generateCrmBookingOperations } from "../operations/operations.service.js";
 
 const round = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 const getReference = async () => {
@@ -178,20 +179,38 @@ const createInstallment = async ({ booking, trip, data, adminId, isInitial = fal
 
 export const createCrmBooking = async (crmTripId, data, adminId) => {
   if (!data.email?.trim() || !data.fullName?.trim()) throw new ValidationError("Customer name and email are required");
+  if (!data.crmTripSlotId) throw new ValidationError("Choose a departure slot for this booking");
   const trip = await getTripWithPricing(crmTripId);
+  const crmTripSlot = await prisma.crmTripSlot.findFirst({
+    where: { id: data.crmTripSlotId, crmTripId, startDate: { not: null }, endDate: { not: null } },
+  });
+  if (!crmTripSlot) throw new ValidationError("Choose a valid dated departure slot for this CRM trip");
+  const travelers = Number(data.numberOfTravelers) || 1;
+  if (crmTripSlot.filledSpots + travelers > crmTripSlot.capacity) {
+    throw new ValidationError("This departure does not have enough remaining capacity");
+  }
   const user = await ensureUser(data);
   const bookingReference = await getReference();
-  const booking = await prisma.booking.create({
-    data: {
-      id: bookingReference, bookingReference, userId: user.id, crmTripId, source: "CRM",
-      numberOfTravelers: Number(data.numberOfTravelers) || 1,
-      totalAmount: trip.totalAmount, tokenAmount: trip.tokenAmount, amountPaid: 0, amountDue: trip.totalAmount,
-      initialPaymentType: "TOKEN", status: "PENDING", paymentStatus: "PENDING",
-      specialRequests: data.specialRequests?.trim() || null,
-      travelers: { create: travelerData(data.additionalTravelers) },
-    },
-    include: { user: { include: { profile: true } } },
+  const booking = await prisma.$transaction(async (tx) => {
+    const currentSlot = await tx.crmTripSlot.findUnique({ where: { id: crmTripSlot.id } });
+    if (!currentSlot || currentSlot.filledSpots + travelers > currentSlot.capacity) {
+      throw new ValidationError("This departure no longer has enough remaining capacity");
+    }
+    const created = await tx.booking.create({
+      data: {
+        id: bookingReference, bookingReference, userId: user.id, crmTripId, crmTripSlotId: crmTripSlot.id, source: "CRM",
+        numberOfTravelers: travelers,
+        totalAmount: trip.totalAmount, tokenAmount: trip.tokenAmount, amountPaid: 0, amountDue: trip.totalAmount,
+        initialPaymentType: "TOKEN", status: "PENDING", paymentStatus: "PENDING",
+        specialRequests: data.specialRequests?.trim() || null,
+        travelers: { create: travelerData(data.additionalTravelers) },
+      },
+      include: { user: { include: { profile: true } } },
+    });
+    await tx.crmTripSlot.update({ where: { id: crmTripSlot.id }, data: { filledSpots: { increment: travelers } } });
+    return created;
   });
+  await generateCrmBookingOperations(booking, crmTripSlot);
   return createInstallment({ booking, trip, data, adminId, isInitial: true });
 };
 
@@ -230,6 +249,6 @@ export const captureHostedCrmPayment = async ({ paymentLinkId, razorpayPayment }
 
 export const listCrmBookings = (crmTripId) => prisma.booking.findMany({
   where: { crmTripId, source: "CRM" },
-  include: { user: { include: { profile: true } }, payments: { orderBy: { createdAt: "desc" } }, travelers: true },
+  include: { crmTripSlot: true, user: { include: { profile: true } }, payments: { orderBy: { createdAt: "desc" } }, travelers: true },
   orderBy: { createdAt: "desc" },
 });
