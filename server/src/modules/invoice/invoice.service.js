@@ -16,7 +16,8 @@ export const createInvoice = async (data) => {
       amount,
       currency: currency || "INR",
       dueDate: dueDate ? new Date(dueDate) : null,
-      status: "PAID",
+      status: "DRAFT",
+      source: "CUSTOM",
     },
   });
 
@@ -32,17 +33,23 @@ export const createInvoice = async (data) => {
       currency: currency || "INR",
       dueDate: dueDate ? new Date(dueDate) : null,
     });
+    return await prisma.customInvoice.update({
+      where: { id: invoice.id },
+      data: { status: "PAID", sentAt: new Date() },
+    });
   } catch (error) {
     console.error("Failed to send custom invoice email:", error);
-    // Optionally update status to DRAFT or FAILED if email fails, but we'll leave it as SENT or let admin manage it
+    throw new AppError(
+      "Receipt was saved as a draft because its email could not be delivered",
+      502,
+      "INVOICE_EMAIL_FAILED",
+    );
   }
-
-  return invoice;
 };
 
 export const getInvoices = async () => {
   return await prisma.customInvoice.findMany({
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ sentAt: "desc" }, { createdAt: "desc" }],
   });
 };
 

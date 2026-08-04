@@ -52,6 +52,7 @@ import { formatTripType } from "../../../lib/tripApi";
 import { paymentApi } from "../../../lib/paymentApi";
 import { showErrorToast } from "../../../lib/errors";
 import CreateBookingModal from "../../components/admin/CreateBookingModal";
+import { OperationsCalendar } from "../../components/admin/operations/OperationsCalendar";
 
 // ─── Shared helpers ───────────────────────────────────────────────
 const money = (v: unknown) =>
@@ -502,6 +503,8 @@ function OperationsTab({ tripId }: { tripId: string }) {
       </div>
     );
 
+  return <div className="space-y-4"><div className="grid grid-cols-2 gap-3 md:grid-cols-4">{[{ label: "Open tasks", value: openTasks.length }, { label: "Overdue", value: overdue.length }, { label: "Total tasks", value: tasks.length }, { label: "Spent", value: money(totalSpend) }].map((item) => <div key={item.label} className="rounded-xl border border-gray-200 bg-white p-4"><p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{item.label}</p><p className="mt-1 text-xl font-bold text-gray-900">{item.value}</p></div>)}</div><OperationsCalendar tasks={filtered} emptyMessage="No dated trip operations match the current filters." /></div>;
+
   return (
     <div className="space-y-4">
       {/* Stats */}
@@ -574,7 +577,7 @@ function OperationsTab({ tripId }: { tripId: string }) {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map((task: any) => (
-                <tr key={task.id} className="group hover:bg-blue-50/20 transition-colors">
+                <tr key={task.id} className={`group transition-colors ${task.status === "DONE" ? "bg-gray-50/80 text-gray-400 hover:bg-gray-100" : "hover:bg-blue-50/20"}`}>
                   <td className="border-r border-gray-200 p-0">
                     <div className="w-full min-h-10 px-3 flex items-center text-xs font-mono font-bold text-[#781216]">
                       {task.booking?.bookingReference}
@@ -610,7 +613,7 @@ function OperationsTab({ tripId }: { tripId: string }) {
                   <td className="border-r border-gray-200 p-0">
                     <input type="text" defaultValue={task.title}
                       onBlur={(e) => handleCellChange(task, "title", e.target.value)}
-                      className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 font-medium text-gray-900" />
+                      className={`w-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 font-medium ${task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"}`} />
                   </td>
                   <td className="border-r border-gray-200 p-0">
                     <input type="date" defaultValue={task.dueAt ? format(new Date(task.dueAt), "yyyy-MM-dd") : ""}

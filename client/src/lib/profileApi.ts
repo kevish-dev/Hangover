@@ -33,7 +33,7 @@ export interface ApiBooking {
   packageId: string | null;
   slotId: string | null;
   customTripId: string | null;
-  source: "CATALOG" | "CUSTOM";
+  source: "CATALOG" | "CUSTOM" | "CRM";
   status: BookingStatus;
   paymentStatus: PaymentStatus;
   numberOfTravelers: number;
@@ -53,6 +53,14 @@ export interface ApiBooking {
   updatedAt: string;
   trip?: ApiTrip;
   festival?: any; // Add festival type when available
+  crmTrip?: {
+    id: string;
+    name: string;
+    numberOfNights: number;
+    websiteBannerImages?: string[];
+    destination?: { name?: string | null } | null;
+  } | null;
+  crmTripSlot?: { startDate?: string | null; endDate?: string | null; title?: string | null } | null;
   customTrip?: {
     id: string; reference: string; title: string; bannerImages: string[];
     startDate: string; endDate: string; durationDays: number;

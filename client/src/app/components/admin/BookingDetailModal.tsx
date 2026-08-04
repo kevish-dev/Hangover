@@ -43,6 +43,7 @@ import { Textarea } from "../ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { SyncIndicator } from "../ui/sync-indicator";
 import { BookingAddOnsTab } from "./BookingAddOnsTab";
+import { OperationsCalendar } from "./operations/OperationsCalendar";
 
 // ─── Shared helpers ───────────────────────────────────────────────
 const money = (v: unknown) =>
@@ -568,6 +569,7 @@ function OperationsTab({
     "GUIDE",
     "PERMIT",
   ];
+  return <OperationsCalendar tasks={tasks} emptyMessage="No dated operations for this booking." />;
   return (
     <div className="space-y-4">
       {/* Summary pills */}

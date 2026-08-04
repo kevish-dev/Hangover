@@ -1,10 +1,11 @@
 import crypto from "crypto";
 import { prisma } from "../../prisma/client.js";
-import { createHostedPaymentLink } from "../../core/services/razorpay.service.js";
+import env from "../../core/env/env.js";
 import { NotFoundError, ValidationError } from "../../core/errors/errors.js";
 import { generateCrmBookingOperations } from "../operations/operations.service.js";
 
 const round = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+const paymentPageUrl = (bookingId) => `${env.ORIGIN.replace(/\/$/, "")}/bookings/${bookingId}/pay-balance`;
 const getReference = async () => {
   const rows = await prisma.$queryRaw`SELECT nextval('"BookingReferenceSequence"') AS "sequence"`;
   return `H${String(Number(rows[0].sequence)).padStart(4, "0")}`;
@@ -16,6 +17,7 @@ const profileFields = (data) => ({
   gender: ["MALE", "FEMALE", "OTHER", "PREFER_NOT_TO_SAY"].includes(data.gender) ? data.gender : undefined,
   dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
   govtIdAssetId: data.govtIdAssetId || undefined,
+  govtIdType: data.govtIdAssetId ? "AADHAAR" : undefined,
 });
 
 const ensureUser = async (data) => {
@@ -53,6 +55,7 @@ const travelerData = (travelers = []) => travelers
 const getTripWithPricing = async (crmTripId) => {
   const trip = await prisma.crmTrip.findUnique({ where: { id: crmTripId } });
   if (!trip) throw new NotFoundError("CRM trip not found");
+  if (!trip.isActive) throw new ValidationError("This CRM trip is not accepting bookings");
   if (trip.totalAmount == null || trip.tokenAmount == null) {
     throw new ValidationError("Set the CRM trip total and token amounts before creating bookings");
   }
@@ -77,6 +80,7 @@ const emailReceipt = async ({ booking, payment, trip }) => {
     paymentType: payment.type,
     paymentMethod: payment.paymentMethod,
     paymentId: payment.razorpayPaymentId || payment.razorpayOrderId,
+    invoicePaymentId: payment.id,
     receiptNumber: payment.receiptNumber || payment.receiptNumberInt,
     paidAt: payment.paidAt,
     travelersCount: booking.numberOfTravelers,
@@ -96,6 +100,7 @@ const emailPaymentRequest = async ({ booking, trip, payment, paymentLink }) => {
     balanceAmount: booking.amountDue,
     paymentRequestAmount: payment.amount,
     isInstallmentRequest: true,
+    isWebsitePaymentLink: true,
     paymentLink,
     travelersCount: booking.numberOfTravelers,
     itemLocation: trip.destinationId,
@@ -109,14 +114,10 @@ const createInstallment = async ({ booking, trip, data, adminId, isInitial = fal
     throw new ValidationError(`Installment amount must be between ₹0.01 and ₹${dueBefore.toFixed(2)}`);
   }
   if (!["MANUAL", "SEND_LINK"].includes(data.paymentAction)) {
-    throw new ValidationError("Choose manual collection or Send Razorpay link");
+    throw new ValidationError("Choose manual collection or send the website payment link");
   }
-  const activeHostedLink = await prisma.payment.findFirst({
-    where: { bookingId: booking.id, status: { in: ["CREATED", "PENDING"] } },
-    select: { amount: true },
-  });
-  if (activeHostedLink) {
-    throw new ValidationError(`A Razorpay payment link for ₹${Number(activeHostedLink.amount).toFixed(2)} is still awaiting payment. Wait for it to be paid before recording another installment.`);
+  if (!isInitial && data.paymentAction === "SEND_LINK" && amount !== dueBefore) {
+    throw new ValidationError(`The website payment page collects the full outstanding balance of ₹${dueBefore.toFixed(2)}. Use manual collection for a partial installment.`);
   }
 
   const type = isInitial ? paymentTypeFor(amount, dueBefore) : "BALANCE";
@@ -143,7 +144,7 @@ const createInstallment = async ({ booking, trip, data, adminId, isInitial = fal
           amountPaid: newPaid,
           amountDue: newDue,
           paymentStatus: newDue === 0 ? "PAID" : "PARTIALLY_PAID",
-          status: newDue === 0 ? "CONFIRMED" : "PENDING",
+          status: newDue === 0 ? "CONFIRMED" : "RESERVED",
           confirmedAt: newDue === 0 ? new Date() : undefined,
         },
         include: { user: { include: { profile: true } } },
@@ -161,31 +162,38 @@ const createInstallment = async ({ booking, trip, data, adminId, isInitial = fal
     return { ...result, paymentLink: null };
   }
 
-  const link = await createHostedPaymentLink({
-    amountPaise: Math.round(amount * 100),
-    referenceId: `${booking.bookingReference}-${crypto.randomUUID().slice(0, 8)}`,
-    customer: { name: booking.user.profile?.fullName || data.fullName, email: booking.user.email, phone: booking.user.profile?.phone || data.phone },
-    notes: { bookingId: booking.id, crmTripId: trip.id },
-  });
-  const payment = await prisma.payment.create({
-    data: {
-      bookingId: booking.id, type, status: "CREATED", amount, razorpayOrderId: link.id,
-      idempotencyKey: `crm_link_${link.id}`, notes: { paymentLink: link.short_url, crm: true, adminId },
-    },
-  });
-  await emailPaymentRequest({ booking, trip, payment, paymentLink: link.short_url }).catch(console.error);
-  return { booking, payment, paymentLink: link.short_url };
+  const paymentLink = paymentPageUrl(booking.id);
+  await emailPaymentRequest({ booking, trip, payment: { amount }, paymentLink }).catch(console.error);
+  return { booking, payment: null, paymentLink };
 };
 
 export const createCrmBooking = async (crmTripId, data, adminId) => {
   if (!data.email?.trim() || !data.fullName?.trim()) throw new ValidationError("Customer name and email are required");
+  if (!data.phone?.trim() || !data.gender || !data.dateOfBirth || !data.govtIdAssetId) {
+    throw new ValidationError("Lead traveler phone, gender, date of birth, and Aadhaar card are required");
+  }
   if (!data.crmTripSlotId) throw new ValidationError("Choose a departure slot for this booking");
   const trip = await getTripWithPricing(crmTripId);
+  const initialPaymentAmount = round(data.paymentAmount);
+  if (!Number.isFinite(initialPaymentAmount) || initialPaymentAmount <= 0 || initialPaymentAmount > Number(trip.totalAmount)) {
+    throw new ValidationError(`Initial payment must be between ₹0.01 and ₹${Number(trip.totalAmount).toFixed(2)}`);
+  }
+  if (!["MANUAL", "SEND_LINK"].includes(data.paymentAction)) {
+    throw new ValidationError("Choose manual collection or send the website payment link");
+  }
+  const initialPaymentType = paymentTypeFor(initialPaymentAmount, Number(trip.totalAmount));
   const crmTripSlot = await prisma.crmTripSlot.findFirst({
     where: { id: data.crmTripSlotId, crmTripId, startDate: { not: null }, endDate: { not: null } },
   });
   if (!crmTripSlot) throw new ValidationError("Choose a valid dated departure slot for this CRM trip");
   const travelers = Number(data.numberOfTravelers) || 1;
+  const additionalTravelers = travelerData(data.additionalTravelers);
+  if (additionalTravelers.length !== travelers - 1) {
+    throw new ValidationError("Enter details for every additional traveler");
+  }
+  if (additionalTravelers.some((traveler) => !traveler.email || !traveler.phone || !traveler.gender || !traveler.dateOfBirth || (!traveler.aadhaar && !traveler.aadhaarAssetId))) {
+    throw new ValidationError("Each additional traveler needs email, phone, gender, date of birth, and Aadhaar card");
+  }
   if (crmTripSlot.filledSpots + travelers > crmTripSlot.capacity) {
     throw new ValidationError("This departure does not have enough remaining capacity");
   }
@@ -200,10 +208,10 @@ export const createCrmBooking = async (crmTripId, data, adminId) => {
       data: {
         id: bookingReference, bookingReference, userId: user.id, crmTripId, crmTripSlotId: crmTripSlot.id, source: "CRM",
         numberOfTravelers: travelers,
-        totalAmount: trip.totalAmount, tokenAmount: trip.tokenAmount, amountPaid: 0, amountDue: trip.totalAmount,
-        initialPaymentType: "TOKEN", status: "PENDING", paymentStatus: "PENDING",
+        totalAmount: trip.totalAmount, tokenAmount: initialPaymentType === "FULL" ? trip.totalAmount : initialPaymentAmount, amountPaid: 0, amountDue: trip.totalAmount,
+        initialPaymentType, status: "PENDING", paymentStatus: "PENDING",
         specialRequests: data.specialRequests?.trim() || null,
-        travelers: { create: travelerData(data.additionalTravelers) },
+        travelers: { create: additionalTravelers },
       },
       include: { user: { include: { profile: true } } },
     });

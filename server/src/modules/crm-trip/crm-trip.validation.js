@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const nullableId = z.string().uuid().nullable();
+const tripTypeSchema = z.enum(["MOUNTAIN_TREK", "BEACH_ESCAPE", "DESERT_EXPEDITION", "JUNGLE_WILDLIFE", "HERITAGE_WALK", "ROAD_TRIP", "BACKPACKING_TOUR", "PHOTOGRAPHY_TOUR", "BONFIRE_RETREAT", "INSTITUTE_COLLEGE_TRIP", "CUSTOM_TRIP"]);
 const packageSchema = z.object({ title: z.string().trim().min(1).max(200), price: z.number().min(0), tokenAmount: z.number().min(0) }).refine((item) => item.tokenAmount <= item.price, { message: "Package token cannot exceed its price", path: ["tokenAmount"] });
 const addOnSchema = z.object({
   title: z.string().trim().min(1).max(200),
@@ -44,6 +45,12 @@ const crmTripFields = z.object({
   destinationId: z.string().uuid(),
   airportPickupEnabled: z.boolean().default(false),
   airportDropEnabled: z.boolean().default(false),
+  tripType: tripTypeSchema.nullable().optional(),
+  bestTimeToVisit: z.string().trim().max(300).nullable().optional(),
+  isActive: z.boolean().default(true),
+  isFeatured: z.boolean().default(false),
+  isPublished: z.boolean().default(false),
+  isListed: z.boolean().default(true),
   operationsReminderDays: z.number().int().min(0).max(365).default(3),
   packages: z.array(packageSchema).max(30).default([]),
   addOns: z.array(addOnSchema).max(50).default([]),
@@ -61,7 +68,38 @@ const crmTripFields = z.object({
 
 export const createCrmTripSchema = crmTripFields.refine((data) => data.tokenAmount <= data.totalAmount, { message: "Token amount cannot exceed the total amount", path: ["tokenAmount"] });
 
-export const updateCrmTripSchema = crmTripFields.partial().refine(
+// Do not derive this from `crmTripFields.partial()`: Zod still evaluates the
+// defaults in the create schema for omitted fields. A patch such as
+// `{ airportPickupEnabled: true }` would otherwise also reset drop-off and
+// other defaulted fields.
+export const updateCrmTripSchema = z.object({
+  name: z.string().trim().min(1).max(300).optional(),
+  numberOfNights: z.number().int().min(0).max(365).optional(),
+  totalAmount: z.number().positive().optional(),
+  tokenAmount: z.number().min(0).optional(),
+  destinationId: z.string().uuid().optional(),
+  airportPickupEnabled: z.boolean().optional(),
+  airportDropEnabled: z.boolean().optional(),
+  tripType: tripTypeSchema.nullable().optional(),
+  bestTimeToVisit: z.string().trim().max(300).nullable().optional(),
+  isActive: z.boolean().optional(),
+  isFeatured: z.boolean().optional(),
+  isPublished: z.boolean().optional(),
+  isListed: z.boolean().optional(),
+  operationsReminderDays: z.number().int().min(0).max(365).optional(),
+  packages: z.array(packageSchema).max(30).optional(),
+  addOns: z.array(addOnSchema).max(50).optional(),
+  days: z.array(setupDaySchema).max(366).optional(),
+  manualInclusions: z.array(z.object({ title: z.string().trim().min(1).max(300), description: z.string().trim().max(2000).nullable().optional() })).max(100).optional(),
+  exclusions: z.array(z.string().trim().min(1).max(300)).max(100).optional(),
+  slots: z.array(slotSchema).min(1, "At least one dated departure slot is required").max(100).optional(),
+  websiteOverview: z.string().trim().max(20000).nullable().optional(),
+  websiteFaqs: z.array(z.object({ question: z.string().trim().min(1).max(500), answer: z.string().trim().min(1).max(5000) })).max(100).optional(),
+  websiteTagIds: z.array(z.string().uuid()).max(50).optional(),
+  websiteBannerImages: z.array(z.string().url()).max(20).optional(),
+  websiteStayTransportImages: z.array(z.string().url()).max(20).optional(),
+  websiteHighlights: z.array(z.string().trim().min(1).max(500)).max(50).optional(),
+}).refine(
   (data) => data.tokenAmount === undefined || data.totalAmount === undefined || data.tokenAmount <= data.totalAmount,
   { message: "Token amount cannot exceed the total amount", path: ["tokenAmount"] },
 );

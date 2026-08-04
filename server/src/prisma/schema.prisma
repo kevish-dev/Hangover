@@ -486,6 +486,12 @@ model CrmTrip {
   destination                CrmDestination           @relation(fields: [destinationId], references: [id], onDelete: Restrict)
   airportPickupEnabled       Boolean                  @default(false)
   airportDropEnabled         Boolean                  @default(false)
+  tripType                   TripType?
+  bestTimeToVisit            String?
+  isActive                   Boolean                  @default(true)
+  isFeatured                 Boolean                  @default(false)
+  isPublished                Boolean                  @default(false)
+  isListed                   Boolean                  @default(true)
   operationsReminderDays     Int                      @default(3)
   exclusions                 String[]                 @default([])
   websiteOverview            String?
@@ -505,6 +511,10 @@ model CrmTrip {
   slots                      CrmTripSlot[]
 
   @@index([destinationId])
+  @@index([isActive])
+  @@index([isFeatured])
+  @@index([isPublished])
+  @@index([isListed])
   @@index([createdAt])
 }
 
@@ -1359,10 +1369,16 @@ model CustomInvoice {
   currency      String        @default("INR")
   dueDate       DateTime?
   status        InvoiceStatus @default(SENT)
+  source        InvoiceSource @default(CUSTOM)
+  bookingId     String?
+  paymentId     String?       @unique
+  sentAt        DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   @@index([status])
+  @@index([source])
+  @@index([bookingId])
   @@index([customerEmail])
 }
 
@@ -1371,6 +1387,11 @@ enum InvoiceStatus {
   SENT
   PAID
   CANCELLED
+}
+
+enum InvoiceSource {
+  CUSTOM
+  BOOKING_RECEIPT
 }
 
 enum CrmInclusionType {

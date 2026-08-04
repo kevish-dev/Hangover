@@ -26,6 +26,21 @@ export const createUser = async (userData) => {
   });
 };
 
+export const linkGoogleAccount = async (userId, googleId, fullName) => {
+  return prisma.user.update({
+    where: { id: userId },
+    data: {
+      googleId,
+      profile: {
+        upsert: {
+          update: {},
+          create: { fullName: fullName || null },
+        },
+      },
+    },
+  });
+};
+
 export const updateLastLogin = async (userId) => {
   return prisma.user.update({
     where: { id: userId },

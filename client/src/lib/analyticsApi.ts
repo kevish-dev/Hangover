@@ -7,6 +7,7 @@ export interface AnalyticsData {
   cashflow: Array<{ name: string; amount: number }>;
   travelers: Array<{ name: string; new: number; returning: number }>;
   ratings: Array<{ name: string; rating: number }>;
+  crm: { revenue: number; cost: number; net: number; bookings: number; travelers: number };
 }
 
 export const useAnalytics = (timeframe: string) => {

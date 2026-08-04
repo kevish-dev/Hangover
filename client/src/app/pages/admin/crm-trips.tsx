@@ -1,7 +1,10 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   CalendarDays,
+  ArrowDown,
+  ArrowUp,
+  Copy,
   ChevronRight,
   ImagePlus,
   Loader2,
@@ -40,23 +43,37 @@ type CrmTrip = {
   destination: Destination;
   airportPickupEnabled: boolean;
   airportDropEnabled: boolean;
+  tripType?: string | null;
+  bestTimeToVisit?: string | null;
+  isActive: boolean;
+  isFeatured: boolean;
+  isPublished: boolean;
+  isListed: boolean;
   _count?: { itineraryDays: number; inclusions: number; bookings?: number };
 };
 type CrmTripDetail = CrmTrip & {
   totalAmount: string | number;
   tokenAmount: string | number;
-  packages: Array<{ title: string; price: string | number; tokenAmount: string | number }>;
-  addOns: Array<{ title: string; description?: string | null; imageUrl?: string | null; price: string | number; maxQuantityPerBooking?: number | null; maxQuantityPerSlot?: number | null; purchaseCutoffOffsetDays?: number | null; isActive: boolean }>;
+  packages: Array<{ id: string; title: string; price: string | number; tokenAmount: string | number }>;
+  addOns: Array<{ id: string; title: string; description?: string | null; imageUrl?: string | null; price: string | number; maxQuantityPerBooking?: number | null; maxQuantityPerSlot?: number | null; purchaseCutoffOffsetDays?: number | null; isActive: boolean }>;
   itineraryDays: Array<{ stayLocationId?: string | null; propertyId?: string | null; visitingPlaces: Array<{ placeId?: string; place: { id: string } }>; breakfast: boolean; lunch: boolean; dinner: boolean; transportEnabled?: boolean; transportText?: string | null; notes?: string | null; isDropOff: boolean; dropOffLocationId?: string | null; activities: Array<{ name: string }>; commonInclusions: Array<{ key: DayCommonInclusionKey }> }>;
   operationsReminderDays?: number;
+  websiteOverview?: string | null;
+  websiteFaqs?: Array<{ question: string; answer: string }>;
+  websiteTags?: Array<{ id: string }>;
+  websiteBannerImages?: string[];
+  websiteStayTransportImages?: string[];
+  websiteHighlights?: string[];
   slots?: Array<{ id: string; startDate: string; endDate: string; capacity: number; title?: string | null; priority: number; filledSpots?: number; _count?: { bookings: number } }>;
 };
 type PricingPackageDraft = {
+  id?: string;
   title: string;
   price: string;
   tokenAmount: string;
 };
 type AddOnDraft = {
+  id?: string;
   title: string;
   description: string;
   imageUrl: string;
@@ -88,6 +105,11 @@ const emptyItineraryDay = (): ItineraryDayDraft => ({
   stayLocationId: "", propertyId: "", placeIds: [], breakfast: false, lunch: false,
   dinner: false, transportEnabled: false, transportText: "", notes: "", isDropOff: false, dropOffLocationId: "", activities: [], commonInclusions: [],
 });
+
+const TRIP_TYPES = [
+  "MOUNTAIN_TREK", "BEACH_ESCAPE", "DESERT_EXPEDITION", "JUNGLE_WILDLIFE", "HERITAGE_WALK",
+  "ROAD_TRIP", "BACKPACKING_TOUR", "PHOTOGRAPHY_TOUR", "BONFIRE_RETREAT", "INSTITUTE_COLLEGE_TRIP", "CUSTOM_TRIP",
+];
 
 type InclusionDraft = {
   title: string;
@@ -204,6 +226,7 @@ export default function CrmTripsPage() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [editingTrip, setEditingTrip] = useState<CrmTripDetail | null>(null);
+  const [forkingTrip, setForkingTrip] = useState<CrmTripDetail | null>(null);
   const [menuTrip, setMenuTrip] = useState<string | null>(null);
   const [deleteTrip, setDeleteTrip] = useState<CrmTrip | null>(null);
   const [bookingsTrip, setBookingsTrip] = useState<CrmTrip | null>(null);
@@ -235,10 +258,21 @@ export default function CrmTripsPage() {
   const edit = async (tripId: string) => {
     try {
       const { data } = await apiClient.get(`/crm-trips/${tripId}`);
+      setForkingTrip(null);
       setEditingTrip(data);
       setOpen(true);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || "Could not load this trip for editing");
+    }
+  };
+  const fork = async (tripId: string) => {
+    try {
+      const { data } = await apiClient.get(`/crm-trips/${tripId}`);
+      setEditingTrip(null);
+      setForkingTrip(data);
+      setOpen(true);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Could not load this trip to fork");
     }
   };
 
@@ -270,7 +304,7 @@ export default function CrmTripsPage() {
           </p>
         </div>
         <Button
-          onClick={() => { setEditingTrip(null); setOpen(true); }}
+          onClick={() => { setEditingTrip(null); setForkingTrip(null); setOpen(true); }}
           className="bg-[#781216] text-white hover:bg-[#5f0e11]"
         >
           <Plus className="mr-2 h-4 w-4" />
@@ -344,6 +378,7 @@ export default function CrmTripsPage() {
                   {trip._count?.itineraryDays || trip.numberOfNights + 1} days
                 </span>
                 <span>{trip._count?.inclusions || 0} inclusions</span>
+                <Button type="button" variant="outline" size="sm" onClick={() => fork(trip.id)} className="h-7 gap-1.5 px-2 text-xs text-gray-700 hover:text-[#781216]"><Copy className="h-3.5 w-3.5" />Fork</Button>
                 <button type="button" onClick={() => navigate(`/dashboard/crm-trips/${trip.id}`)} className="ml-auto font-medium text-[#781216] hover:underline">Open trip <ChevronRight className="inline h-3.5 w-3.5" /></button>
               </div>
             </article>
@@ -351,7 +386,7 @@ export default function CrmTripsPage() {
           {!trips.length && (
             <button
               type="button"
-              onClick={() => { setEditingTrip(null); setOpen(true); }}
+              onClick={() => { setEditingTrip(null); setForkingTrip(null); setOpen(true); }}
               className="col-span-full rounded-xl border-2 border-dashed border-gray-200 bg-white py-16 text-center text-gray-500 hover:border-[#b59410] hover:text-[#781216]"
             >
               <Plus className="mx-auto mb-3 h-6 w-6" />
@@ -362,12 +397,14 @@ export default function CrmTripsPage() {
       )}
       <CreateTripDialog
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={(nextOpen) => { setOpen(nextOpen); if (!nextOpen) { setEditingTrip(null); setForkingTrip(null); } }}
         trip={editingTrip}
+        forkSource={forkingTrip}
         destinations={destinationsQuery.data || []}
         onCreated={() => {
           queryClient.invalidateQueries({ queryKey: ["crm-trips"] });
           setEditingTrip(null);
+          setForkingTrip(null);
         }}
       />
       <Dialog
@@ -429,15 +466,20 @@ function CreateTripDialog({
   open,
   onOpenChange,
   trip,
+  forkSource,
   destinations,
   onCreated,
 }: {
   open: boolean;
   onOpenChange: (value: boolean) => void;
   trip: CrmTripDetail | null;
+  forkSource: CrmTripDetail | null;
   destinations: Destination[];
   onCreated: () => void;
 }) {
+  const sourceTrip = trip || forkSource;
+  const isFork = Boolean(forkSource);
+  const hasLockedPricing = Boolean(trip && sourceTrip?.slots?.some((slot) => (slot._count?.bookings || 0) > 0));
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
   const [nights, setNights] = useState("1");
@@ -450,6 +492,12 @@ function CreateTripDialog({
   const [addOns, setAddOns] = useState<AddOnDraft[]>([]);
   const [pickup, setPickup] = useState(false);
   const [drop, setDrop] = useState(false);
+  const [tripType, setTripType] = useState("");
+  const [bestTimeToVisit, setBestTimeToVisit] = useState("");
+  const [isPublished, setIsPublished] = useState(false);
+  const [isFeatured, setIsFeatured] = useState(false);
+  const [isListed, setIsListed] = useState(true);
+  const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pricingError, setPricingError] = useState("");
   const [uploadingAddOnIndex, setUploadingAddOnIndex] = useState<number | null>(null);
@@ -481,6 +529,9 @@ function CreateTripDialog({
   const [websiteBannerImages, setWebsiteBannerImages] = useState<string[]>([]);
   const [websiteStayTransportImages, setWebsiteStayTransportImages] = useState<string[]>([]);
   const [websiteHighlights, setWebsiteHighlights] = useState<string[]>([]);
+  const [hasLocalDraft, setHasLocalDraft] = useState(false);
+  const formScrollRef = useRef<HTMLDivElement>(null);
+  const draftKey = `crm-trip-draft:${trip?.id || (forkSource ? `fork:${forkSource.id}` : "new")}`;
   const placesQuery = useQuery({ queryKey: ["crm", "places", "create"], queryFn: async () => (await apiClient.get("/places", { params: { activeOnly: true, limit: 500 } })).data.data as Master[], enabled: Boolean(destinationId) });
   const staysQuery = useQuery({ queryKey: ["crm", "stays", "create", destinationId], queryFn: async () => (await apiClient.get("/stay-locations", { params: { destinationId, activeOnly: true, limit: 200 } })).data.data as Master[], enabled: Boolean(destinationId) });
   const propertiesQuery = useQuery({ queryKey: ["crm", "properties", "create"], queryFn: async () => (await apiClient.get("/properties", { params: { activeOnly: true, limit: 500 } })).data.data as Master[], enabled: Boolean(destinationId) });
@@ -498,6 +549,12 @@ function CreateTripDialog({
     setUploadingAddOnIndex(null);
     setPickup(false);
     setDrop(false);
+    setTripType("");
+    setBestTimeToVisit("");
+    setIsPublished(false);
+    setIsFeatured(false);
+    setIsListed(true);
+    setIsActive(true);
     setPricingError("");
     setCustomInclusions([]);
     setCustomExclusions([]);
@@ -511,18 +568,44 @@ function CreateTripDialog({
     setWebsiteHighlights([]);
   };
 
+  const saveLocalDraft = () => {
+    try {
+      window.localStorage.setItem(draftKey, JSON.stringify({ step, name, nights, destinationId, itineraryDays, itineraryDayIndex, packages, addOns, pickup, drop, tripType, bestTimeToVisit, isPublished, isFeatured, isListed, isActive, customInclusions, customExclusions, websiteOverview, websiteFaqs, websiteTagIds, slots, operationsReminderDays, websiteBannerImages, websiteStayTransportImages, websiteHighlights }));
+      setHasLocalDraft(true);
+      toast.success("Draft saved on this device");
+    } catch { toast.error("Could not save this draft locally"); }
+  };
+
+  const restoreLocalDraft = () => {
+    try {
+      const raw = window.localStorage.getItem(draftKey);
+      if (!raw) return toast.error("No local draft was found");
+      const draft = JSON.parse(raw);
+      setStep(Math.min(8, Math.max(1, Number(draft.step) || 1)));
+      setName(draft.name || ""); setNights(draft.nights || "1"); setDestinationId(draft.destinationId || "");
+      setItineraryDays(Array.isArray(draft.itineraryDays) ? draft.itineraryDays : []); setItineraryDayIndex(Number(draft.itineraryDayIndex) || 0);
+      setPackages(Array.isArray(draft.packages) && draft.packages.length ? draft.packages : [{ title: "Standard", price: "", tokenAmount: "" }]); setAddOns(Array.isArray(draft.addOns) ? draft.addOns : []);
+      setPickup(Boolean(draft.pickup)); setDrop(Boolean(draft.drop)); setTripType(draft.tripType || ""); setBestTimeToVisit(draft.bestTimeToVisit || ""); setIsPublished(Boolean(draft.isPublished)); setIsFeatured(Boolean(draft.isFeatured)); setIsListed(draft.isListed ?? true); setIsActive(draft.isActive ?? true); setCustomInclusions(Array.isArray(draft.customInclusions) ? draft.customInclusions : []); setCustomExclusions(Array.isArray(draft.customExclusions) ? draft.customExclusions : []);
+      setWebsiteOverview(draft.websiteOverview || ""); setWebsiteFaqs(Array.isArray(draft.websiteFaqs) ? draft.websiteFaqs : []); setWebsiteTagIds(Array.isArray(draft.websiteTagIds) ? draft.websiteTagIds : []);
+      setSlots(Array.isArray(draft.slots) && draft.slots.length ? draft.slots : [{ startDate: "", endDate: "", capacity: "", title: "", priority: "0" }]); setOperationsReminderDays(String(draft.operationsReminderDays ?? 3));
+      setWebsiteBannerImages(Array.isArray(draft.websiteBannerImages) ? draft.websiteBannerImages : []); setWebsiteStayTransportImages(Array.isArray(draft.websiteStayTransportImages) ? draft.websiteStayTransportImages : []); setWebsiteHighlights(Array.isArray(draft.websiteHighlights) ? draft.websiteHighlights : []);
+      toast.success("Local draft restored");
+    } catch { toast.error("This local draft could not be restored"); }
+  };
+
   useEffect(() => {
     if (!open) return;
-    if (!trip) {
+    setHasLocalDraft(Boolean(window.localStorage.getItem(draftKey)));
+    if (!sourceTrip) {
       reset();
       return;
     }
     setStep(1);
-    setName(trip.name);
-    setNights(String(trip.numberOfNights));
-    setDestinationId(trip.destination.id);
+    setName(isFork ? `${sourceTrip.name} (Copy)` : sourceTrip.name);
+    setNights(String(sourceTrip.numberOfNights));
+    setDestinationId(sourceTrip.destination.id);
     setItineraryDayIndex(0);
-    setItineraryDays(trip.itineraryDays.map((day) => ({
+    setItineraryDays((sourceTrip.itineraryDays || []).map((day) => ({
       stayLocationId: day.stayLocationId || "", propertyId: day.propertyId || "",
       placeIds: day.visitingPlaces.map((item) => item.placeId || item.place.id),
       breakfast: day.breakfast, lunch: day.lunch, dinner: day.dinner,
@@ -532,27 +615,37 @@ function CreateTripDialog({
       activities: day.activities.map((activity) => activity.name),
       commonInclusions: day.commonInclusions.map((item) => item.key),
     })));
-    setPackages(trip.packages.length ? trip.packages.map((item) => ({ title: item.title, price: String(item.price), tokenAmount: String(item.tokenAmount) })) : [{ title: "Standard", price: String(trip.totalAmount), tokenAmount: String(trip.tokenAmount) }]);
-    setAddOns(trip.addOns.map((item) => ({
-      title: item.title, description: item.description || "", imageUrl: item.imageUrl || "", price: String(item.price),
+    setPackages(sourceTrip.packages.length ? sourceTrip.packages.map((item) => ({ id: item.id, title: item.title, price: String(item.price), tokenAmount: String(item.tokenAmount) })) : [{ title: "Standard", price: String(sourceTrip.totalAmount), tokenAmount: String(sourceTrip.tokenAmount) }]);
+    setAddOns(sourceTrip.addOns.map((item) => ({
+      id: item.id, title: item.title, description: item.description || "", imageUrl: item.imageUrl || "", price: String(item.price),
       maxQuantityPerBooking: item.maxQuantityPerBooking == null ? "" : String(item.maxQuantityPerBooking),
       maxQuantityPerSlot: item.maxQuantityPerSlot == null ? "" : String(item.maxQuantityPerSlot),
       purchaseCutoffOffsetDays: item.purchaseCutoffOffsetDays == null ? "" : String(item.purchaseCutoffOffsetDays), isActive: item.isActive,
     })));
-    setPickup(trip.airportPickupEnabled);
-    setDrop(trip.airportDropEnabled);
+    setPickup(sourceTrip.airportPickupEnabled);
+    setDrop(sourceTrip.airportDropEnabled);
+    setTripType(sourceTrip.tripType || "");
+    setBestTimeToVisit(sourceTrip.bestTimeToVisit || "");
+    setIsPublished(sourceTrip.isPublished);
+    setIsFeatured(sourceTrip.isFeatured);
+    setIsListed(sourceTrip.isListed);
+    setIsActive(sourceTrip.isActive);
     setPricingError("");
-    setCustomInclusions((trip.inclusions || []).map((inc) => ({ title: inc.title, description: inc.description || "" })));
-    setCustomExclusions(trip.exclusions || []);
-    setWebsiteOverview(trip.websiteOverview || "");
-    setWebsiteFaqs((trip.websiteFaqs as any) || []);
-    setWebsiteTagIds((trip.websiteTags || []).map((tag: any) => tag.id));
-    setSlots(trip.slots?.length ? trip.slots.map((s) => ({ id: s.id, startDate: s.startDate ? s.startDate.split('T')[0] : "", endDate: s.endDate ? s.endDate.split('T')[0] : "", capacity: String(s.capacity), title: s.title || "", priority: String(s.priority), bookedCount: s._count?.bookings || 0 })) : [{ startDate: "", endDate: "", capacity: "", title: "", priority: "0" }]);
-    setOperationsReminderDays(String(trip.operationsReminderDays ?? 3));
-    setWebsiteBannerImages(trip.websiteBannerImages || []);
-    setWebsiteStayTransportImages(trip.websiteStayTransportImages || []);
-    setWebsiteHighlights((trip.websiteHighlights as any) || []);
-  }, [open, trip]);
+    setCustomInclusions((sourceTrip.inclusions || []).map((inc) => ({ title: inc.title, description: inc.description || "" })));
+    setCustomExclusions(sourceTrip.exclusions || []);
+    setWebsiteOverview(sourceTrip.websiteOverview || "");
+    setWebsiteFaqs((sourceTrip.websiteFaqs as any) || []);
+    setWebsiteTagIds((sourceTrip.websiteTags || []).map((tag: any) => tag.id));
+    setSlots(sourceTrip.slots?.length ? sourceTrip.slots.map((s) => ({ ...(isFork ? {} : { id: s.id }), startDate: s.startDate ? s.startDate.split('T')[0] : "", endDate: s.endDate ? s.endDate.split('T')[0] : "", capacity: String(s.capacity), title: s.title || "", priority: String(s.priority), ...(isFork ? {} : { bookedCount: s._count?.bookings || 0 }) })) : [{ startDate: "", endDate: "", capacity: "", title: "", priority: "0" }]);
+    setOperationsReminderDays(String(sourceTrip.operationsReminderDays ?? 3));
+    setWebsiteBannerImages(sourceTrip.websiteBannerImages || []);
+    setWebsiteStayTransportImages(sourceTrip.websiteStayTransportImages || []);
+    setWebsiteHighlights((sourceTrip.websiteHighlights as any) || []);
+  }, [open, sourceTrip, isFork]);
+
+  useEffect(() => {
+    formScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, [step, itineraryDayIndex]);
 
   const close = () => {
     reset();
@@ -583,6 +676,20 @@ function CreateTripDialog({
     );
     setPricingError("");
   };
+  const endDateForTrip = (startDate: string) => {
+    if (!startDate) return "";
+    const date = new Date(`${startDate}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + Number(nights));
+    return date.toISOString().slice(0, 10);
+  };
+  const moveWebsiteFaq = (from: number, to: number) => {
+    setWebsiteFaqs((faqs) => {
+      if (to < 0 || to >= faqs.length) return faqs;
+      const next = [...faqs];
+      [next[from], next[to]] = [next[to], next[from]];
+      return next;
+    });
+  };
 
   const uploadAddOnImage = async (index: number, file?: File) => {
     if (!file) return;
@@ -612,7 +719,10 @@ function CreateTripDialog({
         toast.error("Enter a title, a destination, and 0–365 nights");
         return;
       }
-      setItineraryDays(Array.from({ length: Number(nights) + 1 }, emptyItineraryDay));
+      setItineraryDays((currentDays) => Array.from(
+        { length: Number(nights) + 1 },
+        (_, index) => currentDays[index] || emptyItineraryDay(),
+      ));
       setItineraryDayIndex(0);
       setStep(2);
       return;
@@ -621,6 +731,7 @@ function CreateTripDialog({
     if (step === 2) return;
 
     const cleanPackages = packages.map((item) => ({
+      ...(item.id ? { id: item.id } : {}),
       title: item.title.trim(),
       price: Number(item.price),
       tokenAmount: Number(item.tokenAmount),
@@ -628,6 +739,7 @@ function CreateTripDialog({
     const asOptionalInteger = (value: string) =>
       value.trim() === "" ? null : Number(value);
     const cleanAddOns = addOns.map((item) => ({
+      ...(item.id ? { id: item.id } : {}),
       title: item.title.trim(),
       description: item.description.trim() || null,
       imageUrl: item.imageUrl || null,
@@ -670,11 +782,13 @@ function CreateTripDialog({
       return Math.round((end.getTime() - start.getTime()) / 86400000) + 1 !== expectedDays;
     });
     if (step !== 3 && (invalidSlots || !Number.isInteger(Number(operationsReminderDays)) || Number(operationsReminderDays) < 0)) {
-      setPricingError(invalidSlots ? `Add at least one departure with capacity. Each slot must span exactly ${expectedDays} calendar days.` : "Reminder days must be a whole number of zero or more.");
+      const validationMessage = invalidSlots ? `Each departure must span exactly ${expectedDays} calendar days (for example, ${Number(nights)} night${Number(nights) === 1 ? "" : "s"} needs ${expectedDays} dates).` : "Reminder days must be a whole number of zero or more.";
+      setPricingError(validationMessage);
+      toast.error(validationMessage);
       return;
     }
 
-    if (step === 3) {
+    if (step === 3 && action === "continue") {
       if (customInclusions.length === 0) {
         const defaults = generateDefaultInclusions(
           name,
@@ -703,21 +817,28 @@ function CreateTripDialog({
       return;
     }
 
-    if (action === "continue" && step >= 4) {
+    if (action === "continue" && step >= 4 && step < 8) {
       setStep(step + 1);
       return;
     }
     setSaving(true);
     try {
       const primaryPackage = cleanPackages[0];
+      const hasNewPackage = cleanPackages.some((item) => !item.id);
+      const hasNewAddOn = cleanAddOns.some((item) => !item.id);
       const payload = {
         name: name.trim(),
         numberOfNights: Number(nights),
         destinationId,
-        totalAmount: primaryPackage.price,
-        tokenAmount: primaryPackage.tokenAmount,
+        ...(!trip || !hasLockedPricing || hasNewPackage ? { totalAmount: primaryPackage.price, tokenAmount: primaryPackage.tokenAmount, packages: cleanPackages } : {}),
         airportPickupEnabled: pickup,
         airportDropEnabled: drop,
+        tripType: tripType || null,
+        bestTimeToVisit: bestTimeToVisit.trim() || null,
+        isPublished,
+        isFeatured,
+        isListed,
+        isActive,
         days: itineraryDays.map((day) => ({
           ...day,
           stayLocationId: day.stayLocationId || null,
@@ -728,8 +849,7 @@ function CreateTripDialog({
           notes: day.notes.trim() || null,
           activities: day.activities.filter(Boolean).map((name) => ({ name })),
         })),
-        packages: cleanPackages,
-        addOns: cleanAddOns,
+        ...(!trip || !hasLockedPricing || hasNewAddOn ? { addOns: cleanAddOns } : {}),
         manualInclusions: customInclusions.map((inc) => ({
           title: inc.title.trim(),
           description: inc.description?.trim() || null,
@@ -737,7 +857,7 @@ function CreateTripDialog({
         exclusions: customExclusions.map((exc) => exc.trim()).filter(Boolean),
         websiteOverview: websiteOverview.trim() || null,
         websiteFaqs: websiteFaqs.filter(f => f.question && f.answer),
-        websiteTags: websiteTags.filter(Boolean),
+        websiteTagIds: websiteTagIds.filter(Boolean),
         operationsReminderDays: Number(operationsReminderDays),
         slots: slots.map(s => ({
           ...(s.id ? { id: s.id } : {}),
@@ -755,6 +875,8 @@ function CreateTripDialog({
         ? apiClient.patch(`/crm-trips/${trip.id}`, payload)
         : apiClient.post("/crm-trips", payload));
       toast.success(trip ? "CRM trip updated" : "CRM trip created");
+      window.localStorage.removeItem(draftKey);
+      setHasLocalDraft(false);
       close();
       onCreated();
     } catch (error: any) {
@@ -772,24 +894,19 @@ function CreateTripDialog({
         else onOpenChange(true);
       }}
     >
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>
-            {step === 1
-              ? `${trip ? "Edit" : "New"} itinerary trip · basic details`
-              : step === 2
-                ? `New itinerary trip · day ${itineraryDayIndex + 1} of ${itineraryDays.length}`
-                : step === 3
-                  ? `${trip ? "Edit" : "New"} itinerary trip · pricing & options`
-                  : step === 4 ? `${trip ? "Edit" : "New"} itinerary trip · departures & preview`
-                  : step === 5 ? `${trip ? "Edit" : "New"} itinerary trip · overview & FAQs`
-                  : step === 6 ? `${trip ? "Edit" : "New"} itinerary trip · tags & slots`
-                  : step === 7 ? `${trip ? "Edit" : "New"} itinerary trip · banner images`
-                  : `${trip ? "Edit" : "New"} itinerary trip · stay & transport images`
-            }
+      <DialogContent className="!flex !h-[min(780px,calc(100dvh-1rem))] !w-[calc(100vw-1rem)] !max-w-none !flex-col !gap-0 !overflow-hidden !p-0 sm:!max-w-4xl">
+        <DialogHeader className="shrink-0 border-b border-gray-200 bg-white px-5 py-4 pr-12 sm:px-7 sm:py-5">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#781216]">{isFork ? "Fork trip" : trip ? "Trip editor" : "New trip"} · Step {step} of 8</p>
+          <DialogTitle className="mt-1 text-xl text-gray-950 sm:text-2xl">
+            {step === 1 ? "Trip essentials" : step === 2 ? `Itinerary · day ${itineraryDayIndex + 1} of ${itineraryDays.length}` : step === 3 ? "Pricing & traveller options" : step === 4 ? "Departures & trip preview" : step === 5 ? "Website overview & FAQs" : step === 6 ? "Tags & available departures" : step === 7 ? "Banner images" : "Stay & transport images"}
           </DialogTitle>
+          <div className="mt-4 flex gap-1.5" aria-label={`Step ${step} of 8`}>
+            {Array.from({ length: 8 }, (_, index) => <span key={index} className={`h-1.5 flex-1 rounded-full ${index + 1 <= step ? "bg-[#781216]" : "bg-gray-200"}`} />)}
+          </div>
         </DialogHeader>
-        <form className="space-y-5" onSubmit={submit}>
+        <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
+          <div ref={formScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-7 sm:py-6">
+            <div className="mx-auto max-w-3xl space-y-5">
           {step === 1 ? (
             <>
               <label className="block space-y-1.5">
@@ -846,6 +963,11 @@ function CreateTripDialog({
             />
           ) : step === 3 ? (
             <>
+              <section className="space-y-3 rounded-xl border border-[#781216]/15 bg-[#fffafb] p-4">
+                <div><h3 className="font-semibold text-gray-900">Trip operations</h3><p className="mt-0.5 text-xs text-gray-600">Set these before the preview so pickup and drop-off are included in the generated itinerary details.</p></div>
+                <div className="flex flex-wrap gap-5"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={pickup} onChange={(event) => setPickup(event.target.checked)} />Include airport pickup</label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={drop} onChange={(event) => setDrop(event.target.checked)} />Include airport drop-off</label></div>
+                <div className="grid gap-2 border-t border-[#781216]/10 pt-3 sm:grid-cols-2">{[{ label: "Publish this trip", detail: "Make it available to public trip pages.", checked: isPublished, onChange: setIsPublished }, { label: "Feature this trip", detail: "Highlight it in featured collections.", checked: isFeatured, onChange: setIsFeatured }, { label: "List in public catalog", detail: "Show it in the browsable trip catalog.", checked: isListed, onChange: setIsListed }, { label: "Accept CRM bookings", detail: "Required to create new CRM bookings.", checked: isActive, onChange: setIsActive }].map((control) => <label key={control.label} className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 bg-white p-3 transition-colors hover:border-[#781216]/40"><input type="checkbox" checked={control.checked} onChange={(event) => control.onChange(event.target.checked)} className="mt-0.5 h-4 w-4 accent-[#781216]" /><span><span className="block text-sm font-semibold text-gray-800">{control.label}</span><span className="mt-0.5 block text-xs leading-5 text-gray-500">{control.detail}</span></span></label>)}</div>
+              </section>
               <section className="space-y-3 rounded-xl border border-[#b59410]/30 bg-[#fcf9f2] p-4">
                 <div>
                   <h3 className="font-semibold text-gray-900">
@@ -855,6 +977,7 @@ function CreateTripDialog({
                     Add the same package choices travelers will see. The first
                     package is the default CRM booking price for now.
                   </p>
+                  {hasLockedPricing && <p className="mt-2 rounded-md bg-amber-50 px-2.5 py-2 text-xs text-amber-800">Existing packages are locked because this trip has bookings. You can add a new package for future use.</p>}
                 </div>
                 <div className="hidden grid-cols-[minmax(0,1fr)_130px_150px_32px] gap-3 px-1 text-[11px] font-bold uppercase tracking-wider text-gray-500 md:grid">
                   <span>Package name</span>
@@ -873,6 +996,7 @@ function CreateTripDialog({
                           Package name
                         </span>
                         <Input
+                          disabled={hasLockedPricing && Boolean(item.id)}
                           value={item.title}
                           onChange={(event) =>
                             updatePackage(index, "title", event.target.value)
@@ -885,6 +1009,7 @@ function CreateTripDialog({
                           Price (₹)
                         </span>
                         <Input
+                          disabled={hasLockedPricing && Boolean(item.id)}
                           min="0"
                           step="0.01"
                           type="number"
@@ -900,6 +1025,7 @@ function CreateTripDialog({
                           Booking amount (₹)
                         </span>
                         <Input
+                          disabled={hasLockedPricing && Boolean(item.id)}
                           min="0"
                           step="0.01"
                           type="number"
@@ -919,11 +1045,13 @@ function CreateTripDialog({
                         variant="ghost"
                         size="icon"
                         className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                        disabled={packages.length === 1}
+                        disabled={packages.length === 1 || (hasLockedPricing && Boolean(item.id))}
                         aria-label="Remove package"
                         title={
                           packages.length === 1
                             ? "At least one package is required"
+                            : hasLockedPricing && item.id
+                              ? "Existing packages are locked after bookings"
                             : "Remove package"
                         }
                         onClick={() =>
@@ -959,9 +1087,10 @@ function CreateTripDialog({
                   <p className="mt-0.5 text-xs text-gray-500">
                     Travelers can add these while booking, before the cutoff.
                   </p>
+                  {hasLockedPricing && <p className="mt-2 text-xs text-amber-800">Existing add-ons are locked after bookings, but you can add new add-ons below.</p>}
                 </div>
                 {addOns.map((item, index) => (
-                  <div key={index} className="flex flex-col gap-4 rounded-lg border bg-gray-50 p-4 md:flex-row">
+                  <div key={item.id || index} className={`flex flex-col gap-4 rounded-lg border bg-gray-50 p-4 md:flex-row ${hasLockedPricing && item.id ? "pointer-events-none opacity-60" : ""}`}>
                     <div className="w-full shrink-0 md:w-32">
                       <span className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">Image</span>
                       {item.imageUrl ? (
@@ -1013,30 +1142,28 @@ function CreateTripDialog({
                   {pricingError}
                 </p>
               )}
-              <div className="flex flex-wrap gap-5">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={pickup}
-                    onChange={(event) => setPickup(event.target.checked)}
-                  />
-                  Include pickup
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={drop}
-                    onChange={(event) => setDrop(event.target.checked)}
-                  />
-                  Include drop
-                </label>
-              </div>
             </>
           ) : step === 4 ? (
             <div className="space-y-6">
               <section className="space-y-3 rounded-xl border border-[#b59410]/30 bg-[#fcf9f2] p-4">
                 <div className="flex items-center justify-between gap-3"><div><h3 className="font-semibold text-gray-900">Dated departure slots <span className="text-red-500">*</span></h3><p className="text-xs text-gray-600">Each departure must cover {Number(nights) + 1} calendar days. Dates lock after the first booking.</p></div><Button type="button" variant="outline" size="sm" onClick={() => setSlots([...slots, { startDate: "", endDate: "", capacity: "", title: "", priority: "0" }])}><Plus className="mr-1 h-3.5 w-3.5" />Add slot</Button></div>
-                <div className="space-y-3">{slots.map((slot, index) => <div key={slot.id || index} className="grid gap-3 rounded-lg border border-gray-200 bg-white p-3 md:grid-cols-5"><label className="space-y-1"><span className="text-xs font-medium">Start</span><Input disabled={Boolean(slot.bookedCount)} type="date" value={slot.startDate} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, startDate: e.target.value } : item))} /></label><label className="space-y-1"><span className="text-xs font-medium">End</span><Input disabled={Boolean(slot.bookedCount)} type="date" value={slot.endDate} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, endDate: e.target.value } : item))} /></label><label className="space-y-1"><span className="text-xs font-medium">Capacity</span><Input min="1" type="number" value={slot.capacity} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, capacity: e.target.value } : item))} /></label><label className="space-y-1"><span className="text-xs font-medium">Title</span><Input value={slot.title} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, title: e.target.value } : item))} /></label><div className="flex items-end"><Button type="button" variant="ghost" size="sm" disabled={Boolean(slot.bookedCount) || slots.length === 1} className="text-red-600" onClick={() => setSlots(slots.filter((_, i) => i !== index))}><Trash2 className="mr-1 h-3.5 w-3.5" />Remove</Button></div>{slot.bookedCount ? <p className="md:col-span-5 text-xs text-amber-700">Dates are locked because this departure has {slot.bookedCount} booking(s).</p> : null}</div>)}</div>
+                <div className="space-y-3">
+                  {slots.map((slot, index) => (
+                    <div key={slot.id || index} className="space-y-4 rounded-lg border border-gray-200 bg-white p-4">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <label className="space-y-1.5"><span className="text-sm font-medium">Start date</span><Input disabled={Boolean(slot.bookedCount)} type="date" value={slot.startDate} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, startDate: e.target.value, endDate: endDateForTrip(e.target.value) } : item))} /></label>
+                        <label className="space-y-1.5"><span className="text-sm font-medium">End date <span className="text-xs font-normal text-gray-400">(auto-calculated)</span></span><Input min={slot.startDate || undefined} disabled={Boolean(slot.bookedCount)} type="date" value={slot.endDate} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, endDate: e.target.value } : item))} /></label>
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-[150px_minmax(0,1fr)_auto] sm:items-end">
+                        <label className="space-y-1.5"><span className="text-sm font-medium">Capacity</span><Input min="1" type="number" value={slot.capacity} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, capacity: e.target.value } : item))} /></label>
+                        <label className="space-y-1.5"><span className="text-sm font-medium">Departure name <span className="text-gray-400">(optional)</span></span><Input value={slot.title} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, title: e.target.value } : item))} placeholder="e.g. August batch" /></label>
+                        <Button type="button" variant="outline" disabled={Boolean(slot.bookedCount) || slots.length === 1} className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setSlots(slots.filter((_, i) => i !== index))}><Trash2 className="mr-1.5 h-4 w-4" />Remove</Button>
+                      </div>
+                      {slot.bookedCount ? <p className="text-xs text-amber-700">Dates are locked because this departure has {slot.bookedCount} booking(s).</p> : null}
+                    </div>
+                  ))}
+                </div>
+                {pricingError && <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{pricingError}</p>}
                 <label className="block max-w-xs space-y-1"><span className="text-xs font-bold uppercase tracking-wider text-gray-500">Reminder days before task</span><Input min="0" type="number" value={operationsReminderDays} onChange={(e) => setOperationsReminderDays(e.target.value)} /></label>
               </section>
               {/* Trip basic info preview summary */}
@@ -1116,6 +1243,19 @@ function CreateTripDialog({
             </div>
           ) : step === 5 ? (
             <div className="space-y-6">
+              <section className="grid gap-4 rounded-xl border border-gray-200 bg-gray-50/70 p-4 sm:grid-cols-2">
+                <label className="block space-y-1.5">
+                  <span className="text-sm font-medium">Trip type</span>
+                  <select className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm" value={tripType} onChange={(e) => setTripType(e.target.value)}>
+                    <option value="">Choose later</option>
+                    {TRIP_TYPES.map((type) => <option key={type} value={type}>{type.replaceAll("_", " ")}</option>)}
+                  </select>
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="text-sm font-medium">Best time to visit</span>
+                  <Input value={bestTimeToVisit} onChange={(e) => setBestTimeToVisit(e.target.value)} placeholder="e.g. October to April" />
+                </label>
+              </section>
               <label className="block space-y-1.5">
                 <span className="text-sm font-medium">Website Overview</span>
                 <textarea
@@ -1125,6 +1265,17 @@ function CreateTripDialog({
                   onChange={(e) => setWebsiteOverview(e.target.value)}
                 />
               </label>
+
+              <section className="space-y-3">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <div><h3 className="text-sm font-medium">Trip highlights</h3><p className="mt-0.5 text-xs text-gray-500">Short, scannable reasons to choose this trip.</p></div>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setWebsiteHighlights([...websiteHighlights, ""])}><Plus className="mr-1.5 h-3.5 w-3.5" />Add highlight</Button>
+                </div>
+                <div className="space-y-2">
+                  {websiteHighlights.map((highlight, index) => <div key={index} className="flex items-center gap-2"><Input value={highlight} placeholder="e.g. Small-group mountain stays" onChange={(e) => setWebsiteHighlights(websiteHighlights.map((item, itemIndex) => itemIndex === index ? e.target.value : item))} /><Button type="button" variant="ghost" size="icon" className="shrink-0 text-red-600 hover:bg-red-50" aria-label="Remove highlight" onClick={() => setWebsiteHighlights(websiteHighlights.filter((_, itemIndex) => itemIndex !== index))}><X className="h-4 w-4" /></Button></div>)}
+                  {!websiteHighlights.length && <p className="rounded-lg border border-dashed border-gray-200 px-3 py-4 text-center text-xs text-gray-500">No highlights yet.</p>}
+                </div>
+              </section>
               
               <div className="space-y-3">
                 <div className="flex items-center justify-between border-b pb-2">
@@ -1140,9 +1291,11 @@ function CreateTripDialog({
                         <Input placeholder="Question" value={faq.question} onChange={(e) => { const updated = [...websiteFaqs]; updated[index].question = e.target.value; setWebsiteFaqs(updated); }} className="h-8 text-xs font-semibold bg-white" />
                         <textarea className="min-h-[60px] w-full rounded-md border border-input bg-white px-3 py-2 text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" placeholder="Answer" value={faq.answer} onChange={(e) => { const updated = [...websiteFaqs]; updated[index].answer = e.target.value; setWebsiteFaqs(updated); }} />
                       </div>
-                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => setWebsiteFaqs(websiteFaqs.filter((_, i) => i !== index))}>
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <div className="flex shrink-0 flex-col gap-1">
+                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-gray-500" aria-label="Move FAQ up" disabled={index === 0} onClick={() => moveWebsiteFaq(index, index - 1)}><ArrowUp className="h-3.5 w-3.5" /></Button>
+                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-gray-500" aria-label="Move FAQ down" disabled={index === websiteFaqs.length - 1} onClick={() => moveWebsiteFaq(index, index + 1)}><ArrowDown className="h-3.5 w-3.5" /></Button>
+                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-red-600 hover:bg-red-50" aria-label="Remove FAQ" onClick={() => setWebsiteFaqs(websiteFaqs.filter((_, i) => i !== index))}><X className="h-4 w-4" /></Button>
+                      </div>
                     </div>
                   ))}
                   {websiteFaqs.length === 0 && <p className="text-xs text-gray-500 italic">No FAQs added yet.</p>}
@@ -1303,10 +1456,15 @@ function CreateTripDialog({
               </div>
             </div>
           )}
-          <div className="flex justify-end gap-2 border-t pt-4">
+            </div>
+          </div>
+          <div className="shrink-0 border-t border-gray-200 bg-white px-5 py-3 sm:px-7">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 if (step === 1) close();
                 else if (step === 2 && itineraryDayIndex > 0) setItineraryDayIndex((index) => index - 1);
@@ -1315,10 +1473,14 @@ function CreateTripDialog({
                 else setStep(step - 1);
               }}
             >
+              {step !== 1 && <ArrowLeft className="mr-1.5 h-4 w-4" />}
               {step === 1 ? "Cancel" : "Back"}
             </Button>
-            
-            {step >= 4 && (
+            <Button type="button" variant="outline" size="sm" onClick={saveLocalDraft}>Save draft</Button>
+            {hasLocalDraft && <Button type="button" variant="outline" size="sm" onClick={restoreLocalDraft}>Restore draft</Button>}
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+            {trip && step >= 3 && (
               <Button
                 type="submit"
                 name="action"
@@ -1328,7 +1490,7 @@ function CreateTripDialog({
                 className="border-[#781216] text-[#781216] hover:bg-[#781216] hover:text-white"
               >
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Save
+                Save & exit
               </Button>
             )}
 
@@ -1336,7 +1498,7 @@ function CreateTripDialog({
               type={step === 1 || step === 3 || step === 8 ? "submit" : "button"}
               name="action"
               value="continue"
-              onClick={(e) => {
+              onClick={() => {
                 if (step === 2) {
                   if (itineraryDayIndex < itineraryDays.length - 1) setItineraryDayIndex((index) => index + 1);
                   else setStep(3);
@@ -1353,7 +1515,10 @@ function CreateTripDialog({
                 : step === 3 ? "Continue to preview" 
                 : step === 8 ? (trip ? "Save changes" : "Create trip") 
                 : "Continue"}
+              {step !== 8 && <ChevronRight className="ml-1.5 h-4 w-4" />}
             </Button>
+              </div>
+            </div>
           </div>
         </form>
       </DialogContent>
@@ -1699,24 +1864,50 @@ function CreateCrmBookingModal({
   const [phone, setPhone] = useState("");
   const [gender, setGender] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
+  const [govtIdAssetId, setGovtIdAssetId] = useState("");
   const [numberOfTravelers, setNumberOfTravelers] = useState(1);
   const [paymentAmount, setPaymentAmount] = useState(String(trip.tokenAmount || ""));
   const [paymentAction, setPaymentAction] = useState<"MANUAL" | "SEND_LINK">("MANUAL");
   const [specialRequests, setSpecialRequests] = useState("");
-  const [additionalTravelers, setAdditionalTravelers] = useState<Array<{ fullName: string; email: string; phone: string; gender: string; dateOfBirth: string }>>([]);
+  const [additionalTravelers, setAdditionalTravelers] = useState<Array<{ fullName: string; email: string; phone: string; gender: string; dateOfBirth: string; aadhaarAssetId: string }>>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState<string | null>(null);
 
   useEffect(() => {
     const extraCount = Math.max(0, numberOfTravelers - 1);
     setAdditionalTravelers(
-      Array.from({ length: extraCount }, (_, i) => additionalTravelers[i] || { fullName: "", email: "", phone: "", gender: "", dateOfBirth: "" })
+      Array.from({ length: extraCount }, (_, i) => additionalTravelers[i] || { fullName: "", email: "", phone: "", gender: "", dateOfBirth: "", aadhaarAssetId: "" })
     );
   }, [numberOfTravelers]);
 
+  const updateTraveler = (index: number, field: string, value: string) => {
+    setAdditionalTravelers((current) => current.map((traveler, travelerIndex) => travelerIndex === index ? { ...traveler, [field]: value } : traveler));
+  };
+  const uploadAadhaar = async (file: File | undefined, key: string, travelerIndex?: number) => {
+    if (!file) return;
+    setUploading(key);
+    try {
+      const body = new FormData();
+      body.append("image", file, file.name);
+      const result = await apiClient.post("/bookings/traveler/govt-id", body, { headers: { "Content-Type": "multipart/form-data" } });
+      if (travelerIndex === undefined) setGovtIdAssetId(result.data.assetId);
+      else updateTraveler(travelerIndex, "aadhaarAssetId", result.data.assetId);
+      toast.success("Aadhaar card uploaded");
+    } catch {
+      toast.error("Could not upload Aadhaar card");
+    } finally {
+      setUploading(null);
+    }
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim() || !email.trim()) {
-      toast.error("Please enter traveler name and email");
+    if (!fullName.trim() || !email.trim() || !phone.trim() || !gender || !dateOfBirth || !govtIdAssetId) {
+      toast.error("Enter all lead traveler details and upload their Aadhaar card");
+      return;
+    }
+    if (additionalTravelers.some((traveler) => !traveler.fullName.trim() || !traveler.email.trim() || !traveler.phone.trim() || !traveler.gender || !traveler.dateOfBirth || !traveler.aadhaarAssetId)) {
+      toast.error("Enter all details and upload an Aadhaar card for every traveler");
       return;
     }
     const amt = Number(paymentAmount);
@@ -1733,11 +1924,12 @@ function CreateCrmBookingModal({
         phone: phone.trim() || null,
         gender: gender || null,
         dateOfBirth: dateOfBirth || null,
+        govtIdAssetId,
         numberOfTravelers,
         paymentAmount: amt,
         paymentAction,
         specialRequests: specialRequests.trim() || null,
-        additionalTravelers: additionalTravelers.filter((t) => t.fullName.trim()),
+        additionalTravelers,
       };
 
       await apiClient.post(`/crm-trips/${trip.id}/bookings`, payload);
@@ -1785,6 +1977,11 @@ function CreateCrmBookingModal({
               <Input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} />
             </label>
             <label className="block space-y-1">
+              <span className="text-xs font-semibold text-gray-500 uppercase">Aadhaar Card</span>
+              <Input type="file" accept="image/*,.pdf" disabled={uploading === "lead"} onChange={(e) => uploadAadhaar(e.target.files?.[0], "lead")} />
+              <span className="text-[10px] text-gray-400">{uploading === "lead" ? "Uploading…" : govtIdAssetId ? "Uploaded" : "Required: clear photo or PDF"}</span>
+            </label>
+            <label className="block space-y-1">
               <span className="text-xs font-semibold text-gray-500 uppercase">Travelers count</span>
               <Input type="number" min="1" value={numberOfTravelers} onChange={(e) => setNumberOfTravelers(Number(e.target.value) || 1)} />
             </label>
@@ -1794,46 +1991,41 @@ function CreateCrmBookingModal({
           {additionalTravelers.length > 0 && (
             <div className="space-y-3 border-t pt-3">
               <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">Additional Travelers Details</h4>
-              <div className="space-y-3 max-h-40 overflow-y-auto pr-1">
+              <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                 {additionalTravelers.map((traveler, index) => (
-                  <div key={index} className="grid gap-3 sm:grid-cols-3 p-3 rounded-lg border bg-gray-50/50">
+                  <div key={index} className="grid gap-3 sm:grid-cols-2 p-3 rounded-lg border bg-gray-50/50">
                     <label className="col-span-full font-semibold text-xs text-gray-600">Traveler #{index + 2}</label>
                     <Input
-                      placeholder="Full Name"
+                      placeholder="Full Name *"
                       value={traveler.fullName}
-                      onChange={(e) => {
-                        const updated = [...additionalTravelers];
-                        updated[index].fullName = e.target.value;
-                        setAdditionalTravelers(updated);
-                      }}
+                      onChange={(e) => updateTraveler(index, "fullName", e.target.value)}
                       required
                       className="h-8 text-xs"
                     />
                     <Input
-                      placeholder="Email"
+                      placeholder="Email *"
                       type="email"
                       value={traveler.email}
-                      onChange={(e) => {
-                        const updated = [...additionalTravelers];
-                        updated[index].email = e.target.value;
-                        setAdditionalTravelers(updated);
-                      }}
+                      onChange={(e) => updateTraveler(index, "email", e.target.value)}
                       className="h-8 text-xs"
                     />
+                    <Input placeholder="Phone *" type="tel" value={traveler.phone} onChange={(e) => updateTraveler(index, "phone", e.target.value)} className="h-8 text-xs" />
                     <select
                       className="h-8 rounded-md border border-input bg-white px-2 text-xs"
                       value={traveler.gender}
-                      onChange={(e) => {
-                        const updated = [...additionalTravelers];
-                        updated[index].gender = e.target.value;
-                        setAdditionalTravelers(updated);
-                      }}
+                      onChange={(e) => updateTraveler(index, "gender", e.target.value)}
                     >
-                      <option value="">Gender</option>
+                      <option value="">Gender *</option>
                       <option value="MALE">Male</option>
                       <option value="FEMALE">Female</option>
                       <option value="OTHER">Other</option>
+                      <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
                     </select>
+                    <Input type="date" value={traveler.dateOfBirth} onChange={(e) => updateTraveler(index, "dateOfBirth", e.target.value)} className="h-8 text-xs" />
+                    <div>
+                      <Input type="file" accept="image/*,.pdf" disabled={uploading === `traveler-${index}`} onChange={(e) => uploadAadhaar(e.target.files?.[0], `traveler-${index}`, index)} className="h-8 text-xs" />
+                      <span className="text-[10px] text-gray-400">{uploading === `traveler-${index}` ? "Uploading…" : traveler.aadhaarAssetId ? "Aadhaar uploaded" : "Aadhaar card *"}</span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1853,7 +2045,7 @@ function CreateCrmBookingModal({
                 <span className="text-xs font-semibold text-gray-500 uppercase">Payment Collection Action</span>
                 <select className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm" value={paymentAction} onChange={(e) => setPaymentAction(e.target.value as any)}>
                   <option value="MANUAL">Collect Offline (Mark Paid)</option>
-                  <option value="SEND_LINK">Send Razorpay Payment Link</option>
+                  <option value="SEND_LINK">Send Website Payment Link</option>
                 </select>
               </label>
             </div>
@@ -1866,7 +2058,7 @@ function CreateCrmBookingModal({
 
           <div className="flex justify-end gap-2 border-t pt-3">
             <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
-            <Button type="submit" disabled={submitting} className="bg-[#781216] text-white hover:bg-[#5f0e11]">
+            <Button type="submit" disabled={submitting || Boolean(uploading)} className="bg-[#781216] text-white hover:bg-[#5f0e11]">
               {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Create booking
             </Button>
@@ -1908,7 +2100,7 @@ function AddInstallmentModal({
       };
 
       await apiClient.post(`/crm-trips/${trip.id}/bookings/${booking.id}/installments`, payload);
-      toast.success("Installment logged successfully!");
+      toast.success(paymentAction === "SEND_LINK" ? "Website payment link emailed" : "Installment logged successfully!");
       onSuccess();
     } catch (error: any) {
       toast.error(error?.response?.data?.message || "Could not record installment");
@@ -1947,7 +2139,7 @@ function AddInstallmentModal({
             <span className="text-xs font-semibold text-gray-500 uppercase">Payment Collection Action</span>
             <select className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm" value={paymentAction} onChange={(e) => setPaymentAction(e.target.value as any)}>
               <option value="MANUAL">Collect Offline (Mark Paid)</option>
-              <option value="SEND_LINK">Send Razorpay Payment Link</option>
+              <option value="SEND_LINK">Send Website Payment Link</option>
             </select>
           </label>
 

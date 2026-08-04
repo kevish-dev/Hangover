@@ -245,8 +245,43 @@ export const updateTrip = async (id, changes) => {
       throw new ValidationError("Token amount cannot exceed the total amount");
     }
     const hasBookings = await tx.booking.count({ where: { crmTripId: id } });
-    if ((tripChanges.totalAmount !== undefined || tripChanges.tokenAmount !== undefined || packages !== undefined || addOns !== undefined) && hasBookings) {
-      throw new ValidationError("Pricing cannot be changed after CRM bookings have been created");
+    const totalChanged = tripChanges.totalAmount !== undefined && Number(tripChanges.totalAmount) !== Number(trip.totalAmount);
+    const tokenChanged = tripChanges.tokenAmount !== undefined && Number(tripChanges.tokenAmount) !== Number(trip.tokenAmount);
+    if ((totalChanged || tokenChanged) && hasBookings) {
+      throw new ValidationError("Existing pricing is locked after CRM bookings have been created");
+    }
+    if (packages !== undefined && hasBookings) {
+      const existingPackages = new Map(trip.packages.map((item) => [item.id, item]));
+      const suppliedExisting = packages.filter((item) => item.id);
+      if (suppliedExisting.length !== existingPackages.size) {
+        throw new ValidationError("Existing packages cannot be removed after CRM bookings have been created");
+      }
+      for (const item of suppliedExisting) {
+        const existing = existingPackages.get(item.id);
+        if (!existing || existing.title !== item.title || Number(existing.price) !== Number(item.price) || Number(existing.tokenAmount) !== Number(item.tokenAmount)) {
+          throw new ValidationError("Existing packages cannot be changed after CRM bookings have been created");
+        }
+      }
+    }
+    if (addOns !== undefined && hasBookings) {
+      const existingAddOns = new Map(trip.addOns.map((item) => [item.id, item]));
+      const suppliedExisting = addOns.filter((item) => item.id);
+      if (suppliedExisting.length !== existingAddOns.size) {
+        throw new ValidationError("Existing add-ons cannot be removed after CRM bookings have been created");
+      }
+      for (const item of suppliedExisting) {
+        const existing = existingAddOns.get(item.id);
+        const unchanged = existing
+          && existing.title === item.title
+          && (existing.description || null) === (item.description || null)
+          && (existing.imageUrl || null) === (item.imageUrl || null)
+          && Number(existing.price) === Number(item.price)
+          && existing.maxQuantityPerBooking === item.maxQuantityPerBooking
+          && existing.maxQuantityPerSlot === item.maxQuantityPerSlot
+          && existing.purchaseCutoffOffsetDays === item.purchaseCutoffOffsetDays
+          && existing.isActive === item.isActive;
+        if (!unchanged) throw new ValidationError("Existing add-ons cannot be changed after CRM bookings have been created");
+      }
     }
     if (tripChanges.destinationId && tripChanges.destinationId !== trip.destinationId) {
       const destination = await tx.crmDestination.findUnique({ where: { id: tripChanges.destinationId }, select: { id: true } });
@@ -283,12 +318,22 @@ export const updateTrip = async (id, changes) => {
       }
     }
     if (packages !== undefined) {
-      await tx.package.deleteMany({ where: { crmTripId: id } });
-      if (packages.length) await tx.package.createMany({ data: packages.map((item) => ({ ...item, crmTripId: id })) });
+      if (hasBookings) {
+        const additions = packages.filter((item) => !item.id).map(({ id: _id, ...item }) => ({ ...item, crmTripId: id }));
+        if (additions.length) await tx.package.createMany({ data: additions });
+      } else {
+        await tx.package.deleteMany({ where: { crmTripId: id } });
+        if (packages.length) await tx.package.createMany({ data: packages.map(({ id: _id, ...item }) => ({ ...item, crmTripId: id })) });
+      }
     }
     if (addOns !== undefined) {
-      await tx.addOn.deleteMany({ where: { crmTripId: id } });
-      if (addOns.length) await tx.addOn.createMany({ data: addOns.map((item) => ({ ...item, crmTripId: id })) });
+      if (hasBookings) {
+        const additions = addOns.filter((item) => !item.id).map(({ id: _id, ...item }) => ({ ...item, crmTripId: id }));
+        if (additions.length) await tx.addOn.createMany({ data: additions });
+      } else {
+        await tx.addOn.deleteMany({ where: { crmTripId: id } });
+        if (addOns.length) await tx.addOn.createMany({ data: addOns.map(({ id: _id, ...item }) => ({ ...item, crmTripId: id })) });
+      }
     }
     if (slots !== undefined) await syncDepartureSlots(tx, id, slots, tripChanges.numberOfNights ?? trip.numberOfNights);
     if (websiteTagIds !== undefined) {

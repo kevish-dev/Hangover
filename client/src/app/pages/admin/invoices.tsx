@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { Plus, Loader2, Send } from "lucide-react";
+import { Plus, Loader2, Send, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -31,6 +31,10 @@ type Invoice = {
   dueDate?: string;
   status: string;
   createdAt: string;
+  source?: "CUSTOM" | "BOOKING_RECEIPT";
+  bookingId?: string;
+  paymentId?: string;
+  sentAt?: string;
 };
 
 export default function InvoicesPage() {
@@ -137,25 +141,63 @@ export default function InvoicesPage() {
     }).format(Number(amount));
   };
 
+  const exportCsv = () => {
+    if (!invoices.length) {
+      toast.error("No receipt records to export");
+      return;
+    }
+
+    const escapeCsv = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+    const headers = ["Sent at", "Source", "Customer", "Email", "Phone", "Title", "Booking ID", "Payment ID", "Amount", "Currency", "Status", "Line items", "Notes"];
+    const rows = invoices.map((invoice) => [
+      invoice.sentAt || invoice.createdAt,
+      invoice.source === "BOOKING_RECEIPT" ? "Booking receipt" : "Custom receipt",
+      invoice.customerName,
+      invoice.customerEmail,
+      invoice.customerPhone,
+      invoice.title,
+      invoice.bookingId,
+      invoice.paymentId,
+      invoice.amount,
+      invoice.currency,
+      invoice.status,
+      invoice.items.map((item) => `${item.description}: ${item.price}`).join(" | "),
+      invoice.description,
+    ]);
+    const csv = [headers, ...rows].map((row) => row.map(escapeCsv).join(",")).join("\r\n");
+    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `receipt-records-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("Receipt records exported");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-gray-900">Receipts</h2>
-          <p className="text-sm text-gray-500">Manage and send custom payment receipts.</p>
+          <p className="text-sm text-gray-500">Every delivered booking and custom receipt is kept here.</p>
         </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" /> Raise Receipt
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Raise Custom Receipt</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-6 pt-4">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={exportCsv} disabled={!invoices.length}>
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" /> Raise Receipt
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Raise Custom Receipt</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-6 pt-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Customer Name *</Label>
@@ -236,9 +278,10 @@ export default function InvoicesPage() {
                   Send Receipt
                 </Button>
               </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="bg-white rounded-md border shadow-sm overflow-hidden">
@@ -256,6 +299,7 @@ export default function InvoicesPage() {
               <thead className="bg-gray-50 border-b text-gray-600">
                 <tr>
                   <th className="px-4 py-3 font-medium">Customer</th>
+                  <th className="px-4 py-3 font-medium">Source</th>
                   <th className="px-4 py-3 font-medium">Title</th>
                   <th className="px-4 py-3 font-medium">Amount</th>
                   <th className="px-4 py-3 font-medium">Date</th>
@@ -269,10 +313,15 @@ export default function InvoicesPage() {
                       <div className="font-medium text-gray-900">{inv.customerName}</div>
                       <div className="text-xs text-gray-500">{inv.customerEmail}</div>
                     </td>
+                    <td className="px-4 py-3">
+                      <Badge variant="outline">
+                        {inv.source === "BOOKING_RECEIPT" ? "Booking" : "Custom"}
+                      </Badge>
+                    </td>
                     <td className="px-4 py-3">{inv.title}</td>
                     <td className="px-4 py-3 font-medium text-gray-900">{formatCurrency(inv.amount)}</td>
                     <td className="px-4 py-3 text-gray-500">
-                      {format(new Date(inv.createdAt), "MMM d, yyyy")}
+                      {format(new Date(inv.sentAt || inv.createdAt), "MMM d, yyyy")}
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={inv.status === "PAID" ? "default" : inv.status === "SENT" ? "secondary" : "outline"}>

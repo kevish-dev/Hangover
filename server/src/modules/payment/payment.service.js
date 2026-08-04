@@ -120,6 +120,7 @@ const sendPaymentConfirmationEmail = async ({
       to: currentBooking.user?.email,
       name: currentBooking.user?.profile?.fullName || "Traveler",
       bookingRef: currentBooking.bookingReference,
+      bookingId: currentBooking.id,
       ...details,
       totalAmount: currentBooking.totalAmount,
       amountPaid: cumulativeAmountPaid,
@@ -133,6 +134,7 @@ const sendPaymentConfirmationEmail = async ({
       paidAt: payment?.paidAt || payment?.createdAt,
       paymentMethod: payment?.paymentMethod || fallbackPaymentMethod || null,
       paymentId: payment?.razorpayPaymentId || fallbackPaymentId || null,
+      invoicePaymentId: payment?.id || null,
       orderId: payment?.razorpayOrderId || intent.razorpayOrderId,
       paymentLink,
     });
@@ -1147,4 +1149,3 @@ export const verifyUpiPayment = async (adminId, paymentId, action) => {
 
   return result;
 };
-

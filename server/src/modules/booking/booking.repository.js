@@ -25,6 +25,8 @@ export const getBookingById = async (id) => {
     where: { id },
     include: {
       ...bookingInclude,
+      crmTrip: true,
+      crmTripSlot: true,
       user: { include: { profile: { include: { govtIdAsset: true } } } },
     },
   });
@@ -42,7 +44,7 @@ export const getUserBookings = async (userId, skip, take) => {
   const [bookings, total] = await Promise.all([
     prisma.booking.findMany({
       where: { userId },
-      include: { slot: { include: { trip: true, festival: true } }, package: true, addOns: { include: { addOn: true } }, review: true, travelers: { include: { aadhaarAsset: true } }, payments: { include: { refunds: true } } },
+      include: { slot: { include: { trip: true, festival: true } }, crmTrip: { include: { destination: true } }, crmTripSlot: true, package: true, addOns: { include: { addOn: true } }, review: true, travelers: { include: { aadhaarAsset: true } }, payments: { include: { refunds: true } } },
       orderBy: { createdAt: "desc" },
       skip,
       take,

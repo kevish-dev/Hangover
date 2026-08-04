@@ -32,6 +32,7 @@ import {
   Image,
   BarChart3,
   Tent,
+  Users,
 } from "lucide-react";
 
 const overviewItems = [
@@ -40,6 +41,7 @@ const overviewItems = [
 ];
 
 const crmItems = [
+  { title: "Users", url: "/dashboard/users", icon: Users },
   { title: "Master data", url: "/dashboard/crm-master-data", icon: Database },
   { title: "Itinerary trips", url: "/dashboard/crm-trips", icon: MapPin },
   { title: "Circuits", url: "/dashboard/circuits", icon: Map },

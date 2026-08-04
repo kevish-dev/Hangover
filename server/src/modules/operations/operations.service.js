@@ -264,12 +264,24 @@ export const updateOperationalTask = async (taskId, input) => {
   return prisma.$transaction(async (tx) => {
     const current = await tx.operationalTask.findUnique({
       where: { id: taskId },
-      include: { booking: { select: { id: true, tripId: true, festivalId: true } } },
+      include: { booking: { select: { id: true, tripId: true, festivalId: true, crmTripId: true } } },
     });
     if (!current) {
       const error = new Error("Operational task not found");
       error.statusCode = 404;
       throw error;
+    }
+
+    // CRM operators commonly enter a cost for one booking task without
+    // separately entering a quantity. Treat that as one acquired unit so the
+    // cost is not silently omitted from the booking/trip ledger. A later
+    // quantity update recalculates the same auto-generated ledger row.
+    if (
+      data.quantityAcquired === undefined
+      && current.quantityAcquired == null
+      && (data.unitPrice !== undefined || (data.status === "DONE" && current.unitPrice != null))
+    ) {
+      data.quantityAcquired = current.quantityNeeded || 1;
     }
 
     const unitPrice = data.unitPrice !== undefined ? data.unitPrice : (current.unitPrice != null ? Number(current.unitPrice) : null);
@@ -289,7 +301,7 @@ export const updateOperationalTask = async (taskId, input) => {
     const updated = await tx.operationalTask.update({ where: { id: taskId }, data });
 
     // Auto-generate ledger entry: unitPrice × quantityAcquired = cost incurred so far
-    if (data.quantityAcquired !== undefined || data.unitPrice !== undefined) {
+    if (data.quantityAcquired !== undefined || data.unitPrice !== undefined || data.status === "DONE") {
       const finalUnitPrice = data.unitPrice !== undefined ? data.unitPrice : (current.unitPrice != null ? Number(current.unitPrice) : null);
       const finalQtyAcquired = data.quantityAcquired !== undefined ? data.quantityAcquired : current.quantityAcquired;
       const ledgerAmount = finalUnitPrice != null && finalQtyAcquired != null

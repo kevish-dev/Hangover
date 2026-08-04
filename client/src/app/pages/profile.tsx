@@ -73,12 +73,12 @@ function StatusBadge({ status }: { status: string }) {
 
 function BookingCard({ booking }: { booking: ApiBooking }) {
   const [hovered, setHovered] = useState(false);
-  const item: any = booking.customTrip || booking.trip || booking.festival;
+  const item: any = booking.customTrip || booking.trip || booking.festival || booking.crmTrip;
   const isCustom = booking.source === "CUSTOM" || Boolean(booking.customTrip);
   const isFestival = !!booking.festival;
-  const heroImage = item?.bannerImages?.[0] || "";
-  const state = isCustom ? "Private custom trip" : (item as any)?.destination?.state || (item as any)?.location || "";
-  const travelStart = booking.customTrip?.startDate || booking.slot?.startDate;
+  const heroImage = item?.bannerImages?.[0] || booking.crmTrip?.websiteBannerImages?.[0] || "";
+  const state = isCustom ? "Private custom trip" : (item as any)?.destination?.state || booking.crmTrip?.destination?.name || (item as any)?.location || "";
+  const travelStart = booking.customTrip?.startDate || booking.slot?.startDate || booking.crmTripSlot?.startDate;
   const paid = parseFloat(booking.amountPaid || "0");
   const due = parseFloat(booking.amountDue || "0");
   const isFullyRefunded = booking.paymentStatus === "REFUNDED";
@@ -241,7 +241,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
               lineHeight: 1.3,
             }}
           >
-            {item?.title}
+            {item?.title || item?.name || "Your trip"}
           </h3>
           <p
             className="profile-booking-reference"

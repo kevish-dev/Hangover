@@ -571,6 +571,7 @@ export const adminCreateBooking = async (adminId, data) => {
     bookingData.travelers = { create: travelersCreateData };
   }
 
+  let manualPaymentId = null;
   const booking = await prisma.$transaction(async (tx) => {
     const newBooking = await tx.booking.create({ data: bookingData, include: { user: { include: { profile: true } }, package: true, trip: true, festival: true, slot: true } });
 
@@ -594,6 +595,7 @@ export const adminCreateBooking = async (adminId, data) => {
           notes: { adminId },
         },
       });
+      manualPaymentId = payment.id;
 
       await tx.ledgerEntry.create({
         data: {
@@ -635,6 +637,8 @@ export const adminCreateBooking = async (adminId, data) => {
         balanceAmount: booking.amountDue,
         totalAmount: booking.totalAmount,
         dueDate: booking.balanceDueDate,
+        bookingId: booking.id,
+        invoicePaymentId: manualPaymentId,
       }).catch(err => console.error("Failed to send booking confirmed email", err));
     });
   } else if (data.paymentAction === "SEND_LINK") {

@@ -32,6 +32,7 @@ import { BalanceSheetTab } from "../../components/admin/BookingDetailModal";
 import { SyncIndicator } from "../../components/ui/sync-indicator";
 import { BookingPaymentsTab } from "../../components/admin/BookingPaymentsTab";
 import { BookingAddOnsTab } from "../../components/admin/BookingAddOnsTab";
+import { OperationsCalendar } from "../../components/admin/operations/OperationsCalendar";
 
 function BookingStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -79,7 +80,7 @@ const CATEGORIES = [
 ];
 const STATUSES = ["PENDING", "IN_PROGRESS", "BLOCKED", "DONE", "CANCELLED"];
 
-function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
+export function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ["admin", "operations", "booking", bookingId],
@@ -181,6 +182,16 @@ function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
     );
 
   return (
+    <div className="p-4 md:p-6">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-gray-900"><ClipboardCheck className="h-4 w-4 text-[#781216]" />Ground operations</h3>
+        <SyncIndicator isMutating={createMutation.isPending || updateMutation.isPending || deleteMutation.isPending} isError={createMutation.isError || updateMutation.isError || deleteMutation.isError} />
+      </div>
+      <OperationsCalendar tasks={tasks} emptyMessage="No operational tasks have been scheduled for this booking." />
+    </div>
+  );
+
+  return (
     <div className="mt-8 border-t border-[#e8d9b7]/40">
       <div className="p-4 md:p-6 bg-[#fbf7ed]/10">
         <div className="flex justify-between items-center mb-4">
@@ -234,7 +245,7 @@ function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {tasks.map((task) => (
-                  <tr key={task.id} className="group hover:bg-blue-50/30">
+                  <tr key={task.id} className={`group transition-colors ${task.status === "DONE" ? "bg-gray-50/80 text-gray-400 hover:bg-gray-100" : "hover:bg-blue-50/30"}`}>
                     <td className="border-r border-gray-200 p-0">
                       <Select
                         defaultValue={task.status}
@@ -282,7 +293,7 @@ function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
                         onBlur={(e) =>
                           handleCellChange(task, "title", e.target.value)
                         }
-                        className="w-full h-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 font-medium"
+                        className={`w-full h-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 font-medium ${task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"}`}
                       />
                     </td>
                     <td className="border-r border-gray-200 p-0">

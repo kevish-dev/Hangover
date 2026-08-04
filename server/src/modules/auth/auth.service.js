@@ -30,7 +30,8 @@ export const googleLogin = async (code) => {
     },
   );
 
-  const { id: googleId, email, name: fullName } = userInfoResponse.data;
+  const { id: googleId, email: googleEmail, name: fullName } = userInfoResponse.data;
+  const email = googleEmail?.trim().toLowerCase();
 
   if (!email || !googleId) {
     throw new Error("Failed to retrieve user email or Google ID from Google.");
@@ -43,9 +44,10 @@ export const googleLogin = async (code) => {
     user = await authRepo.findUserByEmail(email);
 
     if (user) {
-      // If user exists with email but no googleId (unlikely unless another login method was used), we would link them.
-      // But for this project, let's just throw or link. Linking is safer.
-      throw new Error("Email already registered with a different provider.");
+      // CRM and admin bookings reserve a customer record by email before that
+      // customer signs in. A successful Google login with the same email claims
+      // that record, preserving every booking already linked to it.
+      user = await authRepo.linkGoogleAccount(user.id, googleId, fullName);
     } else {
       // Create new user
       user = await authRepo.createUser({ email, googleId, fullName });
