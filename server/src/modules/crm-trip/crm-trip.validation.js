@@ -51,8 +51,6 @@ const crmTripFields = z.object({
   totalAmount: z.number().positive(),
   tokenAmount: z.number().min(0),
   destinationId: z.string().uuid(),
-  airportPickupEnabled: z.boolean().default(false),
-  airportDropEnabled: z.boolean().default(false),
   tripType: tripTypeSchema.nullable().optional(),
   bestTimeToVisit: z.string().trim().max(300).nullable().optional(),
   isActive: z.boolean().default(true),
@@ -77,17 +75,13 @@ const crmTripFields = z.object({
 export const createCrmTripSchema = crmTripFields.refine((data) => data.tokenAmount <= data.totalAmount, { message: "Token amount cannot exceed the total amount", path: ["tokenAmount"] });
 
 // Do not derive this from `crmTripFields.partial()`: Zod still evaluates the
-// defaults in the create schema for omitted fields. A patch such as
-// `{ airportPickupEnabled: true }` would otherwise also reset drop-off and
-// other defaulted fields.
+// defaults in the create schema for omitted fields.
 export const updateCrmTripSchema = z.object({
   name: z.string().trim().min(1).max(300).optional(),
   numberOfNights: z.number().int().min(0).max(365).optional(),
   totalAmount: z.number().positive().optional(),
   tokenAmount: z.number().min(0).optional(),
   destinationId: z.string().uuid().optional(),
-  airportPickupEnabled: z.boolean().optional(),
-  airportDropEnabled: z.boolean().optional(),
   tripType: tripTypeSchema.nullable().optional(),
   bestTimeToVisit: z.string().trim().max(300).nullable().optional(),
   isActive: z.boolean().optional(),

@@ -41,8 +41,6 @@ type CrmTrip = {
   name: string;
   numberOfNights: number;
   destination: Destination;
-  airportPickupEnabled: boolean;
-  airportDropEnabled: boolean;
   tripType?: string | null;
   bestTimeToVisit?: string | null;
   isActive: boolean;
@@ -138,8 +136,6 @@ const generateDefaultInclusions = (
   nights: number,
   destinationId: string,
   itineraryDays: ItineraryDayDraft[],
-  pickup: boolean,
-  drop: boolean,
   stays: Master[],
   properties: Master[],
   places: Master[],
@@ -151,13 +147,6 @@ const generateDefaultInclusions = (
     title: `Accommodation for ${nights} ${nights === 1 ? "night" : "nights"}`,
     description: "",
   });
-
-  if (pickup) {
-    list.push({ title: "Pickup transfer", description: "" });
-  }
-  if (drop) {
-    list.push({ title: "Drop transfer", description: "" });
-  }
 
   itineraryDays.forEach((day, index) => {
     const dayNum = index + 1;
@@ -490,7 +479,6 @@ function CreateTripDialog({
 }) {
   const sourceTrip = trip || forkSource;
   const isFork = Boolean(forkSource);
-  const hasLockedPricing = Boolean(trip && sourceTrip?.slots?.some((slot) => (slot._count?.bookings || 0) > 0));
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
   const [nights, setNights] = useState("1");
@@ -501,8 +489,6 @@ function CreateTripDialog({
     { title: "Standard", price: "", tokenAmount: "" },
   ]);
   const [addOns, setAddOns] = useState<AddOnDraft[]>([]);
-  const [pickup, setPickup] = useState(false);
-  const [drop, setDrop] = useState(false);
   const [tripType, setTripType] = useState("");
   const [bestTimeToVisit, setBestTimeToVisit] = useState("");
   const [isPublished, setIsPublished] = useState(false);
@@ -657,7 +643,7 @@ function CreateTripDialog({
       setName(draft.name || ""); setNights(draft.nights || "1"); setDestinationId(draft.destinationId || "");
       setItineraryDays(Array.isArray(draft.itineraryDays) ? draft.itineraryDays : []); setItineraryDayIndex(Number(draft.itineraryDayIndex) || 0);
       setPackages(Array.isArray(draft.packages) && draft.packages.length ? draft.packages : [{ title: "Standard", price: "", tokenAmount: "" }]); setAddOns(Array.isArray(draft.addOns) ? draft.addOns : []);
-      setPickup(Boolean(draft.pickup)); setDrop(Boolean(draft.drop)); setTripType(draft.tripType || ""); setBestTimeToVisit(draft.bestTimeToVisit || ""); setIsPublished(Boolean(draft.isPublished)); setIsFeatured(Boolean(draft.isFeatured)); setIsListed(draft.isListed ?? true); setIsActive(draft.isActive ?? true); setCustomInclusions(Array.isArray(draft.customInclusions) ? draft.customInclusions : []); setCustomExclusions(Array.isArray(draft.customExclusions) ? draft.customExclusions : []);
+      setTripType(draft.tripType || ""); setBestTimeToVisit(draft.bestTimeToVisit || ""); setIsPublished(Boolean(draft.isPublished)); setIsFeatured(Boolean(draft.isFeatured)); setIsListed(draft.isListed ?? true); setIsActive(draft.isActive ?? true); setCustomInclusions(Array.isArray(draft.customInclusions) ? draft.customInclusions : []); setCustomExclusions(Array.isArray(draft.customExclusions) ? draft.customExclusions : []);
       setWebsiteOverview(draft.websiteOverview || ""); setWebsiteFaqs(Array.isArray(draft.websiteFaqs) ? draft.websiteFaqs : []); setWebsiteTagIds(Array.isArray(draft.websiteTagIds) ? draft.websiteTagIds : []);
       setSlots(Array.isArray(draft.slots) && draft.slots.length ? draft.slots : [{ startDate: "", endDate: "", capacity: "", title: "", priority: "0" }]); setOperationsReminderDays(String(draft.operationsReminderDays ?? 3));
       setWebsiteBannerImages(Array.isArray(draft.websiteBannerImages) ? draft.websiteBannerImages : []); setWebsiteStayTransportImages(Array.isArray(draft.websiteStayTransportImages) ? draft.websiteStayTransportImages : []); setWebsiteHighlights(Array.isArray(draft.websiteHighlights) ? draft.websiteHighlights : []);
@@ -686,7 +672,7 @@ function CreateTripDialog({
         scope: draftScope,
         createdAt: now,
         updatedAt: now,
-        data: { step, name, nights, destinationId, itineraryDays, itineraryDayIndex, packages, addOns, pickup, drop, tripType, bestTimeToVisit, isPublished, isFeatured, isListed, isActive, customInclusions, customExclusions, websiteOverview, websiteFaqs, websiteTagIds, slots, operationsReminderDays, websiteBannerImages, websiteStayTransportImages, websiteHighlights },
+        data: { step, name, nights, destinationId, itineraryDays, itineraryDayIndex, packages, addOns, tripType, bestTimeToVisit, isPublished, isFeatured, isListed, isActive, customInclusions, customExclusions, websiteOverview, websiteFaqs, websiteTagIds, slots, operationsReminderDays, websiteBannerImages, websiteStayTransportImages, websiteHighlights },
       };
       const drafts = [newDraft, ...getStoredDrafts()];
       window.localStorage.setItem(CRM_TRIP_DRAFTS_STORAGE_KEY, JSON.stringify(drafts));
@@ -736,8 +722,6 @@ function CreateTripDialog({
       maxQuantityPerSlot: item.maxQuantityPerSlot == null ? "" : String(item.maxQuantityPerSlot),
       purchaseCutoffOffsetDays: item.purchaseCutoffOffsetDays == null ? "" : String(item.purchaseCutoffOffsetDays), isActive: item.isActive,
     })));
-    setPickup(sourceTrip.airportPickupEnabled);
-    setDrop(sourceTrip.airportDropEnabled);
     setTripType(sourceTrip.tripType || "");
     setBestTimeToVisit(sourceTrip.bestTimeToVisit || "");
     setIsPublished(sourceTrip.isPublished);
@@ -755,9 +739,20 @@ function CreateTripDialog({
     setWebsiteBannerImages(sourceTrip.websiteBannerImages || []);
     setWebsiteStayTransportImages(sourceTrip.websiteStayTransportImages || []);
     setWebsiteHighlights(
-      ((sourceTrip.websiteHighlights as any) || []).map((h: any) =>
-        typeof h === "string" ? { text: h, imageUrl: "" } : { text: h?.text || "", imageUrl: h?.imageUrl || "" }
-      )
+      ((sourceTrip.websiteHighlights as any) || []).map((h: any) => {
+        if (!h) return { text: "", imageUrl: "" };
+        if (typeof h === "string") return { text: h, imageUrl: "" };
+        let textVal = h?.text;
+        let imageVal = h?.imageUrl || "";
+        while (textVal && typeof textVal === "object") {
+          if (textVal.imageUrl && !imageVal) imageVal = textVal.imageUrl;
+          textVal = textVal.text;
+        }
+        return {
+          text: typeof textVal === "string" ? textVal : "",
+          imageUrl: typeof imageVal === "string" ? imageVal : "",
+        };
+      })
     );
   }, [open, sourceTrip, isFork]);
 
@@ -954,16 +949,29 @@ function CreateTripDialog({
       return;
     }
     const expectedDays = Number(nights) + 1;
-    const invalidSlots = !slots.length || slots.some((slot) => {
+    const filledSlots = slots.filter((slot) => slot.startDate || slot.endDate || (slot.capacity && Number(slot.capacity) > 0));
+    const invalidSlots = filledSlots.some((slot) => {
       if (!slot.startDate || !slot.endDate || !Number.isInteger(Number(slot.capacity)) || Number(slot.capacity) < 1) return true;
-      const start = new Date(`${slot.startDate}T00:00:00Z`);
-      const end = new Date(`${slot.endDate}T00:00:00Z`);
+      const start = new Date(slot.startDate.includes("T") ? slot.startDate : `${slot.startDate}T00:00:00Z`);
+      const end = new Date(slot.endDate.includes("T") ? slot.endDate : `${slot.endDate}T00:00:00Z`);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return true;
       return Math.round((end.getTime() - start.getTime()) / 86400000) + 1 !== expectedDays;
     });
-    if (step !== 3 && (invalidSlots || !Number.isInteger(Number(operationsReminderDays)) || Number(operationsReminderDays) < 0)) {
-      const validationMessage = invalidSlots ? `Each departure must span exactly ${expectedDays} calendar days (for example, ${Number(nights)} night${Number(nights) === 1 ? "" : "s"} needs ${expectedDays} dates).` : "Reminder days must be a whole number of zero or more.";
+
+    if (invalidSlots) {
+      const validationMessage = `Each departure must span exactly ${expectedDays} calendar days (for example, ${Number(nights)} night${Number(nights) === 1 ? "" : "s"} needs ${expectedDays} dates).`;
       setPricingError(validationMessage);
       toast.error(validationMessage);
+      return;
+    }
+
+    if (!trip && filledSlots.length === 0) {
+      toast.error("Add at least one dated departure slot to create the trip.");
+      return;
+    }
+
+    if (!Number.isInteger(Number(operationsReminderDays)) || Number(operationsReminderDays) < 0) {
+      toast.error("Reminder days must be a whole number of zero or more.");
       return;
     }
 
@@ -974,8 +982,6 @@ function CreateTripDialog({
           Number(nights),
           destinationId,
           itineraryDays,
-          pickup,
-          drop,
           staysQuery.data || [],
           propertiesQuery.data || [],
           placesQuery.data || [],
@@ -1002,16 +1008,27 @@ function CreateTripDialog({
     }
     setSaving(true);
     try {
-      const primaryPackage = cleanPackages[0];
-      const hasNewPackage = cleanPackages.some((item) => !item.id);
-      const hasNewAddOn = cleanAddOns.some((item) => !item.id);
+      const primaryPackage = cleanPackages[0] || { price: 0, tokenAmount: 0 };
+      const formattedSlots = filledSlots.map((s) => {
+        const startStr = s.startDate.includes("T") ? s.startDate : `${s.startDate}T00:00:00Z`;
+        const endStr = s.endDate.includes("T") ? s.endDate : `${s.endDate}T00:00:00Z`;
+        return {
+          ...(s.id ? { id: s.id } : {}),
+          startDate: new Date(startStr).toISOString(),
+          endDate: new Date(endStr).toISOString(),
+          capacity: Number(s.capacity),
+          title: s.title?.trim() || null,
+          priority: Number(s.priority) || 0,
+        };
+      });
+
       const payload = {
         name: name.trim(),
         numberOfNights: Number(nights),
-        destinationId,
-        ...(!trip || !hasLockedPricing || hasNewPackage ? { totalAmount: primaryPackage.price, tokenAmount: primaryPackage.tokenAmount, packages: cleanPackages } : {}),
-        airportPickupEnabled: pickup,
-        airportDropEnabled: drop,
+        totalAmount: primaryPackage.price,
+        tokenAmount: primaryPackage.tokenAmount,
+        packages: cleanPackages,
+        destinationId: destinationId || null,
         tripType: tripType || null,
         bestTimeToVisit: bestTimeToVisit.trim() || null,
         isPublished,
@@ -1023,34 +1040,29 @@ function CreateTripDialog({
           stayLocationId: day.stayLocationId || null,
           propertyId: day.propertyId || null,
           dropOffLocationId: day.isDropOff ? day.dropOffLocationId || null : null,
-          transportEnabled: day.transportEnabled,
-          transportText: day.transportEnabled ? day.transportText.trim() || null : null,
-          notes: day.notes.trim() || null,
-          activities: day.activities.filter(Boolean).map((name) => ({ name })),
+          transportEnabled: Boolean(day.transportEnabled),
+          transportText: day.transportEnabled ? (day.transportText?.trim() || null) : null,
+          notes: day.notes?.trim() || null,
+          activities: (day.activities || []).filter(Boolean).map((actName) => ({ name: actName })),
         })),
-        ...(!trip || !hasLockedPricing || hasNewAddOn ? { addOns: cleanAddOns } : {}),
-        manualInclusions: customInclusions.map((inc) => ({
-          title: inc.title.trim(),
-          description: inc.description?.trim() || null,
-        })),
+        addOns: cleanAddOns,
+        manualInclusions: customInclusions
+          .filter((inc) => inc && inc.title && inc.title.trim())
+          .map((inc) => ({
+            title: inc.title.trim(),
+            description: inc.description?.trim() || null,
+          })),
         exclusions: customExclusions.map((exc) => exc.trim()).filter(Boolean),
         websiteOverview: websiteOverview.trim() || null,
-        websiteFaqs: websiteFaqs.filter(f => f.question && f.answer),
+        websiteFaqs: websiteFaqs.filter((f) => f.question && f.answer),
         websiteTagIds: websiteTagIds.filter(Boolean),
         operationsReminderDays: Number(operationsReminderDays),
-        slots: slots.map(s => ({
-          ...(s.id ? { id: s.id } : {}),
-          startDate: new Date(`${s.startDate}T00:00:00Z`).toISOString(),
-          endDate: new Date(`${s.endDate}T00:00:00Z`).toISOString(),
-          capacity: Number(s.capacity),
-          title: s.title?.trim() || null,
-          priority: Number(s.priority) || 0
-        })),
+        ...(formattedSlots.length > 0 ? { slots: formattedSlots } : {}),
         websiteBannerImages,
         websiteStayTransportImages,
         websiteHighlights: websiteHighlights
-          .filter((h) => h.text.trim())
-          .map((h) => ({ text: h.text.trim(), imageUrl: h.imageUrl.trim() })),
+          .filter((h) => h && typeof h.text === "string" && h.text.trim())
+          .map((h) => ({ text: h.text.trim(), imageUrl: (h.imageUrl || "").trim() })),
       };
       await (trip
         ? apiClient.patch(`/crm-trips/${trip.id}`, payload)
@@ -1181,8 +1193,7 @@ function CreateTripDialog({
           ) : step === 3 ? (
             <>
               <section className="space-y-3 rounded-xl border border-[#781216]/15 bg-[#fffafb] p-4">
-                <div><h3 className="font-semibold text-gray-900">Trip operations</h3><p className="mt-0.5 text-xs text-gray-600">Set these before the preview so pickup and drop-off are included in the generated itinerary details.</p></div>
-                <div className="flex flex-wrap gap-5"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={pickup} onChange={(event) => setPickup(event.target.checked)} />Include airport pickup</label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={drop} onChange={(event) => setDrop(event.target.checked)} />Include airport drop-off</label></div>
+                <div><h3 className="font-semibold text-gray-900">Trip visibility & status</h3><p className="mt-0.5 text-xs text-gray-600">Configure catalog, publishing, and booking settings for this trip.</p></div>
                 <div className="grid gap-2 border-t border-[#781216]/10 pt-3 sm:grid-cols-2">{[{ label: "Publish this trip", detail: "Make it available to public trip pages.", checked: isPublished, onChange: setIsPublished }, { label: "Feature this trip", detail: "Highlight it in featured collections.", checked: isFeatured, onChange: setIsFeatured }, { label: "List in public catalog", detail: "Show it in the browsable trip catalog.", checked: isListed, onChange: setIsListed }, { label: "Accept CRM bookings", detail: "Required to create new CRM bookings.", checked: isActive, onChange: setIsActive }].map((control) => <label key={control.label} className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 bg-white p-3 transition-colors hover:border-[#781216]/40"><input type="checkbox" checked={control.checked} onChange={(event) => control.onChange(event.target.checked)} className="mt-0.5 h-4 w-4 accent-[#781216]" /><span><span className="block text-sm font-semibold text-gray-800">{control.label}</span><span className="mt-0.5 block text-xs leading-5 text-gray-500">{control.detail}</span></span></label>)}</div>
               </section>
               <section className="space-y-3 rounded-xl border border-[#b59410]/30 bg-[#fcf9f2] p-4">
@@ -1194,7 +1205,6 @@ function CreateTripDialog({
                     Add the same package choices travelers will see. The first
                     package is the default CRM booking price for now.
                   </p>
-                  {hasLockedPricing && <p className="mt-2 rounded-md bg-amber-50 px-2.5 py-2 text-xs text-amber-800">Existing packages are locked because this trip has bookings. You can add a new package for future use.</p>}
                 </div>
                 <div className="hidden grid-cols-[minmax(0,1fr)_130px_150px_32px] gap-3 px-1 text-[11px] font-bold uppercase tracking-wider text-gray-500 md:grid">
                   <span>Package name<RequiredMark /></span>
@@ -1213,7 +1223,6 @@ function CreateTripDialog({
                           Package name<RequiredMark />
                         </span>
                         <Input
-                          disabled={hasLockedPricing && Boolean(item.id)}
                           value={item.title}
                           onChange={(event) =>
                             updatePackage(index, "title", event.target.value)
@@ -1226,7 +1235,6 @@ function CreateTripDialog({
                           Price (₹)<RequiredMark />
                         </span>
                         <Input
-                          disabled={hasLockedPricing && Boolean(item.id)}
                           min="0"
                           step="0.01"
                           type="number"
@@ -1242,7 +1250,6 @@ function CreateTripDialog({
                           Booking amount (₹)<RequiredMark />
                         </span>
                         <Input
-                          disabled={hasLockedPricing && Boolean(item.id)}
                           min="0"
                           step="0.01"
                           type="number"
@@ -1262,13 +1269,11 @@ function CreateTripDialog({
                         variant="ghost"
                         size="icon"
                         className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                        disabled={packages.length === 1 || (hasLockedPricing && Boolean(item.id))}
+                        disabled={packages.length === 1}
                         aria-label="Remove package"
                         title={
                           packages.length === 1
                             ? "At least one package is required"
-                            : hasLockedPricing && item.id
-                              ? "Existing packages are locked after bookings"
                             : "Remove package"
                         }
                         onClick={() =>
@@ -1304,10 +1309,9 @@ function CreateTripDialog({
                   <p className="mt-0.5 text-xs text-gray-500">
                     Travelers can add these while booking, before the cutoff.
                   </p>
-                  {hasLockedPricing && <p className="mt-2 text-xs text-amber-800">Existing add-ons are locked after bookings, but you can add new add-ons below.</p>}
                 </div>
                 {addOns.map((item, index) => (
-                  <div key={item.id || index} className={`flex flex-col gap-4 rounded-lg border bg-gray-50 p-4 md:flex-row ${hasLockedPricing && item.id ? "pointer-events-none opacity-60" : ""}`}>
+                  <div key={item.id || index} className="flex flex-col gap-4 rounded-lg border bg-gray-50 p-4 md:flex-row">
                     <div className="w-full shrink-0 md:w-32">
                       <span className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">Image</span>
                       {item.imageUrl ? (
@@ -1324,7 +1328,7 @@ function CreateTripDialog({
                       )}
                     </div>
                     <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2">
-                      <label className="space-y-1.5"><span className="block text-xs font-bold uppercase tracking-widest text-gray-500">Name <span className="text-red-500">*</span></span><Input value={item.title} onChange={(event) => updateAddOn(index, "title", event.target.value)} placeholder="e.g. Airport pickup" /></label>
+                      <label className="space-y-1.5"><span className="block text-xs font-bold uppercase tracking-widest text-gray-500">Name <span className="text-red-500">*</span></span><Input value={item.title} onChange={(event) => updateAddOn(index, "title", event.target.value)} placeholder="e.g. Extra luggage or equipment" /></label>
                       <label className="space-y-1.5"><span className="block text-xs font-bold uppercase tracking-widest text-gray-500">Price <span className="text-red-500">*</span></span><Input min="0" step="0.01" type="number" value={item.price} onChange={(event) => updateAddOn(index, "price", event.target.value)} placeholder="0" /></label>
                       <label className="space-y-1.5 md:col-span-2"><span className="block text-xs font-bold uppercase tracking-widest text-gray-500">Description</span><Input value={item.description} onChange={(event) => updateAddOn(index, "description", event.target.value)} placeholder="What is included?" /></label>
                       <label className="space-y-1.5"><span className="block text-xs font-bold uppercase tracking-widest text-gray-500">Max Qty (Per Booking)</span><Input min="1" type="number" value={item.maxQuantityPerBooking} onChange={(event) => updateAddOn(index, "maxQuantityPerBooking", event.target.value)} /></label>

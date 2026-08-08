@@ -43,8 +43,6 @@ type CrmFestival = {
   name: string;
   numberOfNights: number;
   destination: Destination;
-  airportPickupEnabled: boolean;
-  airportDropEnabled: boolean;
   tripType?: string | null;
   bestTimeToVisit?: string | null;
   isActive: boolean;
@@ -406,8 +404,6 @@ function FestivalFormModal({
   const [name, setName] = useState("");
   const [nights, setNights] = useState("3");
   const [destinationId, setDestinationId] = useState("");
-  const [pickup, setPickup] = useState(false);
-  const [drop, setDrop] = useState(false);
   const [tripType, setTripType] = useState("");
   const [bestTimeToVisit, setBestTimeToVisit] = useState("");
   const [isPublished, setIsPublished] = useState(false);
@@ -443,8 +439,6 @@ function FestivalFormModal({
       setName(isFork ? `${festival.name} (Copy)` : festival.name);
       setNights(String(festival.numberOfNights));
       setDestinationId(festival.destination.id);
-      setPickup(festival.airportPickupEnabled);
-      setDrop(festival.airportDropEnabled);
       setTripType(festival.tripType || "");
       setBestTimeToVisit(festival.bestTimeToVisit || "");
       setIsPublished(isFork ? false : festival.isPublished);
@@ -481,9 +475,22 @@ function FestivalFormModal({
       setWebsiteStayTransportImages(festival.websiteStayTransportImages || []);
       setWebsiteVideoUrl(festival.websiteVideoUrl || "");
 
-      setWebsiteHighlights((festival.websiteHighlights || []).map((h) =>
-        typeof h === "string" ? { text: h, imageUrl: "" } : { text: h.text || "", imageUrl: h.imageUrl || "" }
-      ));
+      setWebsiteHighlights(
+        ((festival.websiteHighlights as any) || []).map((h: any) => {
+          if (!h) return { text: "", imageUrl: "" };
+          if (typeof h === "string") return { text: h, imageUrl: "" };
+          let textVal = h?.text;
+          let imageVal = h?.imageUrl || "";
+          while (textVal && typeof textVal === "object") {
+            if (textVal.imageUrl && !imageVal) imageVal = textVal.imageUrl;
+            textVal = textVal.text;
+          }
+          return {
+            text: typeof textVal === "string" ? textVal : "",
+            imageUrl: typeof imageVal === "string" ? imageVal : "",
+          };
+        })
+      );
 
       setSlots((festival.slots || []).map((s) => ({
         id: isFork ? undefined : s.id,
@@ -617,8 +624,6 @@ function FestivalFormModal({
       totalAmount: parsedTotal,
       tokenAmount: parsedToken,
       destinationId,
-      airportPickupEnabled: pickup,
-      airportDropEnabled: drop,
       tripType: tripType || null,
       bestTimeToVisit: bestTimeToVisit.trim() || null,
       isActive,
@@ -749,17 +754,6 @@ function FestivalFormModal({
                       <option key={d.id} value={d.id}>{d.name}</option>
                     ))}
                   </select>
-                </label>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 pt-2">
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
-                  <input type="checkbox" checked={pickup} onChange={(e) => setPickup(e.target.checked)} className="rounded text-[#781216]" />
-                  Include Airport Pickup
-                </label>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
-                  <input type="checkbox" checked={drop} onChange={(e) => setDrop(e.target.checked)} className="rounded text-[#781216]" />
-                  Include Airport Drop
                 </label>
               </div>
             </div>

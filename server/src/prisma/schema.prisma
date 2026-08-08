@@ -412,8 +412,6 @@ model CrmTrip {
   tokenAmount                Decimal?                 @db.Decimal(10, 2)
   destinationId              String
   destination                CrmDestination           @relation(fields: [destinationId], references: [id], onDelete: Restrict)
-  airportPickupEnabled       Boolean                  @default(false)
-  airportDropEnabled         Boolean                  @default(false)
   tripType                   TripType?
   bestTimeToVisit            String?
   isActive                   Boolean                  @default(true)
@@ -568,8 +566,6 @@ model CrmFestival {
   tokenAmount                Decimal?                     @db.Decimal(10, 2)
   destinationId              String
   destination                CrmDestination               @relation(fields: [destinationId], references: [id], onDelete: Restrict)
-  airportPickupEnabled       Boolean                      @default(false)
-  airportDropEnabled         Boolean                      @default(false)
   tripType                   TripType?
   bestTimeToVisit            String?
   isActive                   Boolean                      @default(true)
@@ -1491,8 +1487,6 @@ enum CrmInclusionType {
   SIGHTSEEING
   ACTIVITY
   HOTEL_STAY
-  AIRPORT_PICKUP
-  AIRPORT_DROP
   DROP_OFF_TRANSFER
   COMMON
   TRANSPORT

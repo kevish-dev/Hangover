@@ -327,13 +327,21 @@ export function FestivalFormModal({
           try { parsedHighlights = JSON.parse(parsedHighlights); } catch(e) { parsedHighlights = []; }
         }
         setHighlightItems(
-          Array.isArray(parsedHighlights) ? parsedHighlights.map((item: any) => ({
-            id: Math.random().toString(),
-            text: item.text || "",
-            type: "EXISTING",
-            url: item.imageUrl,
-            preview: item.imageUrl,
-          })) : []
+          Array.isArray(parsedHighlights) ? parsedHighlights.map((item: any) => {
+            let textVal = item?.text;
+            let imageVal = item?.imageUrl || "";
+            while (textVal && typeof textVal === "object") {
+              if (textVal.imageUrl && !imageVal) imageVal = textVal.imageUrl;
+              textVal = textVal.text;
+            }
+            return {
+              id: Math.random().toString(),
+              text: typeof textVal === "string" ? textVal : "",
+              type: "EXISTING" as const,
+              url: typeof imageVal === "string" ? imageVal : "",
+              preview: typeof imageVal === "string" ? imageVal : "",
+            };
+          }) : []
         );
 
         let parsedBanners = festival.bannerImages || [];

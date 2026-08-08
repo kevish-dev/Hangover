@@ -1,7 +1,18 @@
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Link } from "react-router";
-import { MapPin, Clock, Search, X, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, AlertCircle } from "lucide-react";
+import {
+  MapPin,
+  Clock,
+  Search,
+  X,
+  ArrowRight,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  SlidersHorizontal,
+  AlertCircle,
+} from "lucide-react";
 import { SiteFooter } from "../components/site-footer";
 import {
   fetchAllTrips,
@@ -23,21 +34,45 @@ export type ExtendedTrip = ApiTrip & { isFestival?: boolean };
 
 // ── "Not Available" inline label ──────────────────────────────────
 function NA({ text = "Not Available" }: { text?: string }) {
-  return <span style={{ color: "#c0392b", fontSize: "inherit", fontWeight: 500, fontStyle: "italic" }}>{text}</span>;
+  return (
+    <span
+      style={{
+        color: "#c0392b",
+        fontSize: "inherit",
+        fontWeight: 500,
+        fontStyle: "italic",
+      }}
+    >
+      {text}
+    </span>
+  );
 }
 
 // ── Filter option definitions ─────────────────────────────────────
-const MONTHS       = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 const PRICE_RANGES = [
-  { label: "Under ₹10,000",  min: 0,     max: 10000 },
-  { label: "₹10k – ₹20k",   min: 10000, max: 20000 },
-  { label: "₹20k – ₹50k",   min: 20000, max: 50000 },
-  { label: "Above ₹50k",     min: 50000, max: Infinity },
+  { label: "Under ₹10,000", min: 0, max: 10000 },
+  { label: "₹10k – ₹20k", min: 10000, max: 20000 },
+  { label: "₹20k – ₹50k", min: 20000, max: 50000 },
+  { label: "Above ₹50k", min: 50000, max: Infinity },
 ];
 
 const SORT_OPTIONS = [
   { label: "Browse by Destination", value: "destination" },
-  { label: "Most Popular",     value: "popular" },
+  { label: "Most Popular", value: "popular" },
   { label: "Price: Low → High", value: "price_asc" },
   { label: "Price: High → Low", value: "price_desc" },
   { label: "Duration: Shortest", value: "duration_asc" },
@@ -52,8 +87,11 @@ type Filters = {
 };
 
 const EMPTY_FILTERS: Filters = {
-  destinations: [], categories: [], durations: [],
-  months: [], priceRange: null,
+  destinations: [],
+  categories: [],
+  durations: [],
+  months: [],
+  priceRange: null,
 };
 
 // ── Helper: extract month abbreviations from bestTimeToVisit ──────
@@ -71,24 +109,51 @@ function parseMonths(bestTime: string | null | undefined): string[] {
 }
 
 // ── Filter group accordion ─────────────────────────────────────────
-function FilterGroup({ title, children, defaultOpen = false }: {
-  title: string; children: React.ReactNode; defaultOpen?: boolean;
+function FilterGroup({
+  title,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div style={{ borderBottom: "1px solid rgba(30,26,20,0.07)", paddingBottom: open ? "0" : "0" }}>
+    <div
+      style={{
+        borderBottom: "1px solid rgba(30,26,20,0.07)",
+        paddingBottom: open ? "0" : "0",
+      }}
+    >
       <button
         onClick={() => setOpen(!open)}
         style={{
-          width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
-          padding: "14px 0", background: "none", border: "none", cursor: "pointer",
+          width: "100%",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "14px 0",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
           fontFamily: "'Poppins', sans-serif",
         }}
       >
-        <span style={{ color: "#1e1a14", fontSize: "0.78rem", fontWeight: 600, letterSpacing: "0.06em" }}>
+        <span
+          style={{
+            color: "#1e1a14",
+            fontSize: "0.78rem",
+            fontWeight: 600,
+            letterSpacing: "0.06em",
+          }}
+        >
           {title}
         </span>
-        <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
+        <motion.div
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+        >
           <ChevronDown size={13} color="rgba(30,26,20,0.4)" />
         </motion.div>
       </button>
@@ -109,31 +174,81 @@ function FilterGroup({ title, children, defaultOpen = false }: {
   );
 }
 
-function CheckPill({ label, active, onToggle }: { label: string; active: boolean; onToggle: () => void }) {
+function CheckPill({
+  label,
+  active,
+  onToggle,
+}: {
+  label: string;
+  active: boolean;
+  onToggle: () => void;
+}) {
   return (
     <button
       onClick={onToggle}
       style={{
-        display: "inline-flex", alignItems: "center", gap: "6px",
-        padding: "6px 12px", borderRadius: "6px",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "6px",
+        padding: "6px 12px",
+        borderRadius: "6px",
         background: active ? "rgba(120,18,22,0.08)" : "transparent",
         border: `1.5px solid ${active ? "#781216" : "rgba(30,26,20,0.12)"}`,
         color: active ? "#781216" : "rgba(30,26,20,0.6)",
-        fontFamily: "'Poppins', sans-serif", fontSize: "0.75rem",
-        fontWeight: active ? 600 : 400, cursor: "pointer",
-        transition: "all 0.2s ease", whiteSpace: "nowrap",
+        fontFamily: "'Poppins', sans-serif",
+        fontSize: "0.75rem",
+        fontWeight: active ? 600 : 400,
+        cursor: "pointer",
+        transition: "all 0.2s ease",
+        whiteSpace: "nowrap",
       }}
     >
-      {active && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#781216", display: "inline-block" }} />}
+      {active && (
+        <span
+          style={{
+            width: "6px",
+            height: "6px",
+            borderRadius: "50%",
+            background: "#781216",
+            display: "inline-block",
+          }}
+        />
+      )}
       {label}
     </button>
   );
 }
 
 // ── Calendar date picker ──────────────────────────────────────────
-const MONTH_NAMES  = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const MONTH_FULL   = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-const DAY_LABELS   = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+const MONTH_NAMES = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+const MONTH_FULL = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+const DAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 function MonthCalendar({
   selected,
@@ -147,16 +262,17 @@ function MonthCalendar({
   const todayM = now.getMonth();
   const todayD = now.getDate();
 
-  const [viewYear,  setViewYear]  = useState(todayY);
+  const [viewYear, setViewYear] = useState(todayY);
   const [viewMonth, setViewMonth] = useState(todayM);
   // "month" = pick-a-month overview, "day" = day grid
   const [mode, setMode] = useState<"day" | "month">("day");
 
-  const daysInMonth  = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const firstWeekday = new Date(viewYear, viewMonth, 1).getDay();
-  const monthKey     = MONTH_NAMES[viewMonth];
-  const isPastMonth  = viewYear < todayY || (viewYear === todayY && viewMonth < todayM);
-  const isSelected   = selected.includes(monthKey);
+  const monthKey = MONTH_NAMES[viewMonth];
+  const isPastMonth =
+    viewYear < todayY || (viewYear === todayY && viewMonth < todayM);
+  const isSelected = selected.includes(monthKey);
 
   const cells: (number | null)[] = [
     ...Array(firstWeekday).fill(null),
@@ -165,16 +281,35 @@ function MonthCalendar({
 
   return (
     <div style={{ fontFamily: "'Poppins', sans-serif", userSelect: "none" }}>
-
       {/* ── Header: always visible ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "10px",
+        }}
+      >
         <button
           onClick={() => {
-            if (mode === "day") { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); }
-            else setViewYear(y => y - 1);
+            if (mode === "day") {
+              if (viewMonth === 0) {
+                setViewMonth(11);
+                setViewYear((y) => y - 1);
+              } else setViewMonth((m) => m - 1);
+            } else setViewYear((y) => y - 1);
           }}
-          style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", borderRadius: "4px", display: "flex" }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(30,26,20,0.06)")}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: "4px 6px",
+            borderRadius: "4px",
+            display: "flex",
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.background = "rgba(30,26,20,0.06)")
+          }
           onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
         >
           <ChevronLeft size={13} color="rgba(30,26,20,0.5)" />
@@ -182,27 +317,73 @@ function MonthCalendar({
 
         {/* Clicking header toggles between day-view and month-picker */}
         <button
-          onClick={() => setMode(m => m === "day" ? "month" : "day")}
-          style={{ background: "none", border: "none", cursor: "pointer", textAlign: "center", padding: "2px 8px", borderRadius: "4px" }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(30,26,20,0.05)")}
+          onClick={() => setMode((m) => (m === "day" ? "month" : "day"))}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            textAlign: "center",
+            padding: "2px 8px",
+            borderRadius: "4px",
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.background = "rgba(30,26,20,0.05)")
+          }
           onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
         >
-          <p style={{ color: "#1e1a14", fontSize: "0.8rem", fontWeight: 600, margin: 0 }}>
+          <p
+            style={{
+              color: "#1e1a14",
+              fontSize: "0.8rem",
+              fontWeight: 600,
+              margin: 0,
+            }}
+          >
             {mode === "day" ? MONTH_FULL[viewMonth] : viewYear}
-            <span style={{ color: "#781216", fontSize: "0.55rem", marginLeft: "5px", letterSpacing: "0.06em" }}>
+            <span
+              style={{
+                color: "#781216",
+                fontSize: "0.55rem",
+                marginLeft: "5px",
+                letterSpacing: "0.06em",
+              }}
+            >
               {mode === "day" ? "▾ pick month" : "▾ pick year"}
             </span>
           </p>
-          {mode === "day" && <p style={{ color: "rgba(30,26,20,0.4)", fontSize: "0.62rem", margin: 0 }}>{viewYear}</p>}
+          {mode === "day" && (
+            <p
+              style={{
+                color: "rgba(30,26,20,0.4)",
+                fontSize: "0.62rem",
+                margin: 0,
+              }}
+            >
+              {viewYear}
+            </p>
+          )}
         </button>
 
         <button
           onClick={() => {
-            if (mode === "day") { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); }
-            else setViewYear(y => y + 1);
+            if (mode === "day") {
+              if (viewMonth === 11) {
+                setViewMonth(0);
+                setViewYear((y) => y + 1);
+              } else setViewMonth((m) => m + 1);
+            } else setViewYear((y) => y + 1);
           }}
-          style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", borderRadius: "4px", display: "flex" }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(30,26,20,0.06)")}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: "4px 6px",
+            borderRadius: "4px",
+            display: "flex",
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.background = "rgba(30,26,20,0.06)")
+          }
           onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
         >
           <ChevronRight size={13} color="rgba(30,26,20,0.5)" />
@@ -212,26 +393,55 @@ function MonthCalendar({
       <AnimatePresence mode="wait">
         {mode === "month" ? (
           /* ── Month overview grid: tap any month to jump to it ── */
-          <motion.div key="month-grid"
-            initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+          <motion.div
+            key="month-grid"
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.18 }}
           >
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "5px" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: "5px",
+              }}
+            >
               {MONTH_NAMES.map((m, i) => {
-                const pastM = viewYear < todayY || (viewYear === todayY && i < todayM);
+                const pastM =
+                  viewYear < todayY || (viewYear === todayY && i < todayM);
                 const isSel = selected.includes(m);
                 const isCur = viewYear === todayY && i === todayM;
                 return (
-                  <button key={m}
-                    onClick={() => { if (!pastM) { setViewMonth(i); setMode("day"); } }}
+                  <button
+                    key={m}
+                    onClick={() => {
+                      if (!pastM) {
+                        setViewMonth(i);
+                        setMode("day");
+                      }
+                    }}
                     style={{
-                      padding: "9px 4px", borderRadius: "8px", textAlign: "center",
+                      padding: "9px 4px",
+                      borderRadius: "8px",
+                      textAlign: "center",
                       cursor: pastM ? "not-allowed" : "pointer",
-                      fontFamily: "'Poppins', sans-serif", fontSize: "0.72rem",
+                      fontFamily: "'Poppins', sans-serif",
+                      fontSize: "0.72rem",
                       fontWeight: isSel ? 700 : i === viewMonth ? 600 : 400,
-                      background: isSel ? "#781216" : i === viewMonth ? "rgba(120,18,22,0.06)" : "transparent",
+                      background: isSel
+                        ? "#781216"
+                        : i === viewMonth
+                          ? "rgba(120,18,22,0.06)"
+                          : "transparent",
                       border: `1.5px solid ${isSel ? "#781216" : isCur ? "rgba(120,18,22,0.3)" : "rgba(30,26,20,0.08)"}`,
-                      color: isSel ? "#fff" : pastM ? "rgba(30,26,20,0.2)" : i === viewMonth ? "#781216" : "#1e1a14",
+                      color: isSel
+                        ? "#fff"
+                        : pastM
+                          ? "rgba(30,26,20,0.2)"
+                          : i === viewMonth
+                            ? "#781216"
+                            : "#1e1a14",
                       transition: "all 0.15s ease",
                     }}
                   >
@@ -240,58 +450,123 @@ function MonthCalendar({
                 );
               })}
             </div>
-            <p style={{ color: "rgba(30,26,20,0.38)", fontSize: "0.62rem", textAlign: "center", marginTop: "8px", marginBottom: 0 }}>
+            <p
+              style={{
+                color: "rgba(30,26,20,0.38)",
+                fontSize: "0.62rem",
+                textAlign: "center",
+                marginTop: "8px",
+                marginBottom: 0,
+              }}
+            >
               Tap a month to view its calendar
             </p>
           </motion.div>
         ) : (
           /* ── Day grid ── */
-          <motion.div key="day-grid"
-            initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+          <motion.div
+            key="day-grid"
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.18 }}
           >
             {/* Select whole month */}
             <button
               onClick={() => !isPastMonth && onToggle(monthKey)}
               style={{
-                width: "100%", marginBottom: "10px", padding: "7px",
+                width: "100%",
+                marginBottom: "10px",
+                padding: "7px",
                 background: isSelected ? "#781216" : "rgba(120,18,22,0.04)",
                 border: `1.5px solid ${isSelected ? "#781216" : "rgba(120,18,22,0.15)"}`,
-                borderRadius: "6px", cursor: isPastMonth ? "not-allowed" : "pointer",
-                color: isSelected ? "#fff" : isPastMonth ? "rgba(30,26,20,0.25)" : "#781216",
-                fontFamily: "'Poppins', sans-serif", fontSize: "0.68rem", fontWeight: 600,
-                letterSpacing: "0.06em", transition: "all 0.2s ease",
+                borderRadius: "6px",
+                cursor: isPastMonth ? "not-allowed" : "pointer",
+                color: isSelected
+                  ? "#fff"
+                  : isPastMonth
+                    ? "rgba(30,26,20,0.25)"
+                    : "#781216",
+                fontFamily: "'Poppins', sans-serif",
+                fontSize: "0.68rem",
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                transition: "all 0.2s ease",
               }}
             >
-              {isSelected ? `✓ ${MONTH_FULL[viewMonth]} selected` : `Select ${MONTH_FULL[viewMonth]}`}
+              {isSelected
+                ? `✓ ${MONTH_FULL[viewMonth]} selected`
+                : `Select ${MONTH_FULL[viewMonth]}`}
             </button>
 
             {/* Day-of-week headers */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "2px", marginBottom: "3px" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(7, 1fr)",
+                gap: "2px",
+                marginBottom: "3px",
+              }}
+            >
               {DAY_LABELS.map((d) => (
-                <div key={d} style={{ textAlign: "center", color: "rgba(30,26,20,0.35)", fontSize: "0.56rem", fontWeight: 600, padding: "2px 0" }}>{d}</div>
+                <div
+                  key={d}
+                  style={{
+                    textAlign: "center",
+                    color: "rgba(30,26,20,0.35)",
+                    fontSize: "0.56rem",
+                    fontWeight: 600,
+                    padding: "2px 0",
+                  }}
+                >
+                  {d}
+                </div>
               ))}
             </div>
 
             {/* Day cells */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "2px" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(7, 1fr)",
+                gap: "2px",
+              }}
+            >
               {cells.map((day, idx) => {
                 if (!day) return <div key={idx} />;
-                const isPastDay = isPastMonth || (viewYear === todayY && viewMonth === todayM && day < todayD);
-                const isToday   = viewYear === todayY && viewMonth === todayM && day === todayD;
+                const isPastDay =
+                  isPastMonth ||
+                  (viewYear === todayY && viewMonth === todayM && day < todayD);
+                const isToday =
+                  viewYear === todayY && viewMonth === todayM && day === todayD;
                 return (
-                  <button key={idx}
+                  <button
+                    key={idx}
                     onClick={() => !isPastMonth && onToggle(monthKey)}
                     style={{
-                      aspectRatio: "1", borderRadius: "5px",
-                      border: isToday ? "1.5px solid #781216" : "1.5px solid transparent",
-                      background: isSelected ? "rgba(120,18,22,0.1)" : isToday ? "rgba(120,18,22,0.06)" : "transparent",
-                      color: isPastDay ? "rgba(30,26,20,0.2)" : isSelected ? "#781216" : "#1e1a14",
-                      fontSize: "0.66rem", fontWeight: isToday ? 700 : 400,
+                      aspectRatio: "1",
+                      borderRadius: "5px",
+                      border: isToday
+                        ? "1.5px solid #781216"
+                        : "1.5px solid transparent",
+                      background: isSelected
+                        ? "rgba(120,18,22,0.1)"
+                        : isToday
+                          ? "rgba(120,18,22,0.06)"
+                          : "transparent",
+                      color: isPastDay
+                        ? "rgba(30,26,20,0.2)"
+                        : isSelected
+                          ? "#781216"
+                          : "#1e1a14",
+                      fontSize: "0.66rem",
+                      fontWeight: isToday ? 700 : 400,
                       fontFamily: "'Poppins', sans-serif",
                       cursor: isPastMonth ? "not-allowed" : "pointer",
                       transition: "background 0.12s ease",
-                      display: "flex", alignItems: "center", justifyContent: "center",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                     }}
                   >
                     {day}
@@ -304,8 +579,20 @@ function MonthCalendar({
       </AnimatePresence>
 
       {selected.length > 0 && (
-        <button onClick={() => selected.forEach((m) => onToggle(m))}
-          style={{ marginTop: "10px", background: "none", border: "none", color: "rgba(30,26,20,0.42)", fontSize: "0.65rem", cursor: "pointer", fontFamily: "'Poppins', sans-serif", textDecoration: "underline", padding: 0 }}>
+        <button
+          onClick={() => selected.forEach((m) => onToggle(m))}
+          style={{
+            marginTop: "10px",
+            background: "none",
+            border: "none",
+            color: "rgba(30,26,20,0.42)",
+            fontSize: "0.65rem",
+            cursor: "pointer",
+            fontFamily: "'Poppins', sans-serif",
+            textDecoration: "underline",
+            padding: 0,
+          }}
+        >
           Clear selection
         </button>
       )}
@@ -314,25 +601,27 @@ function MonthCalendar({
 }
 
 // ── Filter sidebar ─────────────────────────────────────────────────
-function FilterSidebar({ 
-  filters, 
-  setFilters, 
-  availableDestinations, 
+function FilterSidebar({
+  filters,
+  setFilters,
+  availableDestinations,
   availableCategories,
   availableDurations,
-  availablePriceRanges
+  availablePriceRanges,
 }: {
   filters: Filters;
   setFilters: React.Dispatch<React.SetStateAction<Filters>>;
   availableDestinations: string[];
   availableCategories: string[];
   availableDurations: string[];
-  availablePriceRanges: { label: string, min: number, max: number }[];
+  availablePriceRanges: { label: string; min: number; max: number }[];
 }) {
   const toggle = (key: keyof Omit<Filters, "priceRange">, val: string) => {
     setFilters((f) => ({
       ...f,
-      [key]: f[key].includes(val) ? f[key].filter((v) => v !== val) : [...f[key], val],
+      [key]: f[key].includes(val)
+        ? f[key].filter((v) => v !== val)
+        : [...f[key], val],
     }));
   };
 
@@ -341,13 +630,58 @@ function FilterSidebar({
   return (
     <div style={{ fontFamily: "'Poppins', sans-serif" }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
-        <span style={{ display: "flex", alignItems: "center", gap: "6px", color: "#1e1a14", fontSize: "0.82rem", fontWeight: 600 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "4px",
+        }}
+      >
+        <span
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            color: "#1e1a14",
+            fontSize: "0.82rem",
+            fontWeight: 600,
+          }}
+        >
           <SlidersHorizontal size={14} color="#781216" />
-          Filters {activeCount > 0 && <span style={{ background: "#781216", color: "#fff", borderRadius: "999px", width: "18px", height: "18px", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.6rem", fontWeight: 700 }}>{activeCount}</span>}
+          Filters{" "}
+          {activeCount > 0 && (
+            <span
+              style={{
+                background: "#781216",
+                color: "#fff",
+                borderRadius: "999px",
+                width: "18px",
+                height: "18px",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "0.6rem",
+                fontWeight: 700,
+              }}
+            >
+              {activeCount}
+            </span>
+          )}
         </span>
         {activeCount > 0 && (
-          <button onClick={() => setFilters(EMPTY_FILTERS)} style={{ background: "none", border: "none", color: "#781216", fontSize: "0.7rem", cursor: "pointer", fontFamily: "'Poppins', sans-serif", textDecoration: "underline" }}>
+          <button
+            onClick={() => setFilters(EMPTY_FILTERS)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#781216",
+              fontSize: "0.7rem",
+              cursor: "pointer",
+              fontFamily: "'Poppins', sans-serif",
+              textDecoration: "underline",
+            }}
+          >
             Clear all
           </button>
         )}
@@ -358,7 +692,12 @@ function FilterSidebar({
         <FilterGroup title="Destination">
           <div style={{ display: "flex", flexWrap: "wrap", gap: "7px" }}>
             {availableDestinations.map((d) => (
-              <CheckPill key={d} label={d} active={filters.destinations.includes(d)} onToggle={() => toggle("destinations", d)} />
+              <CheckPill
+                key={d}
+                label={d}
+                active={filters.destinations.includes(d)}
+                onToggle={() => toggle("destinations", d)}
+              />
             ))}
           </div>
         </FilterGroup>
@@ -369,7 +708,12 @@ function FilterSidebar({
         <FilterGroup title="Category">
           <div style={{ display: "flex", flexWrap: "wrap", gap: "7px" }}>
             {availableCategories.map((c) => (
-              <CheckPill key={c} label={c} active={filters.categories.includes(c)} onToggle={() => toggle("categories", c)} />
+              <CheckPill
+                key={c}
+                label={c}
+                active={filters.categories.includes(c)}
+                onToggle={() => toggle("categories", c)}
+              />
             ))}
           </div>
         </FilterGroup>
@@ -380,7 +724,12 @@ function FilterSidebar({
         <FilterGroup title="Duration">
           <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
             {availableDurations.map((d) => (
-              <CheckPill key={d} label={d} active={filters.durations.includes(d)} onToggle={() => toggle("durations", d)} />
+              <CheckPill
+                key={d}
+                label={d}
+                active={filters.durations.includes(d)}
+                onToggle={() => toggle("durations", d)}
+              />
             ))}
           </div>
         </FilterGroup>
@@ -391,9 +740,16 @@ function FilterSidebar({
         <FilterGroup title="Price Range">
           <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
             {availablePriceRanges.map((r) => (
-              <CheckPill key={r.label} label={r.label}
+              <CheckPill
+                key={r.label}
+                label={r.label}
                 active={filters.priceRange === r.label}
-                onToggle={() => setFilters((f) => ({ ...f, priceRange: f.priceRange === r.label ? null : r.label }))}
+                onToggle={() =>
+                  setFilters((f) => ({
+                    ...f,
+                    priceRange: f.priceRange === r.label ? null : r.label,
+                  }))
+                }
               />
             ))}
           </div>
@@ -407,7 +763,6 @@ function FilterSidebar({
           onToggle={(m) => toggle("months", m)}
         />
       </FilterGroup>
-
     </div>
   );
 }
@@ -415,11 +770,17 @@ function FilterSidebar({
 // ── Trip Card ──────────────────────────────────────────────────────
 function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
   const [hovered, setHovered] = useState(false);
-  const heroImage = trip.bannerImages?.[0] || trip.highlights?.[0]?.imageUrl || "";
+  const heroImage =
+    trip.bannerImages?.[0] || trip.highlights?.[0]?.imageUrl || "";
   const tripPrice = trip.packages?.[0]?.price || 0;
   const priceNum = priceToNumber(tripPrice);
   const spots = Array.isArray(trip.slots)
-    ? trip.slots.reduce((total, slot) => total + spotsLeft(Number(slot.capacity || 0), Number(slot.filledSpots || 0)), 0)
+    ? trip.slots.reduce(
+        (total, slot) =>
+          total +
+          spotsLeft(Number(slot.capacity || 0), Number(slot.filledSpots || 0)),
+        0,
+      )
     : spotsLeft(trip.capacity, trip.filledSpots);
   const tags = trip.tripTags?.map((t) => t.tag) || [];
   const typeLabel = formatTripType(trip.tripType);
@@ -432,74 +793,281 @@ function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 12 }}
-      transition={{ duration: 0.45, ease: [0.25, 0.46, 0.45, 0.94], delay: Math.min(index * 0.04, 0.3) }}
+      transition={{
+        duration: 0.45,
+        ease: [0.25, 0.46, 0.45, 0.94],
+        delay: Math.min(index * 0.04, 0.3),
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: "#ffffff", borderRadius: "12px", overflow: "hidden",
+        background: "#ffffff",
+        borderRadius: "12px",
+        overflow: "hidden",
         border: "1px solid rgba(30,26,20,0.07)",
-        boxShadow: hovered ? "0 8px 32px rgba(30,26,20,0.1)" : "0 2px 8px rgba(30,26,20,0.05)",
+        boxShadow: hovered
+          ? "0 8px 32px rgba(30,26,20,0.1)"
+          : "0 2px 8px rgba(30,26,20,0.05)",
         transition: "box-shadow 0.3s ease, transform 0.3s ease",
         transform: hovered ? "translateY(-4px)" : "translateY(0)",
-        cursor: "pointer", fontFamily: "'Poppins', sans-serif",
+        cursor: "pointer",
+        fontFamily: "'Poppins', sans-serif",
       }}
     >
-      <div style={{ position: "relative", aspectRatio: "16/10", overflow: "hidden" }}>
+      <div
+        style={{
+          position: "relative",
+          aspectRatio: "16/10",
+          overflow: "hidden",
+        }}
+      >
         {heroImage ? (
-          <img src={mediaImageUrl(heroImage, { width: 640, height: 400 })} alt={trip.title} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.55s ease", transform: hovered ? "scale(1.05)" : "scale(1)" }} />
+          <img
+            src={mediaImageUrl(heroImage, { width: 640, height: 400 })}
+            alt={trip.title}
+            loading="lazy"
+            decoding="async"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              transition: "transform 0.55s ease",
+              transform: hovered ? "scale(1.05)" : "scale(1)",
+            }}
+          />
         ) : (
-          <div style={{ width: "100%", height: "100%", background: "#ede8dc", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              background: "#ede8dc",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
             <NA text="No Image" />
           </div>
         )}
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(11,11,11,0.55) 0%, transparent 50%)" }} />
-        <div style={{ position: "absolute", top: "12px", left: "12px", background: "#781216", color: "#fff", borderRadius: "4px", padding: "3px 10px", fontSize: "0.58rem", fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background:
+              "linear-gradient(to top, rgba(11,11,11,0.55) 0%, transparent 50%)",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            top: "12px",
+            left: "12px",
+            background: "#781216",
+            color: "#fff",
+            borderRadius: "4px",
+            padding: "3px 10px",
+            fontSize: "0.58rem",
+            fontWeight: 600,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+          }}
+        >
           {typeLabel}
         </div>
         {(trip as any).isFestival && (
-          <div style={{ position: "absolute", top: "12px", left: "12px", background: "#c8a96e", color: "#fff", borderRadius: "4px", padding: "3px 10px", fontSize: "0.58rem", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", boxShadow: "0 2px 4px rgba(0,0,0,0.2)" }}>
+          <div
+            style={{
+              position: "absolute",
+              top: "12px",
+              left: "12px",
+              background: "#c8a96e",
+              color: "#fff",
+              borderRadius: "4px",
+              padding: "3px 10px",
+              fontSize: "0.58rem",
+              fontWeight: 600,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+            }}
+          >
             Hangover Featured
           </div>
         )}
         {spots <= 8 && spots > 0 && (
-          <div style={{ position: "absolute", top: "12px", right: "12px", background: "rgba(11,11,11,0.7)", backdropFilter: "blur(6px)", color: "#C8A96E", borderRadius: "4px", padding: "3px 10px", fontSize: "0.58rem", fontWeight: 500 }}>
+          <div
+            style={{
+              position: "absolute",
+              top: "12px",
+              right: "12px",
+              background: "rgba(11,11,11,0.7)",
+              backdropFilter: "blur(6px)",
+              color: "#C8A96E",
+              borderRadius: "4px",
+              padding: "3px 10px",
+              fontSize: "0.58rem",
+              fontWeight: 500,
+            }}
+          >
             {spots} spots left
           </div>
         )}
       </div>
       <div className="trip-card-content" style={{ padding: "20px 22px 22px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "7px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            marginBottom: "7px",
+          }}
+        >
           <MapPin size={11} color="#781216" />
-          <span style={{ color: "#781216", fontSize: "0.65rem", fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-            {safeValue(trip.location) === "Not Available" ? <NA /> : trip.location}
+          <span
+            style={{
+              color: "#781216",
+              fontSize: "0.65rem",
+              fontWeight: 500,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+            }}
+          >
+            {safeValue(trip.location) === "Not Available" ? (
+              <NA />
+            ) : (
+              trip.location
+            )}
           </span>
         </div>
-        <h3 style={{ color: "#1e1a14", fontSize: "1rem", fontWeight: 500, letterSpacing: "-0.01em", lineHeight: 1.3, margin: "0 0 6px" }}>
+        <h3
+          style={{
+            color: "#1e1a14",
+            fontSize: "1rem",
+            fontWeight: 500,
+            letterSpacing: "-0.01em",
+            lineHeight: 1.3,
+            margin: "0 0 6px",
+          }}
+        >
           {trip.title || <NA />}
         </h3>
-        <p style={{ color: "rgba(30,26,20,0.52)", fontSize: "0.78rem", fontWeight: 300, lineHeight: 1.6, margin: "0 0 16px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-          {trip.overview ? trip.overview.substring(0, 120) + (trip.overview.length > 120 ? "…" : "") : <NA text="No description available" />}
+        <p
+          style={{
+            color: "rgba(30,26,20,0.52)",
+            fontSize: "0.78rem",
+            fontWeight: 300,
+            lineHeight: 1.6,
+            margin: "0 0 16px",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {trip.overview ? (
+            trip.overview.substring(0, 120) +
+            (trip.overview.length > 120 ? "…" : "")
+          ) : (
+            <NA text="No description available" />
+          )}
         </p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginBottom: "18px" }}>
-          {tags.length > 0 ? tags.map((tag) => (
-            <span key={tag} style={{ background: "rgba(120,18,22,0.06)", border: "1px solid rgba(120,18,22,0.1)", color: "rgba(30,26,20,0.6)", borderRadius: "999px", padding: "2px 9px", fontSize: "0.6rem", letterSpacing: "0.06em" }}>
-              {tag}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "5px",
+            marginBottom: "18px",
+          }}
+        >
+          {tags.length > 0 ? (
+            tags.map((tag) => (
+              <span
+                key={tag}
+                style={{
+                  background: "rgba(120,18,22,0.06)",
+                  border: "1px solid rgba(120,18,22,0.1)",
+                  color: "rgba(30,26,20,0.6)",
+                  borderRadius: "999px",
+                  padding: "2px 9px",
+                  fontSize: "0.6rem",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                {tag}
+              </span>
+            ))
+          ) : (
+            <span
+              style={{
+                color: "rgba(30,26,20,0.3)",
+                fontSize: "0.6rem",
+                fontStyle: "italic",
+              }}
+            >
+              No tags
             </span>
-          )) : (
-            <span style={{ color: "rgba(30,26,20,0.3)", fontSize: "0.6rem", fontStyle: "italic" }}>No tags</span>
           )}
         </div>
-        <div className="trip-card-footer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "14px", borderTop: "1px solid rgba(30,26,20,0.07)" }}>
-          <div className="trip-card-meta" style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: "4px", color: "rgba(30,26,20,0.5)", fontSize: "0.72rem" }}>
-              <Clock size={11} />{isNotAvailable(durationStr) ? <NA /> : durationStr}
+        <div
+          className="trip-card-footer"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingTop: "14px",
+            borderTop: "1px solid rgba(30,26,20,0.07)",
+          }}
+        >
+          <div
+            className="trip-card-meta"
+            style={{ display: "flex", alignItems: "center", gap: "14px" }}
+          >
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                color: "rgba(30,26,20,0.5)",
+                fontSize: "0.72rem",
+              }}
+            >
+              <Clock size={11} />
+              {isNotAvailable(durationStr) ? <NA /> : durationStr}
             </span>
-            <span style={{ color: "#1e1a14", fontSize: "0.88rem", fontWeight: 600 }}>
+            <span
+              style={{ color: "#1e1a14", fontSize: "0.88rem", fontWeight: 600 }}
+            >
               {isNotAvailable(priceStr) ? <NA /> : priceStr}
             </span>
           </div>
-          <Link className="trip-card-link" to={(trip as any).isFestival ? `/festivals/${trip.id}` : `/trips/${trip.id}`} style={{ background: hovered ? "#C8A96E" : "transparent", border: `1.5px solid ${hovered ? "#C8A96E" : "rgba(30,26,20,0.15)"}`, color: hovered ? "#1e1a14" : "rgba(30,26,20,0.6)", borderRadius: "4px", padding: "7px 16px", fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Poppins', sans-serif", transition: "all 0.25s ease", display: "flex", alignItems: "center", gap: "5px", textDecoration: "none" }}>
-            View {(trip as any).isFestival ? "Festival" : "Trip"} <ArrowRight size={11} />
+          <Link
+            className="trip-card-link"
+            to={
+              (trip as any).isFestival
+                ? `/festivals/${trip.id}`
+                : `/trips/${trip.id}`
+            }
+            style={{
+              background: hovered ? "#C8A96E" : "transparent",
+              border: `1.5px solid ${hovered ? "#C8A96E" : "rgba(30,26,20,0.15)"}`,
+              color: hovered ? "#1e1a14" : "rgba(30,26,20,0.6)",
+              borderRadius: "4px",
+              padding: "7px 16px",
+              fontSize: "0.65rem",
+              fontWeight: 600,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+              fontFamily: "'Poppins', sans-serif",
+              transition: "all 0.25s ease",
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+              textDecoration: "none",
+            }}
+          >
+            View {(trip as any).isFestival ? "Festival" : "Trip"}{" "}
+            <ArrowRight size={11} />
           </Link>
         </div>
       </div>
@@ -511,9 +1079,20 @@ function getDestGroup(trip: ApiTrip): string {
   return trip.destination?.name || "Others";
 }
 
-function DestinationAccordion({ destKey, label, region, tagline, trips, defaultOpen }: {
-  destKey: string; label: string; region: string; tagline: string;
-  trips: ApiTrip[]; defaultOpen: boolean;
+function DestinationAccordion({
+  destKey,
+  label,
+  region,
+  tagline,
+  trips,
+  defaultOpen,
+}: {
+  destKey: string;
+  label: string;
+  region: string;
+  tagline: string;
+  trips: ApiTrip[];
+  defaultOpen: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [hovered, setHovered] = useState(false);
@@ -528,7 +1107,9 @@ function DestinationAccordion({ destKey, label, region, tagline, trips, defaultO
         borderRadius: "14px",
         overflow: "hidden",
         background: "#ffffff",
-        boxShadow: open ? "0 4px 24px rgba(30,26,20,0.06)" : "0 1px 4px rgba(30,26,20,0.04)",
+        boxShadow: open
+          ? "0 4px 24px rgba(30,26,20,0.06)"
+          : "0 1px 4px rgba(30,26,20,0.04)",
         transition: "box-shadow 0.3s ease",
         fontFamily: "'Poppins', sans-serif",
       }}
@@ -546,7 +1127,9 @@ function DestinationAccordion({ destKey, label, region, tagline, trips, defaultO
           padding: "clamp(18px,3vw,26px) clamp(20px,3vw,32px)",
           background: open
             ? "linear-gradient(to right, rgba(120,18,22,0.03) 0%, transparent 60%)"
-            : hovered ? "rgba(30,26,20,0.015)" : "transparent",
+            : hovered
+              ? "rgba(30,26,20,0.015)"
+              : "transparent",
           border: "none",
           cursor: "pointer",
           gap: "16px",
@@ -555,57 +1138,100 @@ function DestinationAccordion({ destKey, label, region, tagline, trips, defaultO
         }}
       >
         {/* Left accent bar */}
-        <div style={{
-          width: "3px",
-          height: "clamp(36px,5vw,52px)",
-          borderRadius: "2px",
-          background: open ? "#781216" : "rgba(30,26,20,0.12)",
-          flexShrink: 0,
-          transition: "background 0.3s ease",
-        }} />
+        <div
+          style={{
+            width: "3px",
+            height: "clamp(36px,5vw,52px)",
+            borderRadius: "2px",
+            background: open ? "#781216" : "rgba(30,26,20,0.12)",
+            flexShrink: 0,
+            transition: "background 0.3s ease",
+          }}
+        />
 
         {/* Text block */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: "4px" }}>
-            <h2 style={{
-              color: open ? "#781216" : "#1e1a14",
-              fontSize: "clamp(1.1rem,2.2vw,1.5rem)",
-              fontWeight: 400,
-              letterSpacing: "-0.025em",
-              lineHeight: 1.15,
-              margin: 0,
-              transition: "color 0.25s ease",
-            }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              flexWrap: "wrap",
+              marginBottom: "4px",
+            }}
+          >
+            <h2
+              style={{
+                color: open ? "#781216" : "#1e1a14",
+                fontSize: "clamp(1.1rem,2.2vw,1.5rem)",
+                fontWeight: 400,
+                letterSpacing: "-0.025em",
+                lineHeight: 1.15,
+                margin: 0,
+                transition: "color 0.25s ease",
+              }}
+            >
               {label}
             </h2>
-            <span style={{
-              color: "rgba(30,26,20,0.38)",
-              fontSize: "0.68rem",
-              fontWeight: 400,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-            }}>
+            <span
+              style={{
+                color: "rgba(30,26,20,0.38)",
+                fontSize: "0.68rem",
+                fontWeight: 400,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+              }}
+            >
               {region}
             </span>
           </div>
-          <p style={{
-            color: "rgba(30,26,20,0.48)",
-            fontSize: "0.78rem",
-            fontWeight: 300,
-            lineHeight: 1.55,
-            margin: 0,
-          }}>
+          <p
+            style={{
+              color: "rgba(30,26,20,0.48)",
+              fontSize: "0.78rem",
+              fontWeight: 300,
+              lineHeight: 1.55,
+              margin: 0,
+            }}
+          >
             {tagline}
           </p>
         </div>
 
         {/* Right: trip count + chevron */}
-        <div className="destination-header-meta" style={{ display: "flex", alignItems: "center", gap: "14px", flexShrink: 0 }}>
+        <div
+          className="destination-header-meta"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "14px",
+            flexShrink: 0,
+          }}
+        >
           <div style={{ textAlign: "right" }}>
-            <p style={{ color: open ? "#781216" : "rgba(30,26,20,0.55)", fontSize: "clamp(1.2rem,2.5vw,1.7rem)", fontWeight: 300, letterSpacing: "-0.04em", lineHeight: 1, margin: 0, transition: "color 0.25s ease" }}>
+            <p
+              style={{
+                color: open ? "#781216" : "rgba(30,26,20,0.55)",
+                fontSize: "clamp(1.2rem,2.5vw,1.7rem)",
+                fontWeight: 300,
+                letterSpacing: "-0.04em",
+                lineHeight: 1,
+                margin: 0,
+                transition: "color 0.25s ease",
+              }}
+            >
               {trips.length}
             </p>
-            <p style={{ color: "rgba(30,26,20,0.32)", fontSize: "0.6rem", fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase", margin: "2px 0 0" }}>
+            <p
+              style={{
+                color: "rgba(30,26,20,0.32)",
+                fontSize: "0.6rem",
+                fontWeight: 400,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                margin: "2px 0 0",
+              }}
+            >
               trip{trips.length !== 1 ? "s" : ""}
             </p>
           </div>
@@ -625,7 +1251,10 @@ function DestinationAccordion({ destKey, label, region, tagline, trips, defaultO
               flexShrink: 0,
             }}
           >
-            <ChevronDown size={15} color={open ? "#781216" : "rgba(30,26,20,0.4)"} />
+            <ChevronDown
+              size={15}
+              color={open ? "#781216" : "rgba(30,26,20,0.4)"}
+            />
           </motion.div>
         </div>
       </button>
@@ -641,10 +1270,22 @@ function DestinationAccordion({ destKey, label, region, tagline, trips, defaultO
             style={{ overflow: "hidden" }}
           >
             {/* Gold separator */}
-            <div style={{ height: "1px", background: "linear-gradient(to right, rgba(120,18,22,0.15) 0%, rgba(120,18,22,0.05) 100%)", margin: "0 clamp(20px,3vw,32px)" }} />
+            <div
+              style={{
+                height: "1px",
+                background:
+                  "linear-gradient(to right, rgba(120,18,22,0.15) 0%, rgba(120,18,22,0.05) 100%)",
+                margin: "0 clamp(20px,3vw,32px)",
+              }}
+            />
 
-            <div style={{ padding: "clamp(20px,3vw,28px) clamp(20px,3vw,32px)" }}>
-              <div style={{ display: "grid", gap: "16px" }} className="grid-cols-1 sm:grid-cols-2">
+            <div
+              style={{ padding: "clamp(20px,3vw,28px) clamp(20px,3vw,32px)" }}
+            >
+              <div
+                style={{ display: "grid", gap: "16px" }}
+                className="grid-cols-1 sm:grid-cols-2"
+              >
                 {trips.map((trip, i) => (
                   <TripCard key={trip.id} trip={trip} index={i} />
                 ))}
@@ -668,7 +1309,9 @@ function DestinationSections({ trips }: { trips: ApiTrip[] }) {
 
   // Build ordered entries: named destinations first (sorted), then "Others" at the bottom
   const entries = Object.entries(groups);
-  const named = entries.filter(([key]) => key !== "Others").sort(([a], [b]) => a.localeCompare(b));
+  const named = entries
+    .filter(([key]) => key !== "Others")
+    .sort(([a], [b]) => a.localeCompare(b));
   const others = entries.filter(([key]) => key === "Others");
   const ordered = [...named, ...others];
 
@@ -677,7 +1320,9 @@ function DestinationSections({ trips }: { trips: ApiTrip[] }) {
       {ordered.map(([key, groupTrips], idx) => {
         // Get region from the first trip's destination state, if available
         const region = groupTrips[0]?.destination?.state || "";
-        const tagline = groupTrips[0]?.destination?.subheading || `${groupTrips.length} trip${groupTrips.length !== 1 ? "s" : ""} available`;
+        const tagline =
+          groupTrips[0]?.destination?.subheading ||
+          `${groupTrips.length} trip${groupTrips.length !== 1 ? "s" : ""} available`;
         return (
           <DestinationAccordion
             key={key}
@@ -748,20 +1393,59 @@ function compareTitles(a: ApiTrip, b: ApiTrip): number {
 // ── Loading skeleton ──────────────────────────────────────────────
 function LoadingSkeleton() {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "2rem 0" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "16px",
+        padding: "2rem 0",
+      }}
+    >
       {[1, 2, 3].map((i) => (
-        <div key={i} style={{
-          background: "#ffffff",
-          borderRadius: "14px",
-          border: "1px solid rgba(30,26,20,0.07)",
-          overflow: "hidden",
-          animation: "pulse 1.5s ease-in-out infinite",
-        }}>
-          <div style={{ padding: "clamp(18px,3vw,26px) clamp(20px,3vw,32px)", display: "flex", alignItems: "center", gap: "16px" }}>
-            <div style={{ width: "3px", height: "52px", borderRadius: "2px", background: "rgba(30,26,20,0.08)" }} />
+        <div
+          key={i}
+          style={{
+            background: "#ffffff",
+            borderRadius: "14px",
+            border: "1px solid rgba(30,26,20,0.07)",
+            overflow: "hidden",
+            animation: "pulse 1.5s ease-in-out infinite",
+          }}
+        >
+          <div
+            style={{
+              padding: "clamp(18px,3vw,26px) clamp(20px,3vw,32px)",
+              display: "flex",
+              alignItems: "center",
+              gap: "16px",
+            }}
+          >
+            <div
+              style={{
+                width: "3px",
+                height: "52px",
+                borderRadius: "2px",
+                background: "rgba(30,26,20,0.08)",
+              }}
+            />
             <div style={{ flex: 1 }}>
-              <div style={{ width: "200px", height: "20px", borderRadius: "4px", background: "rgba(30,26,20,0.06)", marginBottom: "8px" }} />
-              <div style={{ width: "300px", height: "14px", borderRadius: "4px", background: "rgba(30,26,20,0.04)" }} />
+              <div
+                style={{
+                  width: "200px",
+                  height: "20px",
+                  borderRadius: "4px",
+                  background: "rgba(30,26,20,0.06)",
+                  marginBottom: "8px",
+                }}
+              />
+              <div
+                style={{
+                  width: "300px",
+                  height: "14px",
+                  borderRadius: "4px",
+                  background: "rgba(30,26,20,0.04)",
+                }}
+              />
             </div>
           </div>
         </div>
@@ -772,14 +1456,62 @@ function LoadingSkeleton() {
 }
 
 // ── Error state ───────────────────────────────────────────────────
-function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+function ErrorState({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
   return (
-    <div style={{ textAlign: "center", padding: "5rem 0", fontFamily: "'Poppins', sans-serif" }}>
-      <AlertCircle size={40} color="#c0392b" strokeWidth={1.5} style={{ marginBottom: "16px" }} />
-      <p style={{ color: "#c0392b", fontSize: "1rem", fontWeight: 500, marginBottom: "8px" }}>Failed to load trips</p>
-      <p style={{ color: "rgba(30,26,20,0.5)", fontSize: "0.82rem", fontWeight: 300, marginBottom: "20px" }}>{message}</p>
-      <button onClick={onRetry}
-        style={{ background: "#781216", color: "#fff", border: "none", borderRadius: "8px", padding: "10px 24px", fontSize: "0.78rem", fontWeight: 600, fontFamily: "'Poppins', sans-serif", cursor: "pointer", letterSpacing: "0.06em" }}>
+    <div
+      style={{
+        textAlign: "center",
+        padding: "5rem 0",
+        fontFamily: "'Poppins', sans-serif",
+      }}
+    >
+      <AlertCircle
+        size={40}
+        color="#c0392b"
+        strokeWidth={1.5}
+        style={{ marginBottom: "16px" }}
+      />
+      <p
+        style={{
+          color: "#c0392b",
+          fontSize: "1rem",
+          fontWeight: 500,
+          marginBottom: "8px",
+        }}
+      >
+        Failed to load trips
+      </p>
+      <p
+        style={{
+          color: "rgba(30,26,20,0.5)",
+          fontSize: "0.82rem",
+          fontWeight: 300,
+          marginBottom: "20px",
+        }}
+      >
+        {message}
+      </p>
+      <button
+        onClick={onRetry}
+        style={{
+          background: "#781216",
+          color: "#fff",
+          border: "none",
+          borderRadius: "8px",
+          padding: "10px 24px",
+          fontSize: "0.78rem",
+          fontWeight: 600,
+          fontFamily: "'Poppins', sans-serif",
+          cursor: "pointer",
+          letterSpacing: "0.06em",
+        }}
+      >
         Try Again
       </button>
     </div>
@@ -792,8 +1524,8 @@ export default function TripsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [search, setSearch]   = useState("");
-  const [sort, setSort]       = useState("destination");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState("destination");
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
@@ -803,13 +1535,13 @@ export default function TripsPage() {
     try {
       const [tripsData, festivalsData] = await Promise.all([
         fetchAllTrips(),
-        fetchAllFestivals()
+        fetchAllFestivals(),
       ]);
       const festivalsAsTrips = festivalsData.map((f: any) => ({
         ...f,
         isFestival: true,
         tripType: f.tags && f.tags.length > 0 ? f.tags[0].tag : "FESTIVAL",
-        tripTags: f.tags ? f.tags.map((t: any) => ({ tag: t.tag })) : []
+        tripTags: f.tags ? f.tags.map((t: any) => ({ tag: t.tag })) : [],
       }));
       setTrips([...tripsData, ...festivalsAsTrips]);
     } catch (err: unknown) {
@@ -832,7 +1564,9 @@ export default function TripsPage() {
       destSet.add(getDestGroup(t));
     });
     // Named destinations sorted alphabetically, "Others" excluded from filter (it's a catch-all)
-    return Array.from(destSet).filter((d) => d !== "Others").sort();
+    return Array.from(destSet)
+      .filter((d) => d !== "Others")
+      .sort();
   }, [trips]);
 
   const availableCategories = useMemo(() => {
@@ -845,16 +1579,20 @@ export default function TripsPage() {
 
   const availableDurations = useMemo(() => {
     const durSet = new Set<number>();
-    trips.forEach(t => { if (t.duration) durSet.add(t.duration); });
-    const sorted = Array.from(durSet).sort((a,b) => a - b);
-    return sorted.map(d => formatDuration(d));
+    trips.forEach((t) => {
+      if (t.duration) durSet.add(t.duration);
+    });
+    const sorted = Array.from(durSet).sort((a, b) => a - b);
+    return sorted.map((d) => formatDuration(d));
   }, [trips]);
 
   const availablePriceRanges = useMemo(() => {
-    return PRICE_RANGES.filter(r => trips.some(t => {
-      const price = priceToNumber(t.packages?.[0]?.price || 0);
-      return price >= r.min && price <= r.max;
-    }));
+    return PRICE_RANGES.filter((r) =>
+      trips.some((t) => {
+        const price = priceToNumber(t.packages?.[0]?.price || 0);
+        return price >= r.min && price <= r.max;
+      }),
+    );
   }, [trips]);
 
   const activeCount = Object.values(filters).flat().filter(Boolean).length;
@@ -864,7 +1602,14 @@ export default function TripsPage() {
       // Search
       const q = search.toLowerCase();
       const tags = t.tripTags?.map((tg) => tg.tag) || [];
-      if (q && !t.title.toLowerCase().includes(q) && !t.location.toLowerCase().includes(q) && !tags.some((tag) => tag.toLowerCase().includes(q)) && !formatTripType(t.tripType).toLowerCase().includes(q)) return false;
+      if (
+        q &&
+        !t.title.toLowerCase().includes(q) &&
+        !t.location.toLowerCase().includes(q) &&
+        !tags.some((tag) => tag.toLowerCase().includes(q)) &&
+        !formatTripType(t.tripType).toLowerCase().includes(q)
+      )
+        return false;
 
       // Destination
       if (filters.destinations.length > 0) {
@@ -880,7 +1625,8 @@ export default function TripsPage() {
 
       // Duration
       if (filters.durations.length > 0) {
-        if (!filters.durations.includes(formatDuration(t.duration))) return false;
+        if (!filters.durations.includes(formatDuration(t.duration)))
+          return false;
       }
 
       // Price
@@ -901,7 +1647,8 @@ export default function TripsPage() {
 
     if (sort === "popular") {
       list = [...list].sort(
-        (a, b) => getPopularityScore(b) - getPopularityScore(a) || compareTitles(a, b),
+        (a, b) =>
+          getPopularityScore(b) - getPopularityScore(a) || compareTitles(a, b),
       );
     }
     if (sort === "price_asc") {
@@ -926,7 +1673,8 @@ export default function TripsPage() {
       list = [...list].sort((a, b) => {
         const aDuration = getSortableDuration(a);
         const bDuration = getSortableDuration(b);
-        if (aDuration === null) return bDuration === null ? compareTitles(a, b) : 1;
+        if (aDuration === null)
+          return bDuration === null ? compareTitles(a, b) : 1;
         if (bDuration === null) return -1;
         return aDuration - bDuration || compareTitles(a, b);
       });
@@ -936,75 +1684,324 @@ export default function TripsPage() {
   }, [trips, search, filters, sort]);
 
   return (
-    <div style={{ background: "#f5f0e6", minHeight: "100vh", fontFamily: "'Poppins', sans-serif" }}>
-
+    <div
+      style={{
+        background: "#f5f0e6",
+        minHeight: "100vh",
+        fontFamily: "'Poppins', sans-serif",
+      }}
+    >
       {/* ── Hero banner ── */}
-      <div className="trips-hero" style={{ background: "#1e1a14", paddingTop: "110px", paddingBottom: "clamp(2.5rem,5vw,4rem)", paddingLeft: "clamp(1.5rem,5vw,6rem)", paddingRight: "clamp(1.5rem,5vw,6rem)", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "flex-end", pointerEvents: "none", overflow: "hidden" }}>
-          <span style={{ fontSize: "clamp(5rem,15vw,14rem)", fontWeight: 700, color: "rgba(242,237,228,0.03)", letterSpacing: "-0.04em", lineHeight: 1, paddingRight: "2rem", userSelect: "none" }}>TRIPS</span>
+      <div
+        className="trips-hero"
+        style={{
+          background: "#1e1a14",
+          paddingTop: "110px",
+          paddingBottom: "clamp(2.5rem,5vw,4rem)",
+          paddingLeft: "clamp(1.5rem,5vw,6rem)",
+          paddingRight: "clamp(1.5rem,5vw,6rem)",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            pointerEvents: "none",
+            overflow: "hidden",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "clamp(5rem,15vw,14rem)",
+              fontWeight: 700,
+              color: "rgba(242,237,228,0.03)",
+              letterSpacing: "-0.04em",
+              lineHeight: 1,
+              paddingRight: "2rem",
+              userSelect: "none",
+            }}
+          >
+            TRIPS
+          </span>
         </div>
-        <div style={{ maxWidth: "1280px", margin: "0 auto", position: "relative", zIndex: 1 }}>
-          <p style={{ color: "#C8A96E", fontSize: "0.7rem", fontWeight: 500, letterSpacing: "0.28em", textTransform: "uppercase", marginBottom: "12px" }}>/ Our Trips</p>
-          <h1 style={{ color: "#f2ede4", fontSize: "clamp(2.2rem,5vw,4rem)", fontWeight: 300, letterSpacing: "-0.03em", lineHeight: 1.1, margin: "0 0 16px" }}>
-            Find your kind of <strong><em style={{ color: "#C8A96E", fontStyle: "italic" }}>experience.</em></strong>
+        <div
+          style={{
+            maxWidth: "1280px",
+            margin: "0 auto",
+            position: "relative",
+            zIndex: 1,
+          }}
+        >
+          <p
+            style={{
+              color: "#C8A96E",
+              fontSize: "0.7rem",
+              fontWeight: 500,
+              letterSpacing: "0.28em",
+              textTransform: "uppercase",
+              marginBottom: "12px",
+            }}
+          >
+            / Our Trips
+          </p>
+          <h1
+            style={{
+              color: "#f2ede4",
+              fontSize: "clamp(2.2rem,5vw,4rem)",
+              fontWeight: 300,
+              letterSpacing: "-0.03em",
+              lineHeight: 1.1,
+              margin: "0 0 16px",
+            }}
+          >
+            Find your kind of{" "}
+            <strong>
+              <em style={{ color: "#C8A96E", fontStyle: "italic" }}>
+                experience.
+              </em>
+            </strong>
           </h1>
-          <p style={{ color: "rgba(242,237,228,0.5)", fontSize: "0.88rem", fontWeight: 300, lineHeight: 1.8, maxWidth: "480px", margin: 0 }}>
-            {loading ? "Loading trips…" : `${trips.length} handcrafted trips across India and beyond — each one built around real experiences.`}
+          <p
+            style={{
+              color: "rgba(242,237,228,0.5)",
+              fontSize: "0.88rem",
+              fontWeight: 300,
+              lineHeight: 1.8,
+              maxWidth: "480px",
+              margin: 0,
+            }}
+          >
+            {loading
+              ? "Loading trips…"
+              : `${trips.length} handcrafted trips across India and beyond — each one built around real experiences.`}
           </p>
         </div>
       </div>
 
       {/* ── Top bar: search + sort + mobile filter toggle ── */}
-      <div className="trips-toolbar" style={{ background: "#ffffff", borderBottom: "1px solid rgba(30,26,20,0.07)", position: "sticky", top: "72px", zIndex: 50, boxShadow: "0 2px 12px rgba(30,26,20,0.05)" }}>
-        <div className="trips-toolbar-inner" style={{ maxWidth: "1280px", margin: "0 auto", padding: "12px clamp(1.5rem,5vw,6rem)", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-
+      <div
+        className="trips-toolbar"
+        style={{
+          background: "#ffffff",
+          borderBottom: "1px solid rgba(30,26,20,0.07)",
+          position: "sticky",
+          top: "72px",
+          zIndex: 50,
+          boxShadow: "0 2px 12px rgba(30,26,20,0.05)",
+        }}
+      >
+        <div
+          className="trips-toolbar-inner"
+          style={{
+            maxWidth: "1280px",
+            margin: "0 auto",
+            padding: "12px clamp(1.5rem,5vw,6rem)",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            flexWrap: "wrap",
+          }}
+        >
           {/* Search */}
-          <div className="trips-search" style={{ position: "relative", flex: "1 1 200px", maxWidth: "300px" }}>
-            <Search size={13} color="rgba(30,26,20,0.35)" style={{ position: "absolute", left: "11px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-            <input type="text" placeholder="Search trips…" value={search} onChange={(e) => setSearch(e.target.value)}
-              style={{ width: "100%", padding: "9px 32px 9px 34px", background: "#f5f0e6", border: "1px solid rgba(30,26,20,0.1)", borderRadius: "6px", fontSize: "0.8rem", fontFamily: "'Poppins', sans-serif", fontWeight: 300, color: "#1e1a14", outline: "none", boxSizing: "border-box" as const }} />
-            {search && <button onClick={() => setSearch("")} style={{ position: "absolute", right: "9px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", display: "flex" }}><X size={12} color="rgba(30,26,20,0.4)" /></button>}
+          <div
+            className="trips-search"
+            style={{
+              position: "relative",
+              flex: "1 1 200px",
+              maxWidth: "300px",
+            }}
+          >
+            <Search
+              size={13}
+              color="rgba(30,26,20,0.35)"
+              style={{
+                position: "absolute",
+                left: "11px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                pointerEvents: "none",
+              }}
+            />
+            <input
+              type="text"
+              placeholder="Search trips…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "9px 32px 9px 34px",
+                background: "#f5f0e6",
+                border: "1px solid rgba(30,26,20,0.1)",
+                borderRadius: "6px",
+                fontSize: "0.8rem",
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 300,
+                color: "#1e1a14",
+                outline: "none",
+                boxSizing: "border-box" as const,
+              }}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                style={{
+                  position: "absolute",
+                  right: "9px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "flex",
+                }}
+              >
+                <X size={12} color="rgba(30,26,20,0.4)" />
+              </button>
+            )}
           </div>
 
           {/* Sort */}
-          <select className="trips-sort" value={sort} onChange={(e) => setSort(e.target.value)}
-            style={{ padding: "9px 12px", background: "#f5f0e6", border: "1px solid rgba(30,26,20,0.1)", borderRadius: "6px", fontSize: "0.78rem", fontFamily: "'Poppins', sans-serif", color: "rgba(30,26,20,0.7)", cursor: "pointer", outline: "none", flexShrink: 0 }}>
-            {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          <select
+            className="trips-sort"
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            style={{
+              padding: "9px 12px",
+              background: "#f5f0e6",
+              border: "1px solid rgba(30,26,20,0.1)",
+              borderRadius: "6px",
+              fontSize: "0.78rem",
+              fontFamily: "'Poppins', sans-serif",
+              color: "rgba(30,26,20,0.7)",
+              cursor: "pointer",
+              outline: "none",
+              flexShrink: 0,
+            }}
+          >
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
           </select>
 
           {/* Mobile filter toggle */}
-          <button onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
+          <button
+            onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
             className="trips-filter-toggle lg:hidden"
-            style={{ display: "flex", alignItems: "center", gap: "6px", padding: "9px 14px", background: activeCount > 0 ? "rgba(120,18,22,0.06)" : "transparent", border: `1.5px solid ${activeCount > 0 ? "#781216" : "rgba(30,26,20,0.12)"}`, borderRadius: "6px", color: activeCount > 0 ? "#781216" : "rgba(30,26,20,0.6)", fontFamily: "'Poppins', sans-serif", fontSize: "0.78rem", cursor: "pointer", flexShrink: 0 }}>
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "9px 14px",
+              background:
+                activeCount > 0 ? "rgba(120,18,22,0.06)" : "transparent",
+              border: `1.5px solid ${activeCount > 0 ? "#781216" : "rgba(30,26,20,0.12)"}`,
+              borderRadius: "6px",
+              color: activeCount > 0 ? "#781216" : "rgba(30,26,20,0.6)",
+              fontFamily: "'Poppins', sans-serif",
+              fontSize: "0.78rem",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
             <SlidersHorizontal size={13} />
             Filters {activeCount > 0 && `(${activeCount})`}
           </button>
 
           {/* Results count */}
-          <span className="trips-results" style={{ color: "rgba(30,26,20,0.38)", fontSize: "0.72rem", letterSpacing: "0.06em", marginLeft: "auto" }}>
-            {loading ? "…" : `${filtered.length} trip${filtered.length !== 1 ? "s" : ""} found`}
+          <span
+            className="trips-results"
+            style={{
+              color: "rgba(30,26,20,0.38)",
+              fontSize: "0.72rem",
+              letterSpacing: "0.06em",
+              marginLeft: "auto",
+            }}
+          >
+            {loading
+              ? "…"
+              : `${filtered.length} trip${filtered.length !== 1 ? "s" : ""} found`}
           </span>
         </div>
 
         {/* Active filter pills */}
         {activeCount > 0 && (
-          <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "0 clamp(1.5rem,5vw,6rem) 10px", display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
-            {(Object.entries(filters) as [keyof Filters, string | string[]][]).map(([key, val]) => {
+          <div
+            style={{
+              maxWidth: "1280px",
+              margin: "0 auto",
+              padding: "0 clamp(1.5rem,5vw,6rem) 10px",
+              display: "flex",
+              gap: "6px",
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
+            {(
+              Object.entries(filters) as [keyof Filters, string | string[]][]
+            ).map(([key, val]) => {
               if (!val || (Array.isArray(val) && val.length === 0)) return null;
               const vals = Array.isArray(val) ? val : [val];
               return vals.map((v) => (
-                <span key={`${key}-${v}`} style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: "rgba(120,18,22,0.07)", border: "1px solid rgba(120,18,22,0.15)", borderRadius: "999px", padding: "3px 10px", fontSize: "0.65rem", color: "#781216", fontFamily: "'Poppins', sans-serif" }}>
+                <span
+                  key={`${key}-${v}`}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "5px",
+                    background: "rgba(120,18,22,0.07)",
+                    border: "1px solid rgba(120,18,22,0.15)",
+                    borderRadius: "999px",
+                    padding: "3px 10px",
+                    fontSize: "0.65rem",
+                    color: "#781216",
+                    fontFamily: "'Poppins', sans-serif",
+                  }}
+                >
                   {v}
-                  <button onClick={() => {
-                    if (key === "priceRange") setFilters((f) => ({ ...f, priceRange: null }));
-                    else setFilters((f) => ({ ...f, [key]: (f[key] as string[]).filter((x) => x !== v) }));
-                  }} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", padding: 0, lineHeight: 1 }}>
+                  <button
+                    onClick={() => {
+                      if (key === "priceRange")
+                        setFilters((f) => ({ ...f, priceRange: null }));
+                      else
+                        setFilters((f) => ({
+                          ...f,
+                          [key]: (f[key] as string[]).filter((x) => x !== v),
+                        }));
+                    }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      display: "flex",
+                      padding: 0,
+                      lineHeight: 1,
+                    }}
+                  >
                     <X size={10} color="#781216" />
                   </button>
                 </span>
               ));
             })}
-            <button onClick={() => setFilters(EMPTY_FILTERS)} style={{ background: "none", border: "none", color: "rgba(30,26,20,0.45)", fontSize: "0.65rem", cursor: "pointer", fontFamily: "'Poppins', sans-serif", textDecoration: "underline", padding: "3px 6px" }}>
+            <button
+              onClick={() => setFilters(EMPTY_FILTERS)}
+              style={{
+                background: "none",
+                border: "none",
+                color: "rgba(30,26,20,0.45)",
+                fontSize: "0.65rem",
+                cursor: "pointer",
+                fontFamily: "'Poppins', sans-serif",
+                textDecoration: "underline",
+                padding: "3px 6px",
+              }}
+            >
               Clear all
             </button>
           </div>
@@ -1012,32 +2009,124 @@ export default function TripsPage() {
       </div>
 
       {/* ── Body: sidebar + grid ── */}
-      <div className="trips-body" style={{ maxWidth: "1280px", margin: "0 auto", padding: "clamp(2rem,4vw,3rem) clamp(1.5rem,5vw,6rem)" }}>
-        <div style={{ display: "flex", gap: "clamp(1.5rem,3vw,3rem)", alignItems: "flex-start" }}>
-
+      <div
+        className="trips-body"
+        style={{
+          maxWidth: "1280px",
+          margin: "0 auto",
+          padding: "clamp(2rem,4vw,3rem) clamp(1.5rem,5vw,6rem)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            gap: "clamp(1.5rem,3vw,3rem)",
+            alignItems: "flex-start",
+          }}
+        >
           {/* Sidebar — desktop */}
-          <div className="hidden lg:block" style={{ width: "240px", flexShrink: 0, position: "sticky", top: "155px", background: "#ffffff", border: "1px solid rgba(30,26,20,0.07)", borderRadius: "12px", padding: "20px 20px 8px" }}>
-            <FilterSidebar filters={filters} setFilters={setFilters} availableDestinations={availableDestinations} availableCategories={availableCategories} availableDurations={availableDurations} availablePriceRanges={availablePriceRanges} />
+          <div
+            className="hidden lg:block"
+            style={{
+              width: "240px",
+              flexShrink: 0,
+              position: "sticky",
+              top: "155px",
+              background: "#ffffff",
+              border: "1px solid rgba(30,26,20,0.07)",
+              borderRadius: "12px",
+              padding: "20px 20px 8px",
+            }}
+          >
+            <FilterSidebar
+              filters={filters}
+              setFilters={setFilters}
+              availableDestinations={availableDestinations}
+              availableCategories={availableCategories}
+              availableDurations={availableDurations}
+              availablePriceRanges={availablePriceRanges}
+            />
           </div>
 
           {/* Mobile filter drawer */}
           <AnimatePresence>
             {mobileFiltersOpen && (
               <>
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
                   onClick={() => setMobileFiltersOpen(false)}
-                  style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 190 }}
+                  style={{
+                    position: "fixed",
+                    inset: 0,
+                    background: "rgba(0,0,0,0.4)",
+                    zIndex: 190,
+                  }}
                   className="trips-filter-overlay lg:hidden"
                 />
-                <motion.div initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }} transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  style={{ position: "fixed", top: 0, left: 0, bottom: 0, width: "min(86vw, 320px)", background: "#ffffff", zIndex: 200, overflowY: "auto", padding: "16px 20px 24px", boxSizing: "border-box" }}
+                <motion.div
+                  initial={{ x: "-100%" }}
+                  animate={{ x: 0 }}
+                  exit={{ x: "-100%" }}
+                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  style={{
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    width: "min(86vw, 320px)",
+                    background: "#ffffff",
+                    zIndex: 200,
+                    overflowY: "auto",
+                    padding: "16px 20px 24px",
+                    boxSizing: "border-box",
+                  }}
                   className="trips-filter-drawer lg:hidden"
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                    <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, color: "#1e1a14", fontSize: "0.9rem" }}>Filters</span>
-                    <button aria-label="Close filters" onClick={() => setMobileFiltersOpen(false)} style={{ width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer" }}><X size={20} color="#1e1a14" /></button>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "20px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: "'Poppins', sans-serif",
+                        fontWeight: 600,
+                        color: "#1e1a14",
+                        fontSize: "0.9rem",
+                      }}
+                    >
+                      Filters
+                    </span>
+                    <button
+                      aria-label="Close filters"
+                      onClick={() => setMobileFiltersOpen(false)}
+                      style={{
+                        width: "40px",
+                        height: "40px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <X size={20} color="#1e1a14" />
+                    </button>
                   </div>
-                  <FilterSidebar filters={filters} setFilters={setFilters} availableDestinations={availableDestinations} availableCategories={availableCategories} availableDurations={availableDurations} availablePriceRanges={availablePriceRanges} />
+                  <FilterSidebar
+                    filters={filters}
+                    setFilters={setFilters}
+                    availableDestinations={availableDestinations}
+                    availableCategories={availableCategories}
+                    availableDurations={availableDurations}
+                    availablePriceRanges={availablePriceRanges}
+                  />
                 </motion.div>
               </>
             )}
@@ -1051,18 +2140,39 @@ export default function TripsPage() {
               <ErrorState message={error} onRetry={loadTrips} />
             ) : filtered.length === 0 ? (
               <div style={{ textAlign: "center", padding: "5rem 0" }}>
-                <p style={{ color: "rgba(30,26,20,0.35)", fontSize: "1rem", fontWeight: 300, marginBottom: "16px" }}>No trips match your filters.</p>
-                <button onClick={() => { setSearch(""); setFilters(EMPTY_FILTERS); }}
-                  style={{ background: "none", border: "1px solid rgba(30,26,20,0.15)", borderRadius: "999px", padding: "8px 20px", color: "rgba(30,26,20,0.55)", fontSize: "0.72rem", fontFamily: "'Poppins', sans-serif", cursor: "pointer" }}>
+                <p
+                  style={{
+                    color: "rgba(30,26,20,0.35)",
+                    fontSize: "1rem",
+                    fontWeight: 300,
+                    marginBottom: "16px",
+                  }}
+                >
+                  No trips match your filters.
+                </p>
+                <button
+                  onClick={() => {
+                    setSearch("");
+                    setFilters(EMPTY_FILTERS);
+                  }}
+                  style={{
+                    background: "none",
+                    border: "1px solid rgba(30,26,20,0.15)",
+                    borderRadius: "999px",
+                    padding: "8px 20px",
+                    color: "rgba(30,26,20,0.55)",
+                    fontSize: "0.72rem",
+                    fontFamily: "'Poppins', sans-serif",
+                    cursor: "pointer",
+                  }}
+                >
                   Clear all filters
                 </button>
               </div>
+            ) : sort === "destination" ? (
+              <DestinationSections trips={filtered} />
             ) : (
-              sort === "destination" ? (
-                <DestinationSections trips={filtered} />
-              ) : (
-                <GlobalTripGrid trips={filtered} />
-              )
+              <GlobalTripGrid trips={filtered} />
             )}
           </div>
         </div>

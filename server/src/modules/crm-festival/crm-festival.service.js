@@ -1,6 +1,7 @@
 import { prisma } from "../../prisma/client.js";
 import { NotFoundError, ValidationError } from "../../core/errors/errors.js";
 import * as repository from "./crm-festival.repository.js";
+import { normalizeHighlights } from "../crm-trip/crm-trip.service.js";
 
 const COMMON_INCLUSION_DEFAULTS = (numberOfNights) => [
   { key: "BREAKFAST", numberOfDays: 0 },
@@ -184,22 +185,6 @@ export const regenerateInclusions = async (tx, festivalId) => {
       displayOrder: 0,
     },
   ];
-  if (festival.airportPickupEnabled)
-    inclusions.push({
-      type: "AIRPORT_PICKUP",
-      sourceKey: "airport-pickup",
-      title: "Pickup transfer",
-      description: null,
-      displayOrder: inclusions.length,
-    });
-  if (festival.airportDropEnabled)
-    inclusions.push({
-      type: "AIRPORT_DROP",
-      sourceKey: "airport-drop",
-      title: "Drop transfer",
-      description: null,
-      displayOrder: inclusions.length,
-    });
 
   const breakfastInclusion = festival.commonInclusions.find(
     (item) => item.key === "BREAKFAST",
@@ -372,6 +357,8 @@ export const listFestivals = async (query) => {
   });
 };
 
+
+
 const toPublicFestival = (festival) => {
   if (!festival) return null;
   const packages = (festival.packages || []).map((pkg) => ({
@@ -390,7 +377,7 @@ const toPublicFestival = (festival) => {
     bannerImages: festival.websiteBannerImages || [],
     stayTransportImages: festival.websiteStayTransportImages || [],
     overview: festival.websiteOverview || "",
-    highlights: festival.websiteHighlights || [],
+    highlights: normalizeHighlights(festival.websiteHighlights),
     bestTimeToVisit: festival.bestTimeToVisit || "",
     tripType: festival.tripType || "CUSTOM_TRIP",
     inclusions: (festival.inclusions || []).map((item) => item.title),
@@ -484,8 +471,6 @@ export const createFestival = async (data) => {
         totalAmount: data.totalAmount,
         tokenAmount: data.tokenAmount,
         destinationId: data.destinationId,
-        airportPickupEnabled: data.airportPickupEnabled,
-        airportDropEnabled: data.airportDropEnabled,
         tripType: data.tripType || null,
         bestTimeToVisit: data.bestTimeToVisit || null,
         isActive: data.isActive,
@@ -498,7 +483,7 @@ export const createFestival = async (data) => {
         websiteFaqs: data.websiteFaqs,
         websiteBannerImages: data.websiteBannerImages,
         websiteStayTransportImages: data.websiteStayTransportImages,
-        websiteHighlights: data.websiteHighlights,
+        websiteHighlights: normalizeHighlights(data.websiteHighlights),
         websiteVideoUrl: data.websiteVideoUrl || null,
         websiteTags: data.websiteTagIds?.length
           ? { connect: data.websiteTagIds.map((id) => ({ id })) }
@@ -626,12 +611,15 @@ export const updateFestival = async (id, changes) => {
 
     for (const key of [
       "name", "numberOfNights", "totalAmount", "tokenAmount", "destinationId",
-      "airportPickupEnabled", "airportDropEnabled", "tripType", "bestTimeToVisit",
+      "tripType", "bestTimeToVisit",
       "isActive", "isFeatured", "isPublished", "isListed", "operationsReminderDays",
       "exclusions", "websiteOverview", "websiteFaqs", "websiteBannerImages",
       "websiteStayTransportImages", "websiteHighlights", "websiteVideoUrl",
     ]) {
       if (changes[key] !== undefined) updateData[key] = changes[key];
+    }
+    if (updateData.websiteHighlights) {
+      updateData.websiteHighlights = normalizeHighlights(updateData.websiteHighlights);
     }
 
     if (changes.websiteTagIds !== undefined) {
@@ -694,10 +682,6 @@ export const updateFestival = async (id, changes) => {
           where: { id: { in: extraDays.map((day) => day.id) } },
         });
       }
-    }
-
-    if (changes.airportPickupEnabled !== undefined || changes.airportDropEnabled !== undefined) {
-      await regenerateInclusions(tx, id);
     }
 
     return repository.findById(updated.id, tx);

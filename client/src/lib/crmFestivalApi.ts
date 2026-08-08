@@ -65,8 +65,6 @@ export interface CrmFestival {
   tokenAmount: number | null;
   destinationId: string;
   destination?: { id: string; name: string };
-  airportPickupEnabled: boolean;
-  airportDropEnabled: boolean;
   tripType?: string | null;
   bestTimeToVisit?: string | null;
   isActive: boolean;

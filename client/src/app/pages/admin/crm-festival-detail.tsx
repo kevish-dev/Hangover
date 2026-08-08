@@ -130,8 +130,6 @@ type CrmFestival = {
   destinationId: string;
   totalAmount: string | number | null;
   tokenAmount: string | number | null;
-  airportPickupEnabled: boolean;
-  airportDropEnabled: boolean;
   tripType?: string | null;
   bestTimeToVisit?: string | null;
   isActive: boolean;

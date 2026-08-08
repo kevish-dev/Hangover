@@ -117,7 +117,7 @@ export function TaskDialog({
             className={inputClass}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Confirm airport pickup"
+            placeholder="e.g. Confirm guest transfer"
           />
         </div>
         <div>

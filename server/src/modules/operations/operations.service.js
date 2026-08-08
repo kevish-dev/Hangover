@@ -67,7 +67,6 @@ export const generateCrmBookingOperations = async (booking, crmSlot) => {
     tasks.push(taskObj);
   };
 
-  if (entity.airportPickupEnabled) addTask(entity.itineraryDays[0], "airport-pickup", "TRANSPORT", "Arrange airport pickup");
   for (const day of entity.itineraryDays) {
     if (day.property || day.stayLocation) {
       const accommodation = day.property?.name || day.stayLocation?.name;
@@ -85,7 +84,6 @@ export const generateCrmBookingOperations = async (booking, crmSlot) => {
       addTask(day, `inclusion:${inclusion.key}`, isPermit ? "PERMIT" : "VENDOR", label);
     }
   }
-  if (entity.airportDropEnabled) addTask(entity.itineraryDays.at(-1), "airport-drop", "TRANSPORT", "Arrange airport drop");
   if (tasks.length) await prisma.operationalTask.createMany({ data: tasks });
 };
 

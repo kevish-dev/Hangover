@@ -125,8 +125,6 @@ type Trip = {
   numberOfNights: number;
   totalAmount: string | number;
   tokenAmount: string | number;
-  airportPickupEnabled: boolean;
-  airportDropEnabled: boolean;
   operationsReminderDays: number;
   destination: Master;
   itineraryDays: Day[];
@@ -264,24 +262,6 @@ export default function CrmTripDetailPage() {
             >
               <UserPlus className="mr-2 h-4 w-4" />Create booking
             </Button>
-            <Toggle
-              label="Include pickup"
-              checked={trip.airportPickupEnabled}
-              onChange={(value) =>
-                request(() => apiClient.patch(`/crm-trips/${id}`, {
-                  airportPickupEnabled: value,
-                }))}
-            />
-            <Toggle
-              label="Include drop"
-              checked={trip.airportDropEnabled}
-              onChange={(value) =>
-                request(() =>
-                  apiClient.patch(`/crm-trips/${id}`, {
-                    airportDropEnabled: value,
-                  })
-                )}
-            />
           </div>
         </div>
       </header>

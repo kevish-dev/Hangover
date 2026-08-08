@@ -184,22 +184,6 @@ export const regenerateInclusions = async (tx, tripId) => {
       displayOrder: 0,
     },
   ];
-  if (trip.airportPickupEnabled)
-    inclusions.push({
-      type: "AIRPORT_PICKUP",
-      sourceKey: "airport-pickup",
-      title: "Pickup transfer",
-      description: null,
-      displayOrder: inclusions.length,
-    });
-  if (trip.airportDropEnabled)
-    inclusions.push({
-      type: "AIRPORT_DROP",
-      sourceKey: "airport-drop",
-      title: "Drop transfer",
-      description: null,
-      displayOrder: inclusions.length,
-    });
 
   const breakfastDays = trip.itineraryDays.filter(
     (day) => day.breakfast,
@@ -346,6 +330,29 @@ export const listTrips = async (query) => {
   };
 };
 
+export const normalizeHighlightItem = (h) => {
+  if (!h) return null;
+  if (typeof h === "string") return { text: h.trim(), imageUrl: "" };
+  if (typeof h === "object") {
+    let textVal = h.text;
+    let imageUrlVal = h.imageUrl || "";
+    while (textVal && typeof textVal === "object") {
+      if (textVal.imageUrl && !imageUrlVal) imageUrlVal = textVal.imageUrl;
+      textVal = textVal.text;
+    }
+    const textStr = typeof textVal === "string" ? textVal.trim() : "";
+    const imageStr = typeof imageUrlVal === "string" ? imageUrlVal.trim() : "";
+    if (!textStr && !imageStr) return null;
+    return { text: textStr, imageUrl: imageStr };
+  }
+  return { text: String(h).trim(), imageUrl: "" };
+};
+
+export const normalizeHighlights = (arr) => {
+  if (!Array.isArray(arr)) return [];
+  return arr.map(normalizeHighlightItem).filter(Boolean);
+};
+
 const toPublicTrip = (trip) => {
   const firstSlot = trip.slots?.[0] || null;
   return {
@@ -357,10 +364,7 @@ const toPublicTrip = (trip) => {
     duration: trip.numberOfNights + 1,
     bestTimeToVisit: trip.bestTimeToVisit || "",
     overview: trip.websiteOverview || "",
-    highlights: (Array.isArray(trip.websiteHighlights)
-      ? trip.websiteHighlights
-      : []
-    ).map((text) => ({ text, imageUrl: "" })),
+    highlights: normalizeHighlights(trip.websiteHighlights),
     inclusions: (trip.inclusions || []).map((item) => item.title),
     exclusions: trip.exclusions || [],
     stayTransportImages: (trip.websiteStayTransportImages || []).map(
@@ -475,6 +479,9 @@ export const createTrip = async (data) => {
       throw new ValidationError(
         "Configure one itinerary day for each trip day",
       );
+    if (tripData.websiteHighlights) {
+      tripData.websiteHighlights = normalizeHighlights(tripData.websiteHighlights);
+    }
     const created = await repository.create(
       {
         ...tripData,
@@ -576,6 +583,9 @@ export const updateTrip = async (id, changes) => {
     websiteTagIds,
     ...tripChanges
   } = changes;
+  if (tripChanges.websiteHighlights) {
+    tripChanges.websiteHighlights = normalizeHighlights(tripChanges.websiteHighlights);
+  }
   await prisma.$transaction(async (tx) => {
     const trip = await repository.findById(id, tx);
     if (!trip) throw new NotFoundError("CRM trip not found");
@@ -588,70 +598,7 @@ export const updateTrip = async (id, changes) => {
     ) {
       throw new ValidationError("Token amount cannot exceed the total amount");
     }
-    const hasBookings = await tx.booking.count({ where: { crmTripId: id } });
-    const totalChanged =
-      tripChanges.totalAmount !== undefined &&
-      Number(tripChanges.totalAmount) !== Number(trip.totalAmount);
-    const tokenChanged =
-      tripChanges.tokenAmount !== undefined &&
-      Number(tripChanges.tokenAmount) !== Number(trip.tokenAmount);
-    if ((totalChanged || tokenChanged) && hasBookings) {
-      throw new ValidationError(
-        "Existing pricing is locked after CRM bookings have been created",
-      );
-    }
-    if (packages !== undefined && hasBookings) {
-      const existingPackages = new Map(
-        trip.packages.map((item) => [item.id, item]),
-      );
-      const suppliedExisting = packages.filter((item) => item.id);
-      if (suppliedExisting.length !== existingPackages.size) {
-        throw new ValidationError(
-          "Existing packages cannot be removed after CRM bookings have been created",
-        );
-      }
-      for (const item of suppliedExisting) {
-        const existing = existingPackages.get(item.id);
-        if (
-          !existing ||
-          existing.title !== item.title ||
-          Number(existing.price) !== Number(item.price) ||
-          Number(existing.tokenAmount) !== Number(item.tokenAmount)
-        ) {
-          throw new ValidationError(
-            "Existing packages cannot be changed after CRM bookings have been created",
-          );
-        }
-      }
-    }
-    if (addOns !== undefined && hasBookings) {
-      const existingAddOns = new Map(
-        trip.addOns.map((item) => [item.id, item]),
-      );
-      const suppliedExisting = addOns.filter((item) => item.id);
-      if (suppliedExisting.length !== existingAddOns.size) {
-        throw new ValidationError(
-          "Existing add-ons cannot be removed after CRM bookings have been created",
-        );
-      }
-      for (const item of suppliedExisting) {
-        const existing = existingAddOns.get(item.id);
-        const unchanged =
-          existing &&
-          existing.title === item.title &&
-          (existing.description || null) === (item.description || null) &&
-          (existing.imageUrl || null) === (item.imageUrl || null) &&
-          Number(existing.price) === Number(item.price) &&
-          existing.maxQuantityPerBooking === item.maxQuantityPerBooking &&
-          existing.maxQuantityPerSlot === item.maxQuantityPerSlot &&
-          existing.purchaseCutoffOffsetDays === item.purchaseCutoffOffsetDays &&
-          existing.isActive === item.isActive;
-        if (!unchanged)
-          throw new ValidationError(
-            "Existing add-ons cannot be changed after CRM bookings have been created",
-          );
-      }
-    }
+
     if (
       tripChanges.destinationId &&
       tripChanges.destinationId !== trip.destinationId
@@ -765,37 +712,66 @@ export const updateTrip = async (id, changes) => {
       }
     }
     if (packages !== undefined) {
-      if (hasBookings) {
-        const additions = packages
-          .filter((item) => !item.id)
-          .map(({ id: _id, ...item }) => ({ ...item, crmTripId: id }));
-        if (additions.length) await tx.package.createMany({ data: additions });
-      } else {
-        await tx.package.deleteMany({ where: { crmTripId: id } });
-        if (packages.length)
-          await tx.package.createMany({
-            data: packages.map(({ id: _id, ...item }) => ({
-              ...item,
-              crmTripId: id,
-            })),
-          });
+      const existingPkgIds = new Set(trip.packages.map((p) => p.id));
+      const suppliedPkgIds = new Set(packages.filter((p) => p.id).map((p) => p.id));
+
+      const toDeletePkgIds = [...existingPkgIds].filter((pkgId) => !suppliedPkgIds.has(pkgId));
+      if (toDeletePkgIds.length) {
+        await tx.package.deleteMany({
+          where: { id: { in: toDeletePkgIds }, crmTripId: id },
+        });
+      }
+
+      for (const pkg of packages.filter((p) => p.id && existingPkgIds.has(p.id))) {
+        await tx.package.update({
+          where: { id: pkg.id },
+          data: {
+            title: pkg.title,
+            price: pkg.price,
+            tokenAmount: pkg.tokenAmount,
+          },
+        });
+      }
+
+      const newPkgs = packages
+        .filter((p) => !p.id)
+        .map(({ id: _id, ...item }) => ({ ...item, crmTripId: id }));
+      if (newPkgs.length) {
+        await tx.package.createMany({ data: newPkgs });
       }
     }
     if (addOns !== undefined) {
-      if (hasBookings) {
-        const additions = addOns
-          .filter((item) => !item.id)
-          .map(({ id: _id, ...item }) => ({ ...item, crmTripId: id }));
-        if (additions.length) await tx.addOn.createMany({ data: additions });
-      } else {
-        await tx.addOn.deleteMany({ where: { crmTripId: id } });
-        if (addOns.length)
-          await tx.addOn.createMany({
-            data: addOns.map(({ id: _id, ...item }) => ({
-              ...item,
-              crmTripId: id,
-            })),
-          });
+      const existingAddOnIds = new Set(trip.addOns.map((a) => a.id));
+      const suppliedAddOnIds = new Set(addOns.filter((a) => a.id).map((a) => a.id));
+
+      const toDeleteAddOnIds = [...existingAddOnIds].filter((addOnId) => !suppliedAddOnIds.has(addOnId));
+      if (toDeleteAddOnIds.length) {
+        await tx.addOn.deleteMany({
+          where: { id: { in: toDeleteAddOnIds }, crmTripId: id },
+        });
+      }
+
+      for (const item of addOns.filter((a) => a.id && existingAddOnIds.has(a.id))) {
+        await tx.addOn.update({
+          where: { id: item.id },
+          data: {
+            title: item.title,
+            description: item.description || null,
+            imageUrl: item.imageUrl || null,
+            price: item.price,
+            maxQuantityPerBooking: item.maxQuantityPerBooking || null,
+            maxQuantityPerSlot: item.maxQuantityPerSlot || null,
+            purchaseCutoffOffsetDays: item.purchaseCutoffOffsetDays ?? null,
+            isActive: item.isActive,
+          },
+        });
+      }
+
+      const newAddOns = addOns
+        .filter((a) => !a.id)
+        .map(({ id: _id, ...item }) => ({ ...item, crmTripId: id }));
+      if (newAddOns.length) {
+        await tx.addOn.createMany({ data: newAddOns });
       }
     }
     if (slots !== undefined)
