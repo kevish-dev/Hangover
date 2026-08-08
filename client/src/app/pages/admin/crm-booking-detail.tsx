@@ -37,12 +37,14 @@ type Booking = {
   travelers: Array<{ id: string; fullName: string; email?: string | null; phone?: string | null; gender?: string | null; dateOfBirth?: string | null; aadhaar?: string | null }>;
   crmTrip?: { id: string; name: string } | null;
   crmTripSlot?: { startDate?: string | null; endDate?: string | null; title?: string | null } | null;
+  crmFestival?: { id: string; name: string } | null;
+  crmFestivalSlot?: { startDate?: string | null; endDate?: string | null; title?: string | null } | null;
 };
 
 const date = (value?: string | null) => value ? new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Not provided";
 
 export default function CrmBookingDetailPage() {
-  const { tripId = "", bookingId = "" } = useParams();
+  const { tripId = "", festivalId = "", bookingId = "" } = useParams();
   const [activeTab, setActiveTab] = useState<"details" | "operations" | "ledger">("details");
   const bookingQuery = useQuery({
     queryKey: ["crm-booking", bookingId],
@@ -55,8 +57,12 @@ export default function CrmBookingDetailPage() {
   if (bookingQuery.isError || !booking) return <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-800">This booking could not be loaded.</div>;
 
   const profile = booking.user.profile;
-  const tripName = booking.crmTrip?.name || "Itinerary trip";
-  const tripPath = `/dashboard/crm-trips/${tripId || booking.crmTrip?.id || ""}`;
+  const tripName = booking.crmFestival?.name || booking.crmTrip?.name || "Itinerary festival/trip";
+  const isFestivalBooking = Boolean(booking.crmFestival);
+  const tripPath = isFestivalBooking
+    ? `/dashboard/crm-festivals/${booking.crmFestival?.id || festivalId || ""}`
+    : `/dashboard/crm-trips/${tripId || booking.crmTrip?.id || ""}`;
+  const slot = booking.crmFestivalSlot || booking.crmTripSlot;
 
   return <div className="mx-auto max-w-6xl space-y-6 pb-12">
     <Link to={tripPath} className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-[#781216]"><ArrowLeft className="h-4 w-4" />Back to {tripName}</Link>
@@ -69,7 +75,7 @@ export default function CrmBookingDetailPage() {
     {activeTab === "details" ? <section className="space-y-5">
       <div className="rounded-xl border border-gray-200 bg-white"><div className="border-b px-5 py-4"><h2 className="flex items-center gap-2 font-bold text-gray-900"><User className="h-4 w-4 text-[#781216]" />Lead customer</h2></div><div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3"><Detail label="Name" value={profile?.fullName || "Not provided"} /><Detail label="Email" value={booking.user.email} icon={<Mail className="h-3.5 w-3.5" />} /><Detail label="Phone" value={profile?.phone || "Not provided"} icon={<Phone className="h-3.5 w-3.5" />} /><Detail label="Alternate phone" value={profile?.alternatePhone || "Not provided"} /><Detail label="Gender" value={profile?.gender || "Not provided"} /><Detail label="Date of birth" value={date(profile?.dateOfBirth)} /><Detail label="Address" value={[profile?.addressLine1, profile?.addressLine2, profile?.city, profile?.state, profile?.postalCode, profile?.country].filter(Boolean).join(", ") || "Not provided"} /><Detail label="Emergency contact" value={[profile?.emergencyContactName, profile?.emergencyContactRelation, profile?.emergencyContactPhone].filter(Boolean).join(" · ") || "Not provided"} /><Detail label="Blood group" value={profile?.bloodGroup || "Not provided"} /><Detail label="Medical notes" value={profile?.medicalNotes || "None"} />{profile?.govtIdImageUrl ? <a href={profile.govtIdImageUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 self-end text-sm font-semibold text-[#781216] hover:underline"><ImageIcon className="h-4 w-4" />View Aadhaar / government ID</a> : <Detail label="Government ID" value="Not uploaded" />}</div></div>
       <div className="rounded-xl border border-gray-200 bg-white"><div className="border-b px-5 py-4"><h2 className="flex items-center gap-2 font-bold text-gray-900"><Users className="h-4 w-4 text-[#781216]" />Co-passengers</h2><p className="mt-1 text-xs text-gray-500">{booking.travelers.length} additional traveler{booking.travelers.length === 1 ? "" : "s"}</p></div>{booking.travelers.length ? <div className="divide-y divide-gray-100">{booking.travelers.map((traveler, index) => <div key={traveler.id} className="grid gap-3 px-5 py-4 sm:grid-cols-2 lg:grid-cols-[1.1fr_1fr_1fr_1fr_auto]"><div><p className="text-xs font-bold uppercase tracking-wide text-gray-400">Traveler {index + 2}</p><p className="mt-1 font-semibold text-gray-900">{traveler.fullName}</p></div><Detail label="Email" value={traveler.email || "Not provided"} /><Detail label="Phone" value={traveler.phone || "Not provided"} /><div><p className="text-xs font-medium text-gray-500">Gender · Date of birth</p><p className="mt-1 text-sm text-gray-800">{traveler.gender || "Not provided"} · {date(traveler.dateOfBirth)}</p></div>{traveler.aadhaar ? <a href={traveler.aadhaar} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 self-center text-sm font-semibold text-[#781216] hover:underline"><ImageIcon className="h-4 w-4" />View ID</a> : <span className="self-center text-sm text-gray-400">ID not uploaded</span>}</div>)}</div> : <p className="p-8 text-center text-sm text-gray-500">No co-passengers have been added.</p>}</div>
-      <div className="rounded-xl border border-gray-200 bg-white p-5"><h2 className="flex items-center gap-2 font-bold text-gray-900"><CalendarDays className="h-4 w-4 text-[#781216]" />Departure</h2><p className="mt-2 text-sm text-gray-700">{booking.crmTripSlot?.startDate ? `${date(booking.crmTripSlot.startDate)} – ${date(booking.crmTripSlot.endDate)}` : "Departure has not been scheduled."}{booking.crmTripSlot?.title ? ` · ${booking.crmTripSlot.title}` : ""}</p></div>
+      <div className="rounded-xl border border-gray-200 bg-white p-5"><h2 className="flex items-center gap-2 font-bold text-gray-900"><CalendarDays className="h-4 w-4 text-[#781216]" />Departure</h2><p className="mt-2 text-sm text-gray-700">{slot?.startDate ? `${date(slot.startDate)} – ${date(slot.endDate)}` : "Departure has not been scheduled."}{slot?.title ? ` · ${slot.title}` : ""}</p></div>
     </section> : activeTab === "operations" ? <section className="overflow-hidden rounded-xl border border-gray-200 bg-white"><BookingOperationsGrid bookingId={booking.id} /></section> : <section className="rounded-xl border border-gray-200 bg-white p-5"><h2 className="mb-4 font-bold text-gray-900">Booking ledger</h2><BalanceSheetTab bookingId={booking.id} queryKeySuffix="crm-booking" /></section>}
   </div>;
 }

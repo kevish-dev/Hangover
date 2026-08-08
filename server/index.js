@@ -19,6 +19,7 @@ import stayLocationRoutes from "./src/modules/stay-location/stay-location.routes
 import propertyRoutes from "./src/modules/property/property.routes.js";
 import transferLocationRoutes from "./src/modules/transfer-location/transfer-location.routes.js";
 import crmTripRoutes from "./src/modules/crm-trip/crm-trip.routes.js";
+import crmFestivalRoutes from "./src/modules/crm-festival/crm-festival.routes.js";
 import crmDestinationRoutes from "./src/modules/crm-destination/crm-destination.routes.js";
 import reviewRoutes from "./src/modules/review/review.routes.js";
 import landingReasonRoutes from "./src/modules/landing-reason/landing-reason.routes.js";
@@ -75,6 +76,7 @@ app.use("/api/v1/stay-locations", stayLocationRoutes);
 app.use("/api/v1/properties", propertyRoutes);
 app.use("/api/v1/transfer-locations", transferLocationRoutes);
 app.use("/api/v1/crm-trips", crmTripRoutes);
+app.use("/api/v1/crm-festivals", crmFestivalRoutes);
 app.use("/api/v1/crm-destinations", crmDestinationRoutes);
 app.use("/api/v1/reviews", reviewRoutes);
 app.use("/api/v1/landing-reasons", landingReasonRoutes);

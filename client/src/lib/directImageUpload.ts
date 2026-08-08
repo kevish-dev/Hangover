@@ -48,9 +48,33 @@ export const uploadOne = async (
   return payload.secure_url as string;
 };
 
+/** Uploads a single video file directly to Cloudinary. */
+export const uploadVideoOne = async (
+  file: File,
+  signature: { cloudName: string; apiKey: string; timestamp: number; folder: string; signature: string }
+) => {
+  if (!file.type.startsWith("video/")) throw new Error(`${file.name}: please select a valid video file (MP4, WebM, MOV).`);
+  if (file.size > MAX_IMAGE_BYTES) throw new Error(`${file.name}: maximum file size exceeded.`);
+
+  const body = new FormData();
+  body.append("file", file, file.name);
+  body.append("api_key", signature.apiKey);
+  body.append("timestamp", String(signature.timestamp));
+  body.append("folder", signature.folder);
+  body.append("signature", signature.signature);
+
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${signature.cloudName}/video/upload`, {
+    method: "POST",
+    body,
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.secure_url) throw new Error(payload?.error?.message || `${file.name}: video upload failed.`);
+  return payload.secure_url as string;
+};
+
 /** Uploads at most three images at a time to keep the admin's network responsive. */
 export async function uploadBannerImagesDirect(
-  kind: "trips" | "festivals" | "crm-trips",
+  kind: "trips" | "festivals" | "crm-trips" | "crm-festivals",
   id: string,
   files: File[],
   onProgress?: (completed: number, total: number) => void,
@@ -80,6 +104,12 @@ export async function uploadBannerImagesDirect(
 export async function uploadGenericImageDirect(file: File) {
   const { data: signature } = await apiClient.post(`/crm-trips/upload-signature`);
   return uploadOne(file, signature);
+}
+
+/** Uploads a single video directly. */
+export async function uploadGenericVideoDirect(file: File) {
+  const { data: signature } = await apiClient.post(`/crm-festivals/upload-signature?type=video`);
+  return uploadVideoOne(file, signature);
 }
 
 /** Uploads multiple images in parallel with automatic client-side compression. */

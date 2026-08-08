@@ -103,7 +103,7 @@ export const getDashboardAnalytics = async (timeframe) => {
     where: {
       entryDate: { gte: startDate, lte: endDate }
     },
-    include: { booking: { select: { source: true, crmTripId: true } } },
+    include: { booking: { select: { source: true, crmTripId: true, crmFestivalId: true } } },
   });
 
   // 2. Fetch Travelers (via Booking)
@@ -216,7 +216,7 @@ export const getDashboardAnalytics = async (timeframe) => {
     name: r.name,
     rating: r.rating || 0
   }));
-  const crmLedgerEntries = ledgerEntries.filter((entry) => entry.booking?.source === "CRM" && entry.booking.crmTripId);
+  const crmLedgerEntries = ledgerEntries.filter((entry) => entry.booking?.source === "CRM" && (entry.booking.crmTripId || entry.booking.crmFestivalId));
   const crmRevenue = crmLedgerEntries.filter((entry) => entry.type === "INCOME").reduce((total, entry) => total + Number(entry.amount), 0);
   const crmCost = crmLedgerEntries.filter((entry) => entry.type === "EXPENSE").reduce((total, entry) => total + Number(entry.amount), 0);
   const crmBookings = bookings.filter((booking) => booking.source === "CRM");

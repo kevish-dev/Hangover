@@ -6,7 +6,8 @@ export const getUnifiedLedger = async (query = {}) => {
   if (query.type) where.type = query.type;
   if (query.scope) where.scope = query.scope;
   if (query.tripId) where.tripId = query.tripId;
-  if (query.crmTripId) where.booking = { crmTripId: query.crmTripId };
+  if (query.crmTripId) where.booking = { ...(where.booking || {}), crmTripId: query.crmTripId };
+  if (query.crmFestivalId) where.booking = { ...(where.booking || {}), crmFestivalId: query.crmFestivalId };
   if (query.source) where.source = query.source;
   if (query.from || query.to) {
     where.entryDate = {};
@@ -18,7 +19,9 @@ export const getUnifiedLedger = async (query = {}) => {
     include: {
       trip: { select: { id: true, title: true } },
       festival: { select: { id: true, title: true } },
-      booking: { select: { id: true, bookingReference: true, crmTrip: { select: { id: true, name: true } }, user: { select: { email: true, profile: { select: { fullName: true } } } } } },
+      crmTrip: { select: { id: true, name: true } },
+      crmFestival: { select: { id: true, name: true } },
+      booking: { select: { id: true, bookingReference: true, crmTrip: { select: { id: true, name: true } }, crmFestival: { select: { id: true, name: true } }, user: { select: { email: true, profile: { select: { fullName: true } } } } } },
       createdBy: { select: { email: true, profile: { select: { fullName: true } } } },
     },
     orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }],
