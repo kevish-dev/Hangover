@@ -47,7 +47,6 @@ model User {
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
   bookings          Booking[]
-  circuitsCreated   Circuit[]     @relation("CircuitCreator")
   resolvedInquiries Inquiry[]     @relation("InquiryResolver")
   inquiries         Inquiry[]
   profile           UserProfile?
@@ -98,81 +97,8 @@ model UserProfile {
   @@index([govtIdNumber])
 }
 
-model Circuit {
-  id                     String       @id @default(uuid())
-  title                  String
-  slug                   String       @unique
-  tripType               TripType
-  location               String
-  destinationId          String?
-  destination            Destination? @relation(fields: [destinationId], references: [id])
-  overview               String
-  bestTimeToVisit        String
-  duration               Int
-  bannerImages           String[]
-  stayTransportImages    Json         @default("[]")
-  highlights             Json         @default("[]")
-  inclusions             String[]
-  exclusions             String[]
-  isActive               Boolean      @default(true)
-  operationsReminderDays Int          @default(3) // days before dueAt to send admin alert
-  internalNotes          String?
-  createdById            String?
-  createdBy              User?        @relation("CircuitCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt              DateTime     @default(now())
-  updatedAt              DateTime     @updatedAt
-
-  days      CircuitDay[]
-  packages  Package[]
-  faqs      FAQ[]
-  tags      TripTag[]    @relation("CircuitToTripTag")
-  addOns    AddOn[]
-  trips     Trip[]
-  festivals Festival[]
-
-  @@index([tripType])
-  @@index([isActive])
-  @@index([destinationId])
-}
-
-model CircuitDay {
-  id          String           @id @default(uuid())
-  circuitId   String
-  circuit     Circuit          @relation(fields: [circuitId], references: [id], onDelete: Cascade)
-  dayNumber   Int
-  title       String
-  description String?
-  todos       String[]         @default([])
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  tasks       CircuitDayTask[]
-
-  @@unique([circuitId, dayNumber])
-  @@index([circuitId])
-}
-
-model CircuitDayTask {
-  id             String                  @id @default(uuid())
-  circuitDayId   String
-  circuitDay     CircuitDay              @relation(fields: [circuitDayId], references: [id], onDelete: Cascade)
-  category       OperationalTaskCategory
-  title          String
-  description    String?
-  config         Json                    @default("{}")
-  unitPrice      Decimal?                @db.Decimal(10, 2)
-  quantityNeeded Int?
-  dueOffsetDays  Int?
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-
-  @@index([circuitDayId])
-  @@index([category])
-}
-
 model Trip {
   id                  String       @id @default(uuid())
-  circuitId           String?
-  circuit             Circuit?     @relation(fields: [circuitId], references: [id], onDelete: SetNull)
   title               String
   slug                String       @unique
   location            String
@@ -216,7 +142,6 @@ model Trip {
   @@index([isPublished])
   @@index([location])
   @@index([destinationId])
-  @@index([circuitId])
 }
 
 model ItineraryDay {
@@ -343,8 +268,6 @@ model Festival {
   isFeatured          Boolean        @default(false)
   isPublished         Boolean        @default(false)
   isListed            Boolean        @default(true)
-  circuitId           String?
-  circuit             Circuit?       @relation(fields: [circuitId], references: [id], onDelete: SetNull)
   shareTokenHash      String?        @unique
   shareTokenExpiresAt DateTime?
   createdAt           DateTime       @default(now())
@@ -381,7 +304,6 @@ model Destination {
   updatedAt   DateTime   @updatedAt
   festivals   Festival[]
   trips       Trip[]
-  circuits    Circuit[]
 
   @@index([isPublished])
 }
@@ -633,7 +555,6 @@ model CrmTripInclusion {
 
 model Package {
   id          String    @id @default(uuid())
-  circuitId   String?
   tripId      String?
   festivalId  String?
   crmTripId   String?
@@ -643,12 +564,10 @@ model Package {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   bookings    Booking[]
-  circuit     Circuit?  @relation(fields: [circuitId], references: [id], onDelete: Cascade)
   festival    Festival? @relation(fields: [festivalId], references: [id], onDelete: Cascade)
   trip        Trip?     @relation(fields: [tripId], references: [id], onDelete: Cascade)
   crmTrip     CrmTrip?  @relation(fields: [crmTripId], references: [id], onDelete: Cascade)
 
-  @@index([circuitId])
   @@index([tripId])
   @@index([festivalId])
   @@index([crmTripId])
@@ -775,7 +694,6 @@ model MediaAsset {
 
 model FAQ {
   id         String    @id @default(uuid())
-  circuitId  String?
   tripId     String?
   festivalId String?
   question   String
@@ -783,11 +701,9 @@ model FAQ {
   order      Int
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
-  circuit    Circuit?  @relation(fields: [circuitId], references: [id], onDelete: Cascade)
   festival   Festival? @relation(fields: [festivalId], references: [id], onDelete: Cascade)
   trip       Trip?     @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
-  @@index([circuitId])
   @@index([tripId])
   @@index([festivalId])
   @@index([order])
@@ -799,7 +715,6 @@ model TripTag {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   trips     Trip[]    @relation("TripToTripTag")
-  circuits  Circuit[] @relation("CircuitToTripTag")
   crmTrips  CrmTrip[] @relation("CrmTripToTripTag")
 }
 
@@ -842,7 +757,7 @@ model OperationalTask {
   crmItineraryDayId  String?
   crmItineraryDay    CrmTripItineraryDay?    @relation(fields: [crmItineraryDayId], references: [id], onDelete: SetNull)
   crmSourceKey       String?
-  sourceTemplateId   String? // CircuitDayTask.id this was forked from, if any
+  sourceTemplateId   String?
   addOnId            String? // If this task was generated from an add-on
   category           OperationalTaskCategory
   title              String
@@ -891,8 +806,6 @@ model OperationalTaskReminder {
 
 model AddOn {
   id                       String         @id @default(uuid())
-  circuitId                String?
-  circuit                  Circuit?       @relation(fields: [circuitId], references: [id], onDelete: Cascade)
   tripId                   String?
   trip                     Trip?          @relation(fields: [tripId], references: [id], onDelete: Cascade)
   festivalId               String?
@@ -911,7 +824,6 @@ model AddOn {
   updatedAt                DateTime       @updatedAt
   purchases                BookingAddOn[]
 
-  @@index([circuitId])
   @@index([tripId])
   @@index([festivalId])
   @@index([crmTripId])

@@ -61,7 +61,7 @@ const toDecimal2 = (value) =>
   Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
 const getBookableAddOns = (item) =>
-  item?.addOns?.length ? item.addOns : item?.circuit?.addOns || [];
+  item?.addOns?.length ? item.addOns : [];
 
 const normalizeAddOnSelections = (addOns) => {
   if (!Array.isArray(addOns)) return [];
@@ -121,8 +121,8 @@ export const createBooking = async (userId, data) => {
   const slot = await prisma.slot.findUnique({ 
     where: { id: data.slotId },
     include: {
-      trip: { include: { packages: true, addOns: true, circuit: { include: { addOns: true } } } },
-      festival: { include: { packages: true, addOns: true, circuit: { include: { addOns: true } } } },
+      trip: { include: { packages: true, addOns: true } },
+      festival: { include: { packages: true, addOns: true } },
     }
   });
   if (!slot) {
@@ -413,8 +413,8 @@ export const adminCreateBooking = async (adminId, data) => {
   const slot = await prisma.slot.findUnique({ 
     where: { id: data.slotId },
     include: {
-      trip: { include: { packages: true, addOns: true, circuit: { include: { addOns: true } } } },
-      festival: { include: { packages: true, addOns: true, circuit: { include: { addOns: true } } } },
+      trip: { include: { packages: true, addOns: true } },
+      festival: { include: { packages: true, addOns: true } },
     }
   });
   if (!slot) {

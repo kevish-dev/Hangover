@@ -63,8 +63,12 @@ type CrmTripDetail = CrmTrip & {
   websiteTags?: Array<{ id: string }>;
   websiteBannerImages?: string[];
   websiteStayTransportImages?: string[];
-  websiteHighlights?: string[];
+  websiteHighlights?: Array<{ text: string; imageUrl?: string } | string>;
   slots?: Array<{ id: string; startDate: string; endDate: string; capacity: number; title?: string | null; priority: number; filledSpots?: number; _count?: { bookings: number } }>;
+};
+type WebsiteHighlightDraft = {
+  text: string;
+  imageUrl: string;
 };
 type PricingPackageDraft = {
   id?: string;
@@ -111,10 +115,23 @@ const TRIP_TYPES = [
   "ROAD_TRIP", "BACKPACKING_TOUR", "PHOTOGRAPHY_TOUR", "BONFIRE_RETREAT", "INSTITUTE_COLLEGE_TRIP", "CUSTOM_TRIP",
 ];
 
+const RequiredMark = () => <span aria-hidden="true" className="text-red-500"> *</span>;
+
 type InclusionDraft = {
   title: string;
   description: string;
 };
+
+type LocalCrmTripDraft = {
+  id: string;
+  title: string;
+  scope: string;
+  createdAt: string;
+  updatedAt: string;
+  data: Record<string, any>;
+};
+
+const CRM_TRIP_DRAFTS_STORAGE_KEY = "crm-trip-drafts:v2";
 
 const generateDefaultInclusions = (
   name: string,
@@ -436,24 +453,18 @@ export default function CrmTripsPage() {
                   toast.warning(
                     `This trip has ${bookingsCount} active booking(s). Deleting it will unlink all bookings.`,
                     {
-                      description: "Are you sure you want to proceed and delete this trip?",
                       action: {
-                        label: "Yes, Delete",
+                        label: "Delete anyway",
                         onClick: () => remove(tripToDel),
                       },
-                      cancel: {
-                        label: "Cancel",
-                        onClick: () => {},
-                      },
-                      duration: 8000,
-                    }
+                    },
                   );
                 } else {
-                  remove();
+                  remove(deleteTrip);
                 }
               }}
             >
-              Delete trip
+              Delete
             </Button>
           </div>
         </DialogContent>
@@ -501,6 +512,7 @@ function CreateTripDialog({
   const [saving, setSaving] = useState(false);
   const [pricingError, setPricingError] = useState("");
   const [uploadingAddOnIndex, setUploadingAddOnIndex] = useState<number | null>(null);
+  const [uploadingHighlightIndex, setUploadingHighlightIndex] = useState<number | null>(null);
   const [customInclusions, setCustomInclusions] = useState<InclusionDraft[]>([]);
   const [customExclusions, setCustomExclusions] = useState<string[]>([]);
   const [websiteOverview, setWebsiteOverview] = useState("");
@@ -513,25 +525,70 @@ function CreateTripDialog({
     queryFn: async () => (await apiClient.get("/trip-tags", { params: { limit: 200 } })).data,
   });
 
+  const availableTags = Array.isArray(tagsQuery.data) ? tagsQuery.data : tagsQuery.data?.data || [];
+
   const createTagMutation = useMutation({
     mutationFn: async (tag: string) => (await apiClient.post("/trip-tags", { tag })).data,
     onSuccess: (newTag) => {
-      setWebsiteTagIds([...websiteTagIds, newTag.id]);
-      setNewWebsiteTag("");
+      if (newTag?.id) {
+        if (!websiteTagIds.includes(newTag.id)) {
+          setWebsiteTagIds((prev) => [...prev, newTag.id]);
+        }
+        setNewWebsiteTag("");
+        toast.success(`Tag "${newTag.tag}" added`);
+        queryClient.invalidateQueries({ queryKey: ["trip-tags"] });
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || "Failed to create tag");
+    }
+  });
+
+  const deleteTagMutation = useMutation({
+    mutationFn: async (tagId: string) => (await apiClient.delete(`/trip-tags/${tagId}`)).data,
+    onSuccess: (_, tagId) => {
+      setWebsiteTagIds((prev) => prev.filter((id) => id !== tagId));
+      toast.success("Tag removed");
       queryClient.invalidateQueries({ queryKey: ["trip-tags"] });
     },
-    onError: () => toast.error("Failed to create tag")
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || "Failed to remove tag");
+    }
   });
-  
-  const availableTags = Array.isArray(tagsQuery.data) ? tagsQuery.data : tagsQuery.data?.data || [];
+
+  const handleAddTag = () => {
+    const val = newWebsiteTag.trim();
+    if (!val) return;
+    const existing = availableTags.find(
+      (t: any) => t.tag?.toLowerCase() === val.toLowerCase()
+    );
+    if (existing) {
+      if (!websiteTagIds.includes(existing.id)) {
+        setWebsiteTagIds((prev) => [...prev, existing.id]);
+      }
+      setNewWebsiteTag("");
+      toast.success(`Tag "${existing.tag}" selected`);
+      return;
+    }
+    if (!createTagMutation.isPending) {
+      createTagMutation.mutate(val);
+    }
+  };
   const [slots, setSlots] = useState<{ id?: string; startDate: string; endDate: string; capacity: string; title: string; priority: string; bookedCount?: number }[]>([{ startDate: "", endDate: "", capacity: "", title: "", priority: "0" }]);
   const [operationsReminderDays, setOperationsReminderDays] = useState("3");
   const [websiteBannerImages, setWebsiteBannerImages] = useState<string[]>([]);
   const [websiteStayTransportImages, setWebsiteStayTransportImages] = useState<string[]>([]);
-  const [websiteHighlights, setWebsiteHighlights] = useState<string[]>([]);
-  const [hasLocalDraft, setHasLocalDraft] = useState(false);
+  const [websiteHighlights, setWebsiteHighlights] = useState<WebsiteHighlightDraft[]>([]);
+  const [localDrafts, setLocalDrafts] = useState<LocalCrmTripDraft[]>([]);
+  const [draftsOpen, setDraftsOpen] = useState(false);
+  const [draftToDelete, setDraftToDelete] = useState<LocalCrmTripDraft | null>(null);
+  const [tagToDelete, setTagToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [saveDraftOpen, setSaveDraftOpen] = useState(false);
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftTitleError, setDraftTitleError] = useState("");
   const formScrollRef = useRef<HTMLDivElement>(null);
-  const draftKey = `crm-trip-draft:${trip?.id || (forkSource ? `fork:${forkSource.id}` : "new")}`;
+  const draftScope = trip?.id ? `trip:${trip.id}` : forkSource ? `fork:${forkSource.id}` : "new";
+  const legacyDraftKey = `crm-trip-draft:${trip?.id || (forkSource ? `fork:${forkSource.id}` : "new")}`;
   const placesQuery = useQuery({ queryKey: ["crm", "places", "create"], queryFn: async () => (await apiClient.get("/places", { params: { activeOnly: true, limit: 500 } })).data.data as Master[], enabled: Boolean(destinationId) });
   const staysQuery = useQuery({ queryKey: ["crm", "stays", "create", destinationId], queryFn: async () => (await apiClient.get("/stay-locations", { params: { destinationId, activeOnly: true, limit: 200 } })).data.data as Master[], enabled: Boolean(destinationId) });
   const propertiesQuery = useQuery({ queryKey: ["crm", "properties", "create"], queryFn: async () => (await apiClient.get("/properties", { params: { activeOnly: true, limit: 500 } })).data.data as Master[], enabled: Boolean(destinationId) });
@@ -568,20 +625,35 @@ function CreateTripDialog({
     setWebsiteHighlights([]);
   };
 
-  const saveLocalDraft = () => {
+  const getStoredDrafts = (): LocalCrmTripDraft[] => {
     try {
-      window.localStorage.setItem(draftKey, JSON.stringify({ step, name, nights, destinationId, itineraryDays, itineraryDayIndex, packages, addOns, pickup, drop, tripType, bestTimeToVisit, isPublished, isFeatured, isListed, isActive, customInclusions, customExclusions, websiteOverview, websiteFaqs, websiteTagIds, slots, operationsReminderDays, websiteBannerImages, websiteStayTransportImages, websiteHighlights }));
-      setHasLocalDraft(true);
-      toast.success("Draft saved on this device");
-    } catch { toast.error("Could not save this draft locally"); }
+      const parsed = JSON.parse(window.localStorage.getItem(CRM_TRIP_DRAFTS_STORAGE_KEY) || "[]");
+      return Array.isArray(parsed) ? parsed.filter((draft): draft is LocalCrmTripDraft => Boolean(draft?.id && draft?.data)) : [];
+    } catch {
+      return [];
+    }
   };
 
-  const restoreLocalDraft = () => {
+  const loadLocalDrafts = () => {
+    const drafts = getStoredDrafts();
     try {
-      const raw = window.localStorage.getItem(draftKey);
-      if (!raw) return toast.error("No local draft was found");
-      const draft = JSON.parse(raw);
-      setStep(Math.min(8, Math.max(1, Number(draft.step) || 1)));
+      const legacyDraft = window.localStorage.getItem(legacyDraftKey);
+      if (legacyDraft) {
+        const data = JSON.parse(legacyDraft);
+        const now = new Date().toISOString();
+        drafts.push({ id: `legacy-${Date.now()}`, title: data.name?.trim() || "Recovered itinerary draft", scope: draftScope, createdAt: now, updatedAt: now, data });
+        window.localStorage.removeItem(legacyDraftKey);
+        window.localStorage.setItem(CRM_TRIP_DRAFTS_STORAGE_KEY, JSON.stringify(drafts));
+      }
+    } catch {
+      // Keep the current drafts available if an older draft cannot be migrated.
+    }
+    setLocalDrafts(drafts.filter((draft) => draft.scope === draftScope).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
+  };
+
+  const applyLocalDraft = (draft: Record<string, any>) => {
+    try {
+      setStep(Math.min(7, Math.max(1, Number(draft.step) || 1)));
       setName(draft.name || ""); setNights(draft.nights || "1"); setDestinationId(draft.destinationId || "");
       setItineraryDays(Array.isArray(draft.itineraryDays) ? draft.itineraryDays : []); setItineraryDayIndex(Number(draft.itineraryDayIndex) || 0);
       setPackages(Array.isArray(draft.packages) && draft.packages.length ? draft.packages : [{ title: "Standard", price: "", tokenAmount: "" }]); setAddOns(Array.isArray(draft.addOns) ? draft.addOns : []);
@@ -589,13 +661,55 @@ function CreateTripDialog({
       setWebsiteOverview(draft.websiteOverview || ""); setWebsiteFaqs(Array.isArray(draft.websiteFaqs) ? draft.websiteFaqs : []); setWebsiteTagIds(Array.isArray(draft.websiteTagIds) ? draft.websiteTagIds : []);
       setSlots(Array.isArray(draft.slots) && draft.slots.length ? draft.slots : [{ startDate: "", endDate: "", capacity: "", title: "", priority: "0" }]); setOperationsReminderDays(String(draft.operationsReminderDays ?? 3));
       setWebsiteBannerImages(Array.isArray(draft.websiteBannerImages) ? draft.websiteBannerImages : []); setWebsiteStayTransportImages(Array.isArray(draft.websiteStayTransportImages) ? draft.websiteStayTransportImages : []); setWebsiteHighlights(Array.isArray(draft.websiteHighlights) ? draft.websiteHighlights : []);
-      toast.success("Local draft restored");
-    } catch { toast.error("This local draft could not be restored"); }
+      setDraftsOpen(false);
+      toast.success("Draft restored");
+    } catch { toast.error("This draft could not be restored"); }
   };
+
+  const openSaveDraft = () => {
+    setDraftTitle(name.trim() || (trip ? `${trip.name} changes` : "Untitled itinerary trip"));
+    setDraftTitleError("");
+    setSaveDraftOpen(true);
+  };
+
+  const saveLocalDraft = () => {
+    const title = draftTitle.trim();
+    if (!title) {
+      setDraftTitleError("Enter a name for this draft.");
+      return;
+    }
+    try {
+      const now = new Date().toISOString();
+      const newDraft: LocalCrmTripDraft = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        title,
+        scope: draftScope,
+        createdAt: now,
+        updatedAt: now,
+        data: { step, name, nights, destinationId, itineraryDays, itineraryDayIndex, packages, addOns, pickup, drop, tripType, bestTimeToVisit, isPublished, isFeatured, isListed, isActive, customInclusions, customExclusions, websiteOverview, websiteFaqs, websiteTagIds, slots, operationsReminderDays, websiteBannerImages, websiteStayTransportImages, websiteHighlights },
+      };
+      const drafts = [newDraft, ...getStoredDrafts()];
+      window.localStorage.setItem(CRM_TRIP_DRAFTS_STORAGE_KEY, JSON.stringify(drafts));
+      setLocalDrafts(drafts.filter((draft) => draft.scope === draftScope));
+      setSaveDraftOpen(false);
+      toast.success("Draft saved on this device");
+    } catch { toast.error("Could not save this draft locally"); }
+  };
+
+  const removeLocalDraft = (id: string) => {
+    try {
+      const drafts = getStoredDrafts().filter((draft) => draft.id !== id);
+      window.localStorage.setItem(CRM_TRIP_DRAFTS_STORAGE_KEY, JSON.stringify(drafts));
+      setLocalDrafts(drafts.filter((draft) => draft.scope === draftScope));
+      toast.success("Draft deleted");
+    } catch { toast.error("Could not delete this draft"); }
+  };
+
+  const deleteLocalDraft = (draft: LocalCrmTripDraft) => setDraftToDelete(draft);
 
   useEffect(() => {
     if (!open) return;
-    setHasLocalDraft(Boolean(window.localStorage.getItem(draftKey)));
+    loadLocalDrafts();
     if (!sourceTrip) {
       reset();
       return;
@@ -640,7 +754,11 @@ function CreateTripDialog({
     setOperationsReminderDays(String(sourceTrip.operationsReminderDays ?? 3));
     setWebsiteBannerImages(sourceTrip.websiteBannerImages || []);
     setWebsiteStayTransportImages(sourceTrip.websiteStayTransportImages || []);
-    setWebsiteHighlights((sourceTrip.websiteHighlights as any) || []);
+    setWebsiteHighlights(
+      ((sourceTrip.websiteHighlights as any) || []).map((h: any) =>
+        typeof h === "string" ? { text: h, imageUrl: "" } : { text: h?.text || "", imageUrl: h?.imageUrl || "" }
+      )
+    );
   }, [open, sourceTrip, isFork]);
 
   useEffect(() => {
@@ -648,6 +766,9 @@ function CreateTripDialog({
   }, [step, itineraryDayIndex]);
 
   const close = () => {
+    setDraftsOpen(false);
+    setDraftToDelete(null);
+    setSaveDraftOpen(false);
     reset();
     onOpenChange(false);
   };
@@ -689,6 +810,41 @@ function CreateTripDialog({
       [next[from], next[to]] = [next[to], next[from]];
       return next;
     });
+  };
+
+  const STEP_TITLES = [
+    "Trip essentials",
+    "Itinerary setup",
+    "Pricing & traveller options",
+    "Departures & trip preview",
+    "Website overview & FAQs",
+    "Tags & media",
+  ];
+
+  const jumpToStep = (targetStep: number) => {
+    if (targetStep === step) return;
+    if (step === 1 || targetStep > 1) {
+      if (
+        !name.trim() ||
+        !destinationId ||
+        !Number.isInteger(Number(nights)) ||
+        Number(nights) < 0 ||
+        Number(nights) > 365
+      ) {
+        toast.error("Enter a title, a destination, and 0–365 nights before proceeding");
+        return;
+      }
+      setItineraryDays((currentDays) =>
+        Array.from(
+          { length: Number(nights) + 1 },
+          (_, index) => currentDays[index] || emptyItineraryDay(),
+        ),
+      );
+    }
+    if (targetStep === 2) {
+      setItineraryDayIndex(0);
+    }
+    setStep(targetStep);
   };
 
   const uploadAddOnImage = async (index: number, file?: File) => {
@@ -817,7 +973,7 @@ function CreateTripDialog({
       return;
     }
 
-    if (action === "continue" && step >= 4 && step < 8) {
+    if (action === "continue" && step >= 4 && step < 6) {
       setStep(step + 1);
       return;
     }
@@ -869,14 +1025,14 @@ function CreateTripDialog({
         })),
         websiteBannerImages,
         websiteStayTransportImages,
-        websiteHighlights: websiteHighlights.filter(Boolean),
+        websiteHighlights: websiteHighlights
+          .filter((h) => h.text.trim())
+          .map((h) => ({ text: h.text.trim(), imageUrl: h.imageUrl.trim() })),
       };
       await (trip
         ? apiClient.patch(`/crm-trips/${trip.id}`, payload)
         : apiClient.post("/crm-trips", payload));
       toast.success(trip ? "CRM trip updated" : "CRM trip created");
-      window.localStorage.removeItem(draftKey);
-      setHasLocalDraft(false);
       close();
       onCreated();
     } catch (error: any) {
@@ -896,12 +1052,32 @@ function CreateTripDialog({
     >
       <DialogContent className="!flex !h-[min(780px,calc(100dvh-1rem))] !w-[calc(100vw-1rem)] !max-w-none !flex-col !gap-0 !overflow-hidden !p-0 sm:!max-w-4xl">
         <DialogHeader className="shrink-0 border-b border-gray-200 bg-white px-5 py-4 pr-12 sm:px-7 sm:py-5">
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#781216]">{isFork ? "Fork trip" : trip ? "Trip editor" : "New trip"} · Step {step} of 8</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#781216]">{isFork ? "Fork trip" : trip ? "Trip editor" : "New trip"} · Step {step} of 6</p>
           <DialogTitle className="mt-1 text-xl text-gray-950 sm:text-2xl">
-            {step === 1 ? "Trip essentials" : step === 2 ? `Itinerary · day ${itineraryDayIndex + 1} of ${itineraryDays.length}` : step === 3 ? "Pricing & traveller options" : step === 4 ? "Departures & trip preview" : step === 5 ? "Website overview & FAQs" : step === 6 ? "Tags & available departures" : step === 7 ? "Banner images" : "Stay & transport images"}
+            {step === 1 ? "Trip essentials" : step === 2 ? `Itinerary · day ${itineraryDayIndex + 1} of ${itineraryDays.length}` : step === 3 ? "Pricing & traveller options" : step === 4 ? "Departures & trip preview" : step === 5 ? "Website overview & FAQs" : "Tags & media"}
           </DialogTitle>
-          <div className="mt-4 flex gap-1.5" aria-label={`Step ${step} of 8`}>
-            {Array.from({ length: 8 }, (_, index) => <span key={index} className={`h-1.5 flex-1 rounded-full ${index + 1 <= step ? "bg-[#781216]" : "bg-gray-200"}`} />)}
+          <div className="mt-4 flex gap-1.5" aria-label={`Step ${step} of 6`}>
+            {STEP_TITLES.map((title, index) => {
+              const stepNum = index + 1;
+              const isActive = stepNum === step;
+              const isCompleted = stepNum < step;
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => jumpToStep(stepNum)}
+                  title={`Step ${stepNum}: ${title}`}
+                  aria-label={`Jump to Step ${stepNum}: ${title}`}
+                  className={`h-2.5 flex-1 rounded-full transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#781216]/50 ${
+                    isActive
+                      ? "bg-[#781216] ring-2 ring-[#781216]/30"
+                      : isCompleted
+                        ? "bg-[#781216]/70 hover:bg-[#781216]"
+                        : "bg-gray-200 hover:bg-gray-400"
+                  }`}
+                />
+              );
+            })}
           </div>
         </DialogHeader>
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
@@ -910,7 +1086,7 @@ function CreateTripDialog({
           {step === 1 ? (
             <>
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium">Trip title</span>
+                <span className="text-sm font-medium">Trip title<RequiredMark /></span>
                 <Input
                   required
                   value={name}
@@ -919,7 +1095,7 @@ function CreateTripDialog({
                 />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium">Number of nights</span>
+                <span className="text-sm font-medium">Number of nights<RequiredMark /></span>
                 <Input
                   required
                   min="0"
@@ -930,7 +1106,7 @@ function CreateTripDialog({
                 />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium">Destination</span>
+                <span className="text-sm font-medium">Destination<RequiredMark /></span>
                 <select
                   required
                   className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
@@ -980,9 +1156,9 @@ function CreateTripDialog({
                   {hasLockedPricing && <p className="mt-2 rounded-md bg-amber-50 px-2.5 py-2 text-xs text-amber-800">Existing packages are locked because this trip has bookings. You can add a new package for future use.</p>}
                 </div>
                 <div className="hidden grid-cols-[minmax(0,1fr)_130px_150px_32px] gap-3 px-1 text-[11px] font-bold uppercase tracking-wider text-gray-500 md:grid">
-                  <span>Package name</span>
-                  <span>Price (₹)</span>
-                  <span>Booking amount (₹)</span>
+                  <span>Package name<RequiredMark /></span>
+                  <span>Price (₹)<RequiredMark /></span>
+                  <span>Booking amount (₹)<RequiredMark /></span>
                   <span />
                 </div>
                 <div className="space-y-3">
@@ -993,7 +1169,7 @@ function CreateTripDialog({
                     >
                       <label className="space-y-1">
                         <span className="text-xs font-medium text-gray-600 md:hidden">
-                          Package name
+                          Package name<RequiredMark />
                         </span>
                         <Input
                           disabled={hasLockedPricing && Boolean(item.id)}
@@ -1006,7 +1182,7 @@ function CreateTripDialog({
                       </label>
                       <label className="space-y-1">
                         <span className="text-xs font-medium text-gray-600 md:hidden">
-                          Price (₹)
+                          Price (₹)<RequiredMark />
                         </span>
                         <Input
                           disabled={hasLockedPricing && Boolean(item.id)}
@@ -1022,7 +1198,7 @@ function CreateTripDialog({
                       </label>
                       <label className="space-y-1">
                         <span className="text-xs font-medium text-gray-600 md:hidden">
-                          Booking amount (₹)
+                          Booking amount (₹)<RequiredMark />
                         </span>
                         <Input
                           disabled={hasLockedPricing && Boolean(item.id)}
@@ -1151,11 +1327,11 @@ function CreateTripDialog({
                   {slots.map((slot, index) => (
                     <div key={slot.id || index} className="space-y-4 rounded-lg border border-gray-200 bg-white p-4">
                       <div className="grid gap-4 sm:grid-cols-2">
-                        <label className="space-y-1.5"><span className="text-sm font-medium">Start date</span><Input disabled={Boolean(slot.bookedCount)} type="date" value={slot.startDate} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, startDate: e.target.value, endDate: endDateForTrip(e.target.value) } : item))} /></label>
-                        <label className="space-y-1.5"><span className="text-sm font-medium">End date <span className="text-xs font-normal text-gray-400">(auto-calculated)</span></span><Input min={slot.startDate || undefined} disabled={Boolean(slot.bookedCount)} type="date" value={slot.endDate} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, endDate: e.target.value } : item))} /></label>
+                        <label className="space-y-1.5"><span className="text-sm font-medium">Start date<RequiredMark /></span><Input disabled={Boolean(slot.bookedCount)} type="date" value={slot.startDate} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, startDate: e.target.value, endDate: endDateForTrip(e.target.value) } : item))} /></label>
+                        <label className="space-y-1.5"><span className="text-sm font-medium">End date<RequiredMark /> <span className="text-xs font-normal text-gray-400">(auto-calculated)</span></span><Input min={slot.startDate || undefined} disabled={Boolean(slot.bookedCount)} type="date" value={slot.endDate} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, endDate: e.target.value } : item))} /></label>
                       </div>
                       <div className="grid gap-4 sm:grid-cols-[150px_minmax(0,1fr)_auto] sm:items-end">
-                        <label className="space-y-1.5"><span className="text-sm font-medium">Capacity</span><Input min="1" type="number" value={slot.capacity} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, capacity: e.target.value } : item))} /></label>
+                        <label className="space-y-1.5"><span className="text-sm font-medium">Capacity<RequiredMark /></span><Input min="1" type="number" value={slot.capacity} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, capacity: e.target.value } : item))} /></label>
                         <label className="space-y-1.5"><span className="text-sm font-medium">Departure name <span className="text-gray-400">(optional)</span></span><Input value={slot.title} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, title: e.target.value } : item))} placeholder="e.g. August batch" /></label>
                         <Button type="button" variant="outline" disabled={Boolean(slot.bookedCount) || slots.length === 1} className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setSlots(slots.filter((_, i) => i !== index))}><Trash2 className="mr-1.5 h-4 w-4" />Remove</Button>
                       </div>
@@ -1164,9 +1340,8 @@ function CreateTripDialog({
                   ))}
                 </div>
                 {pricingError && <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{pricingError}</p>}
-                <label className="block max-w-xs space-y-1"><span className="text-xs font-bold uppercase tracking-wider text-gray-500">Reminder days before task</span><Input min="0" type="number" value={operationsReminderDays} onChange={(e) => setOperationsReminderDays(e.target.value)} /></label>
+                <label className="block max-w-xs space-y-1"><span className="text-xs font-bold uppercase tracking-wider text-gray-500">Reminder days before task<RequiredMark /></span><Input min="0" type="number" value={operationsReminderDays} onChange={(e) => setOperationsReminderDays(e.target.value)} /></label>
               </section>
-              {/* Trip basic info preview summary */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 rounded-xl border border-gray-200 bg-gray-50/50 p-4 text-sm text-gray-700">
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Trip Title</p>
@@ -1191,7 +1366,6 @@ function CreateTripDialog({
               </div>
 
               <div className="grid md:grid-cols-2 gap-6">
-                {/* Inclusions Editing Section */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between border-b pb-2">
                     <div>
@@ -1205,7 +1379,7 @@ function CreateTripDialog({
                     {customInclusions.map((inc, index) => (
                       <div key={index} className="flex gap-2 items-start group">
                         <div className="flex-1 space-y-1">
-                          <Input placeholder="Title (e.g. Guided tour)" value={inc.title} onChange={(e) => { const updated = [...customInclusions]; updated[index].title = e.target.value; setCustomInclusions(updated); }} className="h-7 text-xs font-medium border-transparent bg-gray-50 hover:bg-gray-100 focus:border-blue-500 focus:bg-white transition-colors" />
+                          <label className="block"><span className="text-[10px] font-semibold text-gray-500">Title<RequiredMark /></span><Input placeholder="e.g. Guided tour" value={inc.title} onChange={(e) => { const updated = [...customInclusions]; updated[index].title = e.target.value; setCustomInclusions(updated); }} className="h-7 text-xs font-medium border-transparent bg-gray-50 hover:bg-gray-100 focus:border-blue-500 focus:bg-white transition-colors" /></label>
                           <Input placeholder="Optional description" value={inc.description} onChange={(e) => { const updated = [...customInclusions]; updated[index].description = e.target.value; setCustomInclusions(updated); }} className="h-7 text-xs text-gray-500 border-transparent bg-gray-50 hover:bg-gray-100 focus:border-blue-500 focus:bg-white transition-colors" />
                         </div>
                         <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setCustomInclusions(customInclusions.filter((_, i) => i !== index))}>
@@ -1217,7 +1391,6 @@ function CreateTripDialog({
                   </div>
                 </div>
 
-                {/* Exclusions Editing Section */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between border-b pb-2">
                     <div>
@@ -1230,7 +1403,7 @@ function CreateTripDialog({
                   <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                     {customExclusions.map((exc, index) => (
                       <div key={index} className="flex gap-2 items-center group">
-                        <Input placeholder="Exclusion detail" value={exc} onChange={(e) => { const updated = [...customExclusions]; updated[index] = e.target.value; setCustomExclusions(updated); }} className="h-7 text-xs border-transparent bg-gray-50 hover:bg-gray-100 focus:border-blue-500 focus:bg-white transition-colors" />
+                        <label className="flex-1"><span className="text-[10px] font-semibold text-gray-500">Exclusion detail<RequiredMark /></span><Input placeholder="e.g. Personal expenses" value={exc} onChange={(e) => { const updated = [...customExclusions]; updated[index] = e.target.value; setCustomExclusions(updated); }} className="h-7 text-xs border-transparent bg-gray-50 hover:bg-gray-100 focus:border-blue-500 focus:bg-white transition-colors" /></label>
                         <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={() => setCustomExclusions(customExclusions.filter((_, i) => i !== index))}>
                           <X className="h-3.5 w-3.5" />
                         </Button>
@@ -1268,12 +1441,82 @@ function CreateTripDialog({
 
               <section className="space-y-3">
                 <div className="flex items-center justify-between border-b pb-2">
-                  <div><h3 className="text-sm font-medium">Trip highlights</h3><p className="mt-0.5 text-xs text-gray-500">Short, scannable reasons to choose this trip.</p></div>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setWebsiteHighlights([...websiteHighlights, ""])}><Plus className="mr-1.5 h-3.5 w-3.5" />Add highlight</Button>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-900">Trip highlights</h3>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      Each highlight includes a feature image and text for the public website accordion.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setWebsiteHighlights([...websiteHighlights, { text: "", imageUrl: "" }])}
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Add highlight
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  {websiteHighlights.map((highlight, index) => <div key={index} className="flex items-center gap-2"><Input value={highlight} placeholder="e.g. Small-group mountain stays" onChange={(e) => setWebsiteHighlights(websiteHighlights.map((item, itemIndex) => itemIndex === index ? e.target.value : item))} /><Button type="button" variant="ghost" size="icon" className="shrink-0 text-red-600 hover:bg-red-50" aria-label="Remove highlight" onClick={() => setWebsiteHighlights(websiteHighlights.filter((_, itemIndex) => itemIndex !== index))}><X className="h-4 w-4" /></Button></div>)}
-                  {!websiteHighlights.length && <p className="rounded-lg border border-dashed border-gray-200 px-3 py-4 text-center text-xs text-gray-500">No highlights yet.</p>}
+                <div className="space-y-3">
+                  {websiteHighlights.map((highlight, index) => (
+                    <div key={index} className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:flex-row sm:items-start">
+                      <div className="w-full shrink-0 sm:w-32">
+                        <span className="mb-1 block text-[10px] font-semibold text-gray-500">Image</span>
+                        {highlight.imageUrl ? (
+                          <div className="group relative aspect-video w-full overflow-hidden rounded-md border border-gray-200 bg-white">
+                            <img src={highlight.imageUrl} alt="" className="h-full w-full object-cover" />
+                            <button
+                              type="button"
+                              aria-label="Remove image"
+                              onClick={() => {
+                                const next = [...websiteHighlights];
+                                next[index].imageUrl = "";
+                                setWebsiteHighlights(next);
+                              }}
+                              className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white shadow-sm"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className={`flex aspect-video w-full cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-gray-300 bg-white shadow-sm transition-colors hover:bg-gray-50 ${uploadingHighlightIndex === index ? "cursor-not-allowed opacity-70" : ""}`}>
+                            {uploadingHighlightIndex === index ? <Loader2 className="h-4 w-4 animate-spin text-gray-400" /> : <ImagePlus className="h-4 w-4 text-gray-400" />}
+                            <span className="mt-1 text-[10px] font-semibold text-gray-500">{uploadingHighlightIndex === index ? "Uploading..." : "Upload image"}</span>
+                            <input type="file" className="hidden" accept="image/*" disabled={uploadingHighlightIndex === index} onChange={(e) => uploadHighlightImage(index, e.target.files?.[0])} />
+                          </label>
+                        )}
+                      </div>
+                      <div className="flex flex-1 items-end gap-2">
+                        <label className="flex-1 space-y-1">
+                          <span className="text-[10px] font-semibold text-gray-500">Highlight Text<RequiredMark /></span>
+                          <Input
+                            value={highlight.text}
+                            placeholder="e.g. Scenic mountain passes & local cultural stays"
+                            onChange={(e) => {
+                              const next = [...websiteHighlights];
+                              next[index].text = e.target.value;
+                              setWebsiteHighlights(next);
+                            }}
+                            className="h-9 text-xs"
+                          />
+                        </label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 text-red-600 hover:bg-red-50"
+                          aria-label="Remove highlight"
+                          onClick={() => setWebsiteHighlights(websiteHighlights.filter((_, itemIndex) => itemIndex !== index))}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {!websiteHighlights.length && (
+                    <p className="rounded-lg border border-dashed border-gray-200 px-3 py-4 text-center text-xs text-gray-500">
+                      No highlights added yet.
+                    </p>
+                  )}
                 </div>
               </section>
               
@@ -1288,8 +1531,8 @@ function CreateTripDialog({
                   {websiteFaqs.map((faq, index) => (
                     <div key={index} className="flex gap-3 items-start p-3 rounded-lg border border-gray-200 bg-gray-50">
                       <div className="flex-1 space-y-2">
-                        <Input placeholder="Question" value={faq.question} onChange={(e) => { const updated = [...websiteFaqs]; updated[index].question = e.target.value; setWebsiteFaqs(updated); }} className="h-8 text-xs font-semibold bg-white" />
-                        <textarea className="min-h-[60px] w-full rounded-md border border-input bg-white px-3 py-2 text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" placeholder="Answer" value={faq.answer} onChange={(e) => { const updated = [...websiteFaqs]; updated[index].answer = e.target.value; setWebsiteFaqs(updated); }} />
+                        <label className="block"><span className="text-[10px] font-semibold text-gray-500">Question<RequiredMark /></span><Input placeholder="Question" value={faq.question} onChange={(e) => { const updated = [...websiteFaqs]; updated[index].question = e.target.value; setWebsiteFaqs(updated); }} className="h-8 text-xs font-semibold bg-white" /></label>
+                        <label className="block"><span className="text-[10px] font-semibold text-gray-500">Answer<RequiredMark /></span><textarea className="min-h-[60px] w-full rounded-md border border-input bg-white px-3 py-2 text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" placeholder="Answer" value={faq.answer} onChange={(e) => { const updated = [...websiteFaqs]; updated[index].answer = e.target.value; setWebsiteFaqs(updated); }} /></label>
                       </div>
                       <div className="flex shrink-0 flex-col gap-1">
                         <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-gray-500" aria-label="Move FAQ up" disabled={index === 0} onClick={() => moveWebsiteFaq(index, index - 1)}><ArrowUp className="h-3.5 w-3.5" /></Button>
@@ -1302,157 +1545,153 @@ function CreateTripDialog({
                 </div>
               </div>
             </div>
-          ) : step === 6 ? (
+          ) : (
             <div className="space-y-6">
               <label className="block space-y-2">
-                <span className="text-sm font-medium">Trip Tags</span>
-                <p className="text-xs text-gray-500 mb-3">Select or create tags to describe this trip (e.g., Adventure, Honeymoon, Relaxing)</p>
-                <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-sm font-medium text-gray-900">Trip Tags</span>
+                <p className="mb-3 text-xs text-gray-500">Select or create tags to describe this trip (e.g., Adventure, Honeymoon, Relaxing)</p>
+                <div className="flex flex-wrap items-center gap-2">
                   {availableTags.map((tag: any) => {
                     const active = websiteTagIds.includes(tag.id);
                     return (
-                      <button
-                        key={tag.id}
-                        type="button"
-                        onClick={() =>
-                          setWebsiteTagIds(
+                      <div key={tag.id} className="group relative inline-flex items-center">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setWebsiteTagIds(
+                              active
+                                ? websiteTagIds.filter((id) => id !== tag.id)
+                                : [...websiteTagIds, tag.id]
+                            )
+                          }
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-all ${
                             active
-                              ? websiteTagIds.filter((id) => id !== tag.id)
-                              : [...websiteTagIds, tag.id]
-                          )
-                        }
-                        className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${active ? "border-[#781216] bg-[#781216] text-white shadow-sm" : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"}`}
-                      >
-                        {tag.tag}
-                      </button>
+                              ? "border-[#781216] bg-[#781216] text-white shadow-sm pr-2.5"
+                              : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                          }`}
+                        >
+                          <span>{tag.tag}</span>
+                          {active && (
+                            <span
+                              className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white/20 hover:bg-white/40"
+                              title="Deselect tag"
+                            >
+                              <X className="h-2.5 w-2.5" />
+                            </span>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Delete tag ${tag.tag} permanently`}
+                          title={`Delete "${tag.tag}" tag permanently`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTagToDelete({ id: tag.id, name: tag.tag });
+                          }}
+                          className="ml-1 hidden h-5 w-5 items-center justify-center rounded-full text-gray-400 hover:bg-red-50 hover:text-red-600 group-hover:inline-flex"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
                     );
                   })}
-                  <Input
-                    placeholder="New tag & enter..."
-                    value={newWebsiteTag}
-                    onChange={(e) => setNewWebsiteTag(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        const val = newWebsiteTag.trim();
-                        if (val && !createTagMutation.isPending) {
-                          createTagMutation.mutate(val);
+                  <div className="inline-flex items-center gap-1.5">
+                    <Input
+                      placeholder="New tag & enter..."
+                      value={newWebsiteTag}
+                      onChange={(e) => setNewWebsiteTag(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddTag();
                         }
-                      }
-                    }}
-                    disabled={createTagMutation.isPending}
-                    className="h-7 text-xs w-32 rounded-full px-3 bg-white"
-                  />
+                      }}
+                      disabled={createTagMutation.isPending}
+                      className="h-8 w-36 rounded-full bg-white px-3 text-xs shadow-sm"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!newWebsiteTag.trim() || createTagMutation.isPending}
+                      onClick={handleAddTag}
+                      className="h-8 rounded-full px-3 text-xs"
+                    >
+                      {createTagMutation.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Plus className="mr-1 h-3 w-3" />
+                      )}
+                      Add
+                    </Button>
+                  </div>
                 </div>
               </label>
               
               <div className="space-y-3 pt-4">
                 <div className="flex items-center justify-between border-b pb-2">
-                  <span className="text-sm font-medium">Available Slots</span>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setSlots([...slots, { startDate: "", endDate: "", capacity: "", title: "", priority: "0" }])}>
-                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Slot
-                  </Button>
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900">Website Banner Images</h3>
+                    <p className="text-xs text-gray-500">High quality images for the trip detail hero section</p>
+                  </div>
+                  <label className="inline-flex h-8 cursor-pointer items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Upload Image
+                    <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        toast.loading("Uploading...", { id: "upload" });
+                        const url = await uploadGenericImageDirect(file);
+                        setWebsiteBannerImages([...websiteBannerImages, url]);
+                        toast.success("Uploaded successfully", { id: "upload" });
+                      } catch (err: any) {
+                        toast.error("Upload failed", { id: "upload" });
+                      }
+                    }} />
+                  </label>
                 </div>
-                <div className="space-y-3 max-h-64 overflow-y-auto">
-                  {slots.map((slot, index) => (
-                    <div key={index} className="relative p-4 rounded-xl border border-gray-200 bg-gray-50 space-y-4 pr-10">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <label className="space-y-1.5">
-                          <span className="text-xs font-semibold text-gray-700">Start Date</span>
-                          <Input type="date" value={slot.startDate} onChange={(e) => { const updated = [...slots]; updated[index].startDate = e.target.value; setSlots(updated); }} className="h-9 bg-white text-sm" />
-                        </label>
-                        <label className="space-y-1.5">
-                          <span className="text-xs font-semibold text-gray-700">End Date</span>
-                          <Input type="date" value={slot.endDate} onChange={(e) => { const updated = [...slots]; updated[index].endDate = e.target.value; setSlots(updated); }} className="h-9 bg-white text-sm" />
-                        </label>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <label className="space-y-1.5">
-                          <span className="text-xs font-semibold text-gray-700">Capacity</span>
-                          <Input type="number" min="1" value={slot.capacity} onChange={(e) => { const updated = [...slots]; updated[index].capacity = e.target.value; setSlots(updated); }} className="h-9 bg-white text-sm" placeholder="e.g. 20" />
-                        </label>
-                        <label className="space-y-1.5">
-                          <span className="text-xs font-semibold text-gray-700">Sort Priority</span>
-                          <Input type="number" value={slot.priority} onChange={(e) => { const updated = [...slots]; updated[index].priority = e.target.value; setSlots(updated); }} className="h-9 bg-white text-sm" placeholder="0" />
-                        </label>
-                        <label className="space-y-1.5">
-                          <span className="text-xs font-semibold text-gray-700">Title (Optional)</span>
-                          <Input value={slot.title} onChange={(e) => { const updated = [...slots]; updated[index].title = e.target.value; setSlots(updated); }} className="h-9 bg-white text-sm" placeholder="e.g. Special Batch" />
-                        </label>
-                      </div>
-                      <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50" onClick={() => setSlots(slots.filter((_, i) => i !== index))}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                  {websiteBannerImages.map((img, idx) => (
+                    <div key={idx} className="group relative aspect-video overflow-hidden rounded-lg border bg-gray-100">
+                      <img src={img} alt="" className="h-full w-full object-cover" />
+                      <button type="button" onClick={() => setWebsiteBannerImages(websiteBannerImages.filter((_, i) => i !== idx))} className="absolute right-1 top-1 rounded-full bg-red-600 p-1 text-white opacity-0 shadow transition-opacity group-hover:opacity-100"><X className="h-3 w-3" /></button>
                     </div>
                   ))}
-                  {slots.length === 0 && <p className="text-xs text-gray-500 italic">No upcoming slots added.</p>}
+                  {websiteBannerImages.length === 0 && <div className="col-span-full rounded-lg border-2 border-dashed py-8 text-center text-sm text-gray-400">No banner images uploaded.</div>}
                 </div>
               </div>
-            </div>
-          ) : step === 7 ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between border-b pb-2">
-                <div>
-                  <h3 className="text-sm font-bold text-gray-900">Website Banner Images</h3>
-                  <p className="text-xs text-gray-500">High quality images for the trip detail hero section</p>
-                </div>
-                <label className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 px-3 cursor-pointer">
-                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Upload Image
-                  <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    try {
-                      toast.loading("Uploading...", { id: "upload" });
-                      const url = await uploadGenericImageDirect(file);
-                      setWebsiteBannerImages([...websiteBannerImages, url]);
-                      toast.success("Uploaded successfully", { id: "upload" });
-                    } catch (err: any) {
-                      toast.error("Upload failed", { id: "upload" });
-                    }
-                  }} />
-                </label>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {websiteBannerImages.map((img, idx) => (
-                  <div key={idx} className="group relative aspect-video bg-gray-100 rounded-lg overflow-hidden border">
-                    <img src={img} alt="" className="w-full h-full object-cover" />
-                    <button type="button" onClick={() => setWebsiteBannerImages(websiteBannerImages.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow"><X className="h-3 w-3" /></button>
+
+              <div className="space-y-3 pt-4">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900">Stay & Transport Images</h3>
+                    <p className="text-xs text-gray-500">Showcase property stays, vehicles, and journey comfort</p>
                   </div>
-                ))}
-                {websiteBannerImages.length === 0 && <div className="col-span-full py-8 text-center text-sm text-gray-400 border-2 border-dashed rounded-lg">No banner images uploaded.</div>}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between border-b pb-2">
-                <div>
-                  <h3 className="text-sm font-bold text-gray-900">Stay & Transport Images</h3>
-                  <p className="text-xs text-gray-500">Images showcasing the accommodation and travel</p>
+                  <label className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 px-3 cursor-pointer">
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Upload Image
+                    <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        toast.loading("Uploading...", { id: "upload-st" });
+                        const url = await uploadGenericImageDirect(file);
+                        setWebsiteStayTransportImages([...websiteStayTransportImages, url]);
+                        toast.success("Uploaded successfully", { id: "upload-st" });
+                      } catch (err: any) {
+                        toast.error("Upload failed", { id: "upload-st" });
+                      }
+                    }} />
+                  </label>
                 </div>
-                <label className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 px-3 cursor-pointer">
-                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Upload Image
-                  <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    try {
-                      toast.loading("Uploading...", { id: "upload-st" });
-                      const url = await uploadGenericImageDirect(file);
-                      setWebsiteStayTransportImages([...websiteStayTransportImages, url]);
-                      toast.success("Uploaded successfully", { id: "upload-st" });
-                    } catch (err: any) {
-                      toast.error("Upload failed", { id: "upload-st" });
-                    }
-                  }} />
-                </label>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {websiteStayTransportImages.map((img, idx) => (
-                  <div key={idx} className="group relative aspect-video bg-gray-100 rounded-lg overflow-hidden border">
-                    <img src={img} alt="" className="w-full h-full object-cover" />
-                    <button type="button" onClick={() => setWebsiteStayTransportImages(websiteStayTransportImages.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow"><X className="h-3 w-3" /></button>
-                  </div>
-                ))}
-                {websiteStayTransportImages.length === 0 && <div className="col-span-full py-8 text-center text-sm text-gray-400 border-2 border-dashed rounded-lg">No stay/transport images uploaded.</div>}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {websiteStayTransportImages.map((img, idx) => (
+                    <div key={idx} className="group relative aspect-video bg-gray-100 rounded-lg overflow-hidden border">
+                      <img src={img} alt="" className="w-full h-full object-cover" />
+                      <button type="button" onClick={() => setWebsiteStayTransportImages(websiteStayTransportImages.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow"><X className="h-3 w-3" /></button>
+                    </div>
+                  ))}
+                  {websiteStayTransportImages.length === 0 && <div className="col-span-full py-8 text-center text-sm text-gray-400 border-2 border-dashed rounded-lg">No stay/transport images uploaded.</div>}
+                </div>
               </div>
             </div>
           )}
@@ -1476,8 +1715,10 @@ function CreateTripDialog({
               {step !== 1 && <ArrowLeft className="mr-1.5 h-4 w-4" />}
               {step === 1 ? "Cancel" : "Back"}
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={saveLocalDraft}>Save draft</Button>
-            {hasLocalDraft && <Button type="button" variant="outline" size="sm" onClick={restoreLocalDraft}>Restore draft</Button>}
+            <Button type="button" variant="outline" size="sm" onClick={openSaveDraft}>Save new draft</Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setDraftsOpen(true)}>
+              My drafts{localDrafts.length ? ` (${localDrafts.length})` : ""}
+            </Button>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
             {trip && step >= 3 && (
@@ -1493,33 +1734,116 @@ function CreateTripDialog({
                 Save & exit
               </Button>
             )}
-
-            <Button
-              type={step === 1 || step === 3 || step === 8 ? "submit" : "button"}
-              name="action"
-              value="continue"
-              onClick={() => {
-                if (step === 2) {
-                  if (itineraryDayIndex < itineraryDays.length - 1) setItineraryDayIndex((index) => index + 1);
-                  else setStep(3);
-                } else if (step >= 4 && step < 8) {
-                  setStep(step + 1);
-                }
-              }}
-              disabled={saving}
-              className="bg-[#781216] text-white hover:bg-[#5f0e11]"
-            >
-              {saving && (step === 1 || step === 3 || step === 8) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {step === 1 ? "Continue" 
-                : step === 2 ? itineraryDayIndex === itineraryDays.length - 1 ? "Continue to pricing" : "Next day" 
-                : step === 3 ? "Continue to preview" 
-                : step === 8 ? (trip ? "Save changes" : "Create trip") 
-                : "Continue"}
-              {step !== 8 && <ChevronRight className="ml-1.5 h-4 w-4" />}
-            </Button>
+            {!trip && step === 5 && (
+              <Button
+                type="submit"
+                name="action"
+                value="save"
+                disabled={saving}
+                variant="outline"
+                className="border-[#781216] text-[#781216] hover:bg-[#781216] hover:text-white"
+              >
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Save trip
+              </Button>
+            )}
+            {step < 6 ? (
+              <Button type="submit" value="continue" className="bg-[#781216] text-white hover:bg-[#5f0e11]">
+                Continue
+              </Button>
+            ) : (
+              <Button type="submit" value="submit" disabled={saving} className="bg-[#781216] text-white hover:bg-[#5f0e11]">
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {trip ? "Save changes" : "Create trip"}
+              </Button>
+            )}
               </div>
             </div>
           </div>
+          <Dialog open={saveDraftOpen} onOpenChange={setSaveDraftOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Save itinerary draft</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2">
+                <label className="block space-y-1.5">
+                  <span className="text-sm font-medium text-gray-800">Draft name</span>
+                  <Input
+                    autoFocus
+                    value={draftTitle}
+                    onChange={(event) => { setDraftTitle(event.target.value); setDraftTitleError(""); }}
+                    onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); saveLocalDraft(); } }}
+                    placeholder="e.g. Tawang group trip – October"
+                  />
+                </label>
+                {draftTitleError && <p role="alert" className="text-sm text-red-600">{draftTitleError}</p>}
+                <p className="text-xs text-gray-500">This saves a copy of your current progress on this device.</p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setSaveDraftOpen(false)}>Cancel</Button>
+                <Button type="button" className="bg-[#781216] text-white hover:bg-[#5f0e11]" onClick={saveLocalDraft}>Save draft</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={draftsOpen} onOpenChange={setDraftsOpen}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Saved itinerary drafts</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-gray-600">Drafts are saved only on this device. Restore one to continue editing it, or delete drafts you no longer need.</p>
+              <div className="max-h-[50vh] space-y-2 overflow-y-auto pr-1">
+                {localDrafts.map((draft) => (
+                  <div key={draft.id} className="flex items-center gap-3 rounded-lg border border-gray-200 p-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-gray-900">{draft.title}</p>
+                      <p className="mt-0.5 text-xs text-gray-500">Saved {new Date(draft.updatedAt).toLocaleString()}</p>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={() => applyLocalDraft(draft.data)}>Restore</Button>
+                    <Button type="button" variant="ghost" size="icon" className="shrink-0 text-red-600 hover:bg-red-50" aria-label={`Delete ${draft.title}`} title="Delete draft" onClick={() => deleteLocalDraft(draft)}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                ))}
+                {!localDrafts.length && <p className="rounded-lg border border-dashed border-gray-200 px-3 py-8 text-center text-sm text-gray-500">No saved drafts yet.</p>}
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={Boolean(draftToDelete)} onOpenChange={(isOpen) => { if (!isOpen) setDraftToDelete(null); }}>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Delete saved draft?</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-gray-600">“{draftToDelete?.title}” will be permanently removed from this device.</p>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setDraftToDelete(null)}>Cancel</Button>
+                <Button type="button" className="bg-red-600 text-white hover:bg-red-700" onClick={() => { if (draftToDelete) removeLocalDraft(draftToDelete.id); setDraftToDelete(null); }}>Delete draft</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={Boolean(tagToDelete)} onOpenChange={(isOpen) => { if (!isOpen) setTagToDelete(null); }}>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Delete tag "{tagToDelete?.name}"?</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-gray-500">
+                This will permanently delete the tag "{tagToDelete?.name}" from master data and un-link it from all trips.
+              </p>
+              <div className="mt-4 flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setTagToDelete(null)}>Cancel</Button>
+                <Button
+                  type="button"
+                  className="bg-red-600 text-white hover:bg-red-700"
+                  disabled={deleteTagMutation.isPending}
+                  onClick={() => {
+                    if (tagToDelete) {
+                      deleteTagMutation.mutate(tagToDelete.id);
+                      setTagToDelete(null);
+                    }
+                  }}
+                >
+                  {deleteTagMutation.isPending ? "Deleting..." : "Delete tag"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </form>
       </DialogContent>
     </Dialog>

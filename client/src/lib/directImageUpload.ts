@@ -50,7 +50,7 @@ export const uploadOne = async (
 
 /** Uploads at most three images at a time to keep the admin's network responsive. */
 export async function uploadBannerImagesDirect(
-  kind: "trips" | "festivals" | "circuits",
+  kind: "trips" | "festivals" | "crm-trips",
   id: string,
   files: File[],
   onProgress?: (completed: number, total: number) => void,
@@ -78,7 +78,7 @@ export async function uploadBannerImagesDirect(
 
 /** Uploads a single image directly with automatic client-side compression. */
 export async function uploadGenericImageDirect(file: File) {
-  const { data: signature } = await apiClient.post(`/circuits/upload-signature`);
+  const { data: signature } = await apiClient.post(`/crm-trips/upload-signature`);
   return uploadOne(file, signature);
 }
 
@@ -88,7 +88,7 @@ export async function uploadMultipleGenericImagesDirect(
   onProgress?: (completed: number, total: number) => void
 ): Promise<string[]> {
   if (files.length === 0) return [];
-  const { data: signature } = await apiClient.post(`/circuits/upload-signature`);
+  const { data: signature } = await apiClient.post(`/crm-trips/upload-signature`);
 
   let completed = 0;
   const uploadPromises = files.map(async (file) => {

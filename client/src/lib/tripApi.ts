@@ -94,9 +94,8 @@ export interface ApiTrip {
     purchaseCutoffOffsetDays?: number | null;
     isActive: boolean;
   }>;
-  circuitId?: string | null;
-  circuit?: { id: string; title: string; slug: string } | null;
   isListed?: boolean;
+  isCrmTrip?: boolean;
 }
 
 export interface ApiTripsResponse {
@@ -112,18 +111,25 @@ export interface ApiTripsResponse {
 // ── Fetch functions ───────────────────────────────────────────────
 
 export async function fetchAllTrips(): Promise<ApiTrip[]> {
-  // Fetch with a high limit to get all trips for client-side filtering
-  const res = await apiClient.get<ApiTripsResponse>("/trips", {
-    params: { page: 1, limit: 200 },
-  });
-  return res.data.data;
+  const [tripsResult, itineraryTripsResult] = await Promise.allSettled([
+    apiClient.get<ApiTripsResponse>("/trips", { params: { page: 1, limit: 200 } }),
+    apiClient.get<{ data: ApiTrip[] }>("/crm-trips/public"),
+  ]);
+  const trips = tripsResult.status === "fulfilled" ? tripsResult.value.data.data : [];
+  const itineraryTrips = itineraryTripsResult.status === "fulfilled" ? itineraryTripsResult.value.data.data : [];
+  return [...trips, ...itineraryTrips];
 }
 
 export async function fetchTripBySlug(slug: string, shareToken?: string | null): Promise<ApiTrip> {
-  const res = await apiClient.get<ApiTrip>(`/trips/${slug}`, {
-    params: shareToken ? { shareToken } : undefined,
-  });
-  return res.data;
+  try {
+    const res = await apiClient.get<ApiTrip>(`/trips/${slug}`, {
+      params: shareToken ? { shareToken } : undefined,
+    });
+    return res.data;
+  } catch (error) {
+    const res = await apiClient.get<ApiTrip>(`/crm-trips/public/${slug}`);
+    return res.data;
+  }
 }
 
 // ── Trip Type labels ──────────────────────────────────────────────

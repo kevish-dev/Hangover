@@ -1,6 +1,15 @@
 import { z } from "zod";
 
-import { OPERATIONAL_TASK_CATEGORIES } from "../circuit/circuit.validation.js";
+export const OPERATIONAL_TASK_CATEGORIES = [
+  "ACCOMMODATION",
+  "TRANSPORTATION",
+  "PERMITS_ENTRY",
+  "GUIDE_STAFF",
+  "MEALS",
+  "EQUIPMENT",
+  "ACTIVITY_EVENT",
+  "OTHER",
+];
 
 const itineraryDayTaskSchema = z.object({
   id: z.string().uuid().optional(),

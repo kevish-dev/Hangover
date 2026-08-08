@@ -35,6 +35,30 @@ export const findMany = async ({ skip, take, where }) => {
   return { data, total };
 };
 
+const PUBLIC_CRM_TRIP_INCLUDE = {
+  destination: true,
+  websiteTags: true,
+  packages: { orderBy: { createdAt: "asc" } },
+  slots: { orderBy: { startDate: "asc" } },
+};
+
+export const findPublicMany = () => prisma.crmTrip.findMany({
+  where: { isActive: true, isPublished: true, isListed: true },
+  orderBy: { createdAt: "desc" },
+  include: PUBLIC_CRM_TRIP_INCLUDE,
+});
+
+export const findFeaturedPublic = () => prisma.crmTrip.findMany({
+  where: { isActive: true, isPublished: true, isFeatured: true, websiteBannerImages: { isEmpty: false } },
+  orderBy: { createdAt: "desc" },
+  include: PUBLIC_CRM_TRIP_INCLUDE,
+});
+
+export const findPublicById = (id) => prisma.crmTrip.findFirst({
+  where: { id, isActive: true, isPublished: true },
+  include: CRM_TRIP_INCLUDE,
+});
+
 export const findById = (id, client = prisma) => client.crmTrip.findUnique({ where: { id }, include: CRM_TRIP_INCLUDE });
 export const findDayById = (id, client = prisma) => client.crmTripItineraryDay.findUnique({
   where: { id },

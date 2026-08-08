@@ -41,7 +41,7 @@ import { SiteFooter } from "../components/site-footer";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiClient } from "../../lib/axios";
 import { toast } from "sonner";
-import { mediaImageUrl } from "../../lib/media";
+import { mediaImageUrl, mediaVideoUrl } from "../../lib/media";
 import { getErrorMessage } from "../../lib/errors";
 
 // ── "Not Available" inline label ──────────────────────────────────
@@ -1126,6 +1126,9 @@ export default function TripDetail() {
         .then((res) => {
           const bookings = res.data?.data || [];
           const belongsToCurrentItem = (booking: any) => {
+            if (!isFestival && (trip as any).isCrmTrip) {
+              return booking.crmTripId === trip.id;
+            }
             const itemId = isFestival
               ? booking.festivalId || booking.festival?.id || booking.slot?.festivalId
               : booking.tripId || booking.trip?.id || booking.slot?.tripId;
@@ -1537,6 +1540,8 @@ function TripDetailContent({
 
   const safeAllImages =
     allImages.length > 0 ? allImages : [heroImage].filter(Boolean);
+  const festivalVideoUrl = isFestival ? (trip as any).videoUrl as string | null | undefined : null;
+  const showHeroVideo = Boolean(festivalVideoUrl);
   const bookingParams = new URLSearchParams();
   if (isFestival) bookingParams.set("type", "festival");
   if (selectedSlotId) bookingParams.set("slotId", selectedSlotId);
@@ -1766,10 +1771,31 @@ function TripDetailContent({
           height: "70vh",
           minHeight: "480px",
           overflow: "hidden",
-          cursor: "zoom-in",
+          cursor: showHeroVideo ? "default" : "zoom-in",
         }}
       >
-        {safeAllImages.length > 0 ? (
+        {showHeroVideo ? (
+          <motion.video
+            key={festivalVideoUrl}
+            src={mediaVideoUrl(festivalVideoUrl!)}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            initial={{ opacity: 0, scale: 1.04 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.55, ease: [0.25, 0.1, 0.25, 1] }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "center",
+            }}
+          />
+        ) : safeAllImages.length > 0 ? (
           <AnimatePresence mode="sync" initial={false}>
             <motion.img
               key={heroIndex}
@@ -1843,7 +1869,7 @@ function TripDetailContent({
         </button>
 
         {/* Prev / Next arrows */}
-        {safeAllImages.length > 1 && (
+        {!showHeroVideo && safeAllImages.length > 1 && (
           <>
             <button
               onClick={(e) => {
@@ -1911,7 +1937,7 @@ function TripDetailContent({
         )}
 
         {/* Dot indicators */}
-        {safeAllImages.length > 1 && (
+        {!showHeroVideo && safeAllImages.length > 1 && (
           <div
             style={{
               position: "absolute",

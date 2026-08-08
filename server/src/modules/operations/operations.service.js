@@ -67,52 +67,9 @@ export const generateCrmBookingOperations = async (booking, crmTripSlot) => {
   if (tasks.length) await prisma.operationalTask.createMany({ data: tasks });
 };
 
-/** Generate OperationalTasks for a new booking. Expenses enter the ledger when paid. */
 export const generateBookingOperations = async (booking, slot, chosenAddOns = []) => {
-  // Determine the circuit this booking belongs to (via trip or festival)
   const isTrip = !!slot.tripId;
-  let circuitId = null;
-  let circuitReminderDays = 3;
-
-  if (isTrip && slot.trip) {
-    circuitId = slot.trip.circuitId;
-  } else if (!isTrip && slot.festival) {
-    circuitId = slot.festival.circuitId;
-  }
-
   const opsToCreate = [];
-
-  if (circuitId) {
-    const circuit = await prisma.circuit.findUnique({
-      where: { id: circuitId },
-      include: { days: { include: { tasks: true } } }
-    });
-
-    if (circuit) {
-      circuitReminderDays = circuit.operationsReminderDays ?? 3;
-
-      for (const day of circuit.days) {
-        for (const task of day.tasks) {
-          // Calculate dueAt: slot start - dueOffsetDays
-          const dueAt = task.dueOffsetDays != null && slot.startDate
-            ? new Date(new Date(slot.startDate).getTime() - task.dueOffsetDays * 86400000)
-            : null;
-
-          opsToCreate.push({
-            bookingId: booking.id,
-            sourceTemplateId: task.id,
-            category: task.category,
-            title: task.title,
-            description: task.description,
-            config: task.config ?? {},
-            unitPrice: task.unitPrice ?? null,
-            quantityNeeded: task.quantityNeeded ?? null,
-            dueAt,
-          });
-        }
-      }
-    }
-  }
 
   // Also check for tasks directly on the Trip or Festival's Itinerary Days
   const itineraryDays = await prisma.itineraryDay.findMany({

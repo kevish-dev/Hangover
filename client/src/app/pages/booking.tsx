@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useSearchParams, useNavigate } from "react-router";
+import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowLeft,
@@ -515,6 +516,7 @@ export default function BookingPage() {
   const [trip, setTrip] = useState<any>(null); // polymorphic
   const [loading, setLoading] = useState(true);
   const [selectedSlotId, setSelectedSlotId] = useState<string>(urlSlotId || "");
+  const isCrmTrip = !isFestival && Boolean(trip?.isCrmTrip);
 
   // Form state
   const [solo, setSolo] = useState<"yes" | "no" | null>("yes");
@@ -621,6 +623,7 @@ export default function BookingPage() {
         .then((res) => {
           const bookings = res.data?.data || [];
           const belongsToCurrentItem = (booking: any) => {
+            if (isCrmTrip) return booking.crmTripId === trip.id;
             const itemId = isFestival
               ? booking.festivalId || booking.festival?.id || booking.slot?.festivalId
               : booking.tripId || booking.trip?.id || booking.slot?.tripId;
@@ -641,7 +644,7 @@ export default function BookingPage() {
         })
         .catch((error) => toast.error(getErrorMessage(error, "Your existing bookings could not be checked"), { id: `booking-status-${trip.id}` }));
     }
-  }, [user, trip, isFestival]);
+  }, [user, trip, isFestival, isCrmTrip]);
 
   useEffect(() => {
     if (selectedPackageId === undefined && trip) {
@@ -804,14 +807,16 @@ export default function BookingPage() {
         payload.packageId = selectedPackageId;
       }
       
-      if (selectedSlotId) {
-        payload.slotId = selectedSlotId;
-      }
+      if (isCrmTrip) payload.crmTripSlotId = selectedSlotId;
+      else payload.slotId = selectedSlotId;
       payload.addOns = Object.entries(selectedAddOns)
         .filter(([addOnId, quantity]) => quantity > 0 && availableAddOns.some((addOn: any) => addOn.id === addOnId))
         .map(([addOnId, quantity]) => ({ addOnId, quantity }));
       
-      const bookingRes = await apiClient.post("/bookings", payload);
+      const bookingRes = await apiClient.post(
+        isCrmTrip ? `/crm-trips/public/${trip.id}/bookings` : "/bookings",
+        payload,
+      );
       const {
         id: bookingId,
         bookingReference,
@@ -819,7 +824,7 @@ export default function BookingPage() {
       } = bookingRes.data;
 
       const paymentType = initialPaymentType || "TOKEN";
-      const payAmount = paymentType === "TOKEN" ? Math.round(totalPrice * 0.2) : Math.round(totalPrice);
+      const payAmount = paymentType === "TOKEN" ? Math.round(tokenAmountDue) : Math.round(totalAmountDue);
 
       setPaymentModalData({
         bookingId,
@@ -830,7 +835,7 @@ export default function BookingPage() {
     } catch (err: any) {
       toast.error(getErrorMessage(err, "Booking creation failed"));
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
@@ -839,7 +844,7 @@ export default function BookingPage() {
     bookingReference: string,
     paymentType: "TOKEN" | "FULL"
   ) => {
-    setIsSubmitting(true);
+    setSubmitting(true);
     try {
       const initiateRes = await apiClient.post("/payments/initiate", {
         bookingId,
@@ -906,7 +911,7 @@ export default function BookingPage() {
       toast.error(msg, { id: "booking-submit-error" });
       setBookingStep("form");
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
@@ -1138,11 +1143,11 @@ export default function BookingPage() {
 
   const numTravelers = 1 + travelers.length;
   const baseTotalAmount = basePrice * numTravelers + addOnTotal;
-  const totalGst = baseTotalAmount * 0.05;
+  const totalGst = isCrmTrip ? 0 : baseTotalAmount * 0.05;
   const totalAmountDue = baseTotalAmount + totalGst;
 
   const baseTokenTotal = baseToken * numTravelers;
-  const tokenGst = baseTokenTotal * 0.05;
+  const tokenGst = isCrmTrip ? 0 : baseTokenTotal * 0.05;
   const tokenAmountDue = baseTokenTotal + tokenGst;
   const isTokenZero = tokenAmountDue === 0;
 

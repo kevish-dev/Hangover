@@ -6,7 +6,7 @@ const packageSchema = z.object({ title: z.string().trim().min(1).max(200), price
 const addOnSchema = z.object({
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().max(2000).nullable().optional(),
-  imageUrl: z.string().url().nullable().optional(),
+  imageUrl: z.string().trim().max(2000).nullable().optional(),
   price: z.number().positive(),
   maxQuantityPerBooking: z.number().int().positive().nullable().optional(),
   maxQuantityPerSlot: z.number().int().positive().nullable().optional(),
@@ -37,6 +37,14 @@ const setupDaySchema = z.object({
   commonInclusions: z.array(z.enum(["ILP_AND_PERMITS", "BBQ", "BONFIRE", "TRIP_GUIDE"])).max(4).default([]),
 });
 
+const highlightSchema = z.union([
+  z.object({
+    text: z.string().trim().min(1).max(500),
+    imageUrl: z.string().trim().max(2000).optional().default(""),
+  }),
+  z.string().trim().min(1).max(500),
+]);
+
 const crmTripFields = z.object({
   name: z.string().trim().min(1).max(300),
   numberOfNights: z.number().int().min(0).max(365),
@@ -61,9 +69,9 @@ const crmTripFields = z.object({
   websiteOverview: z.string().trim().max(20000).nullable().optional(),
   websiteFaqs: z.array(z.object({ question: z.string().trim().min(1).max(500), answer: z.string().trim().min(1).max(5000) })).max(100).default([]),
   websiteTagIds: z.array(z.string().uuid()).max(50).default([]),
-  websiteBannerImages: z.array(z.string().url()).max(20).default([]),
-  websiteStayTransportImages: z.array(z.string().url()).max(20).default([]),
-  websiteHighlights: z.array(z.string().trim().min(1).max(500)).max(50).default([]),
+  websiteBannerImages: z.array(z.string().trim().min(1).max(2000)).max(20).default([]),
+  websiteStayTransportImages: z.array(z.string().trim().min(1).max(2000)).max(20).default([]),
+  websiteHighlights: z.array(highlightSchema).max(50).default([]),
 });
 
 export const createCrmTripSchema = crmTripFields.refine((data) => data.tokenAmount <= data.totalAmount, { message: "Token amount cannot exceed the total amount", path: ["tokenAmount"] });
@@ -96,9 +104,9 @@ export const updateCrmTripSchema = z.object({
   websiteOverview: z.string().trim().max(20000).nullable().optional(),
   websiteFaqs: z.array(z.object({ question: z.string().trim().min(1).max(500), answer: z.string().trim().min(1).max(5000) })).max(100).optional(),
   websiteTagIds: z.array(z.string().uuid()).max(50).optional(),
-  websiteBannerImages: z.array(z.string().url()).max(20).optional(),
-  websiteStayTransportImages: z.array(z.string().url()).max(20).optional(),
-  websiteHighlights: z.array(z.string().trim().min(1).max(500)).max(50).optional(),
+  websiteBannerImages: z.array(z.string().trim().min(1).max(2000)).max(20).optional(),
+  websiteStayTransportImages: z.array(z.string().trim().min(1).max(2000)).max(20).optional(),
+  websiteHighlights: z.array(highlightSchema).max(50).optional(),
 }).refine(
   (data) => data.tokenAmount === undefined || data.totalAmount === undefined || data.tokenAmount <= data.totalAmount,
   { message: "Token amount cannot exceed the total amount", path: ["tokenAmount"] },

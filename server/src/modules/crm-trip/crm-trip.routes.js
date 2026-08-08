@@ -10,9 +10,14 @@ import {
 } from "./crm-trip.validation.js";
 
 const router = Router();
+router.get("/public/featured", controller.getFeaturedPublicTrips);
+router.get("/public/:id", controller.getPublicTrip);
+router.get("/public", controller.listPublicTrips);
+router.post("/public/:id/bookings", requireAuth, bookingController.createPublic);
 router.use(requireAuth, requireAdmin);
 
 router.get("/", controller.listTrips);
+router.post("/upload-signature", controller.createUploadSignature);
 router.post("/", validate(createCrmTripSchema), controller.createTrip);
 router.get("/:id", controller.getTrip);
 router.patch("/:id", validate(updateCrmTripSchema), controller.updateTrip);

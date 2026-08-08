@@ -149,11 +149,6 @@ export default function AdminDestinationsPage() {
                     {destination.subheading}
                   </p>
                 )}
-                <div className="pt-2">
-                  <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-[11px] font-medium text-gray-600">
-                    {destination.circuits?.length || 0} {destination.circuits?.length === 1 ? 'Circuit' : 'Circuits'} Linked
-                  </span>
-                </div>
               </div>
 
               <div className="mt-6 flex items-center justify-between border-t border-gray-100 pt-4">

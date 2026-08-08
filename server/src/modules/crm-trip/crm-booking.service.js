@@ -222,6 +222,168 @@ export const createCrmBooking = async (crmTripId, data, adminId) => {
   return createInstallment({ booking, trip, data, adminId, isInitial: true });
 };
 
+/**
+ * Website checkout for a published CRM itinerary trip. Unlike the admin CRM
+ * flow above, the traveler pays through the standard Razorpay journey after
+ * this creates a PENDING CRM booking; no staff payment action is required.
+ */
+export const createPublicCrmBooking = async (crmTripId, data, userId) => {
+  if (!data.crmTripSlotId) throw new ValidationError("Choose a departure slot for this booking");
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { profile: true },
+  });
+  const profile = user?.profile;
+  if (!user || !profile?.fullName || !profile.phone || !profile.gender || !profile.dateOfBirth || (!profile.govtIdAssetId && !profile.govtIdImageUrl)) {
+    throw new ValidationError("Complete your traveler profile and upload an Aadhaar card before booking");
+  }
+
+  const trip = await prisma.crmTrip.findFirst({
+    where: { id: crmTripId, isActive: true, isPublished: true, isListed: true },
+    include: { packages: true, addOns: true },
+  });
+  if (!trip) throw new NotFoundError("CRM trip not found or not available for booking");
+
+  const travelers = Number(data.numberOfTravelers) || 1;
+  if (!Number.isInteger(travelers) || travelers < 1) {
+    throw new ValidationError("Traveler count must be a positive whole number");
+  }
+
+  const crmTripSlot = await prisma.crmTripSlot.findFirst({
+    where: {
+      id: data.crmTripSlotId,
+      crmTripId,
+      startDate: { not: null },
+      endDate: { not: null },
+    },
+  });
+  if (!crmTripSlot) throw new ValidationError("Choose a valid dated departure slot for this CRM trip");
+
+  const existingBooking = await prisma.booking.findFirst({
+    where: {
+      userId,
+      crmTripId,
+      status: { in: ["PENDING", "RESERVED", "CONFIRMED"] },
+    },
+  });
+  if (existingBooking) {
+    throw new ValidationError("You already have an active booking for this itinerary trip");
+  }
+
+  const selectedPackage = data.packageId
+    ? trip.packages.find((item) => item.id === data.packageId)
+    : trip.packages[0];
+  if (!selectedPackage) throw new ValidationError("Choose a valid package for this CRM trip");
+
+  const additionalTravelers = travelerData(data.additionalTravelers);
+  if (additionalTravelers.length !== travelers - 1) {
+    throw new ValidationError("Enter details for every additional traveler");
+  }
+  if (additionalTravelers.some((traveler) => !traveler.email || !traveler.phone || !traveler.gender || !traveler.dateOfBirth || !traveler.aadhaarAssetId)) {
+    throw new ValidationError("Each additional traveler needs email, phone, gender, date of birth, and Aadhaar card");
+  }
+
+  for (const traveler of additionalTravelers) {
+    const asset = await prisma.mediaAsset.findFirst({
+      where: {
+        id: traveler.aadhaarAssetId,
+        uploadedById: userId,
+        deliveryType: "AUTHENTICATED",
+        travelerGovtId: null,
+      },
+    });
+    if (!asset) throw new ValidationError("One or more traveler Aadhaar uploads are invalid");
+  }
+
+  const quantitiesByAddOn = new Map();
+  for (const item of Array.isArray(data.addOns) ? data.addOns : []) {
+    if (!item?.addOnId) continue;
+    const quantity = Number(item.quantity);
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      throw new ValidationError("Add-on quantity must be a positive whole number");
+    }
+    quantitiesByAddOn.set(item.addOnId, (quantitiesByAddOn.get(item.addOnId) || 0) + quantity);
+  }
+
+  let addOnsTotal = 0;
+  const bookingAddOns = [];
+  for (const [addOnId, quantity] of quantitiesByAddOn) {
+    const addOn = trip.addOns.find((item) => item.id === addOnId);
+    if (!addOn?.isActive) throw new ValidationError("One or more selected add-ons are unavailable");
+    if (addOn.maxQuantityPerBooking && quantity > addOn.maxQuantityPerBooking) {
+      throw new ValidationError(`${addOn.title} is limited to ${addOn.maxQuantityPerBooking} per booking`);
+    }
+    if (addOn.purchaseCutoffOffsetDays != null) {
+      const cutoff = new Date(crmTripSlot.startDate).getTime() - addOn.purchaseCutoffOffsetDays * 86400000;
+      if (Date.now() > cutoff) throw new ValidationError(`${addOn.title} is no longer available for this departure`);
+    }
+    if (addOn.maxQuantityPerSlot) {
+      const used = await prisma.bookingAddOn.aggregate({
+        _sum: { quantity: true },
+        where: {
+          addOnId,
+          status: { notIn: ["CANCELLED", "REFUNDED"] },
+          booking: { crmTripSlotId: crmTripSlot.id, status: { not: "CANCELLED" } },
+        },
+      });
+      const remaining = addOn.maxQuantityPerSlot - Number(used._sum.quantity || 0);
+      if (quantity > remaining) throw new ValidationError(`${addOn.title} only has ${Math.max(0, remaining)} left for this departure`);
+    }
+    const unitPrice = Number(addOn.price);
+    const totalPrice = round(unitPrice * quantity);
+    addOnsTotal += totalPrice;
+    bookingAddOns.push({ addOnId, quantity, unitPrice, totalPrice, status: "PENDING" });
+  }
+
+  const totalAmount = round(Number(selectedPackage.price) * travelers + addOnsTotal);
+  const tokenAmount = round(Number(selectedPackage.tokenAmount) * travelers);
+  const initialPaymentType = tokenAmount > 0 && data.initialPaymentType === "TOKEN" ? "TOKEN" : "FULL";
+  const amountDue = initialPaymentType === "FULL" ? 0 : round(totalAmount - tokenAmount);
+  const balanceDueDate = new Date(crmTripSlot.startDate);
+  balanceDueDate.setDate(balanceDueDate.getDate() - 10);
+  const bookingReference = await getReference();
+
+  const booking = await prisma.$transaction(async (tx) => {
+    const currentSlot = await tx.crmTripSlot.findUnique({ where: { id: crmTripSlot.id } });
+    if (!currentSlot || currentSlot.filledSpots + travelers > currentSlot.capacity) {
+      throw new ValidationError("This departure no longer has enough remaining capacity");
+    }
+    const created = await tx.booking.create({
+      data: {
+        id: bookingReference,
+        bookingReference,
+        userId,
+        crmTripId,
+        crmTripSlotId: crmTripSlot.id,
+        packageId: selectedPackage.id,
+        source: "CRM",
+        numberOfTravelers: travelers,
+        totalAmount,
+        tokenAmount,
+        amountPaid: 0,
+        amountDue,
+        initialPaymentType,
+        balanceDueDate,
+        status: "PENDING",
+        paymentStatus: "PENDING",
+        specialRequests: data.specialRequests?.trim() || null,
+        travelers: additionalTravelers.length ? { create: additionalTravelers } : undefined,
+        addOns: bookingAddOns.length ? { create: bookingAddOns } : undefined,
+      },
+      include: { user: { include: { profile: true } } },
+    });
+    await tx.crmTripSlot.update({
+      where: { id: crmTripSlot.id },
+      data: { filledSpots: { increment: travelers } },
+    });
+    return created;
+  });
+
+  await generateCrmBookingOperations(booking, crmTripSlot);
+  return booking;
+};
+
 export const createCrmInstallment = async (crmTripId, bookingId, data, adminId) => {
   const booking = await prisma.booking.findFirst({
     where: { id: bookingId, crmTripId, source: "CRM" },

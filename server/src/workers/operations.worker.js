@@ -29,8 +29,8 @@ async function scanAndNotify() {
         include: {
           slot: {
             include: {
-              trip: { include: { circuit: true } },
-              festival: { include: { circuit: true } },
+              trip: true,
+              festival: true,
             },
           },
           crmTrip: { select: { operationsReminderDays: true } },
@@ -53,11 +53,7 @@ async function scanAndNotify() {
     const msTillDue = dueAt.getTime() - now.getTime();
     const daysTillDue = msTillDue / (1000 * 60 * 60 * 24);
 
-    // Derive reminderDays from the linked circuit (fallback = 3)
-    const circuit =
-      task.booking?.slot?.trip?.circuit ??
-      task.booking?.slot?.festival?.circuit;
-    const reminderDays = task.booking?.crmTrip?.operationsReminderDays ?? circuit?.operationsReminderDays ?? 3;
+    const reminderDays = task.booking?.crmTrip?.operationsReminderDays ?? 3;
 
     if (daysTillDue > reminderDays) continue; // still comfortable — skip
 

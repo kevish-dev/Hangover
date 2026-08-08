@@ -50,14 +50,6 @@ export const findById = async (whereObj, isAdmin = false) => {
         include: { tasks: { orderBy: { createdAt: "asc" } } },
       },
       addOns: true,
-      circuit: {
-        select: {
-          id: true,
-          title: true,
-          slug: true,
-          addOns: { where: { isActive: true }, orderBy: { createdAt: "asc" } },
-        },
-      },
       destination: true,
     }
   });

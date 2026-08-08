@@ -1,53 +1,34 @@
 import { prisma } from "../../prisma/client.js";
 
-export const findAll = async (skip, take, where = {}, isAdmin = false) => {
-  const circuitInclude = isAdmin ? true : { where: { isActive: true } };
-  
+export const findAll = async (skip, take, where = {}) => {
   const [destinations, total] = await Promise.all([
     prisma.destination.findMany({
       where,
       skip,
       take,
       orderBy: { createdAt: "desc" },
-      include: {
-        circuits: circuitInclude
-      }
     }),
     prisma.destination.count({ where }),
   ]);
   return { destinations, total };
 };
 
-export const findById = async (whereObj, isAdmin = false) => {
+export const findById = async (whereObj) => {
   const filter = typeof whereObj === 'string' ? { id: whereObj } : whereObj;
-  const circuitInclude = isAdmin ? true : { where: { isActive: true } };
   
   return prisma.destination.findFirst({
     where: filter,
-    include: {
-      circuits: circuitInclude
-    }
   });
 };
 
 export const create = async (data) => {
-  const { circuitIds, ...rest } = data;
-  const payload = { ...rest };
-  if (circuitIds && circuitIds.length > 0) {
-    payload.circuits = { connect: circuitIds.map(id => ({ id })) };
-  }
-  return prisma.destination.create({ data: payload });
+  return prisma.destination.create({ data });
 };
 
 export const update = async (id, data) => {
-  const { circuitIds, ...rest } = data;
-  const payload = { ...rest };
-  if (circuitIds) {
-    payload.circuits = { set: circuitIds.map(id => ({ id })) };
-  }
   return prisma.destination.update({
     where: { id },
-    data: payload,
+    data,
   });
 };
 
@@ -55,27 +36,4 @@ export const remove = async (id) => {
   return prisma.destination.delete({
     where: { id },
   });
-};
-
-export const linkExistingEntities = async (destinationId, circuitIds) => {
-  if (!circuitIds || circuitIds.length === 0) return { updatedTrips: 0, updatedFestivals: 0 };
-  
-  const updatedTrips = await prisma.trip.updateMany({
-    where: {
-      circuitId: { in: circuitIds }
-    },
-    data: { destinationId }
-  });
-
-  const updatedFestivals = await prisma.festival.updateMany({
-    where: {
-      circuitId: { in: circuitIds }
-    },
-    data: { destinationId }
-  });
-
-  return {
-    updatedTrips: updatedTrips.count,
-    updatedFestivals: updatedFestivals.count
-  };
 };

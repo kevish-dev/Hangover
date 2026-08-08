@@ -1627,11 +1627,6 @@ export default function AdminFestivalDetailPage() {
                       Draft
                     </span>
                   )}
-                  {festival.circuit && (
-                    <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#fcf0d6] text-[#8a6414] uppercase tracking-wider">
-                      {festival.circuit.title}
-                    </span>
-                  )}
                 </div>
                 <h1 className="text-xl md:text-2xl font-bold text-gray-900">
                   {festival.title}

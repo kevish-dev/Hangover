@@ -27,20 +27,8 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
     name: "",
     state: "",
     subheading: "",
-    circuitIds: [] as string[],
     isPublished: false,
   });
-
-  const { data: circuitsData } = useQuery({
-    queryKey: ["admin", "circuits"],
-    queryFn: async () => {
-      const res = await apiClient.get("/circuits?adminView=true");
-      return res.data;
-    },
-    enabled: open,
-  });
-
-  const availableCircuits = circuitsData?.data || [];
 
   useEffect(() => {
     if (destination) {
@@ -48,7 +36,6 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
         name: destination.name || "",
         state: destination.state || "",
         subheading: destination.subheading || "",
-        circuitIds: destination.circuits?.map((c: any) => c.id) || [],
         isPublished: destination.isPublished || false,
       });
     } else {
@@ -56,7 +43,6 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
         name: "",
         state: "",
         subheading: "",
-        circuitIds: [],
         isPublished: false,
       });
     }
@@ -67,64 +53,21 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleCircuitToggle = (circuitId: string) => {
-    setFormData(prev => {
-      const isSelected = prev.circuitIds.includes(circuitId);
-      if (isSelected) {
-        return { ...prev, circuitIds: prev.circuitIds.filter(id => id !== circuitId) };
-      } else {
-        return { ...prev, circuitIds: [...prev.circuitIds, circuitId] };
-      }
-    });
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     
     try {
-      const oldCircuitIds = destination?.circuits?.map((c: any) => c.id) || [];
-      const newCircuitIds = formData.circuitIds.filter(id => !oldCircuitIds.includes(id));
-
-      let destId = destination?.id;
-
       if (destination) {
         await apiClient.put(`/destinations/${destination.id}`, formData);
         toast.success("Destination updated successfully");
       } else {
-        const res = await apiClient.post("/destinations", formData);
-        destId = res.data.id;
+        await apiClient.post("/destinations", formData);
         toast.success("Destination created successfully");
       }
       
       queryClient.invalidateQueries({ queryKey: ["admin", "destinations"] });
       onOpenChange(false);
-
-      if (newCircuitIds.length > 0) {
-        toast("Update existing trips and festivals?", {
-          description: "Would you like to link all existing trips and festivals from the newly added circuits to this destination?",
-          action: {
-            label: "Yes, update",
-            onClick: async () => {
-              try {
-                await apiClient.post(`/destinations/${destId}/link-existing-entities`, { circuitIds: newCircuitIds });
-                toast.success("Successfully updated trips and festivals");
-                queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
-                queryClient.invalidateQueries({ queryKey: ["admin", "festivals"] });
-              } catch (error) {
-                console.error(error);
-                toast.error("Failed to update trips and festivals");
-              }
-            }
-          },
-          cancel: {
-            label: "No, skip",
-            onClick: () => {}
-          },
-          duration: 10000,
-        });
-      }
-
     } catch (error) {
       console.error(error);
       toast.error(destination ? "Failed to update destination" : "Failed to create destination");
@@ -182,27 +125,6 @@ export function DestinationFormModal({ open, onOpenChange, destination }: Destin
                   rows={2}
                   className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b59410]/50 focus:border-[#b59410] transition-colors shadow-sm resize-y disabled:cursor-not-allowed disabled:opacity-50"
                 />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-3 block">Map Circuits</label>
-                <div className="border border-gray-100 rounded-md p-2 max-h-48 overflow-y-auto bg-gray-50/30 space-y-1">
-                  {availableCircuits.length === 0 ? (
-                    <p className="text-sm text-gray-400 p-3">No circuits available to map.</p>
-                  ) : (
-                    availableCircuits.map((circuit: any) => (
-                      <label key={circuit.id} className="flex items-center space-x-3 p-3 hover:bg-gray-50 rounded cursor-pointer transition-colors border border-transparent hover:border-gray-200 group">
-                        <input 
-                          type="checkbox" 
-                          checked={formData.circuitIds.includes(circuit.id)}
-                          onChange={() => handleCircuitToggle(circuit.id)}
-                          className="w-4 h-4 text-[#b59410] rounded border-gray-300 focus:ring-[#b59410]"
-                        />
-                        <span className="text-sm text-gray-700 group-hover:text-gray-900 transition-colors">{circuit.title}</span>
-                      </label>
-                    ))
-                  )}
-                </div>
               </div>
 
               <div className="flex items-center gap-3 pt-2">

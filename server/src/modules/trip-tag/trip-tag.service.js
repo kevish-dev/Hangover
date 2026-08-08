@@ -1,7 +1,17 @@
 import * as repo from "./trip-tag.repository.js";
 
 export const createTripTag = async (data) => {
-  return repo.createTripTag(data);
+  const name = data.tag?.trim();
+  if (!name) {
+    const error = new Error("Tag name is required");
+    error.statusCode = 400;
+    throw error;
+  }
+  const existing = await repo.findTagByName(name);
+  if (existing) {
+    return existing;
+  }
+  return repo.createTripTag({ tag: name });
 };
 
 export const getAllTripTags = async () => {
