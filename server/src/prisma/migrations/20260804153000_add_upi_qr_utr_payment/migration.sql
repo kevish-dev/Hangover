@@ -1,5 +1,0 @@
--- AlterEnum
-ALTER TYPE "PaymentTransactionStatus" ADD VALUE IF NOT EXISTS 'PENDING_VERIFICATION';
-
--- AlterTable
-ALTER TABLE "Payment" ADD COLUMN IF NOT EXISTS "utr" TEXT;
