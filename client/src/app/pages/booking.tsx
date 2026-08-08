@@ -813,10 +813,7 @@ export default function BookingPage() {
         .filter(([addOnId, quantity]) => quantity > 0 && availableAddOns.some((addOn: any) => addOn.id === addOnId))
         .map(([addOnId, quantity]) => ({ addOnId, quantity }));
       
-      const bookingRes = await apiClient.post(
-        isCrmTrip ? `/crm-trips/public/${trip.id}/bookings` : "/bookings",
-        payload,
-      );
+      const bookingRes = await apiClient.post("/bookings", payload);
       const {
         id: bookingId,
         bookingReference,

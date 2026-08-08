@@ -63,8 +63,8 @@ const getBookingEmailDetails = (booking) => {
     tripTitle: journey.title,
     itemLocation: journey.location,
     packageName: journey.packageName,
-    slotName: booking?.source === "CUSTOM" ? "Private dates" : getSlotName(booking?.slot),
-    slotTitle: booking?.source === "CUSTOM" ? "Private custom trip" : booking?.slot?.title || null,
+    slotName: booking?.source === "CUSTOM" ? "Private dates" : getSlotName(booking?.crmTripSlot || booking?.slot),
+    slotTitle: booking?.source === "CUSTOM" ? "Private custom trip" : (booking?.crmTripSlot?.title || booking?.slot?.title || null),
     tripStartDate: journey.startDate,
     tripEndDate: journey.endDate,
     travelersCount: booking?.numberOfTravelers || 1,
@@ -241,6 +241,11 @@ const _processSuccessfulPayment = async (intent, rzpPaymentId, rzpSignature, rzp
       if (booking.slotId) {
         await tx.slot.update({
           where: { id: booking.slotId },
+          data: { filledSpots: { increment: booking.numberOfTravelers } },
+        });
+      } else if (booking.crmTripSlotId) {
+        await tx.crmTripSlot.update({
+          where: { id: booking.crmTripSlotId },
           data: { filledSpots: { increment: booking.numberOfTravelers } },
         });
       }

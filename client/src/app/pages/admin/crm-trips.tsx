@@ -861,6 +861,22 @@ function CreateTripDialog({
     }
   };
 
+  const uploadHighlightImage = async (index: number, file?: File) => {
+    if (!file) return;
+    setUploadingHighlightIndex(index);
+    try {
+      const imageUrl = await uploadGenericImageDirect(file);
+      const next = [...websiteHighlights];
+      next[index] = { ...next[index], imageUrl };
+      setWebsiteHighlights(next);
+      toast.success("Highlight image uploaded");
+    } catch (error: any) {
+      toast.error(error?.message || "Could not upload the highlight image");
+    } finally {
+      setUploadingHighlightIndex(null);
+    }
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const action = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("value");
@@ -884,7 +900,14 @@ function CreateTripDialog({
       return;
     }
 
-    if (step === 2) return;
+    if (step === 2) {
+      if (itineraryDayIndex < itineraryDays.length - 1) {
+        setItineraryDayIndex((index) => index + 1);
+      } else {
+        setStep(3);
+      }
+      return;
+    }
 
     const cleanPackages = packages.map((item) => ({
       ...(item.id ? { id: item.id } : {}),
@@ -1127,16 +1150,34 @@ function CreateTripDialog({
               </p>
             </>
           ) : step === 2 ? (
-            <ItineraryDayStep
-              dayNumber={itineraryDayIndex + 1}
-              day={itineraryDays[itineraryDayIndex]}
-              stays={staysQuery.data || []}
-              properties={propertiesQuery.data || []}
-              places={placesQuery.data || []}
-              transfers={transfersQuery.data || []}
-              loading={staysQuery.isLoading || propertiesQuery.isLoading || placesQuery.isLoading || transfersQuery.isLoading}
-              onChange={(nextDay) => setItineraryDays((days) => days.map((day, index) => index === itineraryDayIndex ? nextDay : day))}
-            />
+            <div className="space-y-4">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-gray-200">
+                {itineraryDays.map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setItineraryDayIndex(idx)}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                      idx === itineraryDayIndex
+                        ? "bg-[#781216] text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    Day {idx + 1}
+                  </button>
+                ))}
+              </div>
+              <ItineraryDayStep
+                dayNumber={itineraryDayIndex + 1}
+                day={itineraryDays[itineraryDayIndex]}
+                stays={staysQuery.data || []}
+                properties={propertiesQuery.data || []}
+                places={placesQuery.data || []}
+                transfers={transfersQuery.data || []}
+                loading={staysQuery.isLoading || propertiesQuery.isLoading || placesQuery.isLoading || transfersQuery.isLoading}
+                onChange={(nextDay) => setItineraryDays((days) => days.map((day, index) => index === itineraryDayIndex ? nextDay : day))}
+              />
+            </div>
           ) : step === 3 ? (
             <>
               <section className="space-y-3 rounded-xl border border-[#781216]/15 bg-[#fffafb] p-4">

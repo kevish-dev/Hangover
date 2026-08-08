@@ -114,60 +114,109 @@ export const createBooking = async (userId, data) => {
     );
   }
 
-  if (!data.slotId) {
-    throw new ValidationError("Must provide a slotId to book.");
+  const targetSlotId = data.slotId || data.crmTripSlotId;
+  if (!targetSlotId) {
+    throw new ValidationError("Must provide a slotId or crmTripSlotId to book.");
   }
 
-  const slot = await prisma.slot.findUnique({ 
-    where: { id: data.slotId },
+  let slot = await prisma.slot.findUnique({ 
+    where: { id: targetSlotId },
     include: {
       trip: { include: { packages: true, addOns: true } },
       festival: { include: { packages: true, addOns: true } },
     }
   });
-  if (!slot) {
-    throw new NotFoundError("Booking slot not found");
+
+  let crmTripSlot = null;
+  let isCrmTrip = false;
+  let isTrip = false;
+  let isFestival = false;
+  let item = null;
+
+  if (slot) {
+    isTrip = !!slot.tripId;
+    isFestival = !isTrip;
+    item = isTrip ? slot.trip : slot.festival;
+  } else {
+    crmTripSlot = await prisma.crmTripSlot.findUnique({
+      where: { id: targetSlotId },
+      include: {
+        crmTrip: { include: { packages: true, addOns: true, destination: true } },
+      },
+    });
+
+    if (crmTripSlot) {
+      isCrmTrip = true;
+      item = crmTripSlot.crmTrip;
+    }
   }
 
-  const isTrip = !!slot.tripId;
-  const item = isTrip ? slot.trip : slot.festival;
+  if (!slot && !crmTripSlot) {
+    throw new NotFoundError("Booking slot not found");
+  }
 
   if (!item) throw new NotFoundError("Booking item not found");
   if (!item.isActive)
     throw new ValidationError("This item is no longer available for booking.");
-  if (!slot.startDate) {
+
+  const startDate = slot ? slot.startDate : crmTripSlot.startDate;
+  if (!startDate) {
     throw new ValidationError("The selected slot does not have a start date and cannot be booked yet.");
   }
 
-  const siblingSlots = await prisma.slot.findMany({
-    where: isTrip ? { tripId: slot.tripId } : { festivalId: slot.festivalId },
-    select: { id: true }
-  });
-  const siblingSlotIds = siblingSlots.map(s => s.id);
+  if (isCrmTrip) {
+    const siblingCrmSlots = await prisma.crmTripSlot.findMany({
+      where: { crmTripId: crmTripSlot.crmTripId },
+      select: { id: true },
+    });
+    const siblingCrmSlotIds = siblingCrmSlots.map((s) => s.id);
 
-  const existingBooking = await prisma.booking.findFirst({
-    where: {
-      userId,
-      slotId: { in: siblingSlotIds },
-      status: { in: ["PENDING", "RESERVED", "CONFIRMED"] }
+    const existingBooking = await prisma.booking.findFirst({
+      where: {
+        userId,
+        crmTripSlotId: { in: siblingCrmSlotIds },
+        status: { in: ["PENDING", "RESERVED", "CONFIRMED"] },
+      },
+    });
+
+    if (existingBooking) {
+      if (existingBooking.status === "PENDING") {
+        throw new ValidationError("You already have a pending booking for this trip. Please complete the payment or ask support to cancel it.");
+      } else {
+        throw new ValidationError("You already have an active booking for this trip. You cannot book another slot or package until your trip is completed.");
+      }
     }
-  });
+  } else {
+    const siblingSlots = await prisma.slot.findMany({
+      where: isTrip ? { tripId: slot.tripId } : { festivalId: slot.festivalId },
+      select: { id: true }
+    });
+    const siblingSlotIds = siblingSlots.map(s => s.id);
 
-  if (existingBooking) {
-    if (existingBooking.status === "PENDING") {
-      throw new ValidationError("You already have a pending booking for this trip. Please complete the payment or ask support to cancel it.");
-    } else {
-      throw new ValidationError("You already have an active booking for this trip. You cannot book another slot or package until your trip is completed.");
+    const existingBooking = await prisma.booking.findFirst({
+      where: {
+        userId,
+        slotId: { in: siblingSlotIds },
+        status: { in: ["PENDING", "RESERVED", "CONFIRMED"] }
+      }
+    });
+
+    if (existingBooking) {
+      if (existingBooking.status === "PENDING") {
+        throw new ValidationError("You already have a pending booking for this trip. Please complete the payment or ask support to cancel it.");
+      } else {
+        throw new ValidationError("You already have an active booking for this trip. You cannot book another slot or package until your trip is completed.");
+      }
     }
   }
 
   // 3. Pricing calculation (per-person)
   const numberOfTravelers = data.numberOfTravelers || 1;
 
-  // Validate traveler count against group size limits
-
   // Check capacity on the slot
-  const spotsLeft = slot.capacity - slot.filledSpots;
+  const currentCapacity = slot ? slot.capacity : crmTripSlot.capacity;
+  const currentFilledSpots = slot ? slot.filledSpots : crmTripSlot.filledSpots;
+  const spotsLeft = currentCapacity - currentFilledSpots;
   if (numberOfTravelers > spotsLeft) {
     throw new ValidationError(
       `Only ${spotsLeft} spot(s) remaining for the selected dates.`,
@@ -205,16 +254,17 @@ export const createBooking = async (userId, data) => {
         throw new ValidationError(`${addOnModel.title} is limited to ${addOnModel.maxQuantityPerBooking} per booking.`);
       }
       
-      if (addOnModel.maxQuantityPerSlot && slot) {
+      if (addOnModel.maxQuantityPerSlot) {
+        const filterWhere = isCrmTrip
+          ? { crmTripSlotId: crmTripSlot.id, status: { not: "CANCELLED" } }
+          : { slotId: slot.id, status: { not: "CANCELLED" } };
+
         const bookedAddOns = await prisma.bookingAddOn.aggregate({
           _sum: { quantity: true },
           where: {
             addOnId: addOnModel.id,
             status: { notIn: ["CANCELLED", "REFUNDED"] },
-            booking: {
-              slotId: slot.id,
-              status: { not: "CANCELLED" }
-            }
+            booking: filterWhere,
           }
         });
         
@@ -223,8 +273,8 @@ export const createBooking = async (userId, data) => {
           throw new ValidationError(`${addOnModel.title} only has ${Math.max(0, addOnModel.maxQuantityPerSlot - alreadyBooked)} spots left for this departure.`);
         }
       }
-      if (addOnModel.purchaseCutoffOffsetDays != null && slot.startDate) {
-        const cutoff = new Date(slot.startDate).getTime() - addOnModel.purchaseCutoffOffsetDays * 86400000;
+      if (addOnModel.purchaseCutoffOffsetDays != null && startDate) {
+        const cutoff = new Date(startDate).getTime() - addOnModel.purchaseCutoffOffsetDays * 86400000;
         if (Date.now() > cutoff) {
           throw new ValidationError(`${addOnModel.title} is no longer available for this departure.`);
         }
@@ -243,10 +293,10 @@ export const createBooking = async (userId, data) => {
   }
 
   const baseTotalAmount = (itemPrice * numberOfTravelers) + addOnsTotalCost;
-  const totalAmount = toDecimal2(baseTotalAmount + (baseTotalAmount * 0.05));
+  const totalAmount = isCrmTrip ? toDecimal2(baseTotalAmount) : toDecimal2(baseTotalAmount + (baseTotalAmount * 0.05));
 
   const baseTokenAmount = itemToken * numberOfTravelers;
-  const tokenAmount = toDecimal2(baseTokenAmount + (baseTokenAmount * 0.05));
+  const tokenAmount = isCrmTrip ? toDecimal2(baseTokenAmount) : toDecimal2(baseTokenAmount + (baseTokenAmount * 0.05));
 
   let initialPaymentType = data.initialPaymentType || "TOKEN";
   if (tokenAmount === 0) {
@@ -256,7 +306,7 @@ export const createBooking = async (userId, data) => {
     initialPaymentType === "FULL" ? 0 : toDecimal2(totalAmount - tokenAmount);
 
   // 4. Calculate balance due date: 10 days before start
-  const balanceDueDate = new Date(slot.startDate);
+  const balanceDueDate = new Date(startDate);
   balanceDueDate.setDate(balanceDueDate.getDate() - 10);
 
   // 5. Build booking payload
@@ -296,12 +346,12 @@ export const createBooking = async (userId, data) => {
     : [];
 
   // Check if there is an existing PENDING booking to reuse
+  const pendingWhere = isCrmTrip
+    ? { userId, crmTripSlotId: crmTripSlot.id, status: "PENDING" }
+    : { userId, slotId: slot.id, status: "PENDING" };
+
   const existingPending = await prisma.booking.findFirst({
-    where: {
-      userId,
-      slotId: data.slotId,
-      status: "PENDING",
-    },
+    where: pendingWhere,
     include: { travelers: { select: { aadhaarAssetId: true } } },
   });
 
@@ -327,12 +377,17 @@ export const createBooking = async (userId, data) => {
   bookingData.id = customBookingId;
   bookingData.bookingReference = customBookingId;
   bookingData.userId = userId;
-  bookingData.slotId = data.slotId;
-  if (isTrip) {
+  if (isCrmTrip) {
+    bookingData.crmTripId = crmTripSlot.crmTripId;
+    bookingData.crmTripSlotId = crmTripSlot.id;
+  } else if (isTrip) {
+    bookingData.slotId = slot.id;
     bookingData.tripId = slot.tripId;
   } else {
+    bookingData.slotId = slot.id;
     bookingData.festivalId = slot.festivalId;
   }
+  bookingData.source = "CATALOG";
   if (selectedPackage) bookingData.packageId = selectedPackage.id;
   bookingData.status = "PENDING";
   bookingData.paymentStatus = "PENDING";
@@ -347,10 +402,15 @@ export const createBooking = async (userId, data) => {
 
   const booking = await repo.createBooking(bookingData);
 
-  // Auto-generate OperationalTasks from the circuit template (fire-and-forget in background)
-  operationsService.generateBookingOperations(booking, slot, data.addOns || []).catch(
-    (err) => console.error("[OpsGen] Failed to generate operations for booking", booking.id, err)
-  );
+  if (isCrmTrip) {
+    operationsService.generateCrmBookingOperations(booking, crmTripSlot).catch(
+      (err) => console.error("[OpsGen] Failed to generate operations for CRM booking", booking.id, err)
+    );
+  } else {
+    operationsService.generateBookingOperations(booking, slot, data.addOns || []).catch(
+      (err) => console.error("[OpsGen] Failed to generate operations for booking", booking.id, err)
+    );
+  }
 
   return booking;
 };
@@ -711,6 +771,16 @@ export const cancelBooking = async (bookingId, userId, reason) => {
           filledSpots: Math.max(0, (booking.slot.filledSpots || 0) - booking.numberOfTravelers),
         },
       });
+    } else if (booking.crmTripSlotId && (booking.status === "RESERVED" || booking.status === "CONFIRMED")) {
+      const currentSlot = await tx.crmTripSlot.findUnique({ where: { id: booking.crmTripSlotId }, select: { filledSpots: true } });
+      if (currentSlot) {
+        await tx.crmTripSlot.update({
+          where: { id: booking.crmTripSlotId },
+          data: {
+            filledSpots: Math.max(0, currentSlot.filledSpots - booking.numberOfTravelers),
+          },
+        });
+      }
     }
     
     return updated;
@@ -980,6 +1050,16 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
           filledSpots: Math.max(0, (booking.slot.filledSpots || 0) - booking.numberOfTravelers)
         }
       });
+    } else if (booking.crmTripSlotId) {
+      const currentSlot = await tx.crmTripSlot.findUnique({ where: { id: booking.crmTripSlotId }, select: { filledSpots: true } });
+      if (currentSlot) {
+        await tx.crmTripSlot.update({
+          where: { id: booking.crmTripSlotId },
+          data: {
+            filledSpots: Math.max(0, currentSlot.filledSpots - booking.numberOfTravelers)
+          }
+        });
+      }
     }
 
     // Cancel / Refund Add-ons
