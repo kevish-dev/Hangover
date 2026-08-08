@@ -7,8 +7,13 @@ import { generateCrmBookingOperations } from "../operations/operations.service.j
 const round = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 const paymentPageUrl = (bookingId) => `${env.ORIGIN.replace(/\/$/, "")}/bookings/${bookingId}/pay-balance`;
 const getReference = async () => {
-  const rows = await prisma.$queryRaw`SELECT nextval('"BookingReferenceSequence"') AS "sequence"`;
-  return `H${String(Number(rows[0].sequence)).padStart(4, "0")}`;
+  try {
+    const rows = await prisma.$queryRaw`SELECT nextval('"BookingReferenceSequence"') AS "sequence"`;
+    return `H${String(Number(rows[0].sequence)).padStart(4, "0")}`;
+  } catch (error) {
+    if (error?.code !== "P2010") throw error;
+    return `H${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+  }
 };
 const paymentTypeFor = (amount, dueBefore) => amount === dueBefore ? "FULL" : "TOKEN";
 const profileFields = (data) => ({

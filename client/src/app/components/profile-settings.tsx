@@ -108,6 +108,15 @@ export function ProfileSettings() {
         toast.error("Invalid Date of Birth format.");
         return;
       }
+
+      if (profile.phone) {
+        const cleanPhone = profile.phone.replace(/\D/g, "");
+        if (cleanPhone.length !== 10) {
+          toast.error("Phone number must be exactly 10 digits.");
+          setSaving(false);
+          return;
+        }
+      }
       
       // Clean up empty strings to null for backend
       const payload: Partial<UserProfile> = {};
@@ -195,10 +204,14 @@ export function ProfileSettings() {
           <Field label="Phone Number">
             <input
               type="tel"
+              inputMode="numeric"
+              maxLength={10}
+              pattern="[0-9]{10}"
+              title="Phone number must be exactly 10 digits"
               style={inputBase}
               value={profile.phone || ""}
-              onChange={(e) => handleChange("phone", e.target.value)}
-              placeholder="+91"
+              onChange={(e) => handleChange("phone", e.target.value.replace(/\D/g, "").slice(0, 10))}
+              placeholder="9876543210"
             />
           </Field>
           <Field label="Gender">

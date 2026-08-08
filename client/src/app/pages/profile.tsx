@@ -38,6 +38,7 @@ import { getErrorMessage } from "../../lib/errors";
 
 const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }> = {
   PENDING:             { bg: "rgba(200,169,110,0.12)", color: "#b8943a",  label: "Pending" },
+  PENDING_VERIFICATION:{ bg: "rgba(217,119,6,0.12)", color: "#d97706",  label: "UTR Verifying" },
   RESERVED:            { bg: "rgba(200,169,110,0.12)", color: "#b8943a",  label: "Upcoming" },
   CONFIRMED:           { bg: "rgba(34,139,34,0.10)",   color: "#228b22",  label: "Upcoming" },
   COMPLETED:           { bg: "rgba(34,139,34,0.10)",   color: "#228b22",  label: "Completed" },
@@ -84,9 +85,12 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
   const isFullyRefunded = booking.paymentStatus === "REFUNDED";
   const isPartiallyRefunded = booking.paymentStatus === "PARTIALLY_REFUNDED";
   const isRefunded = isFullyRefunded || isPartiallyRefunded;
+  const pendingUtrPayment = (booking.payments || []).find((p: any) => p.status === "PENDING_VERIFICATION");
+  const hasPendingUtr = Boolean(pendingUtrPayment);
   const canPayBalance =
-    (due > 0 && booking.status === "RESERVED" && booking.paymentStatus === "PARTIALLY_PAID") ||
-    (booking.status === "PENDING" && (booking.paymentStatus === "PENDING" || booking.paymentStatus === "FAILED"));
+    !hasPendingUtr &&
+    ((due > 0 && booking.status === "RESERVED" && booking.paymentStatus === "PARTIALLY_PAID") ||
+    (booking.status === "PENDING" && (booking.paymentStatus === "PENDING" || booking.paymentStatus === "FAILED")));
 
   // Sum up all successful or pending refunds across payments
   const totalRefunded = (booking.payments || []).reduce((sum, p) => {
@@ -95,8 +99,10 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
     }, 0);
   }, 0);
 
-  // Determine the status badge to show — prefer paymentStatus for refunded states
-  const badgeStatus: string = isFullyRefunded
+  // Determine the status badge to show — prefer pending UTR state, then refunded states
+  const badgeStatus: string = hasPendingUtr
+    ? "PENDING_VERIFICATION"
+    : isFullyRefunded
     ? "REFUNDED"
     : isPartiallyRefunded
     ? "PARTIALLY_REFUNDED"

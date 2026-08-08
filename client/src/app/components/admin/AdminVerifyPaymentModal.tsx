@@ -37,6 +37,8 @@ export default function AdminVerifyPaymentModal({
 }: AdminVerifyPaymentModalProps) {
   const [submitting, setSubmitting] = useState(false);
   const [copiedUtr, setCopiedUtr] = useState(false);
+  const [showRejectBox, setShowRejectBox] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   const copyUtr = () => {
     if (payment.utr) {
@@ -48,13 +50,21 @@ export default function AdminVerifyPaymentModal({
   };
 
   const handleAction = async (action: "VERIFY" | "REJECT") => {
+    if (action === "REJECT" && !showRejectBox) {
+      setShowRejectBox(true);
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await apiClient.post(`/payments/${payment.id}/verify-upi`, { action });
+      await apiClient.post(`/payments/${payment.id}/verify-upi`, {
+        action,
+        reason: action === "REJECT" ? (rejectReason.trim() || "Invalid UTR reference number") : undefined,
+      });
       toast.success(
         action === "VERIFY"
           ? "Payment verified & approved successfully!"
-          : "Payment rejected."
+          : "Payment rejected and customer notified."
       );
       onSuccess();
       onClose();
@@ -121,6 +131,19 @@ export default function AdminVerifyPaymentModal({
             </div>
           </div>
 
+          {showRejectBox && (
+            <div className="space-y-1.5 border-t border-red-100 pt-3">
+              <label className="block text-xs font-bold text-red-700">Rejection Reason for Customer</label>
+              <input
+                type="text"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="e.g. UTR reference not found in bank statement"
+                className="w-full h-9 text-xs border rounded-md px-3 border-red-300 focus:outline-none focus:ring-1 focus:ring-red-500"
+              />
+            </div>
+          )}
+
           {/* Verification buttons */}
           <div className="flex items-center justify-end gap-3 border-t pt-3">
             <Button
@@ -130,7 +153,7 @@ export default function AdminVerifyPaymentModal({
               disabled={submitting}
               className="text-red-600 hover:bg-red-50 border-red-200"
             >
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><XCircle className="mr-1.5 h-4 w-4" /> Reject</>}
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><XCircle className="mr-1.5 h-4 w-4" /> {showRejectBox ? "Confirm Rejection" : "Reject"}</>}
             </Button>
             <Button
               type="button"

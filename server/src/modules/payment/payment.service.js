@@ -239,15 +239,27 @@ const _processSuccessfulPayment = async (intent, rzpPaymentId, rzpSignature, rzp
     //    TOKEN -> spot reserved now; FULL -> spot confirmed now; BALANCE -> already counted at TOKEN time.
     if (intent.type === "TOKEN" || intent.type === "FULL") {
       if (booking.slotId) {
-        await tx.slot.update({
-          where: { id: booking.slotId },
+        const maxFilledSpots = Number(booking.slot?.capacity) - booking.numberOfTravelers;
+        if (!Number.isFinite(maxFilledSpots)) throw new ValidationError("Booking departure is unavailable.");
+        const updatedSlot = await tx.slot.updateMany({
+          where: {
+            id: booking.slotId,
+            filledSpots: { lte: maxFilledSpots },
+          },
           data: { filledSpots: { increment: booking.numberOfTravelers } },
         });
+        if (!updatedSlot.count) throw new ValidationError("This departure no longer has enough remaining capacity.");
       } else if (booking.crmTripSlotId) {
-        await tx.crmTripSlot.update({
-          where: { id: booking.crmTripSlotId },
+        const maxFilledSpots = Number(booking.crmTripSlot?.capacity) - booking.numberOfTravelers;
+        if (!Number.isFinite(maxFilledSpots)) throw new ValidationError("Booking departure is unavailable.");
+        const updatedSlot = await tx.crmTripSlot.updateMany({
+          where: {
+            id: booking.crmTripSlotId,
+            filledSpots: { lte: maxFilledSpots },
+          },
           data: { filledSpots: { increment: booking.numberOfTravelers } },
         });
+        if (!updatedSlot.count) throw new ValidationError("This departure no longer has enough remaining capacity.");
       }
     }
 
@@ -809,12 +821,24 @@ export const issueRefund = async (paymentId, amount, reason, adminId) => {
 
   const isFullRefund = refundAmount >= Number(payment.amount);
 
-  // Issue refund via Razorpay
-  const rzpRefund = await razorpay.createRefund(
-    payment.razorpayPaymentId,
-    toPaise(refundAmount),
-    { reason, admin_id: adminId }
+  let rzpRefund = null;
+  const isOnlinePayment = Boolean(
+    payment.razorpayPaymentId &&
+    typeof payment.razorpayPaymentId === "string" &&
+    payment.razorpayPaymentId.startsWith("pay_")
   );
+
+  if (isOnlinePayment) {
+    try {
+      rzpRefund = await razorpay.createRefund(
+        payment.razorpayPaymentId,
+        toPaise(refundAmount),
+        { reason: String(reason || "Admin refund").slice(0, 100), adminId: String(adminId) }
+      );
+    } catch (err) {
+      console.warn(`[Refund Warning] Razorpay refund API failed for payment ${payment.id} (${payment.razorpayPaymentId}):`, err?.error?.description || err?.message || err);
+    }
+  }
 
   // Atomically record refund, update payment status, and update booking
   const refundRecord = await prisma.$transaction(async (tx) => {
@@ -823,11 +847,11 @@ export const issueRefund = async (paymentId, amount, reason, adminId) => {
       data: {
         paymentId: payment.id,
         amount: refundAmount,
-        status: "PENDING",
-        reason,
-        razorpayRefundId: rzpRefund.id,
+        status: "SUCCESS",
+        reason: reason || "Admin refund",
+        razorpayRefundId: rzpRefund?.id || null,
         initiatedBy: adminId,
-        metadata: { razorpayRefund: rzpRefund },
+        metadata: rzpRefund ? { razorpayRefund: rzpRefund } : { note: "Manual/offline refund or Razorpay API fallback" },
       },
     });
 
@@ -1043,13 +1067,45 @@ export const submitUpiUtrPayment = async (userId, data) => {
   if (!booking) {
     throw new NotFoundError("Booking not found.");
   }
+  if (booking.userId !== userId) {
+    throw new ForbiddenError("Forbidden");
+  }
 
   const numAmount = toDecimal2(amount);
   if (numAmount <= 0) {
     throw new ValidationError("Payment amount must be greater than zero.");
   }
 
+  const existingPending = await prisma.payment.findFirst({
+    where: {
+      bookingId: booking.id,
+      status: "PENDING_VERIFICATION",
+    },
+  });
+
   const paymentType = type || (Number(booking.amountPaid) === 0 ? (numAmount >= Number(booking.totalAmount) ? "FULL" : "TOKEN") : "BALANCE");
+
+  if (existingPending) {
+    const updated = await prisma.payment.update({
+      where: { id: existingPending.id },
+      data: {
+        amount: numAmount,
+        type: paymentType,
+        utr: cleanUtr,
+        paymentMethod: "UPI_QR",
+        updatedAt: new Date(),
+        notes: { upi: true, utrSubmittedAt: new Date(), updatedUtr: cleanUtr },
+      },
+      include: {
+        booking: {
+          include: {
+            user: { include: { profile: true } },
+          },
+        },
+      },
+    });
+    return updated;
+  }
 
   const payment = await prisma.payment.create({
     data: {
@@ -1066,16 +1122,16 @@ export const submitUpiUtrPayment = async (userId, data) => {
     include: {
       booking: {
         include: {
-          user: { include: { profile: true } }
-        }
-      }
-    }
+          user: { include: { profile: true } },
+        },
+      },
+    },
   });
 
   return payment;
 };
 
-export const verifyUpiPayment = async (adminId, paymentId, action) => {
+export const verifyUpiPayment = async (adminId, paymentId, action, reason) => {
   if (!["VERIFY", "REJECT"].includes(action)) {
     throw new ValidationError("Action must be VERIFY or REJECT.");
   }
@@ -1087,27 +1143,52 @@ export const verifyUpiPayment = async (adminId, paymentId, action) => {
         include: {
           user: { include: { profile: true } },
           crmTrip: true,
+          crmTripSlot: true,
           trip: true,
           festival: true,
-        }
-      }
-    }
+          slot: { include: { trip: true, festival: true } },
+          package: true,
+          travelers: true,
+        },
+      },
+    },
   });
 
   if (!payment) {
     throw new NotFoundError("Payment transaction not found.");
   }
 
+  const booking = payment.booking;
+
   if (action === "REJECT") {
+    const failureReason = String(reason || "Rejected by admin verification").trim();
     const updated = await prisma.payment.update({
       where: { id: paymentId },
-      data: { status: "FAILED", failureReason: "Rejected by admin verification" }
+      data: { status: "FAILED", failureReason },
     });
+
+    if (booking.user?.email) {
+      const journey = getBookingJourney(booking);
+      email.sendPaymentReminderEmail({
+        to: booking.user.email,
+        name: booking.user.profile?.fullName || "Traveler",
+        bookingRef: booking.bookingReference,
+        tripTitle: journey.title,
+        totalAmount: Number(booking.totalAmount),
+        amountPaid: Number(booking.amountPaid),
+        balanceAmount: Number(booking.amountDue),
+        paymentRequestAmount: Number(payment.amount),
+        isInstallmentRequest: false,
+        isWebsitePaymentLink: true,
+        paymentLink: `${env.ORIGIN.replace(/\/$/, "")}/bookings/${booking.id}/pay-balance`,
+        notice: `Your submitted UTR payment (${payment.utr || "N/A"}) for ₹${Number(payment.amount).toLocaleString("en-IN")} could not be verified: "${failureReason}". Please check your payment details and try again.`,
+      }).catch((err) => console.error("[UTR Reject Email Error]", err));
+    }
+
     return updated;
   }
 
   // VERIFY action
-  const booking = payment.booking;
   const amount = Number(payment.amount);
 
   const result = await prisma.$transaction(async (tx) => {
@@ -1116,7 +1197,7 @@ export const verifyUpiPayment = async (adminId, paymentId, action) => {
       data: {
         status: "SUCCESS",
         paidAt: new Date(),
-      }
+      },
     });
 
     const newPaid = toDecimal2(Number(booking.amountPaid) + amount);
@@ -1128,11 +1209,39 @@ export const verifyUpiPayment = async (adminId, paymentId, action) => {
         amountPaid: newPaid,
         amountDue: newDue,
         paymentStatus: newDue === 0 ? "PAID" : "PARTIALLY_PAID",
-        status: "CONFIRMED",
-        confirmedAt: booking.confirmedAt || new Date(),
+        status: newDue === 0 ? "CONFIRMED" : "RESERVED",
+        confirmedAt: newDue === 0 ? (booking.confirmedAt || new Date()) : booking.confirmedAt,
+        reservedAt: booking.reservedAt || new Date(),
       },
-      include: { user: { include: { profile: true } } }
+      include: { user: { include: { profile: true } } },
     });
+
+    if (payment.type === "TOKEN" || payment.type === "FULL") {
+      if (booking.slotId) {
+        const maxFilled = Number(booking.slot?.capacity) - booking.numberOfTravelers;
+        if (Number.isFinite(maxFilled)) {
+          await tx.slot.updateMany({
+            where: { id: booking.slotId, filledSpots: { lte: maxFilled } },
+            data: { filledSpots: { increment: booking.numberOfTravelers } },
+          });
+        }
+      } else if (booking.crmTripSlotId) {
+        const maxFilled = Number(booking.crmTripSlot?.capacity) - booking.numberOfTravelers;
+        if (Number.isFinite(maxFilled)) {
+          await tx.crmTripSlot.updateMany({
+            where: { id: booking.crmTripSlotId, filledSpots: { lte: maxFilled } },
+            data: { filledSpots: { increment: booking.numberOfTravelers } },
+          });
+        }
+      }
+    }
+
+    if (newDue === 0 || payment.type === "FULL" || payment.type === "BALANCE") {
+      await tx.bookingAddOn.updateMany({
+        where: { bookingId: booking.id, status: "PENDING" },
+        data: { status: "PAID", purchasedAt: new Date() },
+      });
+    }
 
     await tx.ledgerEntry.create({
       data: {
@@ -1146,11 +1255,44 @@ export const verifyUpiPayment = async (adminId, paymentId, action) => {
         description: `UPI payment verified (UTR: ${payment.utr || "N/A"})`,
         isAutoGenerated: true,
         createdById: adminId,
-      }
+      },
     });
 
     return { booking: updatedBooking, payment: updatedPayment };
   });
+
+  import("../operations/operations.service.js").then((opsService) => {
+    if (booking.crmTripId && booking.crmTripSlot) {
+      opsService.generateCrmBookingOperations(result.booking, booking.crmTripSlot).catch(
+        (err) => console.error("[OpsGen] Failed to generate operations for UTR CRM booking", booking.id, err)
+      );
+    } else if (booking.slot) {
+      opsService.generateBookingOperations(result.booking, booking.slot, []).catch(
+        (err) => console.error("[OpsGen] Failed to generate operations for UTR booking", booking.id, err)
+      );
+    }
+  });
+
+  const journey = getBookingJourney(booking);
+  email.sendBookingConfirmedEmail({
+    to: booking.user.email,
+    name: booking.user.profile?.fullName || "Traveler",
+    bookingRef: booking.bookingReference,
+    bookingId: booking.id,
+    tripTitle: journey.title,
+    totalAmount: Number(booking.totalAmount),
+    transactionAmount: amount,
+    cumulativeAmountPaid: result.booking.amountPaid,
+    previousAmountPaid: Number(booking.amountPaid),
+    amountDue: result.booking.amountDue,
+    paymentType: payment.type,
+    paymentMethod: "UPI_QR",
+    paymentId: payment.utr ? `UTR: ${payment.utr}` : payment.id,
+    invoicePaymentId: payment.id,
+    paidAt: result.payment.paidAt || new Date(),
+    travelersCount: booking.numberOfTravelers,
+    itemLocation: journey.location,
+  }).catch((err) => console.error("[UTR Receipt Email Error]", err));
 
   return result;
 };

@@ -124,8 +124,8 @@ export const submitUpiUtrPayment = async (req, res, next) => {
 
 export const verifyUpiPayment = async (req, res, next) => {
   try {
-    const { action } = req.body;
-    const result = await paymentService.verifyUpiPayment(req.user.id, req.params.paymentId, action);
+    const { action, reason } = req.body;
+    const result = await paymentService.verifyUpiPayment(req.user.id, req.params.paymentId, action, reason);
     res.status(200).json(result);
   } catch (error) {
     next(error);
