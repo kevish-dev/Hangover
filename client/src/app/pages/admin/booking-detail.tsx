@@ -537,6 +537,33 @@ export default function AdminBookingDetailPage() {
     );
   }
 
+  // Catalog and CRM bookings use different relation names. Normalize them here
+  // so the admin detail page always describes the journey that was booked.
+  const journey =
+    booking.crmTrip ||
+    booking.crmFestival ||
+    booking.trip ||
+    booking.festival ||
+    booking.slot?.trip ||
+    booking.slot?.festival ||
+    null;
+  const journeySlot =
+    booking.crmTripSlot || booking.crmFestivalSlot || booking.slot || null;
+  const journeyName = journey?.name || journey?.title || "N/A";
+  const journeyType = booking.crmFestival || booking.festival || booking.slot?.festival
+    ? "Festival"
+    : "Trip";
+  const journeyDates = journeySlot?.startDate
+    ? [
+        format(new Date(journeySlot.startDate), "MMM d, yyyy"),
+        journeySlot.endDate
+          ? format(new Date(journeySlot.endDate), "MMM d, yyyy")
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" - ")
+    : "N/A";
+
   return (
     <div className="max-w-[1500px] mx-auto space-y-6 pb-12">
       <button
@@ -617,17 +644,24 @@ export default function AdminBookingDetailPage() {
               </h3>
               <div className="bg-[#fbf7ed]/30 border border-[#e8d9b7]/40 p-5 rounded-2xl space-y-4">
                 <div className="admin-booking-detail-grid grid grid-cols-3 gap-2 text-sm">
-                  <span className="text-gray-500">Trip Name:</span>
+                  <span className="text-gray-500">{journeyType} Name:</span>
                   <span className="col-span-2 font-medium text-gray-900">
-                    {booking.trip?.title || booking.festival?.title || "N/A"}
+                    {journeyName}
                   </span>
 
                   <span className="text-gray-500">Dates:</span>
                   <span className="col-span-2 text-gray-900">
-                    {booking.slot?.startDate
-                      ? `${format(new Date(booking.slot.startDate), "MMM d, yyyy")} - ${format(new Date(booking.slot.endDate), "MMM d, yyyy")}`
-                      : "N/A"}
+                    {journeyDates}
                   </span>
+
+                  {journey?.destination?.name && (
+                    <>
+                      <span className="text-gray-500">Destination:</span>
+                      <span className="col-span-2 text-gray-900">
+                        {journey.destination.name}
+                      </span>
+                    </>
+                  )}
 
                   <span className="text-gray-500">Package:</span>
                   <span className="col-span-2 text-gray-900">

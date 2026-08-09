@@ -859,7 +859,7 @@ export const getBookingById = async (id, userId, isAdmin = false) => {
   return withSecureDocumentUrls({
     ...booking,
     trip: booking.crmTrip || booking.trip || booking.slot?.trip || null,
-    festival: booking.festival || booking.slot?.festival || null,
+    festival: booking.crmFestival || booking.festival || booking.slot?.festival || null,
   });
 };
 

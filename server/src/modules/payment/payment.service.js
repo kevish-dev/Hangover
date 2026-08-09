@@ -737,7 +737,12 @@ export const handleWebhook = async (rawBody, signature, webhookEventId) => {
               if (booking) {
                 const newAmountPaid = toDecimal2(Math.max(0, Number(booking.amountPaid) - Number(refund.amount)));
                 const isBookingFullyRefunded = newAmountPaid === 0;
+                const newAmountDue = isBookingFullyRefunded
+                  ? 0
+                  : toDecimal2(Number(booking.totalAmount) - newAmountPaid);
                 await bookingRepo.updateBooking(payment.bookingId, {
+                  amountPaid: newAmountPaid,
+                  amountDue: newAmountDue,
                   paymentStatus: isBookingFullyRefunded ? "REFUNDED" : "PARTIALLY_REFUNDED",
                 });
 
@@ -893,8 +898,10 @@ export const issueRefund = async (paymentId, amount, reason, adminId) => {
     // 3. Fetch the booking's current amountPaid to calculate new values
     const booking = await tx.booking.findUnique({ where: { id: payment.bookingId } });
     const newAmountPaid = toDecimal2(Math.max(0, Number(booking.amountPaid) - refundAmount));
-    const newAmountDue = toDecimal2(Number(booking.totalAmount) - newAmountPaid);
     const isBookingFullyRefunded = newAmountPaid === 0;
+    const newAmountDue = isBookingFullyRefunded
+      ? 0
+      : toDecimal2(Number(booking.totalAmount) - newAmountPaid);
 
     // 4. Update booking payment status and booking status
     if (isBookingFullyRefunded) {
@@ -965,7 +972,7 @@ export const issueRefund = async (paymentId, amount, reason, adminId) => {
       );
       const emailRefundReason = reason || "Refund requested by administrator";
       const refundReference =
-        refundRecord.razorpayRefundId || rzpRefund.id || refundRecord.id;
+        refundRecord.razorpayRefundId || rzpRefund?.id || refundRecord.id;
       const isPaymentFullyRefunded = remainingAmount === 0;
 
       await email.sendRefundInitiatedEmail({
@@ -1233,8 +1240,10 @@ export const verifyUpiPayment = async (adminId, paymentId, action, reason) => {
       booking: {
         include: {
           user: { include: { profile: true } },
-          crmTrip: true,
+          crmTrip: { include: { destination: true } },
           crmTripSlot: true,
+          crmFestival: { include: { destination: true } },
+          crmFestivalSlot: true,
           trip: true,
           festival: true,
           slot: { include: { trip: true, festival: true } },
@@ -1341,11 +1350,13 @@ export const verifyUpiPayment = async (adminId, paymentId, action, reason) => {
   });
 
   const journey = getBookingJourney(booking);
+  const receiptDetails = getBookingEmailDetails(booking);
   email.sendBookingConfirmedEmail({
     to: booking.user.email,
     name: booking.user.profile?.fullName || "Traveler",
     bookingRef: booking.bookingReference,
     bookingId: booking.id,
+    ...receiptDetails,
     tripTitle: journey.title,
     totalAmount: Number(booking.totalAmount),
     transactionAmount: amount,
