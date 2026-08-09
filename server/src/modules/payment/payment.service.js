@@ -7,11 +7,43 @@ import { AppError, NotFoundError, ForbiddenError, ValidationError } from "../../
 import env from "../../core/env/env.js";
 import crypto from "crypto";
 import { getBookingJourney } from "../booking/booking-journey.js";
+import {
+  cancelBookingOperations,
+  releaseBookingSlotCapacity,
+  reserveBookingSlotCapacity,
+} from "../booking/slot-capacity.service.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const toDecimal2 = (n) => Math.round(Number(n) * 100) / 100;
 const toPaise = (rupees) => Math.round(Number(rupees) * 100);
+const moneyEquals = (left, right) => toDecimal2(left) === toDecimal2(right);
+
+const assertExpectedBookingPayment = (booking, type, amount) => {
+  if (!['TOKEN', 'FULL', 'BALANCE'].includes(type)) {
+    throw new ValidationError("Invalid payment type.");
+  }
+
+  if (booking.status === "PENDING" && ["PENDING", "FAILED"].includes(booking.paymentStatus)) {
+    if (type !== booking.initialPaymentType) {
+      throw new ValidationError("Use the payment option selected for this booking.");
+    }
+    const expected = type === "TOKEN" ? Number(booking.tokenAmount) : Number(booking.totalAmount);
+    if (!moneyEquals(amount, expected)) {
+      throw new ValidationError("Payment amount does not match the selected booking payment.");
+    }
+    return;
+  }
+
+  if (booking.status === "RESERVED" && booking.paymentStatus === "PARTIALLY_PAID") {
+    if (type !== "BALANCE" || !moneyEquals(amount, Number(booking.amountDue))) {
+      throw new ValidationError("Balance payment must match the full outstanding balance.");
+    }
+    return;
+  }
+
+  throw new ValidationError("This booking is not eligible for payment.");
+};
 
 const assertBookingOwner = (booking, userId, isAdmin = false) => {
   if (!booking) throw new NotFoundError("Booking not found");
@@ -207,8 +239,10 @@ const _processSuccessfulPayment = async (intent, rzpPaymentId, rzpSignature, rzp
       data: { status: "COMPLETED" },
     });
 
-    // 3. Update Booking status, payment status, and amounts
+    // 3. Move the booking forward exactly once. The conditional update prevents
+    // two valid Razorpay orders from both being accepted for the same booking.
     let bookingUpdate = {};
+    let bookingWhere = { id: booking.id };
     if (intent.type === "FULL") {
       bookingUpdate = {
         status: "CONFIRMED",
@@ -217,6 +251,7 @@ const _processSuccessfulPayment = async (intent, rzpPaymentId, rzpSignature, rzp
         amountDue: 0,
         confirmedAt: new Date(),
       };
+      bookingWhere = { id: booking.id, status: "PENDING", paymentStatus: { in: ["PENDING", "FAILED"] } };
     } else if (intent.type === "TOKEN") {
       bookingUpdate = {
         status: "RESERVED",
@@ -224,6 +259,7 @@ const _processSuccessfulPayment = async (intent, rzpPaymentId, rzpSignature, rzp
         amountPaid: { increment: Number(intent.amount) },
         reservedAt: new Date(),
       };
+      bookingWhere = { id: booking.id, status: "PENDING", paymentStatus: { in: ["PENDING", "FAILED"] } };
     } else if (intent.type === "BALANCE") {
       bookingUpdate = {
         status: "CONFIRMED",
@@ -232,35 +268,17 @@ const _processSuccessfulPayment = async (intent, rzpPaymentId, rzpSignature, rzp
         amountDue: 0,
         confirmedAt: new Date(),
       };
+      bookingWhere = { id: booking.id, status: "RESERVED", paymentStatus: "PARTIALLY_PAID" };
     }
-    await tx.booking.update({ where: { id: booking.id }, data: bookingUpdate });
+    const movedBooking = await tx.booking.updateMany({ where: bookingWhere, data: bookingUpdate });
+    if (!movedBooking.count) {
+      throw new ValidationError("This booking is no longer eligible for this payment.");
+    }
 
-    // 4. Decrement availability:
-    //    TOKEN -> spot reserved now; FULL -> spot confirmed now; BALANCE -> already counted at TOKEN time.
+    // 4. Claim capacity only on the first successful payment. BALANCE never
+    // claims another spot, and the helper makes simultaneous payments safe.
     if (intent.type === "TOKEN" || intent.type === "FULL") {
-      if (booking.slotId) {
-        const maxFilledSpots = Number(booking.slot?.capacity) - booking.numberOfTravelers;
-        if (!Number.isFinite(maxFilledSpots)) throw new ValidationError("Booking departure is unavailable.");
-        const updatedSlot = await tx.slot.updateMany({
-          where: {
-            id: booking.slotId,
-            filledSpots: { lte: maxFilledSpots },
-          },
-          data: { filledSpots: { increment: booking.numberOfTravelers } },
-        });
-        if (!updatedSlot.count) throw new ValidationError("This departure no longer has enough remaining capacity.");
-      } else if (booking.crmTripSlotId) {
-        const maxFilledSpots = Number(booking.crmTripSlot?.capacity) - booking.numberOfTravelers;
-        if (!Number.isFinite(maxFilledSpots)) throw new ValidationError("Booking departure is unavailable.");
-        const updatedSlot = await tx.crmTripSlot.updateMany({
-          where: {
-            id: booking.crmTripSlotId,
-            filledSpots: { lte: maxFilledSpots },
-          },
-          data: { filledSpots: { increment: booking.numberOfTravelers } },
-        });
-        if (!updatedSlot.count) throw new ValidationError("This departure no longer has enough remaining capacity.");
-      }
+      await reserveBookingSlotCapacity(tx, booking);
     }
 
     // 5. Update Add-ons status
@@ -323,6 +341,12 @@ export const initiatePayment = async (userId, bookingId, type) => {
     throw new ValidationError(
       `Cannot initiate payment on a booking with status: ${booking.status}. Only PENDING bookings can be paid.`
     );
+  }
+  if (!["PENDING", "FAILED"].includes(booking.paymentStatus)) {
+    throw new ValidationError("This booking already has a payment under review or has been paid.");
+  }
+  if (type !== booking.initialPaymentType) {
+    throw new ValidationError("Use the payment option selected for this booking.");
   }
 
   // Expire any stale CREATED intents for this booking (e.g. from a previously abandoned attempt)
@@ -819,7 +843,7 @@ export const issueRefund = async (paymentId, amount, reason, adminId) => {
     throw new ValidationError(`Refund amount Rs.${refundAmount} exceeds refundable balance Rs.${maxRefundable}.`);
   }
 
-  const isFullRefund = refundAmount >= Number(payment.amount);
+  const isFullRefund = toDecimal2(alreadyRefunded + refundAmount) >= Number(payment.amount);
 
   let rzpRefund = null;
   const isOnlinePayment = Boolean(
@@ -836,7 +860,12 @@ export const issueRefund = async (paymentId, amount, reason, adminId) => {
         { reason: String(reason || "Admin refund").slice(0, 100), adminId: String(adminId) }
       );
     } catch (err) {
-      console.warn(`[Refund Warning] Razorpay refund API failed for payment ${payment.id} (${payment.razorpayPaymentId}):`, err?.error?.description || err?.message || err);
+      console.error(`[Refund Error] Razorpay refund API failed for payment ${payment.id} (${payment.razorpayPaymentId}):`, err?.error?.description || err?.message || err);
+      throw new AppError(
+        "Razorpay could not accept this refund. No booking or payment records were changed.",
+        502,
+        "RAZORPAY_REFUND_FAILED",
+      );
     }
   }
 
@@ -868,35 +897,58 @@ export const issueRefund = async (paymentId, amount, reason, adminId) => {
     const isBookingFullyRefunded = newAmountPaid === 0;
 
     // 4. Update booking payment status and booking status
-    await tx.booking.update({
-      where: { id: payment.bookingId },
-      data: {
-        amountPaid: newAmountPaid,
-        amountDue: newAmountDue,
-        paymentStatus: isBookingFullyRefunded ? "REFUNDED" : "PARTIALLY_REFUNDED",
-        // Cancel the booking if fully refunded
-        ...(isBookingFullyRefunded && {
+    if (isBookingFullyRefunded) {
+      // The status guard makes the cancellation/release idempotent if two
+      // payment refunds settle close together.
+      const cancelled = await tx.booking.updateMany({
+        where: {
+          id: payment.bookingId,
+          status: { in: ["RESERVED", "CONFIRMED"] },
+        },
+        data: {
+          amountPaid: newAmountPaid,
+          amountDue: newAmountDue,
+          paymentStatus: "REFUNDED",
           status: "CANCELLED",
           cancelledAt: new Date(),
+          cancelledBy: adminId,
           cancellationReason: reason || "Refunded by admin",
-        }),
-      },
-    });
-
-    // 5. Free up trip capacity on full refund.
-    //    filledSpots is decremented for CONFIRMED (FULL/BALANCE paid) AND RESERVED (TOKEN paid)
-    //    bookings, because both states hold a spot per the availability rule.
-    if (isBookingFullyRefunded && (booking.status === "CONFIRMED" || booking.status === "RESERVED")) {
-      if (booking.slotId) {
-        const currentSlot = await tx.slot.findUnique({ where: { id: booking.slotId }, select: { filledSpots: true } });
-        const safeDecrement = Math.min(booking.numberOfTravelers, currentSlot?.filledSpots ?? 0);
-        if (safeDecrement > 0) {
-          await tx.slot.update({
-            where: { id: booking.slotId },
-            data: { filledSpots: { decrement: safeDecrement } },
-          });
-        }
+        },
+      });
+      if (cancelled.count) {
+        await releaseBookingSlotCapacity(tx, booking);
+        await cancelBookingOperations(tx, booking.id);
+        await tx.paymentIntent.updateMany({
+          where: { bookingId: booking.id, status: "CREATED" },
+          data: { status: "CANCELLED" },
+        });
+        await tx.bookingAddOn.updateMany({
+          where: { bookingId: booking.id, status: "PENDING" },
+          data: { status: "CANCELLED" },
+        });
+        await tx.bookingAddOn.updateMany({
+          where: { bookingId: booking.id, status: "PAID" },
+          data: { status: "REFUNDED" },
+        });
+      } else {
+        await tx.booking.update({
+          where: { id: payment.bookingId },
+          data: {
+            amountPaid: newAmountPaid,
+            amountDue: newAmountDue,
+            paymentStatus: "REFUNDED",
+          },
+        });
       }
+    } else {
+      await tx.booking.update({
+        where: { id: payment.bookingId },
+        data: {
+          amountPaid: newAmountPaid,
+          amountDue: newAmountDue,
+          paymentStatus: "PARTIALLY_REFUNDED",
+        },
+      });
     }
 
     return record;
@@ -1008,9 +1060,16 @@ export const sendBalanceReminder = async (bookingId, adminId) => {
 export const manualAdjustment = async (bookingId, amount, notes, adminId) => {
   const booking = await bookingRepo.getBookingById(bookingId);
   if (!booking) throw new NotFoundError("Booking not found");
+  if (!['PENDING', 'RESERVED'].includes(booking.status)) {
+    throw new ValidationError("Manual payments can only be recorded for pending or reserved bookings.");
+  }
 
   const adjustAmount = toDecimal2(Number(amount));
   if (adjustAmount <= 0) throw new ValidationError("Adjustment amount must be positive.");
+  const remaining = toDecimal2(Math.max(0, Number(booking.totalAmount) - Number(booking.amountPaid)));
+  if (adjustAmount > remaining) {
+    throw new ValidationError(`Adjustment amount exceeds the outstanding balance of Rs.${remaining}.`);
+  }
 
   const idempotencyKey = `manual-${bookingId}-${Date.now()}-${adminId}`;
 
@@ -1019,7 +1078,9 @@ export const manualAdjustment = async (bookingId, amount, notes, adminId) => {
     const pmt = await tx.payment.create({
       data: {
         bookingId,
-        type: "FULL",
+        type: booking.status === "PENDING"
+          ? (adjustAmount === remaining ? "FULL" : "TOKEN")
+          : "BALANCE",
         status: "SUCCESS",
         amount: adjustAmount,
         currency: "INR",
@@ -1033,19 +1094,52 @@ export const manualAdjustment = async (bookingId, amount, notes, adminId) => {
     const newAmountPaid = toDecimal2(Number(booking.amountPaid) + adjustAmount);
     const newAmountDue = Math.max(0, toDecimal2(Number(booking.totalAmount) - newAmountPaid));
 
-    await tx.booking.update({
-      where: { id: bookingId },
+    const movedBooking = await tx.booking.updateMany({
+      where: {
+        id: bookingId,
+        status: booking.status,
+        paymentStatus: booking.paymentStatus,
+      },
       data: {
         amountPaid: newAmountPaid,
         amountDue: newAmountDue,
         paymentStatus: newAmountDue === 0 ? "PAID" : "PARTIALLY_PAID",
-        status: newAmountDue === 0 ? "CONFIRMED" : booking.status,
+        status: newAmountDue === 0 ? "CONFIRMED" : "RESERVED",
+        ...(booking.status === "PENDING" && newAmountDue > 0 && { reservedAt: new Date() }),
         ...(newAmountDue === 0 && { confirmedAt: new Date() }),
+      },
+    });
+    if (!movedBooking.count) throw new ValidationError("This booking changed before the payment could be recorded.");
+    if (booking.status === "PENDING") await reserveBookingSlotCapacity(tx, booking);
+
+    await tx.ledgerEntry.create({
+      data: {
+        type: "INCOME",
+        scope: "BOOKING",
+        bookingId,
+        paymentId: pmt.id,
+        source: "MANUAL",
+        category: "Manual payment",
+        amount: adjustAmount,
+        description: notes?.trim() || "Manual payment recorded by admin",
+        isAutoGenerated: true,
+        createdById: adminId,
       },
     });
 
     return pmt;
   });
+
+  const currentBooking = await repo.getBookingForPaymentEmail(bookingId);
+  if (currentBooking?.user?.email) {
+    await sendPaymentConfirmationEmail({
+      booking: currentBooking,
+      intent: { type: payment.type, razorpayOrderId: payment.razorpayOrderId, amount: payment.amount },
+      payment,
+      fallbackPaymentId: null,
+      fallbackPaymentMethod: "OFFLINE",
+    }).catch((error) => console.error(`[Email] Manual payment receipt failed for ${payment.id}:`, error));
+  }
 
   return payment;
 };
@@ -1075,6 +1169,8 @@ export const submitUpiUtrPayment = async (userId, data) => {
   if (numAmount <= 0) {
     throw new ValidationError("Payment amount must be greater than zero.");
   }
+  const paymentType = type || (booking.status === "RESERVED" ? "BALANCE" : booking.initialPaymentType);
+  assertExpectedBookingPayment(booking, paymentType, numAmount);
 
   const existingPending = await prisma.payment.findFirst({
     where: {
@@ -1082,29 +1178,24 @@ export const submitUpiUtrPayment = async (userId, data) => {
       status: "PENDING_VERIFICATION",
     },
   });
-
-  const paymentType = type || (Number(booking.amountPaid) === 0 ? (numAmount >= Number(booking.totalAmount) ? "FULL" : "TOKEN") : "BALANCE");
+  const duplicateUtr = await prisma.payment.findFirst({
+    where: {
+      utr: cleanUtr,
+      status: { in: ["PENDING_VERIFICATION", "SUCCESS"] },
+      ...(existingPending ? { id: { not: existingPending.id } } : {}),
+    },
+  });
+  if (duplicateUtr) {
+    throw new ValidationError("This UTR has already been submitted for another payment.");
+  }
 
   if (existingPending) {
-    const updated = await prisma.payment.update({
-      where: { id: existingPending.id },
-      data: {
-        amount: numAmount,
-        type: paymentType,
-        utr: cleanUtr,
-        paymentMethod: "UPI_QR",
-        updatedAt: new Date(),
-        notes: { upi: true, utrSubmittedAt: new Date(), updatedUtr: cleanUtr },
-      },
-      include: {
-        booking: {
-          include: {
-            user: { include: { profile: true } },
-          },
-        },
-      },
-    });
-    return updated;
+    if (
+      existingPending.utr === cleanUtr &&
+      existingPending.type === paymentType &&
+      moneyEquals(existingPending.amount, numAmount)
+    ) return existingPending;
+    throw new ValidationError("A UPI payment is already awaiting verification for this booking.");
   }
 
   const payment = await prisma.payment.create({
@@ -1157,15 +1248,20 @@ export const verifyUpiPayment = async (adminId, paymentId, action, reason) => {
   if (!payment) {
     throw new NotFoundError("Payment transaction not found.");
   }
+  if (payment.status !== "PENDING_VERIFICATION") {
+    throw new ValidationError("This UPI payment has already been reviewed.");
+  }
 
   const booking = payment.booking;
 
   if (action === "REJECT") {
     const failureReason = String(reason || "Rejected by admin verification").trim();
-    const updated = await prisma.payment.update({
-      where: { id: paymentId },
+    const rejected = await prisma.payment.updateMany({
+      where: { id: paymentId, status: "PENDING_VERIFICATION" },
       data: { status: "FAILED", failureReason },
     });
+    if (!rejected.count) throw new ValidationError("This UPI payment has already been reviewed.");
+    const updated = await prisma.payment.findUnique({ where: { id: paymentId } });
 
     if (booking.user?.email) {
       const journey = getBookingJourney(booking);
@@ -1190,53 +1286,36 @@ export const verifyUpiPayment = async (adminId, paymentId, action, reason) => {
 
   // VERIFY action
   const amount = Number(payment.amount);
+  assertExpectedBookingPayment(booking, payment.type, amount);
 
   const result = await prisma.$transaction(async (tx) => {
-    const updatedPayment = await tx.payment.update({
-      where: { id: paymentId },
+    const verifiedPayment = await tx.payment.updateMany({
+      where: { id: paymentId, status: "PENDING_VERIFICATION" },
       data: {
         status: "SUCCESS",
         paidAt: new Date(),
       },
     });
+    if (!verifiedPayment.count) throw new ValidationError("This UPI payment has already been reviewed.");
 
-    const newPaid = toDecimal2(Number(booking.amountPaid) + amount);
-    const newDue = toDecimal2(Math.max(0, Number(booking.totalAmount) - newPaid));
+    const isInitialPayment = payment.type === "TOKEN" || payment.type === "FULL";
+    const bookingWhere = isInitialPayment
+      ? { id: booking.id, status: "PENDING", paymentStatus: { in: ["PENDING", "FAILED"] } }
+      : { id: booking.id, status: "RESERVED", paymentStatus: "PARTIALLY_PAID" };
+    const bookingUpdate = payment.type === "TOKEN"
+      ? { status: "RESERVED", paymentStatus: "PARTIALLY_PAID", amountPaid: { increment: amount }, reservedAt: new Date() }
+      : { status: "CONFIRMED", paymentStatus: "PAID", amountPaid: { increment: amount }, amountDue: 0, confirmedAt: new Date() };
+    const movedBooking = await tx.booking.updateMany({ where: bookingWhere, data: bookingUpdate });
+    if (!movedBooking.count) throw new ValidationError("This booking is no longer eligible for this payment.");
 
-    const updatedBooking = await tx.booking.update({
+    if (isInitialPayment) await reserveBookingSlotCapacity(tx, booking);
+    const updatedBooking = await tx.booking.findUnique({
       where: { id: booking.id },
-      data: {
-        amountPaid: newPaid,
-        amountDue: newDue,
-        paymentStatus: newDue === 0 ? "PAID" : "PARTIALLY_PAID",
-        status: newDue === 0 ? "CONFIRMED" : "RESERVED",
-        confirmedAt: newDue === 0 ? (booking.confirmedAt || new Date()) : booking.confirmedAt,
-        reservedAt: booking.reservedAt || new Date(),
-      },
       include: { user: { include: { profile: true } } },
     });
+    const updatedPayment = await tx.payment.findUnique({ where: { id: paymentId } });
 
-    if (payment.type === "TOKEN" || payment.type === "FULL") {
-      if (booking.slotId) {
-        const maxFilled = Number(booking.slot?.capacity) - booking.numberOfTravelers;
-        if (Number.isFinite(maxFilled)) {
-          await tx.slot.updateMany({
-            where: { id: booking.slotId, filledSpots: { lte: maxFilled } },
-            data: { filledSpots: { increment: booking.numberOfTravelers } },
-          });
-        }
-      } else if (booking.crmTripSlotId) {
-        const maxFilled = Number(booking.crmTripSlot?.capacity) - booking.numberOfTravelers;
-        if (Number.isFinite(maxFilled)) {
-          await tx.crmTripSlot.updateMany({
-            where: { id: booking.crmTripSlotId, filledSpots: { lte: maxFilled } },
-            data: { filledSpots: { increment: booking.numberOfTravelers } },
-          });
-        }
-      }
-    }
-
-    if (newDue === 0 || payment.type === "FULL" || payment.type === "BALANCE") {
+    if (payment.type === "FULL" || payment.type === "BALANCE") {
       await tx.bookingAddOn.updateMany({
         where: { bookingId: booking.id, status: "PENDING" },
         data: { status: "PAID", purchasedAt: new Date() },
@@ -1259,18 +1338,6 @@ export const verifyUpiPayment = async (adminId, paymentId, action, reason) => {
     });
 
     return { booking: updatedBooking, payment: updatedPayment };
-  });
-
-  import("../operations/operations.service.js").then((opsService) => {
-    if (booking.crmTripId && booking.crmTripSlot) {
-      opsService.generateCrmBookingOperations(result.booking, booking.crmTripSlot).catch(
-        (err) => console.error("[OpsGen] Failed to generate operations for UTR CRM booking", booking.id, err)
-      );
-    } else if (booking.slot) {
-      opsService.generateBookingOperations(result.booking, booking.slot, []).catch(
-        (err) => console.error("[OpsGen] Failed to generate operations for UTR booking", booking.id, err)
-      );
-    }
   });
 
   const journey = getBookingJourney(booking);

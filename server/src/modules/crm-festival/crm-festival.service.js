@@ -359,6 +359,32 @@ export const listFestivals = async (query) => {
 
 
 
+const normalizeStayTransportImages = (arr) => {
+  if (!arr) return [];
+  let list = arr;
+  if (typeof list === "string") {
+    try { list = JSON.parse(list); } catch { list = []; }
+  }
+  if (!Array.isArray(list)) return [];
+  return list.map((item) => {
+    if (!item) return null;
+    if (typeof item === "string") return { text: "", imageUrl: item.trim() };
+    if (typeof item === "object") {
+      let textVal = item.text;
+      let imageUrlVal = item.imageUrl || "";
+      while (textVal && typeof textVal === "object") {
+        if (textVal.imageUrl && !imageUrlVal) imageUrlVal = textVal.imageUrl;
+        textVal = textVal.text;
+      }
+      const textStr = typeof textVal === "string" ? textVal.trim() : "";
+      const imageStr = typeof imageUrlVal === "string" ? imageUrlVal.trim() : "";
+      if (!textStr && !imageStr) return null;
+      return { text: textStr, imageUrl: imageStr };
+    }
+    return { text: String(item).trim(), imageUrl: "" };
+  }).filter(Boolean);
+};
+
 const toPublicFestival = (festival) => {
   if (!festival) return null;
   const packages = (festival.packages || []).map((pkg) => ({
@@ -375,7 +401,7 @@ const toPublicFestival = (festival) => {
     location: festival.destination?.name || "",
     duration: festival.numberOfNights + 1,
     bannerImages: festival.websiteBannerImages || [],
-    stayTransportImages: festival.websiteStayTransportImages || [],
+    stayTransportImages: normalizeStayTransportImages(festival.websiteStayTransportImages),
     overview: festival.websiteOverview || "",
     highlights: normalizeHighlights(festival.websiteHighlights),
     bestTimeToVisit: festival.bestTimeToVisit || "",
@@ -482,7 +508,7 @@ export const createFestival = async (data) => {
         websiteOverview: data.websiteOverview || null,
         websiteFaqs: data.websiteFaqs,
         websiteBannerImages: data.websiteBannerImages,
-        websiteStayTransportImages: data.websiteStayTransportImages,
+        websiteStayTransportImages: normalizeStayTransportImages(data.websiteStayTransportImages),
         websiteHighlights: normalizeHighlights(data.websiteHighlights),
         websiteVideoUrl: data.websiteVideoUrl || null,
         websiteTags: data.websiteTagIds?.length
@@ -620,6 +646,9 @@ export const updateFestival = async (id, changes) => {
     }
     if (updateData.websiteHighlights) {
       updateData.websiteHighlights = normalizeHighlights(updateData.websiteHighlights);
+    }
+    if (updateData.websiteStayTransportImages) {
+      updateData.websiteStayTransportImages = normalizeStayTransportImages(updateData.websiteStayTransportImages);
     }
 
     if (changes.websiteTagIds !== undefined) {

@@ -424,7 +424,7 @@ model CrmTrip {
   websiteFaqs                Json                     @default("[]")
   websiteTags                TripTag[]                @relation("CrmTripToTripTag")
   websiteBannerImages        String[]                 @default([])
-  websiteStayTransportImages String[]                 @default([])
+  websiteStayTransportImages Json                     @default("[]")
   websiteHighlights          Json                     @default("[]")
   createdAt                  DateTime                 @default(now())
   updatedAt                  DateTime                 @updatedAt
@@ -578,7 +578,7 @@ model CrmFestival {
   websiteFaqs                Json                         @default("[]")
   websiteTags                FestivalTag[]                @relation("CrmFestivalToFestivalTag")
   websiteBannerImages        String[]                     @default([])
-  websiteStayTransportImages String[]                     @default([])
+  websiteStayTransportImages Json                         @default("[]")
   websiteHighlights          Json                         @default("[]")
   websiteVideoUrl            String?
   createdAt                  DateTime                     @default(now())

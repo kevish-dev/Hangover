@@ -6,16 +6,31 @@ import { IndianRupee, AlertCircle, Ban, RefreshCcw } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import AdminVerifyPaymentModal from "./AdminVerifyPaymentModal";
 
-export function BookingPaymentsTab({ bookingId, booking }: { bookingId: string; booking: any }) {
+export function BookingPaymentsTab({
+  bookingId,
+  booking,
+  onPaymentChange,
+}: {
+  bookingId: string;
+  booking: any;
+  onPaymentChange?: () => void;
+}) {
   const queryClient = useQueryClient();
   const [refundingPayment, setRefundingPayment] = useState<any>(null);
+  const [verifyingPayment, setVerifyingPayment] = useState<any>(null);
   const [refundAmount, setRefundAmount] = useState("");
   const [refundReason, setRefundReason] = useState("");
   
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelRefundAmount, setCancelRefundAmount] = useState("");
+
+  const refreshBooking = () => {
+    queryClient.invalidateQueries({ queryKey: ["admin", "booking", bookingId] });
+    onPaymentChange?.();
+  };
 
   const refundMutation = useMutation({
     mutationFn: async ({ paymentId, amount, reason }: { paymentId: string, amount: number, reason: string }) => {
@@ -27,7 +42,7 @@ export function BookingPaymentsTab({ bookingId, booking }: { bookingId: string; 
       setRefundingPayment(null);
       setRefundAmount("");
       setRefundReason("");
-      queryClient.invalidateQueries({ queryKey: ["admin", "booking", bookingId] });
+      refreshBooking();
     },
     onError: (err: any) => {
       toast.error(err.response?.data?.error || "Failed to issue refund");
@@ -44,7 +59,7 @@ export function BookingPaymentsTab({ bookingId, booking }: { bookingId: string; 
       setIsCancelling(false);
       setCancelReason("");
       setCancelRefundAmount("");
-      queryClient.invalidateQueries({ queryKey: ["admin", "booking", bookingId] });
+      refreshBooking();
     },
     onError: (err: any) => {
       toast.error(err.response?.data?.error || "Failed to cancel booking");
@@ -162,7 +177,16 @@ export function BookingPaymentsTab({ bookingId, booking }: { bookingId: string; 
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {(p.status === "SUCCESS" || p.status === "PARTIAL_REFUND") ? (
+                        {p.status === "PENDING_VERIFICATION" ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 border-amber-300 text-xs font-semibold text-amber-800 hover:bg-amber-50"
+                            onClick={() => setVerifyingPayment(p)}
+                          >
+                            Verify UTR
+                          </Button>
+                        ) : (p.status === "SUCCESS" || p.status === "PARTIAL_REFUND") ? (
                           <Button 
                             variant="outline" 
                             size="sm" 
@@ -231,6 +255,24 @@ export function BookingPaymentsTab({ bookingId, booking }: { bookingId: string; 
             </form>
           </div>
         </div>
+      )}
+
+      {verifyingPayment && (
+        <AdminVerifyPaymentModal
+          payment={{
+            ...verifyingPayment,
+            bookingId,
+            booking: {
+              bookingReference: booking.bookingReference,
+              user: booking.user,
+            },
+          }}
+          onClose={() => setVerifyingPayment(null)}
+          onSuccess={() => {
+            setVerifyingPayment(null);
+            refreshBooking();
+          }}
+        />
       )}
     </div>
   );

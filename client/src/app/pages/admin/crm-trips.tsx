@@ -37,6 +37,7 @@ import { useNavigate } from "react-router";
 
 type Destination = { id: string; name: string };
 type CrmTrip = {
+  tokenAmount: string;
   id: string;
   name: string;
   numberOfNights: number;
@@ -505,6 +506,7 @@ function CreateTripDialog({
   const [websiteFaqs, setWebsiteFaqs] = useState<{ question: string; answer: string }[]>([]);
   const [websiteTagIds, setWebsiteTagIds] = useState<string[]>(trip?.websiteTags?.map((t: any) => t.id) || []);
   const [newWebsiteTag, setNewWebsiteTag] = useState("");
+  const queryClient = useQueryClient();
 
   const tagsQuery = useQuery({
     queryKey: ["trip-tags"],
@@ -563,7 +565,8 @@ function CreateTripDialog({
   const [slots, setSlots] = useState<{ id?: string; startDate: string; endDate: string; capacity: string; title: string; priority: string; bookedCount?: number }[]>([{ startDate: "", endDate: "", capacity: "", title: "", priority: "0" }]);
   const [operationsReminderDays, setOperationsReminderDays] = useState("3");
   const [websiteBannerImages, setWebsiteBannerImages] = useState<string[]>([]);
-  const [websiteStayTransportImages, setWebsiteStayTransportImages] = useState<string[]>([]);
+  const [websiteStayTransportImages, setWebsiteStayTransportImages] = useState<WebsiteHighlightDraft[]>([]);
+  const [uploadingStayTransportIndex, setUploadingStayTransportIndex] = useState<number | null>(null);
   const [websiteHighlights, setWebsiteHighlights] = useState<WebsiteHighlightDraft[]>([]);
   const [localDrafts, setLocalDrafts] = useState<LocalCrmTripDraft[]>([]);
   const [draftsOpen, setDraftsOpen] = useState(false);
@@ -590,8 +593,6 @@ function CreateTripDialog({
     setPackages([{ title: "Standard", price: "", tokenAmount: "" }]);
     setAddOns([]);
     setUploadingAddOnIndex(null);
-    setPickup(false);
-    setDrop(false);
     setTripType("");
     setBestTimeToVisit("");
     setIsPublished(false);
@@ -637,6 +638,29 @@ function CreateTripDialog({
     setLocalDrafts(drafts.filter((draft) => draft.scope === draftScope).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
   };
 
+  const parseMediaItems = (raw: any): WebsiteHighlightDraft[] => {
+    if (!raw) return [];
+    let list = raw;
+    if (typeof list === "string") {
+      try { list = JSON.parse(list); } catch { list = []; }
+    }
+    if (!Array.isArray(list)) return [];
+    return list.map((h: any) => {
+      if (!h) return { text: "", imageUrl: "" };
+      if (typeof h === "string") return { text: h, imageUrl: "" };
+      let textVal = h?.text;
+      let imageVal = h?.imageUrl || "";
+      while (textVal && typeof textVal === "object") {
+        if (textVal.imageUrl && !imageVal) imageVal = textVal.imageUrl;
+        textVal = textVal.text;
+      }
+      return {
+        text: typeof textVal === "string" ? textVal : "",
+        imageUrl: typeof imageVal === "string" ? imageVal : "",
+      };
+    });
+  };
+
   const applyLocalDraft = (draft: Record<string, any>) => {
     try {
       setStep(Math.min(7, Math.max(1, Number(draft.step) || 1)));
@@ -646,7 +670,9 @@ function CreateTripDialog({
       setTripType(draft.tripType || ""); setBestTimeToVisit(draft.bestTimeToVisit || ""); setIsPublished(Boolean(draft.isPublished)); setIsFeatured(Boolean(draft.isFeatured)); setIsListed(draft.isListed ?? true); setIsActive(draft.isActive ?? true); setCustomInclusions(Array.isArray(draft.customInclusions) ? draft.customInclusions : []); setCustomExclusions(Array.isArray(draft.customExclusions) ? draft.customExclusions : []);
       setWebsiteOverview(draft.websiteOverview || ""); setWebsiteFaqs(Array.isArray(draft.websiteFaqs) ? draft.websiteFaqs : []); setWebsiteTagIds(Array.isArray(draft.websiteTagIds) ? draft.websiteTagIds : []);
       setSlots(Array.isArray(draft.slots) && draft.slots.length ? draft.slots : [{ startDate: "", endDate: "", capacity: "", title: "", priority: "0" }]); setOperationsReminderDays(String(draft.operationsReminderDays ?? 3));
-      setWebsiteBannerImages(Array.isArray(draft.websiteBannerImages) ? draft.websiteBannerImages : []); setWebsiteStayTransportImages(Array.isArray(draft.websiteStayTransportImages) ? draft.websiteStayTransportImages : []); setWebsiteHighlights(Array.isArray(draft.websiteHighlights) ? draft.websiteHighlights : []);
+      setWebsiteBannerImages(Array.isArray(draft.websiteBannerImages) ? draft.websiteBannerImages : []);
+      setWebsiteStayTransportImages(parseMediaItems(draft.websiteStayTransportImages));
+      setWebsiteHighlights(parseMediaItems(draft.websiteHighlights));
       setDraftsOpen(false);
       toast.success("Draft restored");
     } catch { toast.error("This draft could not be restored"); }
@@ -737,23 +763,8 @@ function CreateTripDialog({
     setSlots(sourceTrip.slots?.length ? sourceTrip.slots.map((s) => ({ ...(isFork ? {} : { id: s.id }), startDate: s.startDate ? s.startDate.split('T')[0] : "", endDate: s.endDate ? s.endDate.split('T')[0] : "", capacity: String(s.capacity), title: s.title || "", priority: String(s.priority), ...(isFork ? {} : { bookedCount: s._count?.bookings || 0 }) })) : [{ startDate: "", endDate: "", capacity: "", title: "", priority: "0" }]);
     setOperationsReminderDays(String(sourceTrip.operationsReminderDays ?? 3));
     setWebsiteBannerImages(sourceTrip.websiteBannerImages || []);
-    setWebsiteStayTransportImages(sourceTrip.websiteStayTransportImages || []);
-    setWebsiteHighlights(
-      ((sourceTrip.websiteHighlights as any) || []).map((h: any) => {
-        if (!h) return { text: "", imageUrl: "" };
-        if (typeof h === "string") return { text: h, imageUrl: "" };
-        let textVal = h?.text;
-        let imageVal = h?.imageUrl || "";
-        while (textVal && typeof textVal === "object") {
-          if (textVal.imageUrl && !imageVal) imageVal = textVal.imageUrl;
-          textVal = textVal.text;
-        }
-        return {
-          text: typeof textVal === "string" ? textVal : "",
-          imageUrl: typeof imageVal === "string" ? imageVal : "",
-        };
-      })
-    );
+    setWebsiteStayTransportImages(parseMediaItems(sourceTrip.websiteStayTransportImages));
+    setWebsiteHighlights(parseMediaItems(sourceTrip.websiteHighlights));
   }, [open, sourceTrip, isFork]);
 
   useEffect(() => {
@@ -872,6 +883,22 @@ function CreateTripDialog({
     }
   };
 
+  const uploadStayTransportImage = async (index: number, file?: File) => {
+    if (!file) return;
+    setUploadingStayTransportIndex(index);
+    try {
+      const imageUrl = await uploadGenericImageDirect(file);
+      const next = [...websiteStayTransportImages];
+      next[index] = { ...next[index], imageUrl };
+      setWebsiteStayTransportImages(next);
+      toast.success("Stay/transport image uploaded");
+    } catch (error: any) {
+      toast.error(error?.message || "Could not upload the image");
+    } finally {
+      setUploadingStayTransportIndex(null);
+    }
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const action = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("value");
@@ -948,32 +975,6 @@ function CreateTripDialog({
       );
       return;
     }
-    const expectedDays = Number(nights) + 1;
-    const filledSlots = slots.filter((slot) => slot.startDate || slot.endDate || (slot.capacity && Number(slot.capacity) > 0));
-    const invalidSlots = filledSlots.some((slot) => {
-      if (!slot.startDate || !slot.endDate || !Number.isInteger(Number(slot.capacity)) || Number(slot.capacity) < 1) return true;
-      const start = new Date(slot.startDate.includes("T") ? slot.startDate : `${slot.startDate}T00:00:00Z`);
-      const end = new Date(slot.endDate.includes("T") ? slot.endDate : `${slot.endDate}T00:00:00Z`);
-      if (isNaN(start.getTime()) || isNaN(end.getTime())) return true;
-      return Math.round((end.getTime() - start.getTime()) / 86400000) + 1 !== expectedDays;
-    });
-
-    if (invalidSlots) {
-      const validationMessage = `Each departure must span exactly ${expectedDays} calendar days (for example, ${Number(nights)} night${Number(nights) === 1 ? "" : "s"} needs ${expectedDays} dates).`;
-      setPricingError(validationMessage);
-      toast.error(validationMessage);
-      return;
-    }
-
-    if (!trip && filledSlots.length === 0) {
-      toast.error("Add at least one dated departure slot to create the trip.");
-      return;
-    }
-
-    if (!Number.isInteger(Number(operationsReminderDays)) || Number(operationsReminderDays) < 0) {
-      toast.error("Reminder days must be a whole number of zero or more.");
-      return;
-    }
 
     if (step === 3 && action === "continue") {
       if (customInclusions.length === 0) {
@@ -1002,6 +1003,40 @@ function CreateTripDialog({
       return;
     }
 
+    const expectedDays = Number(nights) + 1;
+    const filledSlots = slots.filter((slot) => slot.startDate || slot.endDate || (slot.capacity && Number(slot.capacity) > 0));
+    const invalidSlots = filledSlots.some((slot) => {
+      if (
+        !slot.startDate ||
+        !slot.endDate ||
+        !Number.isInteger(Number(slot.capacity)) ||
+        Number(slot.capacity) < 1 ||
+        !Number.isInteger(Number(slot.priority)) ||
+        Number(slot.priority) < 0
+      ) return true;
+      const start = new Date(slot.startDate.includes("T") ? slot.startDate : `${slot.startDate}T00:00:00Z`);
+      const end = new Date(slot.endDate.includes("T") ? slot.endDate : `${slot.endDate}T00:00:00Z`);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return true;
+      return Math.round((end.getTime() - start.getTime()) / 86400000) + 1 !== expectedDays;
+    });
+
+    if (invalidSlots) {
+      const validationMessage = `Each departure needs a capacity of at least 1, a whole-number priority of zero or more, and must span exactly ${expectedDays} calendar days (for example, ${Number(nights)} night${Number(nights) === 1 ? "" : "s"} needs ${expectedDays} dates).`;
+      setPricingError(validationMessage);
+      toast.error(validationMessage);
+      return;
+    }
+
+    if (!trip && filledSlots.length === 0) {
+      toast.error("Add at least one dated departure slot to create the trip.");
+      return;
+    }
+
+    if (!Number.isInteger(Number(operationsReminderDays)) || Number(operationsReminderDays) < 0) {
+      toast.error("Reminder days must be a whole number of zero or more.");
+      return;
+    }
+
     if (action === "continue" && step >= 4 && step < 6) {
       setStep(step + 1);
       return;
@@ -1018,7 +1053,7 @@ function CreateTripDialog({
           endDate: new Date(endStr).toISOString(),
           capacity: Number(s.capacity),
           title: s.title?.trim() || null,
-          priority: Number(s.priority) || 0,
+          priority: Number(s.priority),
         };
       });
 
@@ -1059,7 +1094,9 @@ function CreateTripDialog({
         operationsReminderDays: Number(operationsReminderDays),
         ...(formattedSlots.length > 0 ? { slots: formattedSlots } : {}),
         websiteBannerImages,
-        websiteStayTransportImages,
+        websiteStayTransportImages: websiteStayTransportImages
+          .filter((h) => h && ((h.text && h.text.trim()) || (h.imageUrl && h.imageUrl.trim())))
+          .map((h) => ({ text: (h.text || "").trim(), imageUrl: (h.imageUrl || "").trim() })),
         websiteHighlights: websiteHighlights
           .filter((h) => h && typeof h.text === "string" && h.text.trim())
           .map((h) => ({ text: h.text.trim(), imageUrl: (h.imageUrl || "").trim() })),
@@ -1375,8 +1412,9 @@ function CreateTripDialog({
                         <label className="space-y-1.5"><span className="text-sm font-medium">Start date<RequiredMark /></span><Input disabled={Boolean(slot.bookedCount)} type="date" value={slot.startDate} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, startDate: e.target.value, endDate: endDateForTrip(e.target.value) } : item))} /></label>
                         <label className="space-y-1.5"><span className="text-sm font-medium">End date<RequiredMark /> <span className="text-xs font-normal text-gray-400">(auto-calculated)</span></span><Input min={slot.startDate || undefined} disabled={Boolean(slot.bookedCount)} type="date" value={slot.endDate} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, endDate: e.target.value } : item))} /></label>
                       </div>
-                      <div className="grid gap-4 sm:grid-cols-[150px_minmax(0,1fr)_auto] sm:items-end">
+                      <div className="grid gap-4 sm:grid-cols-[150px_150px_minmax(0,1fr)_auto] sm:items-end">
                         <label className="space-y-1.5"><span className="text-sm font-medium">Capacity<RequiredMark /></span><Input min="1" type="number" value={slot.capacity} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, capacity: e.target.value } : item))} /></label>
+                        <label className="space-y-1.5"><span className="text-sm font-medium">Priority <span className="text-xs font-normal text-gray-400">(higher first)</span></span><Input min="0" step="1" type="number" value={slot.priority} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, priority: e.target.value } : item))} /></label>
                         <label className="space-y-1.5"><span className="text-sm font-medium">Departure name <span className="text-gray-400">(optional)</span></span><Input value={slot.title} onChange={(e) => setSlots(slots.map((item, i) => i === index ? { ...item, title: e.target.value } : item))} placeholder="e.g. August batch" /></label>
                         <Button type="button" variant="outline" disabled={Boolean(slot.bookedCount) || slots.length === 1} className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setSlots(slots.filter((_, i) => i !== index))}><Trash2 className="mr-1.5 h-4 w-4" />Remove</Button>
                       </div>
@@ -1706,38 +1744,85 @@ function CreateTripDialog({
                 </div>
               </div>
 
-              <div className="space-y-3 pt-4">
+              <section className="space-y-3 pt-4 border-t">
                 <div className="flex items-center justify-between border-b pb-2">
                   <div>
-                    <h3 className="text-sm font-bold text-gray-900">Stay & Transport Images</h3>
-                    <p className="text-xs text-gray-500">Showcase property stays, vehicles, and journey comfort</p>
+                    <h3 className="text-sm font-bold text-gray-900">Stay & Transport Details</h3>
+                    <p className="text-xs text-gray-500">Showcase property stays, vehicles, and journey comfort with image and text</p>
                   </div>
-                  <label className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 px-3 cursor-pointer">
-                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Upload Image
-                    <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      try {
-                        toast.loading("Uploading...", { id: "upload-st" });
-                        const url = await uploadGenericImageDirect(file);
-                        setWebsiteStayTransportImages([...websiteStayTransportImages, url]);
-                        toast.success("Uploaded successfully", { id: "upload-st" });
-                      } catch (err: any) {
-                        toast.error("Upload failed", { id: "upload-st" });
-                      }
-                    }} />
-                  </label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => setWebsiteStayTransportImages([...websiteStayTransportImages, { text: "", imageUrl: "" }])}
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Add stay option
+                  </Button>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {websiteStayTransportImages.map((img, idx) => (
-                    <div key={idx} className="group relative aspect-video bg-gray-100 rounded-lg overflow-hidden border">
-                      <img src={img} alt="" className="w-full h-full object-cover" />
-                      <button type="button" onClick={() => setWebsiteStayTransportImages(websiteStayTransportImages.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow"><X className="h-3 w-3" /></button>
+                <div className="space-y-3">
+                  {websiteStayTransportImages.map((item, index) => (
+                    <div key={index} className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:flex-row sm:items-start">
+                      <div className="w-full shrink-0 sm:w-32">
+                        <span className="mb-1 block text-[10px] font-semibold text-gray-500">Image</span>
+                        {item.imageUrl ? (
+                          <div className="group relative aspect-video w-full overflow-hidden rounded-md border border-gray-200 bg-white">
+                            <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+                            <button
+                              type="button"
+                              aria-label="Remove image"
+                              onClick={() => {
+                                const next = [...websiteStayTransportImages];
+                                next[index].imageUrl = "";
+                                setWebsiteStayTransportImages(next);
+                              }}
+                              className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white shadow-sm"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className={`flex aspect-video w-full cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-gray-300 bg-white shadow-sm transition-colors hover:bg-gray-50 ${uploadingStayTransportIndex === index ? "cursor-not-allowed opacity-70" : ""}`}>
+                            {uploadingStayTransportIndex === index ? <Loader2 className="h-4 w-4 animate-spin text-gray-400" /> : <ImagePlus className="h-4 w-4 text-gray-400" />}
+                            <span className="mt-1 text-[10px] font-semibold text-gray-500">{uploadingStayTransportIndex === index ? "Uploading..." : "Upload image"}</span>
+                            <input type="file" className="hidden" accept="image/*" disabled={uploadingStayTransportIndex === index} onChange={(e) => uploadStayTransportImage(index, e.target.files?.[0])} />
+                          </label>
+                        )}
+                      </div>
+                      <div className="flex flex-1 items-end gap-2">
+                        <label className="flex-1 space-y-1">
+                          <span className="text-[10px] font-semibold text-gray-500">Stay / Transport Title & Location</span>
+                          <Input
+                            value={item.text}
+                            placeholder="e.g. Stay Option 1: LD Retreat, Tawang"
+                            onChange={(e) => {
+                              const next = [...websiteStayTransportImages];
+                              next[index].text = e.target.value;
+                              setWebsiteStayTransportImages(next);
+                            }}
+                            className="h-9 text-xs"
+                          />
+                        </label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 text-red-600 hover:bg-red-50"
+                          aria-label="Remove stay option"
+                          onClick={() => setWebsiteStayTransportImages(websiteStayTransportImages.filter((_, itemIndex) => itemIndex !== index))}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
-                  {websiteStayTransportImages.length === 0 && <div className="col-span-full py-8 text-center text-sm text-gray-400 border-2 border-dashed rounded-lg">No stay/transport images uploaded.</div>}
+                  {!websiteStayTransportImages.length && (
+                    <p className="rounded-lg border border-dashed border-gray-200 px-3 py-4 text-center text-xs text-gray-500">
+                      No stay or transport options added yet. Click &quot;Add stay option&quot; to include images and titles.
+                    </p>
+                  )}
                 </div>
-              </div>
+              </section>
             </div>
           )}
             </div>

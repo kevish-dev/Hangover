@@ -73,7 +73,7 @@ const syncDepartureSlots = async (tx, tripId, slots, numberOfNights) => {
       endDate: new Date(slot.endDate),
       capacity: slot.capacity,
       title: slot.title || null,
-      priority: slot.priority || 0,
+      priority: slot.priority,
     };
     if (!slot.id) {
       await tx.crmTripSlot.create({ data: { ...data, crmTripId: tripId } });
@@ -348,6 +348,32 @@ export const normalizeHighlightItem = (h) => {
   return { text: String(h).trim(), imageUrl: "" };
 };
 
+export const normalizeStayTransportImages = (arr) => {
+  if (!arr) return [];
+  let list = arr;
+  if (typeof list === "string") {
+    try { list = JSON.parse(list); } catch { list = []; }
+  }
+  if (!Array.isArray(list)) return [];
+  return list.map((item) => {
+    if (!item) return null;
+    if (typeof item === "string") return { text: "", imageUrl: item.trim() };
+    if (typeof item === "object") {
+      let textVal = item.text;
+      let imageUrlVal = item.imageUrl || "";
+      while (textVal && typeof textVal === "object") {
+        if (textVal.imageUrl && !imageUrlVal) imageUrlVal = textVal.imageUrl;
+        textVal = textVal.text;
+      }
+      const textStr = typeof textVal === "string" ? textVal.trim() : "";
+      const imageStr = typeof imageUrlVal === "string" ? imageUrlVal.trim() : "";
+      if (!textStr && !imageStr) return null;
+      return { text: textStr, imageUrl: imageStr };
+    }
+    return { text: String(item).trim(), imageUrl: "" };
+  }).filter(Boolean);
+};
+
 export const normalizeHighlights = (arr) => {
   if (!Array.isArray(arr)) return [];
   return arr.map(normalizeHighlightItem).filter(Boolean);
@@ -367,9 +393,7 @@ const toPublicTrip = (trip) => {
     highlights: normalizeHighlights(trip.websiteHighlights),
     inclusions: (trip.inclusions || []).map((item) => item.title),
     exclusions: trip.exclusions || [],
-    stayTransportImages: (trip.websiteStayTransportImages || []).map(
-      (imageUrl) => ({ text: "", imageUrl }),
-    ),
+    stayTransportImages: normalizeStayTransportImages(trip.websiteStayTransportImages),
     capacity: firstSlot?.capacity || 0,
     filledSpots: firstSlot?.filledSpots || 0,
     startDate: firstSlot?.startDate || null,
@@ -482,6 +506,9 @@ export const createTrip = async (data) => {
     if (tripData.websiteHighlights) {
       tripData.websiteHighlights = normalizeHighlights(tripData.websiteHighlights);
     }
+    if (tripData.websiteStayTransportImages) {
+      tripData.websiteStayTransportImages = normalizeStayTransportImages(tripData.websiteStayTransportImages);
+    }
     const created = await repository.create(
       {
         ...tripData,
@@ -585,6 +612,9 @@ export const updateTrip = async (id, changes) => {
   } = changes;
   if (tripChanges.websiteHighlights) {
     tripChanges.websiteHighlights = normalizeHighlights(tripChanges.websiteHighlights);
+  }
+  if (tripChanges.websiteStayTransportImages) {
+    tripChanges.websiteStayTransportImages = normalizeStayTransportImages(tripChanges.websiteStayTransportImages);
   }
   await prisma.$transaction(async (tx) => {
     const trip = await repository.findById(id, tx);
@@ -1058,7 +1088,7 @@ export const getOperationsCalendar = async (tripId, requestedSlotId) => {
       name: true,
       operationsReminderDays: true,
       slots: {
-        orderBy: { startDate: "asc" },
+        orderBy: [{ priority: "desc" }, { startDate: "asc" }],
         include: { _count: { select: { bookings: true } } },
       },
     },

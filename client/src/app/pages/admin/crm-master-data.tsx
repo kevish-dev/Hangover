@@ -27,7 +27,7 @@ export default function CrmMasterDataPage() {
   const queryClient = useQueryClient();
   const [destination, setDestination] = useState<Destination | null>(null);
   const [stay, setStay] = useState<Stay | null>(null);
-  const [tab, setTab] = useState<"property" | "place">("property");
+  const [tab, setTab] = useState<"place" | "property">("place");
   const [dialog, setDialog] = useState<{ kind: Kind; item?: any } | null>(null);
   const destinationsQuery = useQuery({ queryKey: ["crm", "destinations"], queryFn: async () => (await apiClient.get("/crm-destinations", { params: { limit: 200 } })).data.data as Destination[] });
   const staysQuery = useQuery({ queryKey: ["crm", "stays", destination?.id], queryFn: async () => (await apiClient.get("/stay-locations", { params: { destinationId: destination!.id, limit: 200 } })).data.data as Stay[], enabled: Boolean(destination) });
@@ -126,8 +126,8 @@ export default function CrmMasterDataPage() {
                         {legacy ? "Older places need to be moved to their real stay location." : item.description || "Open to manage the properties and places for this stay."}
                       </p>
                       <div className="mt-5 flex gap-2">
-                        <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">{item._count?.properties || 0} properties</span>
                         <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">{item._count?.places || 0} places</span>
+                        <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">{item._count?.properties || 0} properties</span>
                       </div>
                     </div>
                   </button>
@@ -163,8 +163,8 @@ export default function CrmMasterDataPage() {
         </Button>
       </header>
       <div className="flex gap-2 border-b border-gray-200">
-        <Tab active={tab === "property"} onClick={() => setTab("property")}>Properties</Tab>
         <Tab active={tab === "place"} onClick={() => setTab("place")}>Visiting places</Tab>
+        <Tab active={tab === "property"} onClick={() => setTab("property")}>Properties</Tab>
       </div>
       {currentLoading ? (
         <Loading label={tab === "property" ? "properties" : "visiting places"} />

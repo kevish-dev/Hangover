@@ -37,6 +37,14 @@ const setupDaySchema = z.object({
   commonInclusions: z.array(z.enum(["ILP_AND_PERMITS", "BBQ", "BONFIRE", "TRIP_GUIDE"])).max(4).default([]),
 });
 
+const stayTransportSchema = z.union([
+  z.object({
+    text: z.string().trim().max(500).optional().default(""),
+    imageUrl: z.string().trim().max(2000).optional().default(""),
+  }),
+  z.string().trim().max(2000),
+]);
+
 const highlightSchema = z.union([
   z.object({
     text: z.string().trim().min(1).max(500),
@@ -68,7 +76,7 @@ const crmFestivalFields = z.object({
   websiteFaqs: z.array(z.object({ question: z.string().trim().min(1).max(500), answer: z.string().trim().min(1).max(5000) })).max(100).default([]),
   websiteTagIds: z.array(z.string().uuid()).max(50).default([]),
   websiteBannerImages: z.array(z.string().trim().min(1).max(2000)).max(20).default([]),
-  websiteStayTransportImages: z.array(z.string().trim().min(1).max(2000)).max(20).default([]),
+  websiteStayTransportImages: z.array(stayTransportSchema).max(50).default([]),
   websiteHighlights: z.array(highlightSchema).max(50).default([]),
   websiteVideoUrl: z.string().trim().max(2000).nullable().optional(),
 });
@@ -98,7 +106,7 @@ export const updateCrmFestivalSchema = z.object({
   websiteFaqs: z.array(z.object({ question: z.string().trim().min(1).max(500), answer: z.string().trim().min(1).max(5000) })).max(100).optional(),
   websiteTagIds: z.array(z.string().uuid()).max(50).optional(),
   websiteBannerImages: z.array(z.string().trim().min(1).max(2000)).max(20).optional(),
-  websiteStayTransportImages: z.array(z.string().trim().min(1).max(2000)).max(20).optional(),
+  websiteStayTransportImages: z.array(stayTransportSchema).max(50).optional(),
   websiteHighlights: z.array(highlightSchema).max(50).optional(),
   websiteVideoUrl: z.string().trim().max(2000).nullable().optional(),
 }).refine(

@@ -425,7 +425,8 @@ function FestivalFormModal({
   const [websiteTagIds, setWebsiteTagIds] = useState<string[]>([]);
   const [newWebsiteTag, setNewWebsiteTag] = useState("");
   const [websiteBannerImages, setWebsiteBannerImages] = useState<string[]>([]);
-  const [websiteStayTransportImages, setWebsiteStayTransportImages] = useState<string[]>([]);
+  const [websiteStayTransportImages, setWebsiteStayTransportImages] = useState<WebsiteHighlightDraft[]>([]);
+  const [uploadingStayTransportIndex, setUploadingStayTransportIndex] = useState<number | null>(null);
   const [websiteHighlights, setWebsiteHighlights] = useState<WebsiteHighlightDraft[]>([]);
   const [websiteVideoUrl, setWebsiteVideoUrl] = useState("");
 
@@ -470,13 +471,14 @@ function FestivalFormModal({
       setCustomExclusions(festival.exclusions || []);
       setWebsiteOverview(festival.websiteOverview || "");
       setWebsiteFaqs(festival.websiteFaqs || []);
-      setWebsiteTagIds((festival.websiteTags || []).map((t) => t.id));
-      setWebsiteBannerImages(festival.websiteBannerImages || []);
-      setWebsiteStayTransportImages(festival.websiteStayTransportImages || []);
-      setWebsiteVideoUrl(festival.websiteVideoUrl || "");
-
-      setWebsiteHighlights(
-        ((festival.websiteHighlights as any) || []).map((h: any) => {
+      const parseMediaItems = (raw: any): WebsiteHighlightDraft[] => {
+        if (!raw) return [];
+        let list = raw;
+        if (typeof list === "string") {
+          try { list = JSON.parse(list); } catch { list = []; }
+        }
+        if (!Array.isArray(list)) return [];
+        return list.map((h: any) => {
           if (!h) return { text: "", imageUrl: "" };
           if (typeof h === "string") return { text: h, imageUrl: "" };
           let textVal = h?.text;
@@ -489,8 +491,13 @@ function FestivalFormModal({
             text: typeof textVal === "string" ? textVal : "",
             imageUrl: typeof imageVal === "string" ? imageVal : "",
           };
-        })
-      );
+        });
+      };
+
+      setWebsiteBannerImages(festival.websiteBannerImages || []);
+      setWebsiteStayTransportImages(parseMediaItems(festival.websiteStayTransportImages));
+      setWebsiteVideoUrl(festival.websiteVideoUrl || "");
+      setWebsiteHighlights(parseMediaItems(festival.websiteHighlights));
 
       setSlots((festival.slots || []).map((s) => ({
         id: isFork ? undefined : s.id,
@@ -525,8 +532,6 @@ function FestivalFormModal({
       setName("");
       setNights("3");
       setDestinationId(destinations[0]?.id || "");
-      setPickup(false);
-      setDrop(false);
       setTripType("");
       setBestTimeToVisit("");
       setIsPublished(false);
@@ -656,7 +661,9 @@ function FestivalFormModal({
       websiteFaqs,
       websiteTagIds,
       websiteBannerImages,
-      websiteStayTransportImages,
+      websiteStayTransportImages: websiteStayTransportImages
+        .filter((h) => h && ((h.text && h.text.trim()) || (h.imageUrl && h.imageUrl.trim())))
+        .map((h) => ({ text: (h.text || "").trim(), imageUrl: (h.imageUrl || "").trim() })),
       websiteHighlights,
       websiteVideoUrl: websiteVideoUrl.trim() || null,
     };
@@ -678,6 +685,23 @@ function FestivalFormModal({
       toast.error("Failed to upload image", { id: "hl-up" });
     } finally {
       setUploadingHighlightIndex(null);
+    }
+  };
+
+  const uploadStayTransportImage = async (index: number, file?: File) => {
+    if (!file) return;
+    try {
+      setUploadingStayTransportIndex(index);
+      toast.loading("Uploading image...", { id: "st-up" });
+      const url = await uploadGenericImageDirect(file);
+      const next = [...websiteStayTransportImages];
+      next[index].imageUrl = url;
+      setWebsiteStayTransportImages(next);
+      toast.success("Image uploaded", { id: "st-up" });
+    } catch (err: any) {
+      toast.error("Failed to upload image", { id: "st-up" });
+    } finally {
+      setUploadingStayTransportIndex(null);
     }
   };
 
@@ -961,6 +985,87 @@ function FestivalFormModal({
                       <button type="button" onClick={() => setWebsiteBannerImages(websiteBannerImages.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"><X className="h-3 w-3" /></button>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* Stay & Transport Options */}
+              <div className="space-y-3 border-t pt-4">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900">Stay & Transport Details</h3>
+                    <p className="text-xs text-gray-500">Showcase property stays, vehicles, and journey comfort with image and text</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => setWebsiteStayTransportImages([...websiteStayTransportImages, { text: "", imageUrl: "" }])}
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Add stay option
+                  </Button>
+                </div>
+                <div className="space-y-3">
+                  {websiteStayTransportImages.map((item, index) => (
+                    <div key={index} className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:flex-row sm:items-start">
+                      <div className="w-full shrink-0 sm:w-32">
+                        <span className="mb-1 block text-[10px] font-semibold text-gray-500">Image</span>
+                        {item.imageUrl ? (
+                          <div className="group relative aspect-video w-full overflow-hidden rounded-md border border-gray-200 bg-white">
+                            <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+                            <button
+                              type="button"
+                              aria-label="Remove image"
+                              onClick={() => {
+                                const next = [...websiteStayTransportImages];
+                                next[index].imageUrl = "";
+                                setWebsiteStayTransportImages(next);
+                              }}
+                              className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white shadow-sm"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className={`flex aspect-video w-full cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-gray-300 bg-white shadow-sm transition-colors hover:bg-gray-50 ${uploadingStayTransportIndex === index ? "cursor-not-allowed opacity-70" : ""}`}>
+                            {uploadingStayTransportIndex === index ? <Loader2 className="h-4 w-4 animate-spin text-gray-400" /> : <ImagePlus className="h-4 w-4 text-gray-400" />}
+                            <span className="mt-1 text-[10px] font-semibold text-gray-500">{uploadingStayTransportIndex === index ? "Uploading..." : "Upload image"}</span>
+                            <input type="file" className="hidden" accept="image/*" disabled={uploadingStayTransportIndex === index} onChange={(e) => uploadStayTransportImage(index, e.target.files?.[0])} />
+                          </label>
+                        )}
+                      </div>
+                      <div className="flex flex-1 items-end gap-2">
+                        <label className="flex-1 space-y-1">
+                          <span className="text-[10px] font-semibold text-gray-500">Stay / Transport Title & Location</span>
+                          <Input
+                            value={item.text}
+                            placeholder="e.g. Stay Option 1: LD Retreat, Tawang"
+                            onChange={(e) => {
+                              const next = [...websiteStayTransportImages];
+                              next[index].text = e.target.value;
+                              setWebsiteStayTransportImages(next);
+                            }}
+                            className="h-9 text-xs"
+                          />
+                        </label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 text-red-600 hover:bg-red-50"
+                          aria-label="Remove stay option"
+                          onClick={() => setWebsiteStayTransportImages(websiteStayTransportImages.filter((_, itemIndex) => itemIndex !== index))}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {!websiteStayTransportImages.length && (
+                    <p className="rounded-lg border border-dashed border-gray-200 px-3 py-4 text-center text-xs text-gray-500">
+                      No stay or transport options added yet. Click &quot;Add stay option&quot; to include images and titles.
+                    </p>
+                  )}
                 </div>
               </div>
 

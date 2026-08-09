@@ -77,7 +77,7 @@ export interface CrmFestival {
   websiteFaqs: CrmFestivalFaq[];
   websiteTags: Array<{ id: string; tag: string }>;
   websiteBannerImages: string[];
-  websiteStayTransportImages: string[];
+  websiteStayTransportImages: Array<{ text: string; imageUrl: string }> | string[];
   websiteHighlights: CrmFestivalHighlight[];
   websiteVideoUrl?: string | null;
   packages: CrmFestivalPackage[];

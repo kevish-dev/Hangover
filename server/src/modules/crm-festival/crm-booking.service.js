@@ -3,6 +3,7 @@ import { prisma } from "../../prisma/client.js";
 import env from "../../core/env/env.js";
 import { NotFoundError, ValidationError } from "../../core/errors/errors.js";
 import { generateCrmBookingOperations } from "../operations/operations.service.js";
+import { reserveBookingSlotCapacity } from "../booking/slot-capacity.service.js";
 
 const round = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 const paymentPageUrl = (bookingId) => `${env.ORIGIN.replace(/\/$/, "")}/bookings/${bookingId}/pay-balance`;
@@ -154,6 +155,9 @@ const createInstallment = async ({ booking, festival, data, adminId, isInitial =
         },
         include: { user: { include: { profile: true } } },
       });
+      if (isInitial && booking.status === "PENDING") {
+        await reserveBookingSlotCapacity(tx, booking);
+      }
       await tx.ledgerEntry.create({
         data: {
           type: "INCOME", scope: "BOOKING", bookingId: booking.id, paymentId: payment.id,
@@ -220,7 +224,6 @@ export const createCrmFestivalBooking = async (crmFestivalId, data, adminId) => 
       },
       include: { user: { include: { profile: true } } },
     });
-    await tx.crmFestivalSlot.update({ where: { id: crmFestivalSlot.id }, data: { filledSpots: { increment: travelers } } });
     return created;
   });
   await generateCrmBookingOperations(booking, crmFestivalSlot);
@@ -324,7 +327,7 @@ export const createPublicCrmFestivalBooking = async (crmFestivalId, data, userId
         where: {
           addOnId,
           status: { notIn: ["CANCELLED", "REFUNDED"] },
-          booking: { crmFestivalSlotId: crmFestivalSlot.id, status: { not: "CANCELLED" } },
+          booking: { crmFestivalSlotId: crmFestivalSlot.id, status: { in: ["RESERVED", "CONFIRMED"] } },
         },
       });
       const remaining = addOn.maxQuantityPerSlot - Number(used._sum.quantity || 0);
@@ -372,10 +375,6 @@ export const createPublicCrmFestivalBooking = async (crmFestivalId, data, userId
         addOns: bookingAddOns.length ? { create: bookingAddOns } : undefined,
       },
       include: { user: { include: { profile: true } } },
-    });
-    await tx.crmFestivalSlot.update({
-      where: { id: crmFestivalSlot.id },
-      data: { filledSpots: { increment: travelers } },
     });
     return created;
   });

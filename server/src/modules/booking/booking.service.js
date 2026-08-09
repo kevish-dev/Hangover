@@ -10,6 +10,12 @@ import crypto from "crypto";
 import { uploadSensitiveDocument, createAuthenticatedDeliveryUrl, deleteMediaAsset } from "../../core/services/upload.service.js";
 import { getBookingJourney } from "./booking-journey.js";
 import * as operationsService from "../operations/operations.service.js";
+import {
+  bookingHoldsSlotCapacity,
+  cancelBookingOperations,
+  releaseBookingSlotCapacity,
+  reserveBookingSlotCapacity,
+} from "./slot-capacity.service.js";
 
 const withSecureDocumentUrls = (booking) => {
   if (!booking) return booking;
@@ -121,6 +127,9 @@ export const createBooking = async (userId, data) => {
       "A valid Government ID is required in your profile to proceed with the booking.",
     );
   }
+  if (!user.profile.fullName || !user.profile.phone || !user.profile.gender || !user.profile.dateOfBirth) {
+    throw new ValidationError("Complete your traveler profile before booking.");
+  }
 
   const targetSlotId = data.slotId || data.crmTripSlotId;
   if (!targetSlotId) {
@@ -171,8 +180,9 @@ export const createBooking = async (userId, data) => {
   }
 
   const startDate = slot ? slot.startDate : crmTripSlot.startDate;
-  if (!startDate) {
-    throw new ValidationError("The selected slot does not have a start date and cannot be booked yet.");
+  const endDate = slot ? slot.endDate : crmTripSlot.endDate;
+  if (!startDate || !endDate) {
+    throw new ValidationError("The selected departure is missing its travel dates and cannot be booked yet.");
   }
 
   if (isCrmTrip) {
@@ -222,7 +232,10 @@ export const createBooking = async (userId, data) => {
   }
 
   // 3. Pricing calculation (per-person)
-  const numberOfTravelers = data.numberOfTravelers || 1;
+  const numberOfTravelers = Number(data.numberOfTravelers ?? 1);
+  if (!Number.isInteger(numberOfTravelers) || numberOfTravelers < 1 || numberOfTravelers > 100) {
+    throw new ValidationError("Traveler count must be a whole number between 1 and 100.");
+  }
 
   // Check capacity on the slot
   const currentCapacity = slot ? slot.capacity : crmTripSlot.capacity;
@@ -267,8 +280,8 @@ export const createBooking = async (userId, data) => {
       
       if (addOnModel.maxQuantityPerSlot) {
         const filterWhere = isCrmTrip
-          ? { crmTripSlotId: crmTripSlot.id, status: { not: "CANCELLED" } }
-          : { slotId: slot.id, status: { not: "CANCELLED" } };
+          ? { crmTripSlotId: crmTripSlot.id, status: { in: ["RESERVED", "CONFIRMED"] } }
+          : { slotId: slot.id, status: { in: ["RESERVED", "CONFIRMED"] } };
 
         const bookedAddOns = await prisma.bookingAddOn.aggregate({
           _sum: { quantity: true },
@@ -310,6 +323,9 @@ export const createBooking = async (userId, data) => {
   const tokenAmount = isCrmTrip ? toDecimal2(baseTokenAmount) : toDecimal2(baseTokenAmount + (baseTokenAmount * 0.05));
 
   let initialPaymentType = data.initialPaymentType || "TOKEN";
+  if (!["TOKEN", "FULL"].includes(initialPaymentType)) {
+    throw new ValidationError("Initial payment type must be TOKEN or FULL.");
+  }
   if (tokenAmount === 0) {
     initialPaymentType = "FULL";
   }
@@ -361,6 +377,12 @@ export const createBooking = async (userId, data) => {
       };
       }))
     : [];
+  if (travelersCreateData.length !== numberOfTravelers - 1) {
+    throw new ValidationError("Enter details for every additional traveler.");
+  }
+  if (travelersCreateData.some((traveler) => !traveler.fullName?.trim() || !traveler.email?.trim() || !traveler.phone || !traveler.gender || !traveler.dateOfBirth || (!traveler.aadhaar && !traveler.aadhaarAssetId))) {
+    throw new ValidationError("Each additional traveler needs complete contact, identity, and date-of-birth details.");
+  }
 
   // Check if there is an existing PENDING booking to reuse
   const pendingWhere = isCrmTrip
@@ -377,6 +399,10 @@ export const createBooking = async (userId, data) => {
     bookingData.travelers = {
       deleteMany: {}, // Clear any previous travelers if updating an existing pending booking
       ...(travelersCreateData.length > 0 && { create: travelersCreateData })
+    };
+    bookingData.addOns = {
+      deleteMany: {},
+      ...(bookingAddOnsData.length > 0 && { create: bookingAddOnsData }),
     };
     const booking = await repo.updateBooking(existingPending.id, bookingData);
     if (replacedAssetIds.length > 0) {
@@ -542,7 +568,7 @@ export const adminCreateBooking = async (adminId, data) => {
           where: {
             addOnId: addOnModel.id,
             status: { notIn: ["CANCELLED", "REFUNDED"] },
-            booking: { slotId: slot.id, status: { not: "CANCELLED" } },
+            booking: { slotId: slot.id, status: { in: ["RESERVED", "CONFIRMED"] } },
           },
         });
         const alreadyBooked = bookedAddOns._sum.quantity || 0;
@@ -589,7 +615,7 @@ export const adminCreateBooking = async (adminId, data) => {
   if (data.paymentAction === "MARK_PAID") {
     amountPaid = amountToPay;
     paymentStatus = initialPaymentType === "FULL" ? "PAID" : "PARTIALLY_PAID";
-    status = "CONFIRMED";
+    status = initialPaymentType === "FULL" ? "CONFIRMED" : "RESERVED";
   }
 
   const customBookingId = await generateBookingReference(prisma);
@@ -652,10 +678,9 @@ export const adminCreateBooking = async (adminId, data) => {
   const booking = await prisma.$transaction(async (tx) => {
     const newBooking = await tx.booking.create({ data: bookingData, include: { user: { include: { profile: true } }, package: true, trip: true, festival: true, slot: true } });
 
-    await tx.slot.update({
-      where: { id: slot.id },
-      data: { filledSpots: { increment: numberOfTravelers } },
-    });
+    if (data.paymentAction === "MARK_PAID") {
+      await reserveBookingSlotCapacity(tx, newBooking);
+    }
 
     if (data.paymentAction === "MARK_PAID") {
       const payment = await tx.payment.create({
@@ -763,44 +788,45 @@ export const cancelBooking = async (bookingId, userId, reason) => {
   }
 
   const cancelledBooking = await prisma.$transaction(async (tx) => {
-    const updated = await tx.booking.update({
-      where: { id: bookingId },
+    const cancelled = await tx.booking.updateMany({
+      where: { id: bookingId, status: { in: cancellableStatuses } },
       data: {
         status: "CANCELLED",
         cancelledAt: new Date(),
         cancelledBy: userId,
         cancellationReason: reason || null,
       },
+    });
+    if (!cancelled.count) {
+      throw new ValidationError("Booking has already been cancelled or completed.");
+    }
+
+    if (bookingHoldsSlotCapacity(booking.status)) {
+      await releaseBookingSlotCapacity(tx, booking);
+    }
+    await cancelBookingOperations(tx, bookingId);
+    await tx.paymentIntent.updateMany({
+      where: { bookingId, status: "CREATED" },
+      data: { status: "CANCELLED" },
+    });
+    await tx.bookingAddOn.updateMany({
+      where: { bookingId, status: { in: ["PENDING", "PAID"] } },
+      data: { status: "CANCELLED" },
+    });
+
+    return tx.booking.findUnique({
+      where: { id: bookingId },
       include: {
         slot: { include: { trip: true, festival: true } },
+        crmTrip: { include: { destination: true } },
+        crmTripSlot: true,
         package: true,
         addOns: { include: { addOn: true } },
         travelers: { include: { aadhaarAsset: true } },
         payments: { include: { refunds: true } },
         user: { include: { profile: { include: { govtIdAsset: true } } } },
-      }
+      },
     });
-
-    if (booking.slotId && (booking.status === "RESERVED" || booking.status === "CONFIRMED")) {
-      await tx.slot.update({
-        where: { id: booking.slotId },
-        data: {
-          filledSpots: Math.max(0, (booking.slot.filledSpots || 0) - booking.numberOfTravelers),
-        },
-      });
-    } else if (booking.crmTripSlotId && (booking.status === "RESERVED" || booking.status === "CONFIRMED")) {
-      const currentSlot = await tx.crmTripSlot.findUnique({ where: { id: booking.crmTripSlotId }, select: { filledSpots: true } });
-      if (currentSlot) {
-        await tx.crmTripSlot.update({
-          where: { id: booking.crmTripSlotId },
-          data: {
-            filledSpots: Math.max(0, currentSlot.filledSpots - booking.numberOfTravelers),
-          },
-        });
-      }
-    }
-    
-    return updated;
   });
 
   import("../../core/services/email.service.js")
@@ -892,10 +918,15 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
     where: { id: bookingId },
     include: {
       slot: { include: { trip: true, festival: true } },
+      crmTrip: true,
+      crmTripSlot: true,
+      crmFestival: true,
+      crmFestivalSlot: true,
       package: true,
       user: { include: { profile: true } },
       payments: {
-        where: { status: "SUCCESS" }
+        where: { status: "SUCCESS" },
+        include: { refunds: true },
       }
     }
   });
@@ -920,192 +951,56 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
     throw new ValidationError("Refund amount is required.");
   }
 
-  // Import razorpay dynamically to avoid circular dependencies if any
-  const razorpay = await import("../../core/services/razorpay.service.js");
-
-  // 1. Process refunds via Razorpay first (outside DB transaction)
-  const refundsData = [];
-  const offlineRefundsData = [];
+  // Delegate each payment to the canonical refund service. It records the
+  // ledger entry, prevents duplicate refunds, and refuses an online refund if
+  // Razorpay itself rejects it instead of fabricating an offline success.
+  const { issueRefund } = await import("../payment/payment.service.js");
   let remainingRefundAmount = validRefundAmount;
-
+  const refundReferences = [];
   for (const payment of booking.payments) {
     if (remainingRefundAmount <= 0) break;
-
-    const maxRefundForPayment = Number(payment.amount);
-    const amountToRefund = Math.min(remainingRefundAmount, maxRefundForPayment);
-    if (amountToRefund <= 0) continue;
-
-    const isOnlinePayment = Boolean(
-      payment.razorpayPaymentId &&
-      typeof payment.razorpayPaymentId === "string" &&
-      payment.razorpayPaymentId.startsWith("pay_")
-    );
-
-    if (isOnlinePayment) {
-      try {
-        const amountPaise = Math.round(amountToRefund * 100);
-        const rzpRefund = await razorpay.createRefund(
-          payment.razorpayPaymentId,
-          amountPaise,
-          { reason: String(reason || "Admin cancellation and refund").slice(0, 100), adminId: String(adminId) }
-        );
-        refundsData.push({
-          payment,
-          rzpRefund,
-          amountRefunded: amountToRefund
-        });
-      } catch (rzpErr) {
-        console.warn(`[Refund Warning] Razorpay refund API failed for payment ${payment.id} (${payment.razorpayPaymentId}):`, rzpErr?.error?.description || rzpErr?.message || rzpErr);
-        offlineRefundsData.push({
-          payment,
-          amountRefunded: amountToRefund,
-          note: `Razorpay refund fallback: ${rzpErr?.error?.description || rzpErr?.message || "Invalid or test payment ID"}`
-        });
-      }
-    } else {
-      offlineRefundsData.push({
-        payment,
-        amountRefunded: amountToRefund
-      });
-    }
-    remainingRefundAmount -= amountToRefund;
+    const alreadyRefunded = payment.refunds
+      .filter((refund) => ["PENDING", "SUCCESS"].includes(refund.status))
+      .reduce((sum, refund) => sum + Number(refund.amount), 0);
+    const refundable = Math.max(0, Number(payment.amount) - alreadyRefunded);
+    const amountToRefund = Math.min(remainingRefundAmount, refundable);
+    if (!amountToRefund) continue;
+    const refund = await issueRefund(payment.id, amountToRefund, reason || "Admin initiated cancellation and refund", adminId);
+    refundReferences.push(refund.razorpayRefundId || refund.id);
+    remainingRefundAmount = toDecimal2(remainingRefundAmount - amountToRefund);
+  }
+  if (remainingRefundAmount > 0) {
+    throw new ValidationError("The requested refund exceeds the remaining refundable payment balance.");
   }
 
-  // 2. Perform DB updates in a transaction
-  await prisma.$transaction(async (tx) => {
-    // Record Razorpay refunds
-    for (const { payment, rzpRefund, amountRefunded } of refundsData) {
-      await tx.refund.create({
+  const cancelledBooking = await prisma.$transaction(async (tx) => {
+    const current = await tx.booking.findUnique({ where: { id: bookingId } });
+    if (!current) throw new NotFoundError("Booking not found");
+    const wasActive = ["PENDING", "RESERVED", "CONFIRMED"].includes(current.status);
+    if (wasActive) {
+      const cancelled = await tx.booking.updateMany({
+        where: { id: bookingId, status: { in: ["PENDING", "RESERVED", "CONFIRMED"] } },
         data: {
-          paymentId: payment.id,
-          amount: amountRefunded,
-          status: "SUCCESS",
-          reason: reason || "Admin initiated cancellation and refund",
-          razorpayRefundId: rzpRefund.id,
-          initiatedBy: adminId,
-          metadata: { razorpayRefund: rzpRefund },
-        }
-      });
-
-      await tx.ledgerEntry.create({
-        data: {
-          type: "EXPENSE",
-          scope: booking.tripId ? "TRIP" : booking.festivalId ? "FESTIVAL" : "BOOKING",
-          tripId: booking.tripId,
-          festivalId: booking.festivalId,
-          bookingId: booking.id,
-          paymentId: payment.id,
-          source: "REFUND",
-          category: "Customer Refund",
-          amount: amountRefunded,
-          description: reason || `Refund for ${booking.bookingReference}`,
-          isAutoGenerated: true,
+          status: "CANCELLED",
+          paymentStatus: validRefundAmount === totalPaid && totalPaid > 0 ? "REFUNDED" : validRefundAmount > 0 ? "PARTIALLY_REFUNDED" : current.paymentStatus,
+          cancelledAt: new Date(),
+          cancelledBy: adminId,
+          cancellationReason: reason || "Admin initiated cancellation",
         },
       });
-
-      const isFullyRefunded = amountRefunded === Number(payment.amount);
-      if (isFullyRefunded) {
-        await tx.payment.update({
-          where: { id: payment.id },
-          data: { status: "REFUNDED" }
-        });
+      if (!cancelled.count) throw new ValidationError("Booking has already been cancelled or completed.");
+      if (bookingHoldsSlotCapacity(current.status)) {
+        await releaseBookingSlotCapacity(tx, current);
       }
     }
-
-    // Record Offline refunds
-    for (const { payment, amountRefunded, note } of offlineRefundsData) {
-      await tx.refund.create({
-        data: {
-          paymentId: payment.id,
-          amount: amountRefunded,
-          status: "SUCCESS",
-          reason: note
-            ? `${reason || "Admin cancellation and refund"} (${note})`
-            : reason || "Admin initiated cancellation and refund (Offline)",
-          initiatedBy: adminId,
-        }
-      });
-
-      await tx.ledgerEntry.create({
-        data: {
-          type: "EXPENSE",
-          scope: booking.tripId ? "TRIP" : booking.festivalId ? "FESTIVAL" : "BOOKING",
-          tripId: booking.tripId,
-          festivalId: booking.festivalId,
-          bookingId: booking.id,
-          paymentId: payment.id,
-          source: "REFUND",
-          category: "Customer Refund",
-          amount: amountRefunded,
-          description: reason || `Refund for ${booking.bookingReference} (Offline)`,
-          isAutoGenerated: true,
-        },
-      });
-
-      const isFullyRefunded = amountRefunded === Number(payment.amount);
-      if (isFullyRefunded) {
-        await tx.payment.update({
-          where: { id: payment.id },
-          data: { status: "REFUNDED" }
-        });
-      }
-    }
-
-
-    // Determine new paymentStatus for booking
-    let newPaymentStatus = booking.paymentStatus;
-    if (totalPaid > 0) {
-      if (validRefundAmount === totalPaid) {
-        newPaymentStatus = "REFUNDED";
-      } else if (validRefundAmount > 0) {
-        newPaymentStatus = "PARTIALLY_REFUNDED";
-      } else {
-        newPaymentStatus = booking.paymentStatus;
-      }
-    }
-
-    // Cancel booking
-    await tx.booking.update({
-      where: { id: bookingId },
-      data: {
-        status: "CANCELLED",
-        paymentStatus: newPaymentStatus,
-        cancelledAt: new Date(),
-        cancelledBy: adminId,
-        cancellationReason: reason || "Admin initiated cancellation",
-      }
-    });
-
-    // Free up spots
-    if (booking.slotId) {
-      await tx.slot.update({
-        where: { id: booking.slotId },
-        data: {
-          filledSpots: Math.max(0, (booking.slot.filledSpots || 0) - booking.numberOfTravelers)
-        }
-      });
-    } else if (booking.crmTripSlotId) {
-      const currentSlot = await tx.crmTripSlot.findUnique({ where: { id: booking.crmTripSlotId }, select: { filledSpots: true } });
-      if (currentSlot) {
-        await tx.crmTripSlot.update({
-          where: { id: booking.crmTripSlotId },
-          data: {
-            filledSpots: Math.max(0, currentSlot.filledSpots - booking.numberOfTravelers)
-          }
-        });
-      }
-    }
-
-    // Cancel / Refund Add-ons
+    await cancelBookingOperations(tx, bookingId);
+    await tx.paymentIntent.updateMany({ where: { bookingId, status: "CREATED" }, data: { status: "CANCELLED" } });
+    await tx.bookingAddOn.updateMany({ where: { bookingId, status: "PENDING" }, data: { status: "CANCELLED" } });
     await tx.bookingAddOn.updateMany({
-      where: { bookingId: booking.id, status: "PENDING" },
-      data: { status: "CANCELLED" },
+      where: { bookingId, status: "PAID" },
+      data: { status: validRefundAmount > 0 ? "REFUNDED" : "CANCELLED" },
     });
-    
-    await tx.bookingAddOn.updateMany({
-      where: { bookingId: booking.id, status: "PAID" },
-      data: { status: newPaymentStatus === "REFUNDED" || newPaymentStatus === "PARTIALLY_REFUNDED" ? "REFUNDED" : "CANCELLED" },
-    });
+    return tx.booking.findUnique({ where: { id: bookingId } });
   });
 
   // Send Email (Fire and forget)
@@ -1122,7 +1017,7 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
         isFullRefund: validRefundAmount > 0 && validRefundAmount === totalPaid,
         refundType: validRefundAmount === totalPaid && validRefundAmount > 0 ? "FULL" : validRefundAmount > 0 ? "PARTIAL" : "NONE",
         reason: reason || "Admin initiated cancellation",
-        refundReference: refundsData.map(({ rzpRefund }) => rzpRefund.id).filter(Boolean).join(", "),
+        refundReference: refundReferences.join(", "),
         cancelledAt: new Date(),
         tripStartDate: journey.startDate,
         tripEndDate: journey.endDate,
@@ -1132,7 +1027,7 @@ export const cancelAndRefundBooking = async (bookingId, adminId, reason, refundA
     }
   }).catch(err => console.error("Failed to import email service:", err));
 
-  return { success: true, message: `Booking cancelled${validRefundAmount > 0 ? ` and ₹${validRefundAmount} refunded` : ""} successfully.` };
+  return { success: true, booking: cancelledBooking, message: `Booking cancelled${validRefundAmount > 0 ? ` and ₹${validRefundAmount} refunded` : ""} successfully.` };
 };
 
 export const finalizeBooking = async (bookingId) => {

@@ -17,7 +17,7 @@ export const CRM_TRIP_INCLUDE = {
   commonInclusions: { orderBy: { key: "asc" } },
   packages: { orderBy: { createdAt: "asc" } },
   addOns: { orderBy: { createdAt: "asc" } },
-  slots: { orderBy: { startDate: "asc" }, include: { _count: { select: { bookings: true } } } },
+  slots: { orderBy: [{ priority: "desc" }, { startDate: "asc" }], include: { _count: { select: { bookings: true } } } },
   websiteTags: true,
 };
 
@@ -39,7 +39,7 @@ const PUBLIC_CRM_TRIP_INCLUDE = {
   destination: true,
   websiteTags: true,
   packages: { orderBy: { createdAt: "asc" } },
-  slots: { orderBy: { startDate: "asc" } },
+  slots: { orderBy: [{ priority: "desc" }, { startDate: "asc" }] },
 };
 
 export const findPublicMany = () => prisma.crmTrip.findMany({

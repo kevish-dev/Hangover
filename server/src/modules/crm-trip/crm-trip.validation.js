@@ -18,7 +18,7 @@ const slotSchema = z.object({
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
   title: z.string().trim().max(200).nullable().optional(),
-  priority: z.number().int().default(0),
+  priority: z.number().int().nonnegative().default(0),
   capacity: z.number().int().positive(),
 });
 const setupDaySchema = z.object({
@@ -36,6 +36,14 @@ const setupDaySchema = z.object({
   activities: z.array(z.object({ name: z.string().trim().min(1).max(300), description: z.string().trim().max(2000).nullable().optional() })).max(100).default([]),
   commonInclusions: z.array(z.enum(["ILP_AND_PERMITS", "BBQ", "BONFIRE", "TRIP_GUIDE"])).max(4).default([]),
 });
+
+const stayTransportSchema = z.union([
+  z.object({
+    text: z.string().trim().max(500).optional().default(""),
+    imageUrl: z.string().trim().max(2000).optional().default(""),
+  }),
+  z.string().trim().max(2000),
+]);
 
 const highlightSchema = z.union([
   z.object({
@@ -68,7 +76,7 @@ const crmTripFields = z.object({
   websiteFaqs: z.array(z.object({ question: z.string().trim().min(1).max(500), answer: z.string().trim().min(1).max(5000) })).max(100).default([]),
   websiteTagIds: z.array(z.string().uuid()).max(50).default([]),
   websiteBannerImages: z.array(z.string().trim().min(1).max(2000)).max(20).default([]),
-  websiteStayTransportImages: z.array(z.string().trim().min(1).max(2000)).max(20).default([]),
+  websiteStayTransportImages: z.array(stayTransportSchema).max(50).default([]),
   websiteHighlights: z.array(highlightSchema).max(50).default([]),
 });
 
@@ -99,7 +107,7 @@ export const updateCrmTripSchema = z.object({
   websiteFaqs: z.array(z.object({ question: z.string().trim().min(1).max(500), answer: z.string().trim().min(1).max(5000) })).max(100).optional(),
   websiteTagIds: z.array(z.string().uuid()).max(50).optional(),
   websiteBannerImages: z.array(z.string().trim().min(1).max(2000)).max(20).optional(),
-  websiteStayTransportImages: z.array(z.string().trim().min(1).max(2000)).max(20).optional(),
+  websiteStayTransportImages: z.array(stayTransportSchema).max(50).optional(),
   websiteHighlights: z.array(highlightSchema).max(50).optional(),
 }).refine(
   (data) => data.tokenAmount === undefined || data.totalAmount === undefined || data.tokenAmount <= data.totalAmount,
