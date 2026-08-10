@@ -42,6 +42,8 @@ export interface ApiPayment {
     amountDue: string;
     trip: { id: string; title: string; location: string; slug: string } | null;
     festival: { id: string; title: string; location: string; slug: string } | null;
+    crmTrip?: { id: string; name: string; destination?: { name: string } } | null;
+    crmFestival?: { id: string; name: string; destination?: { name: string } } | null;
     customTrip: { id: string; reference: string; title: string; startDate: string; endDate: string; durationDays: number } | null;
     slot: {
       id: string;
@@ -50,6 +52,20 @@ export interface ApiPayment {
       endDate: string | null;
       trip: { id: string; title: string; location: string; slug: string } | null;
       festival: { id: string; title: string; location: string; slug: string } | null;
+    } | null;
+    crmTripSlot?: {
+      id: string;
+      title?: string | null;
+      startDate: string | null;
+      endDate: string | null;
+      crmTrip?: { id: string; name: string } | null;
+    } | null;
+    crmFestivalSlot?: {
+      id: string;
+      title?: string | null;
+      startDate: string | null;
+      endDate: string | null;
+      crmFestival?: { id: string; name: string } | null;
     } | null;
     package: { id: string; title: string; price: string; tokenAmount: string } | null;
     user: {
