@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, isValid } from "date-fns";
 import {
   AlertTriangle,
@@ -48,14 +48,14 @@ const formatCalendarDate = (value: string | null | undefined) => {
 
 const getItemDetails = (payment: ApiPayment) => {
   const customTrip = payment.booking.customTrip;
-  const festival = payment.booking.festival || payment.booking.slot?.festival;
-  const trip = payment.booking.trip || payment.booking.slot?.trip;
+  const festival = payment.booking.festival || (payment.booking as any).crmFestival || payment.booking.slot?.festival || (payment.booking as any).crmFestivalSlot?.crmFestival;
+  const trip = payment.booking.trip || (payment.booking as any).crmTrip || payment.booking.slot?.trip || (payment.booking as any).crmTripSlot?.crmTrip;
   const item = festival || trip;
 
   return {
     kind: customTrip ? "Custom trip" : festival ? "Festival" : trip ? "Trip" : "Booking",
-    title: customTrip?.title || item?.title || "Booking item unavailable",
-    location: customTrip ? "Private itinerary" : item?.location || "Location not provided",
+    title: customTrip?.title || item?.title || item?.name || "Booking item unavailable",
+    location: customTrip ? "Private itinerary" : item?.location || item?.destination?.name || "Location not provided",
   };
 };
 
@@ -263,6 +263,7 @@ function PaymentDetailsModal({ payment, onClose }: { payment: ApiPayment; onClos
 }
 
 export default function AdminPaymentsPage() {
+  const queryClient = useQueryClient();
   const [selectedPayment, setSelectedPayment] = useState<ApiPayment | null>(null);
   const [verifyPayment, setVerifyPayment] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -513,9 +514,9 @@ export default function AdminPaymentsPage() {
                             e.stopPropagation();
                             setVerifyPayment(payment);
                           }}
-                          className="mt-1 flex items-center gap-1 rounded bg-amber-600 px-2 py-1 text-xs font-bold text-white hover:bg-amber-700"
+                          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-amber-600 active:scale-95"
                         >
-                          <ShieldCheck className="h-3 w-3" /> Verify
+                          <ShieldCheck className="h-3.5 w-3.5" /> Verify Payment
                         </button>
                       )}
                     </td>
@@ -536,6 +537,7 @@ export default function AdminPaymentsPage() {
           onSuccess={() => {
             setVerifyPayment(null);
             refetch();
+            queryClient.invalidateQueries({ queryKey: ["admin", "payments", "pending_verification_count"] });
           }}
         />
       )}

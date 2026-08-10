@@ -23,7 +23,7 @@ export const getFeaturedPublicTrips = async (_req, res, next) => {
 };
 export const getPublicTrip = async (req, res, next) => {
   try {
-    res.json(await service.getPublicTrip(req.params.id));
+    res.json(await service.getPublicTrip(req.params.id, req.user));
   } catch (error) {
     next(error);
   }

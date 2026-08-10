@@ -182,19 +182,18 @@ export const createCrmBooking = async (crmTripId, data, adminId) => {
     throw new ValidationError("Lead traveler phone, gender, date of birth, and Aadhaar card are required");
   }
   if (!data.crmTripSlotId) throw new ValidationError("Choose a departure slot for this booking");
-  const trip = await getTripWithPricing(crmTripId);
-  const initialPaymentAmount = round(data.paymentAmount);
-  if (!Number.isFinite(initialPaymentAmount) || initialPaymentAmount <= 0 || initialPaymentAmount > Number(trip.totalAmount)) {
-    throw new ValidationError(`Initial payment must be between ₹0.01 and ₹${Number(trip.totalAmount).toFixed(2)}`);
-  }
-  if (!["MANUAL", "SEND_LINK"].includes(data.paymentAction)) {
-    throw new ValidationError("Choose manual collection or send the website payment link");
-  }
-  const initialPaymentType = paymentTypeFor(initialPaymentAmount, Number(trip.totalAmount));
+  const trip = await prisma.crmTrip.findUnique({
+    where: { id: crmTripId },
+    include: { packages: true, addOns: true },
+  });
+  if (!trip) throw new NotFoundError("CRM trip not found");
+  if (!trip.isActive) throw new ValidationError("This CRM trip is not accepting bookings");
+
   const crmTripSlot = await prisma.crmTripSlot.findFirst({
     where: { id: data.crmTripSlotId, crmTripId, startDate: { not: null }, endDate: { not: null } },
   });
   if (!crmTripSlot) throw new ValidationError("Choose a valid dated departure slot for this CRM trip");
+
   const travelers = Number(data.numberOfTravelers) || 1;
   const additionalTravelers = travelerData(data.additionalTravelers);
   if (additionalTravelers.length !== travelers - 1) {
@@ -206,6 +205,67 @@ export const createCrmBooking = async (crmTripId, data, adminId) => {
   if (crmTripSlot.filledSpots + travelers > crmTripSlot.capacity) {
     throw new ValidationError("This departure does not have enough remaining capacity");
   }
+
+  // Pricing & Add-on Resolution
+  const hasPackages = trip.packages && trip.packages.length > 0;
+  const selectedPackage = hasPackages
+    ? (data.packageId ? trip.packages.find((item) => item.id === data.packageId) : trip.packages[0])
+    : null;
+  if (hasPackages && !selectedPackage) throw new ValidationError("Choose a valid package for this CRM trip");
+
+  const quantitiesByAddOn = new Map();
+  for (const item of Array.isArray(data.addOns) ? data.addOns : []) {
+    if (!item?.addOnId) continue;
+    const quantity = Number(item.quantity);
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      throw new ValidationError("Add-on quantity must be a positive whole number");
+    }
+    quantitiesByAddOn.set(item.addOnId, (quantitiesByAddOn.get(item.addOnId) || 0) + quantity);
+  }
+
+  let addOnsTotal = 0;
+  const bookingAddOns = [];
+  for (const [addOnId, quantity] of quantitiesByAddOn) {
+    const addOn = trip.addOns.find((item) => item.id === addOnId);
+    if (!addOn?.isActive) throw new ValidationError(`Add-on "${addOn?.title || addOnId}" is unavailable`);
+    if (addOn.maxQuantityPerBooking && quantity > addOn.maxQuantityPerBooking) {
+      throw new ValidationError(`${addOn.title} is limited to ${addOn.maxQuantityPerBooking} per booking`);
+    }
+    if (addOn.purchaseCutoffOffsetDays != null) {
+      const cutoff = new Date(crmTripSlot.startDate).getTime() - addOn.purchaseCutoffOffsetDays * 86400000;
+      if (Date.now() > cutoff) throw new ValidationError(`${addOn.title} is no longer available for this departure`);
+    }
+    if (addOn.maxQuantityPerSlot) {
+      const used = await prisma.bookingAddOn.aggregate({
+        _sum: { quantity: true },
+        where: {
+          addOnId,
+          status: { notIn: ["CANCELLED", "REFUNDED"] },
+          booking: { crmTripSlotId: crmTripSlot.id, status: { in: ["RESERVED", "CONFIRMED"] } },
+        },
+      });
+      const remaining = addOn.maxQuantityPerSlot - Number(used._sum.quantity || 0);
+      if (quantity > remaining) throw new ValidationError(`${addOn.title} only has ${Math.max(0, remaining)} left for this departure`);
+    }
+    const unitPrice = Number(addOn.price);
+    const totalPrice = round(unitPrice * quantity);
+    addOnsTotal += totalPrice;
+    bookingAddOns.push({ addOnId, quantity, unitPrice, totalPrice, status: "PENDING" });
+  }
+
+  const packagePrice = selectedPackage ? Number(selectedPackage.price) : Number(trip.totalAmount || 0);
+  const totalAmount = round(packagePrice * travelers + addOnsTotal);
+
+  const initialPaymentAmount = round(data.paymentAmount);
+  if (!Number.isFinite(initialPaymentAmount) || initialPaymentAmount <= 0 || initialPaymentAmount > totalAmount) {
+    throw new ValidationError(`Initial payment must be between ₹0.01 and ₹${totalAmount.toFixed(2)}`);
+  }
+  const initialPaymentType = paymentTypeFor(initialPaymentAmount, totalAmount);
+
+  if (!["MANUAL", "SEND_LINK"].includes(data.paymentAction)) {
+    throw new ValidationError("Choose manual collection or send the website payment link");
+  }
+
   const user = await ensureUser(data);
   const bookingReference = await getReference();
   const booking = await prisma.$transaction(async (tx) => {
@@ -215,12 +275,15 @@ export const createCrmBooking = async (crmTripId, data, adminId) => {
     }
     const created = await tx.booking.create({
       data: {
-        id: bookingReference, bookingReference, userId: user.id, crmTripId, crmTripSlotId: crmTripSlot.id, source: "CRM",
+        id: bookingReference, bookingReference, userId: user.id, crmTripId, crmTripSlotId: crmTripSlot.id,
+        packageId: selectedPackage?.id || null,
+        source: "CRM",
         numberOfTravelers: travelers,
-        totalAmount: trip.totalAmount, tokenAmount: initialPaymentType === "FULL" ? trip.totalAmount : initialPaymentAmount, amountPaid: 0, amountDue: trip.totalAmount,
+        totalAmount, tokenAmount: initialPaymentType === "FULL" ? totalAmount : initialPaymentAmount, amountPaid: 0, amountDue: totalAmount,
         initialPaymentType, status: "PENDING", paymentStatus: "PENDING",
         specialRequests: data.specialRequests?.trim() || null,
         travelers: { create: additionalTravelers },
+        addOns: bookingAddOns.length ? { create: bookingAddOns } : undefined,
       },
       include: { user: { include: { profile: true } } },
     });

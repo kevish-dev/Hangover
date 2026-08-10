@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth, requireAdmin } from "../../core/middlewares/auth.middleware.js";
+import { requireAuth, requireAdmin, optionalAuth } from "../../core/middlewares/auth.middleware.js";
 import * as controller from "./crm-trip.controller.js";
 import * as bookingController from "./crm-booking.controller.js";
 import {
@@ -11,7 +11,7 @@ import {
 
 const router = Router();
 router.get("/public/featured", controller.getFeaturedPublicTrips);
-router.get("/public/:id", controller.getPublicTrip);
+router.get("/public/:id", optionalAuth, controller.getPublicTrip);
 router.get("/public", controller.listPublicTrips);
 router.post("/public/:id/bookings", requireAuth, bookingController.createPublic);
 router.use(requireAuth, requireAdmin);

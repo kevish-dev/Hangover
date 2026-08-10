@@ -2313,6 +2313,15 @@ function CreateCrmBookingModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
+  const { data: tripDetails, isLoading: isLoadingDetails } = useQuery({
+    queryKey: ["crm-trip-details", trip.id],
+    queryFn: async () => (await apiClient.get(`/crm-trips/${trip.id}`)).data,
+  });
+
+  const slots = tripDetails?.slots || [];
+  const packages = tripDetails?.packages || [];
+  const addOns = tripDetails?.addOns || [];
+
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -2320,12 +2329,40 @@ function CreateCrmBookingModal({
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [govtIdAssetId, setGovtIdAssetId] = useState("");
   const [numberOfTravelers, setNumberOfTravelers] = useState(1);
-  const [paymentAmount, setPaymentAmount] = useState(String(trip.tokenAmount || ""));
+  const [crmTripSlotId, setCrmTripSlotId] = useState("");
+  const [packageId, setPackageId] = useState("");
+  const [selectedAddOns, setSelectedAddOns] = useState<Record<string, number>>({});
+  const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentAction, setPaymentAction] = useState<"MANUAL" | "SEND_LINK">("MANUAL");
   const [specialRequests, setSpecialRequests] = useState("");
   const [additionalTravelers, setAdditionalTravelers] = useState<Array<{ fullName: string; email: string; phone: string; gender: string; dateOfBirth: string; aadhaarAssetId: string }>>([]);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (packages.length > 0 && !packageId) {
+      setPackageId(packages[0].id);
+    }
+  }, [packages, packageId]);
+
+  const selectedPackage = packages.find((p: any) => p.id === packageId);
+  const basePrice = selectedPackage ? Number(selectedPackage.price) : Number(tripDetails?.totalAmount || trip.totalAmount || 0);
+  const tokenPrice = selectedPackage ? Number(selectedPackage.tokenAmount) : Number(tripDetails?.tokenAmount || trip.tokenAmount || 0);
+
+  let addOnsPrice = 0;
+  Object.entries(selectedAddOns).forEach(([id, qty]) => {
+    const addon = addOns.find((a: any) => a.id === id);
+    if (addon) addOnsPrice += Number(addon.price) * qty;
+  });
+
+  const totalPrice = basePrice * numberOfTravelers + addOnsPrice;
+  const recommendedTokenPrice = tokenPrice * numberOfTravelers;
+
+  useEffect(() => {
+    if (recommendedTokenPrice > 0) {
+      setPaymentAmount(String(recommendedTokenPrice));
+    }
+  }, [recommendedTokenPrice]);
 
   useEffect(() => {
     const extraCount = Math.max(0, numberOfTravelers - 1);
@@ -2356,6 +2393,10 @@ function CreateCrmBookingModal({
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!crmTripSlotId) {
+      toast.error("Please select a departure slot");
+      return;
+    }
     if (!fullName.trim() || !email.trim() || !phone.trim() || !gender || !dateOfBirth || !govtIdAssetId) {
       toast.error("Enter all lead traveler details and upload their Aadhaar card");
       return;
@@ -2365,8 +2406,8 @@ function CreateCrmBookingModal({
       return;
     }
     const amt = Number(paymentAmount);
-    if (!Number.isFinite(amt) || amt <= 0 || amt > Number(trip.totalAmount)) {
-      toast.error(`Please enter a payment amount between ₹1 and ₹${Number(trip.totalAmount).toFixed(2)}`);
+    if (!Number.isFinite(amt) || amt <= 0 || amt > totalPrice) {
+      toast.error(`Please enter a payment amount between ₹1 and ₹${totalPrice.toFixed(2)}`);
       return;
     }
 
@@ -2384,6 +2425,9 @@ function CreateCrmBookingModal({
         paymentAction,
         specialRequests: specialRequests.trim() || null,
         additionalTravelers,
+        crmTripSlotId,
+        packageId: packageId || null,
+        addOns: Object.entries(selectedAddOns).map(([addOnId, quantity]) => ({ addOnId, quantity })),
       };
 
       await apiClient.post(`/crm-trips/${trip.id}/bookings`, payload);
@@ -2441,6 +2485,107 @@ function CreateCrmBookingModal({
             </label>
           </div>
 
+          {/* Slot & Package Selectors */}
+          <div className="grid gap-4 sm:grid-cols-2 border-t pt-3">
+            <label className="block space-y-1 col-span-full">
+              <span className="text-xs font-semibold text-gray-500 uppercase">Departure Slot *</span>
+              {isLoadingDetails ? (
+                <div className="text-xs text-gray-400 flex items-center gap-1.5 py-1">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[#781216]" /> Loading departure dates...
+                </div>
+              ) : (
+                <select
+                  required
+                  className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
+                  value={crmTripSlotId}
+                  onChange={(e) => setCrmTripSlotId(e.target.value)}
+                >
+                  <option value="">Select departure date</option>
+                  {slots.map((slot: any) => {
+                    const availableSpots = slot.capacity - (slot.filledSpots || 0);
+                    const label = `${slot.title ? `${slot.title} (` : ""}${new Date(slot.startDate).toLocaleDateString("en-IN")} - ${new Date(slot.endDate).toLocaleDateString("en-IN")}${slot.title ? ")" : ""} (${availableSpots} spots left)`;
+                    return (
+                      <option key={slot.id} value={slot.id} disabled={availableSpots < numberOfTravelers}>
+                        {label}
+                      </option>
+                    );
+                  })}
+                </select>
+              )}
+            </label>
+
+            {!isLoadingDetails && packages.length > 0 && (
+              <label className="block space-y-1 col-span-full">
+                <span className="text-xs font-semibold text-gray-500 uppercase">Pricing Package *</span>
+                <select
+                  required
+                  className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
+                  value={packageId}
+                  onChange={(e) => setPackageId(e.target.value)}
+                >
+                  {packages.map((pkg: any) => (
+                    <option key={pkg.id} value={pkg.id}>
+                      {pkg.title} - ₹{Number(pkg.price).toLocaleString("en-IN")} (Token: ₹{Number(pkg.tokenAmount).toLocaleString("en-IN")} / person)
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+
+          {/* Add-Ons section */}
+          {!isLoadingDetails && addOns.length > 0 && (
+            <div className="space-y-3 border-t pt-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">Add-Ons</h4>
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {addOns.map((addon: any) => {
+                  const qty = selectedAddOns[addon.id] || 0;
+                  return (
+                    <div key={addon.id} className="flex items-center justify-between p-2.5 border border-gray-100 rounded-lg bg-gray-50/50 text-xs">
+                      <div>
+                        <div className="font-semibold text-gray-900">{addon.title}</div>
+                        {addon.description && <div className="text-gray-400 mt-0.5 line-clamp-1">{addon.description}</div>}
+                        <div className="font-medium text-[#781216] mt-0.5">₹{Number(addon.price).toLocaleString("en-IN")}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newQty = Math.max(0, qty - 1);
+                            setSelectedAddOns(prev => {
+                              const updated = { ...prev };
+                              if (newQty === 0) delete updated[addon.id];
+                              else updated[addon.id] = newQty;
+                              return updated;
+                            });
+                          }}
+                          className="w-6 h-6 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 text-gray-600 font-bold"
+                        >
+                          -
+                        </button>
+                        <span className="w-4 text-center font-medium">{qty}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newQty = qty + 1;
+                            if (addon.maxQuantityPerBooking && newQty > addon.maxQuantityPerBooking) {
+                              toast.error(`Maximum limit of ${addon.maxQuantityPerBooking} reached for this add-on`);
+                              return;
+                            }
+                            setSelectedAddOns(prev => ({ ...prev, [addon.id]: newQty }));
+                          }}
+                          className="w-6 h-6 rounded-full border border-[#c8a96e] bg-[#c8a96e]/10 flex items-center justify-center hover:bg-[#c8a96e]/20 text-[#781216] font-bold"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Additional travelers details */}
           {additionalTravelers.length > 0 && (
             <div className="space-y-3 border-t pt-3">
@@ -2493,7 +2638,9 @@ function CreateCrmBookingModal({
               <label className="block space-y-1">
                 <span className="text-xs font-semibold text-gray-500 uppercase">Payment Amount (₹)</span>
                 <Input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder="₹" />
-                <span className="text-[10px] text-gray-400 block mt-0.5">Prefilled token amount. (Total: ₹{Number(trip.totalAmount).toLocaleString("en-IN")})</span>
+                <span className="text-[10px] text-gray-400 block mt-0.5">
+                  Prefilled recommended token. (Total: ₹{totalPrice.toLocaleString("en-IN")})
+                </span>
               </label>
               <label className="block space-y-1">
                 <span className="text-xs font-semibold text-gray-500 uppercase">Payment Collection Action</span>

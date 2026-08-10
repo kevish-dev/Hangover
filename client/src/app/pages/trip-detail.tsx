@@ -1828,13 +1828,23 @@ function TripDetailContent({
             style={{
               width: "100%",
               height: "100%",
-              background: "#1e1a14",
               display: "flex",
+              flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
+              background: "linear-gradient(135deg, #1e1a14 0%, #2c1a1d 50%, #1e1a14 100%)",
+              color: "#fff",
+              textAlign: "center",
+              padding: "24px",
             }}
           >
-            <NA text="No Images Available" />
+            <MapPin size={48} strokeWidth={1.5} style={{ marginBottom: "16px", color: "#781216", opacity: 0.9 }} />
+            <h2 style={{ fontSize: "1.75rem", fontWeight: 600, letterSpacing: "0.02em", color: "#f5f0e6", margin: "0 auto", maxWidth: "600px" }}>
+              {trip.title || "Your Itinerary"}
+            </h2>
+            <p style={{ fontSize: "0.88rem", color: "rgba(245,240,230,0.6)", marginTop: "8px", fontWeight: 400, margin: 0 }}>
+              Itinerary details & travel plan
+            </p>
           </div>
         )}
         <div

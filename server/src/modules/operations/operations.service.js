@@ -273,12 +273,13 @@ export const updateOperationalTask = async (taskId, input) => {
     const quantityNeeded = data.quantityNeeded !== undefined ? data.quantityNeeded : current.quantityNeeded;
     const quantityAcquired = data.quantityAcquired !== undefined ? data.quantityAcquired : current.quantityAcquired;
 
-    // Auto-complete if acquired reaches needed
+    // Auto-complete if acquired reaches needed (unless status is explicitly specified as not DONE)
     if (unitPrice != null && quantityNeeded != null && quantityAcquired != null && quantityNeeded > 0 && quantityAcquired >= quantityNeeded) {
-      data.status = "DONE";
+      if (input.status === undefined || input.status === "DONE") {
+        data.status = "DONE";
+      }
     }
 
-    // Resolve completedAt based on final status
     const finalStatus = data.status || current.status;
     if (finalStatus === "DONE") data.completedAt = new Date();
     else if (data.status && data.status !== "DONE") data.completedAt = null;

@@ -77,6 +77,11 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
   const item: any = booking.customTrip || booking.trip || booking.festival || booking.crmTrip;
   const isCustom = booking.source === "CUSTOM" || Boolean(booking.customTrip);
   const isFestival = !!booking.festival;
+  const isCrm = booking.source === "CRM" || Boolean(booking.crmTrip);
+  const isCrmTripViewable = isCrm && (
+    item?.isPublished || 
+    (booking.status !== "PENDING" && booking.status !== "CANCELLED")
+  );
   const heroImage = item?.bannerImages?.[0] || booking.crmTrip?.websiteBannerImages?.[0] || "";
   const state = isCustom ? "Private custom trip" : (item as any)?.destination?.state || booking.crmTrip?.destination?.name || (item as any)?.location || "";
   const travelStart = booking.customTrip?.startDate || booking.slot?.startDate || booking.crmTripSlot?.startDate;
@@ -435,23 +440,33 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
                 <RotateCcw size={10} /> Book Again
               </Link>
             )}
-            {!isCustom ? <Link
-              className="profile-booking-view-action"
-              to={isFestival ? `/festivals/${item?.id}` : `/trips/${item?.id}`}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-                color: hovered ? "#781216" : "rgba(30,26,20,0.45)",
-                fontSize: "0.72rem",
-                fontWeight: 500,
-                textDecoration: "none",
-                transition: "color 0.2s ease",
-                whiteSpace: "nowrap",
-              }}
-            >
-              View {isFestival ? "Festival" : "Trip"} <ChevronRight size={12} />
-            </Link> : <span style={{ color: "rgba(30,26,20,0.45)", fontSize: "0.72rem", fontWeight: 500 }}>Private itinerary</span>}
+            {isCustom ? (
+              <span style={{ color: "rgba(30,26,20,0.45)", fontSize: "0.72rem", fontWeight: 500 }}>Private itinerary</span>
+            ) : !item?.id ? (
+              <span style={{ color: "rgba(30,26,20,0.45)", fontSize: "0.72rem", fontWeight: 500 }}>Itinerary unavailable</span>
+            ) : isCrm && !isCrmTripViewable ? (
+              <span style={{ color: "rgba(30,26,20,0.45)", fontSize: "0.72rem", fontWeight: 500 }}>
+                {booking.status === "PENDING" ? "Pending payment" : "Itinerary unavailable"}
+              </span>
+            ) : (
+              <Link
+                className="profile-booking-view-action"
+                to={isFestival ? `/festivals/${item?.id}` : `/trips/${item?.id}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  color: hovered ? "#781216" : "rgba(30,26,20,0.45)",
+                  fontSize: "0.72rem",
+                  fontWeight: 500,
+                  textDecoration: "none",
+                  transition: "color 0.2s ease",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                View {isFestival ? "Festival" : "Trip"} <ChevronRight size={12} />
+              </Link>
+            )}
           </div>
         </div>
       </div>

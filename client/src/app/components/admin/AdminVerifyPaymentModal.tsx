@@ -151,7 +151,7 @@ export default function AdminVerifyPaymentModal({
               variant="outline"
               onClick={() => handleAction("REJECT")}
               disabled={submitting}
-              className="text-red-600 hover:bg-red-50 border-red-200"
+              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><XCircle className="mr-1.5 h-4 w-4" /> {showRejectBox ? "Confirm Rejection" : "Reject"}</>}
             </Button>
@@ -159,7 +159,7 @@ export default function AdminVerifyPaymentModal({
               type="button"
               onClick={() => handleAction("VERIFY")}
               disabled={submitting}
-              className="bg-green-700 hover:bg-green-800 text-white font-bold"
+              className="bg-green-600 hover:bg-green-700 text-white font-bold"
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ShieldCheck className="mr-1.5 h-4 w-4" /> Mark as Verified</>}
             </Button>

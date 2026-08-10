@@ -10,10 +10,75 @@ import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 
 type MediaImage = { url: string; caption?: string };
-type Destination = { id: string; name: string };
-type Stay = { id: string; name: string; description?: string | null; imageUrl?: string | null; images?: MediaImage[] | null; isActive: boolean; _count?: { properties: number; places: number } };
-type Item = { id: string; name: string; description?: string | null; address?: string | null; imageUrl?: string | null; images?: MediaImage[] | null; isActive: boolean };
+type HighlightItem = { imageUrl?: string | null; text: string; caption?: string | null };
+type Destination = { id: string; name: string; description?: string | null; imageUrl?: string | null; images?: MediaImage[] | null; highlights?: HighlightItem[] | null };
+type Stay = { id: string; name: string; description?: string | null; imageUrl?: string | null; images?: MediaImage[] | null; highlights?: HighlightItem[] | null; isActive: boolean; _count?: { properties: number; places: number } };
+type Item = { id: string; name: string; description?: string | null; address?: string | null; imageUrl?: string | null; images?: MediaImage[] | null; highlights?: HighlightItem[] | null; isActive: boolean };
 type Kind = "destination" | "stay" | "property" | "place" | "transfer";
+
+const normalizeImages = (rawImages: any, coverUrl?: string | null): MediaImage[] => {
+  let parsed: any[] = [];
+  if (Array.isArray(rawImages)) {
+    parsed = rawImages;
+  } else if (typeof rawImages === "string" && rawImages.trim()) {
+    try {
+      parsed = JSON.parse(rawImages);
+      if (typeof parsed === "string") {
+        try { parsed = JSON.parse(parsed); } catch (e) {}
+      }
+    } catch (e) {
+      parsed = [];
+    }
+  }
+  if (!Array.isArray(parsed)) parsed = [];
+
+  const list: MediaImage[] = parsed
+    .map((img: any) => {
+      if (typeof img === "string") return { url: img.trim(), caption: "" };
+      if (!img || typeof img !== "object") return null;
+      const url = (img.url || img.imageUrl || img.src || "").trim();
+      const caption = (img.caption || img.text || img.description || img.title || "").trim();
+      if (!url) return null;
+      return { url, caption };
+    })
+    .filter((img): img is MediaImage => Boolean(img && img.url));
+
+  const cleanCover = coverUrl?.trim();
+  if (cleanCover && !list.some((img) => img.url === cleanCover)) {
+    list.unshift({ url: cleanCover, caption: "" });
+  }
+  return list;
+};
+
+const normalizeHighlights = (rawHighlights: any): HighlightItem[] => {
+  let parsed: any[] = [];
+  if (Array.isArray(rawHighlights)) {
+    parsed = rawHighlights;
+  } else if (typeof rawHighlights === "string" && rawHighlights.trim()) {
+    try {
+      parsed = JSON.parse(rawHighlights);
+      if (typeof parsed === "string") {
+        try { parsed = JSON.parse(parsed); } catch (e) {}
+      }
+    } catch (e) {
+      parsed = [];
+    }
+  }
+  if (!Array.isArray(parsed)) parsed = [];
+
+  return parsed
+    .map((h: any) => {
+      if (typeof h === "string") return { text: h.trim(), caption: "", imageUrl: null };
+      if (!h || typeof h !== "object") return null;
+      const text = (h.text || h.title || h.name || (h.caption && !h.imageUrl ? h.caption : "") || h.description || "").trim();
+      const caption = (h.caption && h.text ? h.caption : (h.description && h.text ? h.description : "")).trim();
+      const imageUrl = (h.imageUrl || h.url || h.image || "").trim() || null;
+      if (!text && !caption && !imageUrl) return null;
+      return { text: text || caption || "Highlight", caption, imageUrl };
+    })
+    .filter((h): h is HighlightItem => Boolean(h));
+};
+
 const info: Record<Kind, { singular: string; endpoint: string }> = {
   destination: { singular: "Destination", endpoint: "/crm-destinations" },
   stay: { singular: "Stay location", endpoint: "/stay-locations" },
@@ -61,7 +126,48 @@ export default function CrmMasterDataPage() {
     });
   };
 
-  if (!destination) return <div className="mx-auto max-w-7xl space-y-6 pb-12"><header className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#b59410]">CRM foundation</p><h1 className="mt-1 text-3xl font-bold tracking-tight text-gray-900">Master data</h1><p className="mt-2 text-sm text-gray-500">Choose a destination, then manage its stay locations, properties and visiting places in context.</p></div><Button onClick={() => setDialog({ kind: "destination" })} className="bg-[#781216] text-white hover:bg-[#5f0e11]"><Plus className="mr-2 h-4 w-4" />Add destination</Button></header>{destinationsQuery.isLoading ? <Loading label="destinations" /> : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{destinations.map((item) => <button key={item.id} onClick={() => setDestination(item)} className="group rounded-xl border border-gray-200 bg-white p-5 text-left shadow-sm transition hover:border-[#b59410] hover:shadow-md"><MapPin className="h-6 w-6 text-[#b59410]" /><h2 className="mt-5 text-lg font-bold text-gray-900">{item.name}</h2><p className="mt-1 text-sm text-gray-500">Manage stay locations</p></button>)}{!destinations.length && <Empty label="destinations" />}</div>}<MasterDialog dialog={dialog} destination={null} stay={null} stays={[]} onClose={() => setDialog(null)} onSaved={() => dialog && invalidate(dialog.kind)} /></div>;
+  if (!destination)
+    return (
+      <div className="mx-auto max-w-7xl space-y-6 pb-12">
+        <header className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#b59410]">CRM foundation</p>
+            <h1 className="mt-1 text-3xl font-bold tracking-tight text-gray-900">Master data</h1>
+            <p className="mt-2 text-sm text-gray-500">Choose a destination, then manage its stay locations, properties and visiting places in context.</p>
+          </div>
+          <Button onClick={() => setDialog({ kind: "destination" })} className="bg-[#781216] text-white hover:bg-[#5f0e11]">
+            <Plus className="mr-2 h-4 w-4" />Add destination
+          </Button>
+        </header>
+        {destinationsQuery.isLoading ? (
+          <Loading label="destinations" />
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {destinations.map((item) => (
+              <div key={item.id} className="group relative flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-[#b59410] hover:shadow-md">
+                <button onClick={() => setDestination(item)} className="text-left w-full">
+                  <MapPin className="h-6 w-6 text-[#b59410]" />
+                  <h2 className="mt-3 text-lg font-bold text-gray-900">{item.name}</h2>
+                  {item.description && <p className="mt-1 text-xs text-gray-500 line-clamp-2">{item.description}</p>}
+                  <p className="mt-2 text-xs font-medium text-gray-400">Click to manage stay locations →</p>
+                  {item.highlights && item.highlights.length > 0 && (
+                    <div className="mt-3 space-y-1 border-t border-gray-100 pt-2">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Highlights ({item.highlights.length})</span>
+                      {item.highlights.slice(0, 2).map((h, idx) => (
+                        <p key={idx} className="text-xs text-gray-600 truncate">• {h.text}</p>
+                      ))}
+                    </div>
+                  )}
+                </button>
+                <CardActions onEdit={() => setDialog({ kind: "destination", item })} onDelete={() => remove("destination", item as any)} />
+              </div>
+            ))}
+            {!destinations.length && <Empty label="destinations" />}
+          </div>
+        )}
+        <MasterDialog dialog={dialog} destination={null} stay={null} stays={[]} onClose={() => setDialog(null)} onSaved={() => dialog && invalidate(dialog.kind)} />
+      </div>
+    );
 
   if (!stay)
     return (
@@ -125,6 +231,14 @@ export default function CrmMasterDataPage() {
                       <p className="mt-2 min-h-10 text-sm leading-relaxed text-gray-500">
                         {legacy ? "Older places need to be moved to their real stay location." : item.description || "Open to manage the properties and places for this stay."}
                       </p>
+                      {item.highlights && item.highlights.length > 0 && (
+                        <div className="mt-3 space-y-1 border-t border-gray-100 pt-2">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Highlights ({item.highlights.length})</span>
+                          {item.highlights.slice(0, 2).map((h, idx) => (
+                            <p key={idx} className="text-xs text-gray-600 truncate">• {h.text}</p>
+                          ))}
+                        </div>
+                      )}
                       <div className="mt-5 flex gap-2">
                         <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">{item._count?.places || 0} places</span>
                         <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">{item._count?.properties || 0} properties</span>
@@ -132,7 +246,7 @@ export default function CrmMasterDataPage() {
                     </div>
                   </button>
                   <div className="px-5 pb-5">
-                    <CardActions onEdit={() => setDialog({ kind: "stay", item })} onDelete={() => remove("stay", item)} />
+                    <CardActions onEdit={() => setDialog({ kind: "stay", item })} onDelete={() => remove("stay", item as any)} />
                   </div>
                 </article>
               );
@@ -200,6 +314,24 @@ export default function CrmMasterDataPage() {
                           ))}
                       </div>
                     )}
+                    {tab === "place" && item.highlights && item.highlights.length > 0 && (
+                      <div className="mt-4 space-y-2 border-t border-gray-100 pt-3">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Highlights</span>
+                        <div className="space-y-1.5">
+                          {item.highlights.map((highlight, idx) => (
+                            <div key={idx} className="flex items-center gap-2 text-xs text-gray-700 bg-gray-50/70 p-1.5 rounded-lg border border-gray-100">
+                              {highlight.imageUrl && (
+                                <img src={highlight.imageUrl} alt="" className="h-6 w-8 object-cover rounded border bg-white shrink-0" />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <span className="font-medium truncate block" title={highlight.text}>{highlight.text}</span>
+                                {highlight.caption && <span className="text-[10px] text-gray-400 truncate block">{highlight.caption}</span>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="px-5 pb-5">
@@ -217,40 +349,38 @@ export default function CrmMasterDataPage() {
 }
 
 function MasterDialog({ dialog, destination, stay, stays, onClose, onSaved }: { dialog: { kind: Kind; item?: any } | null; destination: Destination | null; stay: Stay | null; stays: Stay[]; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState<{ name: string; description: string; address: string; imageUrl: string; images: MediaImage[]; isActive: boolean; stayLocationId: string }>({
+  const [form, setForm] = useState<{ name: string; description: string; address: string; imageUrl: string; images: MediaImage[]; highlights: HighlightItem[]; isActive: boolean; stayLocationId: string }>({
     name: "",
     description: "",
     address: "",
     imageUrl: "",
     images: [],
+    highlights: [],
     isActive: true,
     stayLocationId: "",
   });
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingHighlightIdx, setUploadingHighlightIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (dialog?.item) {
-      const rawImages = Array.isArray(dialog.item.images) ? dialog.item.images : [];
-      const normalizedImages: MediaImage[] = rawImages
-        .map((img: any) => (typeof img === "string" ? { url: img, caption: "" } : { url: img?.url || img?.imageUrl || "", caption: img?.caption || "" }))
-        .filter((img: MediaImage) => Boolean(img.url));
-
-      if (dialog.item.imageUrl && !normalizedImages.some((img) => img.url === dialog.item.imageUrl)) {
-        normalizedImages.unshift({ url: dialog.item.imageUrl, caption: "" });
-      }
+      const normalizedImages = normalizeImages(dialog.item.images, dialog.item.imageUrl || dialog.item.url);
+      const normalizedHighlights = normalizeHighlights(dialog.item.highlights);
+      const coverUrl = dialog.item.imageUrl || dialog.item.url || normalizedImages[0]?.url || "";
 
       setForm({
         name: dialog.item.name || "",
         description: dialog.item.description || "",
         address: dialog.item.address || "",
-        imageUrl: dialog.item.imageUrl || normalizedImages[0]?.url || "",
+        imageUrl: coverUrl,
         images: normalizedImages,
+        highlights: normalizedHighlights,
         isActive: dialog.item.isActive !== false,
         stayLocationId: "",
       });
     } else {
-      setForm({ name: "", description: "", address: "", imageUrl: "", images: [], isActive: true, stayLocationId: "" });
+      setForm({ name: "", description: "", address: "", imageUrl: "", images: [], highlights: [], isActive: true, stayLocationId: "" });
     }
   }, [dialog]);
 
@@ -264,16 +394,28 @@ function MasterDialog({ dialog, destination, stay, stays, onClose, onSaved }: { 
     const payload: Record<string, any> = { name: form.name.trim() };
     if (kind === "stay" || kind === "transfer") payload.destinationId = destination?.id;
     if (kind === "property" || kind === "place") payload.stayLocationId = movingLegacyPlace ? form.stayLocationId : stay?.id;
+
+    payload.description = form.description.trim() || null;
     if (kind !== "destination") {
-      payload.description = form.description.trim() || null;
       payload.isActive = form.isActive;
     }
     if (kind === "property") payload.address = form.address.trim() || null;
 
-    if (kind === "stay" || kind === "place" || kind === "property") {
+    if (kind === "destination" || kind === "stay" || kind === "place" || kind === "property") {
       const cleanImages = form.images.filter((img) => Boolean(img.url.trim()));
       payload.images = cleanImages;
       payload.imageUrl = cleanImages[0]?.url || form.imageUrl.trim() || null;
+    }
+
+    if (kind === "destination" || kind === "stay" || kind === "place") {
+      const cleanHighlights = form.highlights
+        .map((h) => ({
+          imageUrl: h.imageUrl?.trim() || null,
+          text: h.text.trim(),
+          caption: h.caption?.trim() || null,
+        }))
+        .filter((h) => Boolean(h.text || h.imageUrl));
+      payload.highlights = cleanHighlights;
     }
 
     if (movingLegacyPlace && !payload.stayLocationId) return toast.error("Choose the stay location this visiting place belongs to");
@@ -317,7 +459,7 @@ function MasterDialog({ dialog, destination, stay, stays, onClose, onSaved }: { 
               <Input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} />
             </Field>
           )}
-          {(kind === "stay" || kind === "place" || kind === "property") && (
+          {(kind === "destination" || kind === "stay" || kind === "place" || kind === "property") && (
             <div className="space-y-3 pt-1">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-gray-700">Images & Captions (optional)</span>
@@ -336,7 +478,7 @@ function MasterDialog({ dialog, destination, stay, stays, onClose, onSaved }: { 
                           </span>
                         )}
                       </div>
-                      <div className="flex-1 space-y-1">
+                      <div className="flex-1 min-w-0 space-y-1">
                         <Input
                           placeholder="Add caption (optional)"
                           value={img.caption || ""}
@@ -347,7 +489,7 @@ function MasterDialog({ dialog, destination, stay, stays, onClose, onSaved }: { 
                           }}
                           className="h-8 text-xs bg-white"
                         />
-                        <p className="text-[10px] text-gray-400 truncate">{img.url}</p>
+                        <p className="text-[10px] text-gray-400 truncate max-w-[200px] sm:max-w-[320px]" title={img.url}>{img.url}</p>
                       </div>
                       <button
                         type="button"
@@ -411,20 +553,150 @@ function MasterDialog({ dialog, destination, stay, stays, onClose, onSaved }: { 
               </label>
             </div>
           )}
-          {kind !== "destination" && (
-            <>
-              <Field label="Description (optional)">
-                <Textarea rows={3} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
-              </Field>
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
-                <input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />
-                Active and selectable
-              </label>
-            </>
+          
+          <Field label="Description (optional)">
+            <Textarea rows={3} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
+          </Field>
+
+          {(kind === "destination" || kind === "stay" || kind === "place") && (
+            <div className="space-y-3 pt-1 border-t border-gray-100 mt-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-800">Highlights (optional)</span>
+                <span className="text-xs text-gray-500">{form.highlights.length} {form.highlights.length === 1 ? "highlight" : "highlights"}</span>
+              </div>
+
+              {form.highlights.length > 0 && (
+                <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                  {form.highlights.map((highlight, idx) => (
+                    <div key={idx} className="flex flex-col gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50/50">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-gray-400">Highlight #{idx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = form.highlights.filter((_, i) => i !== idx);
+                            setForm({ ...form, highlights: updated });
+                          }}
+                          className="text-xs text-red-600 hover:underline"
+                        >
+                          Remove
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Field label="Highlight text / title">
+                          <Input
+                            required
+                            placeholder="E.g., Breathtaking sunset view"
+                            value={highlight.text}
+                            onChange={(e) => {
+                              const updated = [...form.highlights];
+                              updated[idx] = { ...updated[idx], text: e.target.value };
+                              setForm({ ...form, highlights: updated });
+                            }}
+                            className="bg-white"
+                          />
+                        </Field>
+
+                        <Input
+                          placeholder="Add caption (optional)"
+                          value={highlight.caption || ""}
+                          onChange={(e) => {
+                            const updated = [...form.highlights];
+                            updated[idx] = { ...updated[idx], caption: e.target.value };
+                            setForm({ ...form, highlights: updated });
+                          }}
+                          className="h-8 text-xs bg-white"
+                        />
+
+                        <div className="flex items-center gap-3">
+                          {highlight.imageUrl ? (
+                            <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
+                              <img src={highlight.imageUrl} alt={`Highlight ${idx + 1}`} className="h-full w-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = [...form.highlights];
+                                  updated[idx] = { ...updated[idx], imageUrl: null };
+                                  setForm({ ...form, highlights: updated });
+                                }}
+                                className="absolute top-0.5 right-0.5 p-1 bg-black/60 hover:bg-black/80 text-white rounded-full transition"
+                                title="Remove image"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <label className="flex h-16 w-20 shrink-0 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-white hover:border-[#b59410] transition">
+                              {uploadingHighlightIdx === idx ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-[#781216]" />
+                              ) : (
+                                <>
+                                  <UploadCloud className="h-4 w-4 text-gray-400" />
+                                  <span className="text-[10px] text-gray-500 font-semibold mt-1">Upload</span>
+                                </>
+                              )}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                disabled={uploadingHighlightIdx !== null}
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  setUploadingHighlightIdx(idx);
+                                  try {
+                                    const url = await uploadGenericImageDirect(file);
+                                    const updated = [...form.highlights];
+                                    updated[idx] = { ...updated[idx], imageUrl: url };
+                                    setForm({ ...form, highlights: updated });
+                                    toast.success("Highlight image uploaded successfully");
+                                  } catch (err: any) {
+                                    toast.error(err?.message || "Failed to upload image");
+                                  } finally {
+                                    setUploadingHighlightIdx(null);
+                                  }
+                                }}
+                              />
+                            </label>
+                          )}
+                          <div className="flex-1 min-w-0 text-xs text-gray-500">
+                            {highlight.imageUrl ? (
+                              <span className="truncate block max-w-[150px] sm:max-w-[250px]" title={highlight.imageUrl}>{highlight.imageUrl}</span>
+                            ) : (
+                              <span>Add an image to represent this highlight.</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setForm({ ...form, highlights: [...form.highlights, { text: "", caption: "", imageUrl: null }] });
+                }}
+                className="w-full text-xs font-semibold py-1.5 h-8 border-dashed"
+              >
+                + Add Highlight
+              </Button>
+            </div>
           )}
+          
+          {kind !== "destination" && (
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 mt-4 block">
+              <input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />
+              Active and selectable
+            </label>
+          )}
+
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button disabled={saving || uploadingImage} className="bg-[#781216] text-white hover:bg-[#5f0e11]">
+            <Button disabled={saving || uploadingImage || uploadingHighlightIdx !== null} className="bg-[#781216] text-white hover:bg-[#5f0e11]">
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {movingLegacyPlace ? "Move place" : item ? "Save changes" : `Create ${meta.singular}`}
             </Button>

@@ -464,8 +464,26 @@ export const getFeaturedPublicTrips = async () => ({
   data: (await repository.findFeaturedPublic()).map(toPublicTrip),
 });
 
-export const getPublicTrip = async (id) => {
-  const trip = await repository.findPublicById(id);
+export const getPublicTrip = async (id, user = null) => {
+  let trip = await repository.findPublicById(id);
+
+  if (!trip && user) {
+    if (user.role === "ADMIN") {
+      trip = await repository.findById(id);
+    } else {
+      const booking = await prisma.booking.findFirst({
+        where: {
+          userId: user.id,
+          crmTripId: id,
+          status: { in: ["RESERVED", "CONFIRMED", "COMPLETED"] },
+        },
+      });
+      if (booking) {
+        trip = await repository.findById(id);
+      }
+    }
+  }
+
   if (!trip) throw new NotFoundError("Trip not found");
   return toPublicTrip(trip);
 };

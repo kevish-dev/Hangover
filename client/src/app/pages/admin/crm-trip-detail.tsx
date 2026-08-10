@@ -1501,6 +1501,45 @@ function CrmBookingDetailsDialog(
   });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
+
+  const packages = trip.packages || [];
+  const addOns = trip.addOns || [];
+
+  const [packageId, setPackageId] = useState("");
+  const [selectedAddOns, setSelectedAddOns] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (packages.length > 0 && !packageId) {
+      setPackageId(packages[0].id);
+    }
+  }, [packages, packageId]);
+
+  const selectedPackage = packages.find((p: any) => p.id === packageId);
+  const basePrice = selectedPackage ? Number(selectedPackage.price) : Number(trip.totalAmount || 0);
+  const tokenPrice = selectedPackage ? Number(selectedPackage.tokenAmount) : Number(trip.tokenAmount || 0);
+  const numTravelers = Math.max(1, Number(form.numberOfTravelers) || 1);
+
+  let addOnsPrice = 0;
+  Object.entries(selectedAddOns).forEach(([id, qty]) => {
+    const addon = addOns.find((a: any) => a.id === id);
+    if (addon) addOnsPrice += Number(addon.price) * qty;
+  });
+
+  const totalPrice = basePrice * numTravelers + addOnsPrice;
+  const recommendedTokenPrice = tokenPrice * numTravelers;
+
+  useEffect(() => {
+    if (recommendedTokenPrice > 0) {
+      setForm((current) => ({ ...current, paymentAmount: String(recommendedTokenPrice) }));
+    }
+  }, [recommendedTokenPrice]);
+
+  useEffect(() => {
+    if (open) {
+      reset();
+    }
+  }, [open]);
+
   const update = (key: keyof typeof form, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
   const updateTraveler = (
@@ -1563,7 +1602,7 @@ function CrmBookingDetailsDialog(
       setUploading(null);
     }
   };
-  const reset = () =>
+  const reset = () => {
     setForm({
       fullName: "",
       email: "",
@@ -1574,10 +1613,13 @@ function CrmBookingDetailsDialog(
       crmTripSlotId: "",
       numberOfTravelers: "1",
       additionalTravelers: [],
-      paymentAmount: String(trip.tokenAmount),
+      paymentAmount: String(trip.tokenAmount || ""),
       paymentAction: "MANUAL",
       specialRequests: "",
     });
+    setPackageId(packages[0]?.id || "");
+    setSelectedAddOns({});
+  };
   const submit = async () => {
     const travelers = Math.max(1, Number(form.numberOfTravelers) || 1);
     const amount = Number(form.paymentAmount);
@@ -1604,8 +1646,8 @@ function CrmBookingDetailsDialog(
     if (!form.crmTripSlotId || !amount) {
       return toast.error("Departure and first payment are required");
     }
-    if (amount > Number(trip.totalAmount)) {
-      return toast.error("The first payment cannot exceed the trip total");
+    if (amount > totalPrice) {
+      return toast.error("The first payment cannot exceed the total booking price");
     }
     const slot = trip.slots.find((item) => item.id === form.crmTripSlotId);
     if (!slot || slot.capacity - slot.filledSpots < travelers) {
@@ -1620,6 +1662,8 @@ function CrmBookingDetailsDialog(
         phone: form.phone.trim(),
         numberOfTravelers: travelers,
         paymentAmount: amount,
+        packageId: packageId || null,
+        addOns: Object.entries(selectedAddOns).map(([addOnId, quantity]) => ({ addOnId, quantity })),
       });
       toast.success(
         form.paymentAction === "SEND_LINK"
@@ -1828,6 +1872,76 @@ function CrmBookingDetailsDialog(
               })}
             </select>
           </Field>
+
+          {packages.length > 0 && (
+            <Field label="Pricing Package *">
+              <select
+                required
+                className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
+                value={packageId}
+                onChange={(e) => setPackageId(e.target.value)}
+              >
+                {packages.map((pkg: any) => (
+                  <option key={pkg.id} value={pkg.id}>
+                    {pkg.title} - ₹{Number(pkg.price).toLocaleString("en-IN")} (Token: ₹{Number(pkg.tokenAmount).toLocaleString("en-IN")} / person)
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+
+          {addOns.length > 0 && (
+            <div className="space-y-3 border-t pt-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">Add-Ons</h4>
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {addOns.map((addon: any) => {
+                  const qty = selectedAddOns[addon.id] || 0;
+                  return (
+                    <div key={addon.id} className="flex items-center justify-between p-2.5 border border-gray-100 rounded-lg bg-gray-50/50 text-xs">
+                      <div>
+                        <div className="font-semibold text-gray-900">{addon.title}</div>
+                        {addon.description && <div className="text-gray-400 mt-0.5 line-clamp-1">{addon.description}</div>}
+                        <div className="font-medium text-[#781216] mt-0.5">₹{Number(addon.price).toLocaleString("en-IN")}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newQty = Math.max(0, qty - 1);
+                            setSelectedAddOns(prev => {
+                              const updated = { ...prev };
+                              if (newQty === 0) delete updated[addon.id];
+                              else updated[addon.id] = newQty;
+                              return updated;
+                            });
+                          }}
+                          className="w-6 h-6 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 text-gray-600 font-bold"
+                        >
+                          -
+                        </button>
+                        <span className="w-4 text-center font-medium">{qty}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newQty = qty + 1;
+                            if (addon.maxQuantityPerBooking && newQty > addon.maxQuantityPerBooking) {
+                              toast.error(`Maximum limit of ${addon.maxQuantityPerBooking} reached for this add-on`);
+                              return;
+                            }
+                            setSelectedAddOns(prev => ({ ...prev, [addon.id]: newQty }));
+                          }}
+                          className="w-6 h-6 rounded-full border border-[#c8a96e] bg-[#c8a96e]/10 flex items-center justify-center hover:bg-[#c8a96e]/20 text-[#781216] font-bold"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <Field label="Special requests">
             <Textarea
               value={form.specialRequests}
@@ -1840,12 +1954,15 @@ function CrmBookingDetailsDialog(
               <Field label="First payment *">
                 <Input
                   min="0.01"
-                  max={String(trip.totalAmount)}
+                  max={String(totalPrice)}
                   step="0.01"
                   type="number"
                   value={form.paymentAmount}
                   onChange={(e) => update("paymentAmount", e.target.value)}
                 />
+                <span className="text-[10px] text-gray-400 block mt-1">
+                  Prefilled recommended token. (Total: ₹{totalPrice.toLocaleString("en-IN")})
+                </span>
               </Field>
               <Field label="Collection">
                 <select
