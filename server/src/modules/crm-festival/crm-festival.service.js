@@ -982,30 +982,56 @@ export const manuallyRegenerateInclusions = async (festivalId) => {
 };
 
 export const getOperationsCalendar = async (festivalId, requestedSlotId) => {
-  const festival = await repository.findById(festivalId);
-  if (!festival) throw new NotFoundError("CRM festival not found");
-
-  const slot = requestedSlotId
-    ? festival.slots.find((s) => s.id === requestedSlotId)
-    : festival.slots[0];
-  if (!slot) return { slot: null, days: [] };
-
-  const bookings = await prisma.booking.findMany({
-    where: { crmFestivalSlotId: slot.id, status: { not: "CANCELLED" } },
-    include: {
-      user: { include: { profile: true } },
-      operationalTasks: { include: { reminders: true } },
+  const festival = await prisma.crmFestival.findUnique({
+    where: { id: festivalId },
+    select: {
+      id: true,
+      name: true,
+      operationsReminderDays: true,
+      slots: {
+        orderBy: [{ priority: "desc" }, { startDate: "asc" }],
+        include: { _count: { select: { bookings: true } } },
+      },
     },
   });
-
-  return {
-    slot,
-    days: festival.itineraryDays.map((day) => ({
-      ...day,
-      bookings: bookings.map((b) => ({
-        ...b,
-        tasks: b.operationalTasks.filter((t) => t.crmFestivalItineraryDayId === day.id),
-      })),
-    })),
-  };
+  if (!festival) throw new NotFoundError("CRM festival not found");
+  const datedSlots = festival.slots.filter(
+    (item) => item.startDate && item.endDate,
+  );
+  const slot = requestedSlotId
+    ? datedSlots.find((item) => item.id === requestedSlotId)
+    : datedSlots[0];
+  if (!slot)
+    throw new ValidationError(
+      "Choose a valid departure slot for this CRM festival",
+    );
+  const bookings = await prisma.booking.findMany({
+    where: { crmFestivalId: festivalId, crmFestivalSlotId: slot.id, source: "CRM" },
+    select: {
+      id: true,
+      bookingReference: true,
+      numberOfTravelers: true,
+      user: {
+        select: { email: true, profile: { select: { fullName: true } } },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  const tasks = await prisma.operationalTask.findMany({
+    where: { booking: { crmFestivalId: festivalId, crmFestivalSlotId: slot.id } },
+    include: {
+      booking: {
+        select: {
+          id: true,
+          bookingReference: true,
+          user: {
+            select: { email: true, profile: { select: { fullName: true } } },
+          },
+        },
+      },
+      crmFestivalItineraryDay: { select: { id: true, dayNumber: true } },
+    },
+    orderBy: [{ dueAt: "asc" }, { createdAt: "asc" }],
+  });
+  return { festival, slots: datedSlots, slot, bookings, tasks };
 };

@@ -4,6 +4,8 @@ import { apiClient } from "../../../lib/axios";
 import { X, Loader2, User, MapPin, IndianRupee, Users, PlusCircle, ArrowLeft, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { Check } from "lucide-react";
+import { uploadGenericImageDirect } from "../../../lib/directImageUpload";
 
 export default function CreateBookingModal({ 
   onClose, 
@@ -41,20 +43,20 @@ export default function CreateBookingModal({
   const [uploadingAdditionalIdx, setUploadingAdditionalIdx] = useState<number | null>(null);
 
   const { data: tripsData, isLoading: isLoadingTrips } = useQuery({
-    queryKey: ["admin", "all-trips"],
-    queryFn: () => apiClient.get("/trips?limit=100&adminView=true").then(res => res.data)
+    queryKey: ["admin", "all-crm-trips"],
+    queryFn: () => apiClient.get("/crm-trips?limit=100").then(res => res.data)
   });
 
   const { data: festivalsData, isLoading: isLoadingFestivals } = useQuery({
-    queryKey: ["admin", "all-festivals"],
-    queryFn: () => apiClient.get("/festivals?limit=100&adminView=true").then(res => res.data)
+    queryKey: ["admin", "all-crm-festivals"],
+    queryFn: () => apiClient.get("/crm-festivals?limit=100").then(res => res.data)
   });
 
-  const items = formData.itemType === "TRIP" ? (tripsData?.data || []) : (festivalsData?.data || []);
+  const items = formData.itemType === "TRIP" ? (tripsData?.data || tripsData || []) : (festivalsData?.data || festivalsData || []);
   
   const { data: itemDetails, isLoading: isLoadingItemDetails } = useQuery({
     queryKey: ["admin", "item-details", formData.itemType, formData.itemId],
-    queryFn: () => apiClient.get(`/${formData.itemType.toLowerCase()}s/${formData.itemId}?adminView=true`).then(res => res.data),
+    queryFn: () => apiClient.get(`/crm-${formData.itemType.toLowerCase()}s/${formData.itemId}`).then(res => res.data),
     enabled: !!formData.itemId
   });
 
@@ -82,7 +84,7 @@ export default function CreateBookingModal({
         const extraCount = formData.numberOfTravelers - 1;
         const currentExtras = [...formData.additionalTravelers];
         while (currentExtras.length < extraCount) {
-          currentExtras.push({ fullName: "", email: "", phone: "", gender: "", dateOfBirth: "", aadhaar: "" });
+          currentExtras.push({ fullName: "", email: "", phone: "", gender: "", dateOfBirth: "", aadhaarAssetId: "" });
         }
         if (currentExtras.length > extraCount) {
           currentExtras.length = extraCount;
@@ -136,16 +138,15 @@ export default function CreateBookingModal({
         setIsUploadingGovtId(true);
       }
       
-      const res = await apiClient.post("/bookings/traveler/govt-id", form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      
-      if (index !== undefined) {
-        handleAdditionalTravelerChange(index, "aadhaarAssetId", res.data.assetId);
-      } else {
-        updateForm("govtIdAssetId", res.data.assetId);
+      const res = await uploadGenericImageDirect(file, "document");
+      if (res.assetId) {
+        if (index !== undefined) {
+          handleAdditionalTravelerChange(index, "aadhaarAssetId", res.assetId);
+        } else {
+          updateForm("govtIdAssetId", res.assetId);
+        }
+        toast.success("Document uploaded successfully");
       }
-      toast.success("Govt ID uploaded successfully");
     } catch (error) {
       toast.error("Failed to upload Govt ID");
     } finally {
@@ -173,7 +174,20 @@ export default function CreateBookingModal({
     
     setIsSubmitting(true);
     try {
-      await apiClient.post("/bookings/admin-create", formData);
+      const endpoint = formData.itemType === "TRIP" 
+        ? `/crm-trips/${formData.itemId}/bookings` 
+        : `/crm-festivals/${formData.itemId}/bookings`;
+        
+      const paymentAmount = formData.initialPaymentType === "TOKEN" ? totalToken : total;
+
+      const payload = {
+        ...formData,
+        paymentAmount,
+        crmTripSlotId: formData.itemType === "TRIP" ? formData.slotId : undefined,
+        crmFestivalSlotId: formData.itemType === "FESTIVAL" ? formData.slotId : undefined,
+      };
+
+      await apiClient.post(endpoint, payload);
       toast.success("Booking created successfully!");
       onSuccess();
     } catch (error: any) {
@@ -183,7 +197,6 @@ export default function CreateBookingModal({
     }
   };
 
-  // Pricing Summary Calculations
   const selectedPackage = packages.find((p: any) => p.id === formData.packageId);
   const basePrice = selectedPackage ? Number(selectedPackage.price) * formData.numberOfTravelers : 0;
   const tokenPerPerson = selectedPackage ? Number(selectedPackage.tokenAmount) : 0;
@@ -197,7 +210,7 @@ export default function CreateBookingModal({
   const subTotal = basePrice + addOnsPrice;
   const gst = subTotal * 0.05;
   const total = subTotal + gst;
-  const totalToken = (tokenPerPerson * formData.numberOfTravelers) * 1.05; // Token + 5% GST on token
+  const totalToken = (tokenPerPerson * formData.numberOfTravelers) * 1.05;
   
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
@@ -300,9 +313,6 @@ export default function CreateBookingModal({
                   </div>
                 </div>
               </div>
-              <p className="text-xs text-gray-500 mt-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
-                If the email matches an existing user, their profile will be linked (and updated with these details). If not, a new user will be created.
-              </p>
             </div>
           )}
 
@@ -393,7 +403,6 @@ export default function CreateBookingModal({
                     <input 
                       type="number" 
                       min={1}
-                      max={slots.find((s: any) => s.id === formData.slotId) ? (slots.find((s: any) => s.id === formData.slotId).capacity - slots.find((s: any) => s.id === formData.slotId).filledSpots) : 100}
                       value={formData.numberOfTravelers}
                       onChange={(e) => updateForm("numberOfTravelers", parseInt(e.target.value) || 1)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#c8a96e]"
@@ -448,18 +457,20 @@ export default function CreateBookingModal({
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Aadhar / Govt ID (Upload)</label>
-                        <div className="flex items-center gap-2">
-                          <input 
-                            type="file" 
-                            accept="image/*,.pdf"
-                            onChange={(e) => handleGovtIdUpload(e.target.files?.[0], index)}
-                            className="w-full px-3 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#c8a96e] file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 cursor-pointer"
-                            disabled={uploadingAdditionalIdx === index}
-                          />
-                          {uploadingAdditionalIdx === index && <Loader2 className="w-3 h-3 animate-spin text-[#c8a96e] shrink-0" />}
-                          {traveler.aadhaarAssetId && uploadingAdditionalIdx !== index && <span className="text-[10px] text-green-600 font-medium shrink-0">Uploaded</span>}
-                        </div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Aadhaar Card (PDF/Img)</label>
+                        <input 
+                          type="file" 
+                          accept="image/*,.pdf"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              handleGovtIdUpload(e.target.files[0], index);
+                            }
+                          }}
+                          className="w-full px-3 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#c8a96e] file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 cursor-pointer"
+                          disabled={uploadingAdditionalIdx === index}
+                        />
+                        {uploadingAdditionalIdx === index && <Loader2 className="w-3 h-3 animate-spin text-[#c8a96e] mt-1" />}
+                        {traveler.aadhaarAssetId && uploadingAdditionalIdx !== index && <p className="text-xs text-green-600 mt-1 flex items-center gap-1"><Check className="w-3 h-3"/> Uploaded</p>}
                       </div>
                     </div>
                   </div>
