@@ -62,11 +62,15 @@ export function HeroCarousel() {
     let cancelled = false;
     const fetchFeatured = async () => {
       try {
-        const res = await axios.get(`${API_URL}/trips/featured`, {
-          withCredentials: true,
-        });
-        const data = res.data?.result?.data;
-        if (!cancelled && Array.isArray(data) && data.length > 0) {
+        const [standardResult, itineraryResult] = await Promise.allSettled([
+          axios.get(`${API_URL}/trips/featured`, { withCredentials: true }),
+          axios.get(`${API_URL}/crm-trips/public/featured`, { withCredentials: true }),
+        ]);
+        const standardTrips = standardResult.status === "fulfilled" ? standardResult.value.data?.result?.data : [];
+        const itineraryTrips = itineraryResult.status === "fulfilled" ? itineraryResult.value.data?.data : [];
+        const data = [...(Array.isArray(standardTrips) ? standardTrips : []), ...(Array.isArray(itineraryTrips) ? itineraryTrips : [])]
+          .map((trip) => ({ ...trip, bannerImages: Array.isArray(trip.bannerImages) ? trip.bannerImages[0] : trip.bannerImages }));
+        if (!cancelled && data.length > 0) {
           setTrips(data.map(withStartingPrice));
         } else if (!cancelled) {
           setTrips(FALLBACK_TRIPS);

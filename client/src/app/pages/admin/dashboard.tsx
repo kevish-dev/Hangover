@@ -1,28 +1,26 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { AlertTriangle, ArrowRight, BookOpen, CalendarCheck, CalendarRange, CheckCircle2, ClipboardCheck, Loader2, Map, RefreshCcw, Wrench } from "lucide-react";
+import { AlertTriangle, ArrowRight, BookOpen, CalendarCheck, CheckCircle2, ClipboardCheck, Loader2, Map, MapPin, RefreshCcw, Wrench } from "lucide-react";
 import { apiClient } from "../../../lib/axios";
 import { toast } from "sonner";
 import { getErrorMessage } from "../../../lib/errors";
 
 const steps = [
-  { number: "01", title: "Build a circuit", detail: "Create custom itineraries from scratch for bespoke client requests.", href: "/dashboard/circuits", icon: Map },
-  { number: "02", title: "Fork a trip", detail: "Duplicate and modify existing templates for rapid route planning.", href: "/dashboard/trips", icon: CalendarRange },
-  { number: "03", title: "Take bookings", detail: "Manage customer reservations, group allocations, and payments.", href: "/dashboard/bookings", icon: CalendarCheck },
-  { number: "04", title: "Run operations", detail: "Coordinate logistics, ground services, and real-time support.", href: "/dashboard/operations", icon: ClipboardCheck },
-  { number: "05", title: "Reconcile the ledger", detail: "Finalize financial records, agency commissions, and vendor payouts.", href: "/dashboard/ledger", icon: BookOpen },
+  { number: "01", title: "Manage itinerary trips", detail: "Create and update curated CRM itinerary trips.", href: "/dashboard/crm-trips", icon: MapPin },
+  { number: "02", title: "Take bookings", detail: "Manage customer reservations, group allocations, and payments.", href: "/dashboard/bookings", icon: CalendarCheck },
+  { number: "03", title: "Run operations", detail: "Coordinate logistics, ground services, and real-time support.", href: "/dashboard/operations", icon: ClipboardCheck },
+  { number: "04", title: "Reconcile the ledger", detail: "Finalize financial records, agency commissions, and vendor payouts.", href: "/dashboard/ledger", icon: BookOpen },
 ];
 
 export default function AdminDashboard() {
-  const circuits = useQuery({ queryKey: ["admin", "circuits", "overview"], queryFn: async () => (await apiClient.get("/circuits", { params: { limit: 1 } })).data.meta.total });
-  const trips = useQuery({ queryKey: ["admin", "trips", "overview"], queryFn: async () => (await apiClient.get("/trips", { params: { adminView: true, limit: 200 } })).data.data });
+  const crmTrips = useQuery({ queryKey: ["admin", "crm-trips", "overview"], queryFn: async () => (await apiClient.get("/crm-trips", { params: { limit: 200 } })).data });
   const bookings = useQuery({ queryKey: ["admin", "bookings", "overview"], queryFn: async () => (await apiClient.get("/bookings", { params: { limit: 1000 } })).data.data });
   const tasks = useQuery({ queryKey: ["admin", "operational-tasks", "overview"], queryFn: async () => (await apiClient.get("/operations", { params: { limit: 500 } })).data });
   const maintenance = useQuery({ queryKey: ["site-settings"], queryFn: async () => (await apiClient.get("/site-settings")).data.data as { maintenanceMode: boolean } });
   
-  const loading = circuits.isLoading || trips.isLoading || bookings.isLoading || tasks.isLoading;
-  const failedQueries = [circuits, trips, bookings, tasks].filter((query) => query.isError);
+  const loading = crmTrips.isLoading || bookings.isLoading || tasks.isLoading;
+  const failedQueries = [crmTrips, bookings, tasks].filter((query) => query.isError);
 
   const toggleMaintenance = async () => {
     const enabled = !maintenance.data?.maintenanceMode;
@@ -48,13 +46,12 @@ export default function AdminDashboard() {
     }
   }, [failedQueries.length]);
 
-  const tripData = trips.data || [];
+  const crmTripData = Array.isArray(crmTrips.data) ? crmTrips.data : crmTrips.data?.data || [];
   const bookingData = bookings.data || [];
   const taskData = tasks.data || [];
 
   const stats = [
-    { label: "Circuit templates", value: circuits.data || 0, icon: Map },
-    { label: "Upcoming departures", value: tripData.reduce((sum: number, trip: any) => sum + (trip.slots || []).filter((slot: any) => slot.startDate && new Date(slot.startDate) > new Date()).length, 0), icon: CalendarRange },
+    { label: "Itinerary trips", value: crmTripData.length, icon: MapPin },
     { label: "Active bookings", value: bookingData.filter((booking: any) => ["PENDING", "RESERVED", "CONFIRMED"].includes(booking.status)).length, icon: CheckCircle2 },
     { label: "Open operations", value: taskData.filter((task: any) => !["DONE", "CANCELLED"].includes(task.status)).length, icon: ClipboardCheck },
   ];
@@ -117,7 +114,7 @@ export default function AdminDashboard() {
               <p className="mt-1 text-sm text-red-700">Totals are hidden so failed requests are never mistaken for real zero values.</p>
               <button 
                 type="button" 
-                onClick={() => Promise.all([circuits.refetch(), trips.refetch(), bookings.refetch(), tasks.refetch()])} 
+                onClick={() => Promise.all([crmTrips.refetch(), bookings.refetch(), tasks.refetch()])} 
                 className="mt-4 inline-flex items-center gap-2 rounded border border-red-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
               >
                 <RefreshCcw className="h-4 w-4" />

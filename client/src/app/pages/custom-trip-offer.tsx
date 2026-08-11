@@ -237,6 +237,17 @@ export default function CustomTripOfferPage() {
     );
     if (!fullName.trim() || !phone.trim())
       return toast.error("Primary traveler name and phone are required.");
+    const cleanPhone = phone.replace(/\D/g, "");
+    if (cleanPhone.length !== 10)
+      return toast.error("Primary traveler phone must be exactly 10 digits.");
+    for (let i = 0; i < travelers.length; i++) {
+      if (travelers[i].phone) {
+        const cleanTPhone = travelers[i].phone.replace(/\D/g, "");
+        if (cleanTPhone.length !== 10) {
+          return toast.error(`Traveler ${i + 2} phone must be exactly 10 digits.`);
+        }
+      }
+    }
     if (!hasPrimaryId)
       return toast.error("Upload a government ID for the primary traveler.");
     if (
@@ -566,13 +577,19 @@ export default function CustomTripOfferPage() {
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-semibold">
-                      Phone *
+                      Phone * (10 digits)
                     </label>
                     <input
                       required
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      pattern="[0-9]{10}"
+                      title="Phone number must be exactly 10 digits"
+                      placeholder="9876543210"
                       className={input}
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                     />
                   </div>
                   <div>
@@ -628,11 +645,16 @@ export default function CustomTripOfferPage() {
                       }
                     />
                     <input
-                      placeholder="Phone"
+                      placeholder="Phone (10 digits)"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      pattern="[0-9]{10}"
+                      title="Phone number must be exactly 10 digits"
                       className={input}
                       value={traveler.phone}
                       onChange={(e) =>
-                        updateTraveler(index, "phone", e.target.value)
+                        updateTraveler(index, "phone", e.target.value.replace(/\D/g, "").slice(0, 10))
                       }
                     />
                     <select

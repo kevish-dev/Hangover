@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useSearchParams, useNavigate } from "react-router";
+import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowLeft,
@@ -25,9 +26,9 @@ import { apiClient, API_URL } from "../../lib/axios";
 import { useAuth } from "../../contexts/AuthContext";
 import { SiteFooter } from "../components/site-footer";
 import { toast } from "sonner";
-import { useQuery } from "@tanstack/react-query";
 import { getMyProfile } from "../../lib/profileApi";
 import { mediaImageUrl } from "../../lib/media";
+import PaymentModal from "../components/PaymentModal";
 import { getErrorMessage } from "../../lib/errors";
 
 // Razorpay is loaded as a static <script> in index.html
@@ -365,6 +366,7 @@ function TravelerForm({
   index: number;
   onRemove: () => void;
 }) {
+  const todayStr = new Date().toISOString().split("T")[0];
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -464,27 +466,39 @@ function TravelerForm({
         className="booking-field-grid grid-cols-1 sm:grid-cols-2"
       >
         <Field label="First Name" required>
-          <Input name={`traveler-${index}-firstName`} type="text" placeholder="First name" required />
+          <Input name={`traveler-${index}-firstName`} type="text" placeholder="First name" maxLength={50} required />
         </Field>
         <Field label="Last Name" required>
-          <Input name={`traveler-${index}-lastName`} type="text" placeholder="Last name" required />
+          <Input name={`traveler-${index}-lastName`} type="text" placeholder="Last name" maxLength={50} required />
         </Field>
         <Field label="Email ID" required>
-          <Input name={`traveler-${index}-email`} type="email" placeholder="email@example.com" required />
+          <Input name={`traveler-${index}-email`} type="email" placeholder="email@example.com" maxLength={100} required />
         </Field>
-        <Field label="Contact Number" required>
-          <Input name={`traveler-${index}-phone`} type="tel" placeholder="+91 98765 43210" required />
+        <Field label="Contact Number" required hint="Exact 10-digit mobile number">
+          <Input
+            name={`traveler-${index}-phone`}
+            type="tel"
+            inputMode="numeric"
+            placeholder="9876543210"
+            maxLength={10}
+            pattern="[0-9]{10}"
+            title="Contact number must be exactly 10 digits"
+            required
+            onChange={(e) => {
+              e.target.value = e.target.value.replace(/\D/g, "").slice(0, 10);
+            }}
+          />
         </Field>
         <Field label="Date of Birth" required>
-          <Input name={`traveler-${index}-dob`} type="date" required />
+          <Input name={`traveler-${index}-dob`} type="date" max={todayStr} min="1920-01-01" required />
         </Field>
         <Field label="Gender" required>
           <Select name={`traveler-${index}-gender`} required>
             <option value="">Select gender</option>
-            <option>Male</option>
-            <option>Female</option>
-            <option>Non-binary</option>
-            <option>Prefer not to say</option>
+            <option value="MALE">Male</option>
+            <option value="FEMALE">Female</option>
+            <option value="OTHER">Non-binary</option>
+            <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
           </Select>
         </Field>
         <div className="sm:col-span-2">
@@ -515,6 +529,7 @@ export default function BookingPage() {
   const [trip, setTrip] = useState<any>(null); // polymorphic
   const [loading, setLoading] = useState(true);
   const [selectedSlotId, setSelectedSlotId] = useState<string>(urlSlotId || "");
+  const isCrmTrip = !isFestival && Boolean(trip?.isCrmTrip);
 
   // Form state
   const [solo, setSolo] = useState<"yes" | "no" | null>("yes");
@@ -594,6 +609,12 @@ export default function BookingPage() {
     amountPaid: number;
     paymentType: string;
   } | null>(null);
+  const [paymentModalData, setPaymentModalData] = useState<{
+    bookingId: string;
+    bookingReference: string;
+    amount: number;
+    paymentType: "TOKEN" | "FULL";
+  } | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -615,6 +636,7 @@ export default function BookingPage() {
         .then((res) => {
           const bookings = res.data?.data || [];
           const belongsToCurrentItem = (booking: any) => {
+            if (isCrmTrip) return booking.crmTripId === trip.id;
             const itemId = isFestival
               ? booking.festivalId || booking.festival?.id || booking.slot?.festivalId
               : booking.tripId || booking.trip?.id || booking.slot?.tripId;
@@ -635,7 +657,7 @@ export default function BookingPage() {
         })
         .catch((error) => toast.error(getErrorMessage(error, "Your existing bookings could not be checked"), { id: `booking-status-${trip.id}` }));
     }
-  }, [user, trip, isFestival]);
+  }, [user, trip, isFestival, isCrmTrip]);
 
   useEffect(() => {
     if (selectedPackageId === undefined && trip) {
@@ -707,6 +729,125 @@ export default function BookingPage() {
     });
 
     setBookingError(null);
+
+    // ── Input Validation Rules ──
+    const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const PHONE_REGEX = /^\d{10}$/;
+    const PIN_REGEX = /^\d{6}$/;
+
+    if (!firstName.trim() || firstName.trim().length < 2) {
+      const msg = "Primary traveler First Name must be at least 2 characters.";
+      setBookingError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    if (!lastName.trim()) {
+      const msg = "Primary traveler Last Name is required.";
+      setBookingError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    if (!primaryEmail.trim() || !EMAIL_REGEX.test(primaryEmail.trim())) {
+      const msg = "Please enter a valid Primary traveler Email ID.";
+      setBookingError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    if (!address.trim() || address.trim().length < 5) {
+      const msg = "Please enter a complete address (minimum 5 characters).";
+      setBookingError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    const cleanedPin = pinCode.replace(/\D/g, "");
+    if (!PIN_REGEX.test(cleanedPin)) {
+      const msg = "PIN Code must be exactly 6 digits.";
+      setBookingError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    const cleanedPrimaryPhone = primaryPhone.replace(/\D/g, "");
+    if (!PHONE_REGEX.test(cleanedPrimaryPhone)) {
+      const msg = "Primary traveler contact number must be exactly 10 digits (e.g. 9876543210).";
+      setBookingError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    if (!dateOfBirth || new Date(dateOfBirth) >= new Date()) {
+      const msg = "Primary traveler Date of Birth must be a valid past date.";
+      setBookingError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    if (!gender) {
+      const msg = "Please select a gender for the Primary traveler.";
+      setBookingError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    if (govtIdImage && govtIdImage.size > 8 * 1024 * 1024) {
+      const msg = "Govt ID file size exceeds the 8 MB limit.";
+      setBookingError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    for (let index = 0; index < extractedTravelers.length; index++) {
+      const t = extractedTravelers[index];
+      const travelerLabel = `Traveler ${index + 2}`;
+
+      if (!t.firstName?.trim() || t.firstName.trim().length < 2) {
+        const msg = `${travelerLabel}: First Name must be at least 2 characters.`;
+        setBookingError(msg);
+        toast.error(msg);
+        return;
+      }
+      if (!t.lastName?.trim()) {
+        const msg = `${travelerLabel}: Last Name is required.`;
+        setBookingError(msg);
+        toast.error(msg);
+        return;
+      }
+      if (!t.email?.trim() || !EMAIL_REGEX.test(t.email.trim())) {
+        const msg = `${travelerLabel}: Please enter a valid Email ID.`;
+        setBookingError(msg);
+        toast.error(msg);
+        return;
+      }
+      const cleanedTravelerPhone = (t.phone || "").replace(/\D/g, "");
+      if (!PHONE_REGEX.test(cleanedTravelerPhone)) {
+        const msg = `${travelerLabel}: Contact number must be exactly 10 digits (e.g. 9876543210).`;
+        setBookingError(msg);
+        toast.error(msg);
+        return;
+      }
+      if (!t.dob || new Date(t.dob) >= new Date()) {
+        const msg = `${travelerLabel}: Date of Birth must be a valid past date.`;
+        setBookingError(msg);
+        toast.error(msg);
+        return;
+      }
+      if (!t.gender) {
+        const msg = `${travelerLabel}: Please select a gender.`;
+        setBookingError(msg);
+        toast.error(msg);
+        return;
+      }
+      if (t.aadhaarFile && t.aadhaarFile.size > 8 * 1024 * 1024) {
+        const msg = `${travelerLabel}: Aadhaar file size exceeds the 8 MB limit.`;
+        setBookingError(msg);
+        toast.error(msg);
+        return;
+      }
+    }
 
     if (!selectedSlotId) {
       const msg = "Please select a slot before proceeding.";
@@ -798,9 +939,8 @@ export default function BookingPage() {
         payload.packageId = selectedPackageId;
       }
       
-      if (selectedSlotId) {
-        payload.slotId = selectedSlotId;
-      }
+      if (isCrmTrip) payload.crmTripSlotId = selectedSlotId;
+      else payload.slotId = selectedSlotId;
       payload.addOns = Object.entries(selectedAddOns)
         .filter(([addOnId, quantity]) => quantity > 0 && availableAddOns.some((addOn: any) => addOn.id === addOnId))
         .map(([addOnId, quantity]) => ({ addOnId, quantity }));
@@ -812,16 +952,35 @@ export default function BookingPage() {
         initialPaymentType,
       } = bookingRes.data;
 
-      // 4. Initiate Razorpay payment — TOKEN or FULL based on backend decision
-      const paymentType = initialPaymentType; // "TOKEN" or "FULL"
+      const paymentType = initialPaymentType || "TOKEN";
+      const payAmount = paymentType === "TOKEN" ? Math.round(tokenAmountDue) : Math.round(totalAmountDue);
+
+      setPaymentModalData({
+        bookingId,
+        bookingReference,
+        amount: payAmount,
+        paymentType,
+      });
+    } catch (err: any) {
+      toast.error(getErrorMessage(err, "Booking creation failed"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const triggerRazorpayForBooking = async (
+    bookingId: string,
+    bookingReference: string,
+    paymentType: "TOKEN" | "FULL"
+  ) => {
+    setSubmitting(true);
+    try {
       const initiateRes = await apiClient.post("/payments/initiate", {
         bookingId,
         type: paymentType,
       });
-      const { razorpayOrderId, razorpayKeyId, amount, currency } =
-        initiateRes.data;
+      const { razorpayOrderId, razorpayKeyId, amount, currency } = initiateRes.data;
 
-      // 4. Open Razorpay checkout (SDK already loaded in index.html)
       await new Promise<void>((resolve, reject) => {
         const options = {
           key: razorpayKeyId,
@@ -834,9 +993,7 @@ export default function BookingPage() {
             email: primaryEmail,
             contact: primaryPhone,
           },
-          theme: {
-            color: "#781216",
-          },
+          theme: { color: "#781216" },
           modal: {
             ondismiss: async () => {
               reject(new Error("Payment cancelled. You can try again."));
@@ -847,7 +1004,6 @@ export default function BookingPage() {
             razorpay_payment_id: string;
             razorpay_signature: string;
           }) => {
-            // Immediately show verifying screen — don't make the user wait on this modal
             setBookingStep("verifying");
             setPendingVerify({
               razorpayOrderId: response.razorpay_order_id,
@@ -861,9 +1017,7 @@ export default function BookingPage() {
           },
         };
 
-        const rzp = new Razorpay(options);
-
-        // Listen for failed attempts within the modal (user can still retry after this)
+        const rzp = new (window as any).Razorpay(options);
         rzp.on("payment.failed", async function (response: any) {
           try {
             await apiClient.post("/payments/failed", {
@@ -873,7 +1027,7 @@ export default function BookingPage() {
               code: response.error.code,
             });
           } catch (e) {
-            // Ignore if the backend call fails, the webhook might catch it anyway
+            // Ignore
           }
           toast.error(`Payment failed: ${response.error.description}`);
         });
@@ -1118,11 +1272,11 @@ export default function BookingPage() {
 
   const numTravelers = 1 + travelers.length;
   const baseTotalAmount = basePrice * numTravelers + addOnTotal;
-  const totalGst = baseTotalAmount * 0.05;
+  const totalGst = isCrmTrip ? 0 : baseTotalAmount * 0.05;
   const totalAmountDue = baseTotalAmount + totalGst;
 
   const baseTokenTotal = baseToken * numTravelers;
-  const tokenGst = baseTokenTotal * 0.05;
+  const tokenGst = isCrmTrip ? 0 : baseTokenTotal * 0.05;
   const tokenAmountDue = baseTokenTotal + tokenGst;
   const isTokenZero = tokenAmountDue === 0;
 
@@ -2138,13 +2292,13 @@ export default function BookingPage() {
             >
               <FormSection title="Primary Traveler" icon={User}>
                 <Field label="First Name" required>
-                  <Input type="text" name="firstName" placeholder="Arjun" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+                  <Input type="text" name="firstName" placeholder="Arjun" maxLength={50} value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
                 </Field>
                 <Field label="Middle Name">
-                  <Input type="text" name="middleName" placeholder="Optional" />
+                  <Input type="text" name="middleName" placeholder="Optional" maxLength={50} />
                 </Field>
                 <Field label="Last Name" required>
-                  <Input type="text" name="lastName" placeholder="Sharma" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+                  <Input type="text" name="lastName" placeholder="Sharma" maxLength={50} value={lastName} onChange={(e) => setLastName(e.target.value)} required />
                 </Field>
                 <Field
                   label="Email ID"
@@ -2155,6 +2309,7 @@ export default function BookingPage() {
                     type="email"
                     name="email"
                     placeholder="arjun@email.com"
+                    maxLength={100}
                     value={primaryEmail}
                     onChange={(e) => setPrimaryEmail(e.target.value)}
                     required
@@ -2166,39 +2321,47 @@ export default function BookingPage() {
                       type="text"
                       name="address"
                       placeholder="House / Street / Colony"
+                      maxLength={200}
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
                       required
                     />
                   </Field>
                 </div>
-                <Field label="PIN Code" required>
+                <Field label="PIN Code" required hint="6 digits">
                   <Input
                     type="text"
+                    inputMode="numeric"
                     name="pinCode"
                     placeholder="400001"
                     maxLength={6}
+                    pattern="[0-9]{6}"
+                    title="PIN code must be exactly 6 digits"
                     value={pinCode}
-                    onChange={(e) => setPinCode(e.target.value)}
+                    onChange={(e) => setPinCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                     required
                   />
                 </Field>
                 <Field
                   label="Contact Number"
                   required
-                  hint="WhatsApp updates will be sent here."
+                  hint="Exact 10-digit mobile number for WhatsApp updates."
                 >
                   <Input
                     type="tel"
+                    inputMode="numeric"
                     name="phoneNumber"
-                    placeholder="+91 98765 43210"
+                    placeholder="9876543210"
+                    maxLength={10}
+                    pattern="[0-9]{10}"
+                    title="Contact number must be exactly 10 digits"
                     value={primaryPhone}
-                    onChange={(e) => setPrimaryPhone(e.target.value)}
+                    onChange={(e) => setPrimaryPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                     required
                   />
                 </Field>
                 <Field label="Date of Birth" required>
-                  <Input type="date" name="dateOfBirth" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} required />
+                  <Input type="date" name="dateOfBirth" max={new Date().toISOString().split("T")[0]} min="1920-01-01" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} required />
                 </Field>
                 <Field label="Gender" required>
                   <Select name="gender" value={gender} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setGender(e.target.value)} required>
@@ -3375,6 +3538,33 @@ export default function BookingPage() {
           }
         }
       `}</style>
+      {paymentModalData && (
+        <PaymentModal
+          isOpen={Boolean(paymentModalData)}
+          onClose={() => setPaymentModalData(null)}
+          bookingId={paymentModalData.bookingId}
+          amount={paymentModalData.amount}
+          paymentType={paymentModalData.paymentType}
+          itemTitle={trip?.title}
+          onSuccess={(utrSubmitted) => {
+            const data = paymentModalData;
+            setPaymentModalData(null);
+            if (utrSubmitted) {
+              setSuccessData({
+                bookingReference: data.bookingReference,
+                amountPaid: data.amount,
+                paymentType: data.paymentType,
+              });
+              setBookingStep("success");
+            }
+          }}
+          onTriggerRazorpay={() => {
+            const data = paymentModalData;
+            setPaymentModalData(null);
+            triggerRazorpayForBooking(data.bookingId, data.bookingReference, data.paymentType);
+          }}
+        />
+      )}
     </div>
   );
 }

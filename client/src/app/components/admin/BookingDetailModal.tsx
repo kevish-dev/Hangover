@@ -43,6 +43,7 @@ import { Textarea } from "../ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { SyncIndicator } from "../ui/sync-indicator";
 import { BookingAddOnsTab } from "./BookingAddOnsTab";
+import { OperationsCalendar } from "./operations/OperationsCalendar";
 
 // ─── Shared helpers ───────────────────────────────────────────────
 const money = (v: unknown) =>
@@ -554,7 +555,7 @@ function OperationsTab({
         <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
         <p className="font-semibold text-gray-700">No operational tasks</p>
         <p className="text-sm text-gray-400 mt-1">
-          Tasks are generated from circuit templates when bookings are created.
+          Tasks are generated when bookings are created.
         </p>
       </div>
     );
@@ -568,6 +569,7 @@ function OperationsTab({
     "GUIDE",
     "PERMIT",
   ];
+  return <OperationsCalendar tasks={tasks} emptyMessage="No dated operations for this booking." />;
   return (
     <div className="space-y-4">
       {/* Summary pills */}

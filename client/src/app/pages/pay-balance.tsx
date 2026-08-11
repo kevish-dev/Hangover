@@ -27,6 +27,7 @@ import {
 import { toast } from "sonner";
 import { apiClient, API_URL } from "../../lib/axios";
 import { useAuth } from "../../contexts/AuthContext";
+import PaymentModal from "../components/PaymentModal";
 
 type PaymentStep = "form" | "verifying" | "success" | "failed";
 
@@ -141,12 +142,11 @@ function ResultPage({
   onBack: () => void;
   errorMessage?: string;
 }) {
-  const item = booking.customTrip || booking.trip || booking.festival || booking.slot?.trip || booking.slot?.festival;
-  const itemPath = booking.customTrip ? "/profile" : booking.festival
-    ? `/festivals/${item?.id}`
-    : item?.id
-      ? `/trips/${item.id}`
-      : "/trips";
+  const item = booking?.crmTrip || booking?.customTrip || booking?.trip || booking?.festival || booking?.slot?.trip || booking?.slot?.festival;
+  const itemTitle = item?.title || item?.name || "the trip";
+  const itemPath = booking?.customTrip ? "/profile" : item?.id
+    ? (booking?.festival || booking?.slot?.festival ? `/festivals/${item.id}` : `/trips/${item.id}`)
+    : "/trips";
   const isVerifying = type === "verifying";
   const isSuccess = type === "success";
   const Icon = isVerifying ? Loader2 : isSuccess ? CheckCircle2 : AlertCircle;
@@ -172,7 +172,7 @@ function ResultPage({
             {isVerifying
               ? "Razorpay has returned your payment. We are securely matching it with your booking now—please keep this page open."
               : isSuccess
-                ? `Your place on ${item?.title || "the trip"} is confirmed. A detailed payment receipt will be sent to your email.`
+                ? `Your place on ${itemTitle} is confirmed. A detailed payment receipt will be sent to your email.`
                 : "Your payment may already be captured, so please do not make another payment. Our team can verify it safely for you."}
           </p>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "9px 14px", borderRadius: 999, background: "#f7f3eb", color: "#781216", fontSize: "0.72rem", fontWeight: 600, letterSpacing: "0.06em", marginBottom: 28 }}>
@@ -252,12 +252,18 @@ export default function PayBalancePage() {
     }
   }, [paymentStep]);
 
-  const item = booking?.customTrip || booking?.trip || booking?.festival || booking?.slot?.trip || booking?.slot?.festival;
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const item = booking?.crmTrip || booking?.customTrip || booking?.trip || booking?.festival || booking?.slot?.trip || booking?.slot?.festival || booking?.crmTripSlot?.crmTrip;
+  const isCrm = Boolean(booking?.crmTrip || booking?.crmTripSlot);
   const isCustom = booking?.source === "CUSTOM" || Boolean(booking?.customTrip);
   const isFestival = Boolean(booking?.festival || booking?.slot?.festival);
   const itemPath = isCustom ? "/profile" : item?.id ? (isFestival ? `/festivals/${item.id}` : `/trips/${item.id}`) : "/trips";
-  const tripStartDate = booking?.customTrip?.startDate || booking?.slot?.startDate;
-  const tripEndDate = booking?.customTrip?.endDate || booking?.slot?.endDate;
+  const itemTitle = item?.title || item?.name || "Upcoming Journey";
+  const itemLocation = isCustom ? "Private custom itinerary" : (item?.location || item?.destination?.name || "Location to be announced");
+  const heroBanner = item?.bannerImages?.[0] || item?.websiteBannerImages?.[0] || booking?.crmTrip?.websiteBannerImages?.[0] || "";
+  const tripStartDate = booking?.crmTripSlot?.startDate || booking?.customTrip?.startDate || booking?.slot?.startDate;
+  const tripEndDate = booking?.crmTripSlot?.endDate || booking?.customTrip?.endDate || booking?.slot?.endDate;
+  const durationDays = item?.numberOfNights ? item.numberOfNights + 1 : (item?.duration || item?.durationDays);
   const totalAmount = Number(booking?.totalAmount || 0);
   const amountPaid = Number(booking?.amountPaid || 0);
   const amountDue = Number(booking?.amountDue || 0);
@@ -265,14 +271,47 @@ export default function PayBalancePage() {
   const isInitialPayment = booking?.status === "PENDING" && (booking?.paymentStatus === "PENDING" || booking?.paymentStatus === "FAILED");
   const initialPaymentAmount = booking?.initialPaymentType === "TOKEN" ? Number(booking?.tokenAmount || 0) : totalAmount;
   const isMaintenanceMode = maintenance.data?.maintenanceMode === true;
-  const isEligible = !isMaintenanceMode && ((booking?.status === "RESERVED" && booking?.paymentStatus === "PARTIALLY_PAID" && amountDue > 0) || isInitialPayment);
+  const pendingUtrPayment = useMemo(
+    () => (booking?.payments || []).find((payment: any) => payment.status === "PENDING_VERIFICATION"),
+    [booking?.payments],
+  );
+  const hasPendingUtr = Boolean(pendingUtrPayment);
+  const isEligible = !isMaintenanceMode && !hasPendingUtr && ((booking?.status === "RESERVED" && booking?.paymentStatus === "PARTIALLY_PAID" && amountDue > 0) || isInitialPayment);
   const isPaid = booking?.status === "CONFIRMED" || booking?.paymentStatus === "PAID";
   const isRefunded = booking?.paymentStatus === "REFUNDED" || booking?.paymentStatus === "PARTIALLY_REFUNDED";
   const isCancelled = booking?.status === "CANCELLED";
   const displayAmount = isPaid || isCancelled || isRefunded ? amountPaid : (isInitialPayment ? initialPaymentAmount : amountDue);
-  const statusLabel = isEligible ? (isInitialPayment ? "Payment Pending" : "Spot Reserved") : isPaid ? "Booking Confirmed" : isRefunded ? "Refunded" : isCancelled ? "Booking Cancelled" : String(booking?.status || "Payment Unavailable").replace(/_/g, " ");
-  const heroEyebrow = isEligible ? (isInitialPayment ? "/ Secure Booking Payment" : "/ Secure Balance Payment") : isPaid ? "/ Payment Complete" : "/ Booking Payment Status";
-  const heroTitle = isEligible ? (isInitialPayment ? <>Secure your journey<br /><em style={{ color: "#c8a96e", fontStyle: "italic" }}>complete your booking.</em></> : <>Complete the journey<br /><em style={{ color: "#c8a96e", fontStyle: "italic" }}>you already chose.</em></>) : isPaid ? <>Your journey is<br /><em style={{ color: "#c8a96e", fontStyle: "italic" }}>fully confirmed.</em></> : <>Review your<br /><em style={{ color: "#c8a96e", fontStyle: "italic" }}>booking status.</em></>;
+  const statusLabel = hasPendingUtr
+    ? "UTR Verification Pending"
+    : isEligible
+    ? (isInitialPayment ? "Payment Pending" : "Spot Reserved")
+    : isPaid
+    ? "Booking Confirmed"
+    : isRefunded
+    ? "Refunded"
+    : isCancelled
+    ? "Booking Cancelled"
+    : String(booking?.status || "Payment Unavailable").replace(/_/g, " ");
+  const heroEyebrow = hasPendingUtr
+    ? "/ UTR Verification Pending Admin Review"
+    : isEligible
+    ? (isInitialPayment ? "/ Secure Booking Payment" : "/ Secure Balance Payment")
+    : isPaid
+    ? "/ Payment Complete"
+    : "/ Booking Payment Status";
+  const heroTitle = hasPendingUtr ? (
+    <>UTR Verification<br /><em style={{ color: "#c8a96e", fontStyle: "italic" }}>under admin review.</em></>
+  ) : isEligible ? (
+    isInitialPayment ? (
+      <>Secure your journey<br /><em style={{ color: "#c8a96e", fontStyle: "italic" }}>complete your booking.</em></>
+    ) : (
+      <>Complete the journey<br /><em style={{ color: "#c8a96e", fontStyle: "italic" }}>you already chose.</em></>
+    )
+  ) : isPaid ? (
+    <>Your journey is<br /><em style={{ color: "#c8a96e", fontStyle: "italic" }}>fully confirmed.</em></>
+  ) : (
+    <>Review your<br /><em style={{ color: "#c8a96e", fontStyle: "italic" }}>booking status.</em></>
+  );
   const successfulPayments = useMemo(
     () => (booking?.payments || []).filter((payment: any) => payment.status === "SUCCESS").sort((a: any, b: any) => new Date(a.paidAt || a.createdAt).getTime() - new Date(b.paidAt || b.createdAt).getTime()),
     [booking?.payments],
@@ -331,7 +370,7 @@ export default function PayBalancePage() {
         amount,
         currency,
         name: "Hangover Trails",
-        description: `${item?.title || "Trip"} — ${isInitial ? "Booking Payment" : "Balance Payment"}`,
+        description: `${itemTitle} — ${isInitial ? "Booking Payment" : "Balance Payment"}`,
         order_id: razorpayOrderId,
         prefill: {
           name: booking.user?.profile?.fullName || user.name || "",
@@ -379,7 +418,7 @@ export default function PayBalancePage() {
   return (
     <div style={{ minHeight: "100vh", background: "#f5f0e6", fontFamily: "'Poppins', sans-serif", color: "#1e1a14" }}>
       <header style={{ minHeight: "clamp(480px, 70vh, 640px)", position: "relative", overflow: "hidden", background: "#1e1a14", padding: "112px clamp(1.25rem,5vw,5rem) 220px" }}>
-        {item?.bannerImages?.[0] && <img src={item.bannerImages[0]} alt="" aria-hidden="true" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.14, filter: "saturate(0.65) contrast(1.05)" }} />}
+        {heroBanner && <img src={heroBanner} alt="" aria-hidden="true" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.14, filter: "saturate(0.65) contrast(1.05)" }} />}
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(100deg, rgba(16,14,11,0.98) 8%, rgba(30,26,20,0.9) 58%, rgba(30,26,20,0.72) 100%)" }} />
         <div style={{ position: "absolute", width: 420, height: 420, borderRadius: "50%", border: "1px solid rgba(184,148,58,0.11)", top: -170, right: -100 }} />
         <div style={{ position: "relative", zIndex: 1, maxWidth: 1180, margin: "0 auto" }}>
@@ -387,7 +426,7 @@ export default function PayBalancePage() {
           <motion.p initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ color: "#b8943a", fontSize: "0.66rem", fontWeight: 600, letterSpacing: "0.24em", textTransform: "uppercase", margin: "0 0 15px" }}>{heroEyebrow}</motion.p>
           <motion.h1 initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} style={{ color: "#f2ede4", fontSize: "clamp(2.25rem,5.3vw,4.35rem)", fontWeight: 300, letterSpacing: "-0.045em", lineHeight: 1.04, margin: "0 0 20px", maxWidth: 760 }}>{heroTitle}</motion.h1>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.12 }} style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <span style={{ color: "rgba(242,237,228,0.66)", fontSize: "0.82rem", fontWeight: 300 }}>{item?.title || "Your upcoming trip"}</span>
+            <span style={{ color: "rgba(242,237,228,0.66)", fontSize: "0.82rem", fontWeight: 300 }}>{itemTitle}</span>
             <span style={{ width: 3, height: 3, borderRadius: "50%", background: "#b8943a" }} />
             <span style={{ color: "rgba(242,237,228,0.45)", fontSize: "0.7rem", letterSpacing: "0.08em" }}>{booking.bookingReference}</span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "#d7bd79", background: "rgba(184,148,58,0.1)", border: "1px solid rgba(184,148,58,0.24)", padding: "5px 10px", borderRadius: 999, fontSize: "0.6rem", fontWeight: 600, letterSpacing: "0.09em", textTransform: "uppercase" }}><BadgeCheck size={12} /> {statusLabel}</span>
@@ -400,20 +439,20 @@ export default function PayBalancePage() {
           <article style={{ background: "#fff", borderRadius: 18, overflow: "hidden", border: "1px solid rgba(30,26,20,0.07)", boxShadow: "0 18px 55px rgba(30,26,20,0.08)" }}>
             <div className="grid grid-cols-1 sm:grid-cols-[230px_minmax(0,1fr)]">
               <div style={{ minHeight: 240, position: "relative", background: "#29231c" }}>
-                {item?.bannerImages?.[0] ? <img src={item.bannerImages[0]} alt={item.title || "Trip"} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "rgba(242,237,228,0.4)" }}><Sparkles size={30} strokeWidth={1.2} /></div>}
+                {heroBanner ? <img src={heroBanner} alt={itemTitle} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "rgba(242,237,228,0.4)" }}><Sparkles size={30} strokeWidth={1.2} /></div>}
                 <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(20,17,13,0.55), transparent 60%)" }} />
-                <span style={{ position: "absolute", left: 16, bottom: 15, background: "rgba(20,17,13,0.78)", color: "#f2ede4", padding: "6px 10px", borderRadius: 6, fontSize: "0.58rem", letterSpacing: "0.13em", textTransform: "uppercase", backdropFilter: "blur(8px)" }}>{isFestival ? "Festival" : "Curated Trip"}</span>
+                <span style={{ position: "absolute", left: 16, bottom: 15, background: "rgba(20,17,13,0.78)", color: "#f2ede4", padding: "6px 10px", borderRadius: 6, fontSize: "0.58rem", letterSpacing: "0.13em", textTransform: "uppercase", backdropFilter: "blur(8px)" }}>{isFestival ? "Festival" : isCrm ? "Itinerary Trip" : "Curated Trip"}</span>
               </div>
               <div style={{ padding: "clamp(24px,4vw,34px)" }}>
                 <p style={{ color: "#b8943a", fontSize: "0.61rem", fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase", margin: "0 0 9px" }}>Your Booking</p>
-                <h2 style={{ color: "#1e1a14", fontSize: "clamp(1.35rem,3vw,1.9rem)", fontWeight: 500, letterSpacing: "-0.03em", lineHeight: 1.2, margin: "0 0 11px" }}>{item?.title || "Upcoming Journey"}</h2>
-                <p style={{ display: "flex", alignItems: "center", gap: 6, color: "rgba(30,26,20,0.5)", fontSize: "0.75rem", margin: "0 0 22px" }}><MapPin size={14} color="#781216" strokeWidth={1.5} /> {isCustom ? "Private custom itinerary" : item?.location || "Location to be announced"}</p>
+                <h2 style={{ color: "#1e1a14", fontSize: "clamp(1.35rem,3vw,1.9rem)", fontWeight: 500, letterSpacing: "-0.03em", lineHeight: 1.2, margin: "0 0 11px" }}>{itemTitle}</h2>
+                <p style={{ display: "flex", alignItems: "center", gap: 6, color: "rgba(30,26,20,0.5)", fontSize: "0.75rem", margin: "0 0 22px" }}><MapPin size={14} color="#781216" strokeWidth={1.5} /> {itemLocation}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 16 }}>
                   {[
                     { icon: CalendarDays, label: "Travel dates", value: formatDateRange(tripStartDate, tripEndDate) },
-                    { icon: Clock3, label: "Duration", value: (item?.duration || item?.durationDays) ? `${item.duration || item.durationDays} ${(item.duration || item.durationDays) === 1 ? "day" : "days"}` : "To be announced" },
+                    { icon: Clock3, label: "Duration", value: durationDays ? `${durationDays} ${durationDays === 1 ? "day" : "days"}` : "To be announced" },
                     { icon: Users, label: "Travel party", value: `${booking.numberOfTravelers} ${booking.numberOfTravelers === 1 ? "traveler" : "travelers"}` },
-                    { icon: Package, label: "Selected plan", value: isCustom ? "Private custom trip" : booking.package?.title || booking.slot?.title || "Standard trip plan" },
+                    { icon: Package, label: "Selected plan", value: isCustom ? "Private custom trip" : booking.package?.title || booking.crmTripSlot?.title || booking.slot?.title || "Standard trip plan" },
                   ].map(({ icon: Icon, label, value }) => (
                     <div key={label} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                       <div style={{ width: 30, height: 30, borderRadius: 8, display: "grid", placeItems: "center", flexShrink: 0, background: "rgba(120,18,22,0.055)" }}><Icon size={14} color="#781216" strokeWidth={1.5} /></div>
@@ -424,6 +463,26 @@ export default function PayBalancePage() {
               </div>
             </div>
           </article>
+
+          {hasPendingUtr && (
+            <article style={{ background: "#fff", borderRadius: 16, padding: "24px 28px", border: "1px solid rgba(184,148,58,0.3)", boxShadow: "0 10px 30px rgba(184,148,58,0.06)" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                <div style={{ width: 38, height: 38, borderRadius: "50%", background: "rgba(184,148,58,0.12)", display: "grid", placeItems: "center", flexShrink: 0, marginTop: 2 }}>
+                  <Clock3 size={20} color="#9f7f2f" />
+                </div>
+                <div>
+                  <p style={{ margin: "0 0 6px", color: "#9f7f2f", fontSize: "0.62rem", fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase" }}>Manual Payment Submitted</p>
+                  <h3 style={{ margin: "0 0 8px", color: "#1e1a14", fontSize: "1.1rem", fontWeight: 500 }}>UTR Verification Pending Admin Review</h3>
+                  <p style={{ margin: "0 0 10px", color: "rgba(30,26,20,0.65)", fontSize: "0.74rem", lineHeight: 1.7 }}>
+                    We have received your payment submission of <strong>{formatCurrency(pendingUtrPayment.amount)}</strong> with transaction reference (UTR: <code style={{ background: "#f5f0e6", padding: "2px 7px", borderRadius: 4, fontFamily: "monospace", color: "#781216", fontWeight: 600 }}>{pendingUtrPayment.utr || "N/A"}</code>).
+                  </p>
+                  <p style={{ margin: 0, color: "rgba(30,26,20,0.52)", fontSize: "0.68rem", lineHeight: 1.6 }}>
+                    Our administration team is cross-checking this UTR with bank records. Once verified, your booking status will update automatically and your official payment receipt will be sent to your email address.
+                  </p>
+                </div>
+              </div>
+            </article>
+          )}
 
           <article style={{ background: "#fff", borderRadius: 16, padding: "clamp(24px,4vw,32px)", border: "1px solid rgba(30,26,20,0.07)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
@@ -472,9 +531,21 @@ export default function PayBalancePage() {
 
               {paymentError && <div role="alert" style={{ display: "flex", gap: 8, padding: "10px 12px", borderRadius: 8, background: "rgba(192,57,43,0.07)", color: "#a93226", fontSize: "0.64rem", lineHeight: 1.55, marginBottom: 14 }}><AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} /> {paymentError}</div>}
 
-              {isEligible ? (
-                <button type="button" onClick={handlePayBalance} disabled={processing} aria-busy={processing} style={{ width: "100%", minHeight: 54, border: "none", borderRadius: 9, background: processing ? "rgba(120,18,22,0.66)" : "#781216", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, fontFamily: "'Poppins', sans-serif", fontSize: "0.77rem", fontWeight: 600, letterSpacing: "0.04em", cursor: processing ? "wait" : "pointer", boxShadow: "0 10px 25px rgba(120,18,22,0.2)", transition: "transform 0.2s ease, background 0.2s ease" }}>
-                  {processing ? <><Loader2 size={17} className="animate-spin" /> Opening secure checkout…</> : <>Pay {formatCurrency(displayAmount)} <ArrowRight size={16} /></>}
+              {hasPendingUtr ? (
+                <div style={{ padding: "16px 18px", borderRadius: 9, background: "rgba(184,148,58,0.09)", border: "1px solid rgba(184,148,58,0.25)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#9f7f2f", fontSize: "0.74rem", fontWeight: 600, marginBottom: 6 }}>
+                    <Clock3 size={16} /> UTR Verification Pending
+                  </div>
+                  <p style={{ margin: "0 0 8px", color: "rgba(30,26,20,0.64)", fontSize: "0.64rem", lineHeight: 1.6 }}>
+                    Submitted UTR: <strong style={{ fontFamily: "monospace" }}>{pendingUtrPayment.utr || "N/A"}</strong> for {formatCurrency(pendingUtrPayment.amount)}. Our admin team is verifying your payment with the bank.
+                  </p>
+                  <p style={{ margin: 0, color: "rgba(30,26,20,0.5)", fontSize: "0.58rem", lineHeight: 1.5 }}>
+                    Once verified, your receipt will be emailed to you. Online checkout is temporarily paused.
+                  </p>
+                </div>
+              ) : isEligible ? (
+                <button type="button" onClick={() => setShowPaymentModal(true)} disabled={processing} aria-busy={processing} style={{ width: "100%", minHeight: 54, border: "none", borderRadius: 9, background: processing ? "rgba(120,18,22,0.66)" : "#781216", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, fontFamily: "'Poppins', sans-serif", fontSize: "0.77rem", fontWeight: 600, letterSpacing: "0.04em", cursor: processing ? "wait" : "pointer", boxShadow: "0 10px 25px rgba(120,18,22,0.2)", transition: "transform 0.2s ease, background 0.2s ease" }}>
+                  {processing ? <><Loader2 size={17} className="animate-spin" /> Processing…</> : <>Pay {formatCurrency(displayAmount)} <ArrowRight size={16} /></>}
                 </button>
               ) : (
                 <div style={{ padding: "15px", borderRadius: 9, background: amountDue <= 0 ? "rgba(34,139,34,0.07)" : "rgba(184,148,58,0.08)", border: `1px solid ${amountDue <= 0 ? "rgba(34,139,34,0.16)" : "rgba(184,148,58,0.2)"}` }}>
@@ -501,6 +572,29 @@ export default function PayBalancePage() {
         <span>© {new Date().getFullYear()} Hangover Trails · Secure booking payments</span>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}><IndianRupee size={12} /> All amounts shown in INR · Taxes included</div>
       </footer>
+
+      {showPaymentModal && booking && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          bookingId={booking.id}
+          amount={displayAmount}
+          paymentType={isInitialPayment ? (booking.initialPaymentType || "FULL") : "BALANCE"}
+          itemTitle={itemTitle}
+          onSuccess={(utrSubmitted) => {
+            setShowPaymentModal(false);
+            if (utrSubmitted) {
+              setPaymentStep("success");
+            } else {
+              refetch();
+            }
+          }}
+          onTriggerRazorpay={() => {
+            setShowPaymentModal(false);
+            handlePayBalance();
+          }}
+        />
+      )}
     </div>
   );
 }

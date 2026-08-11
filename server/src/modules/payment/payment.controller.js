@@ -112,3 +112,23 @@ export const manualAdjustment = async (req, res, next) => {
     next(error);
   }
 };
+
+export const submitUpiUtrPayment = async (req, res, next) => {
+  try {
+    const payment = await paymentService.submitUpiUtrPayment(req.user.id, req.body);
+    res.status(201).json(payment);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifyUpiPayment = async (req, res, next) => {
+  try {
+    const { action, reason } = req.body;
+    const result = await paymentService.verifyUpiPayment(req.user.id, req.params.paymentId, action, reason);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+

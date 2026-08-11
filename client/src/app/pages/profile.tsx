@@ -38,6 +38,7 @@ import { getErrorMessage } from "../../lib/errors";
 
 const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }> = {
   PENDING:             { bg: "rgba(200,169,110,0.12)", color: "#b8943a",  label: "Pending" },
+  PENDING_VERIFICATION:{ bg: "rgba(217,119,6,0.12)", color: "#d97706",  label: "UTR Verifying" },
   RESERVED:            { bg: "rgba(200,169,110,0.12)", color: "#b8943a",  label: "Upcoming" },
   CONFIRMED:           { bg: "rgba(34,139,34,0.10)",   color: "#228b22",  label: "Upcoming" },
   COMPLETED:           { bg: "rgba(34,139,34,0.10)",   color: "#228b22",  label: "Completed" },
@@ -73,20 +74,28 @@ function StatusBadge({ status }: { status: string }) {
 
 function BookingCard({ booking }: { booking: ApiBooking }) {
   const [hovered, setHovered] = useState(false);
-  const item: any = booking.customTrip || booking.trip || booking.festival;
+  const item: any = booking.customTrip || booking.trip || booking.festival || booking.crmTrip;
   const isCustom = booking.source === "CUSTOM" || Boolean(booking.customTrip);
   const isFestival = !!booking.festival;
-  const heroImage = item?.bannerImages?.[0] || "";
-  const state = isCustom ? "Private custom trip" : (item as any)?.destination?.state || (item as any)?.location || "";
-  const travelStart = booking.customTrip?.startDate || booking.slot?.startDate;
+  const isCrm = booking.source === "CRM" || Boolean(booking.crmTrip);
+  const isCrmTripViewable = isCrm && (
+    item?.isPublished || 
+    (booking.status !== "PENDING" && booking.status !== "CANCELLED")
+  );
+  const heroImage = item?.bannerImages?.[0] || booking.crmTrip?.websiteBannerImages?.[0] || "";
+  const state = isCustom ? "Private custom trip" : (item as any)?.destination?.state || booking.crmTrip?.destination?.name || (item as any)?.location || "";
+  const travelStart = booking.customTrip?.startDate || booking.slot?.startDate || booking.crmTripSlot?.startDate;
   const paid = parseFloat(booking.amountPaid || "0");
   const due = parseFloat(booking.amountDue || "0");
   const isFullyRefunded = booking.paymentStatus === "REFUNDED";
   const isPartiallyRefunded = booking.paymentStatus === "PARTIALLY_REFUNDED";
   const isRefunded = isFullyRefunded || isPartiallyRefunded;
+  const pendingUtrPayment = (booking.payments || []).find((p: any) => p.status === "PENDING_VERIFICATION");
+  const hasPendingUtr = Boolean(pendingUtrPayment);
   const canPayBalance =
-    (due > 0 && booking.status === "RESERVED" && booking.paymentStatus === "PARTIALLY_PAID") ||
-    (booking.status === "PENDING" && (booking.paymentStatus === "PENDING" || booking.paymentStatus === "FAILED"));
+    !hasPendingUtr &&
+    ((due > 0 && booking.status === "RESERVED" && booking.paymentStatus === "PARTIALLY_PAID") ||
+    (booking.status === "PENDING" && (booking.paymentStatus === "PENDING" || booking.paymentStatus === "FAILED")));
 
   // Sum up all successful or pending refunds across payments
   const totalRefunded = (booking.payments || []).reduce((sum, p) => {
@@ -95,8 +104,10 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
     }, 0);
   }, 0);
 
-  // Determine the status badge to show — prefer paymentStatus for refunded states
-  const badgeStatus: string = isFullyRefunded
+  // Determine the status badge to show — prefer pending UTR state, then refunded states
+  const badgeStatus: string = hasPendingUtr
+    ? "PENDING_VERIFICATION"
+    : isFullyRefunded
     ? "REFUNDED"
     : isPartiallyRefunded
     ? "PARTIALLY_REFUNDED"
@@ -241,7 +252,7 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
               lineHeight: 1.3,
             }}
           >
-            {item?.title}
+            {item?.title || item?.name || "Your trip"}
           </h3>
           <p
             className="profile-booking-reference"
@@ -429,23 +440,33 @@ function BookingCard({ booking }: { booking: ApiBooking }) {
                 <RotateCcw size={10} /> Book Again
               </Link>
             )}
-            {!isCustom ? <Link
-              className="profile-booking-view-action"
-              to={isFestival ? `/festivals/${item?.id}` : `/trips/${item?.id}`}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-                color: hovered ? "#781216" : "rgba(30,26,20,0.45)",
-                fontSize: "0.72rem",
-                fontWeight: 500,
-                textDecoration: "none",
-                transition: "color 0.2s ease",
-                whiteSpace: "nowrap",
-              }}
-            >
-              View {isFestival ? "Festival" : "Trip"} <ChevronRight size={12} />
-            </Link> : <span style={{ color: "rgba(30,26,20,0.45)", fontSize: "0.72rem", fontWeight: 500 }}>Private itinerary</span>}
+            {isCustom ? (
+              <span style={{ color: "rgba(30,26,20,0.45)", fontSize: "0.72rem", fontWeight: 500 }}>Private itinerary</span>
+            ) : !item?.id ? (
+              <span style={{ color: "rgba(30,26,20,0.45)", fontSize: "0.72rem", fontWeight: 500 }}>Itinerary unavailable</span>
+            ) : isCrm && !isCrmTripViewable ? (
+              <span style={{ color: "rgba(30,26,20,0.45)", fontSize: "0.72rem", fontWeight: 500 }}>
+                {booking.status === "PENDING" ? "Pending payment" : "Itinerary unavailable"}
+              </span>
+            ) : (
+              <Link
+                className="profile-booking-view-action"
+                to={isFestival ? `/festivals/${item?.id}` : `/trips/${item?.id}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  color: hovered ? "#781216" : "rgba(30,26,20,0.45)",
+                  fontSize: "0.72rem",
+                  fontWeight: 500,
+                  textDecoration: "none",
+                  transition: "color 0.2s ease",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                View {isFestival ? "Festival" : "Trip"} <ChevronRight size={12} />
+              </Link>
+            )}
           </div>
         </div>
       </div>

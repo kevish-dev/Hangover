@@ -6,6 +6,8 @@ const bookingInclude = {
       festival: true,
     }
   },
+  crmTrip: { include: { destination: true } },
+  crmTripSlot: true,
   package: true,
   addOns: { include: { addOn: true } },
   
@@ -25,6 +27,8 @@ export const getBookingById = async (id) => {
     where: { id },
     include: {
       ...bookingInclude,
+      crmFestival: true,
+      crmFestivalSlot: true,
       user: { include: { profile: { include: { govtIdAsset: true } } } },
     },
   });
@@ -42,7 +46,12 @@ export const getUserBookings = async (userId, skip, take) => {
   const [bookings, total] = await Promise.all([
     prisma.booking.findMany({
       where: { userId },
-      include: { slot: { include: { trip: true, festival: true } }, package: true, addOns: { include: { addOn: true } }, review: true, travelers: { include: { aadhaarAsset: true } }, payments: { include: { refunds: true } } },
+      include: {
+        ...bookingInclude,
+        crmFestival: { include: { destination: true } },
+        crmFestivalSlot: true,
+        review: true,
+      },
       orderBy: { createdAt: "desc" },
       skip,
       take,
@@ -55,7 +64,10 @@ export const getUserBookings = async (userId, skip, take) => {
 export const getAllBookings = async (skip, take) => {
   const [bookings, total] = await Promise.all([
     prisma.booking.findMany({
-      include: { slot: { include: { trip: true, festival: true } }, package: true, addOns: { include: { addOn: true } }, travelers: { include: { aadhaarAsset: true } }, user: { include: { profile: { include: { govtIdAsset: true } } } }, payments: { include: { refunds: true } } },
+      include: {
+        ...bookingInclude,
+        user: { include: { profile: { include: { govtIdAsset: true } } } },
+      },
       orderBy: { createdAt: "desc" },
       skip,
       take,
@@ -67,14 +79,15 @@ export const getAllBookings = async (skip, take) => {
 
 export const getBookingsByTripId = async (tripId) => {
   return prisma.booking.findMany({
-    where: { slot: { tripId } },
+    where: {
+      OR: [
+        { slot: { tripId } },
+        { crmTripId: tripId },
+      ],
+    },
     include: {
+      ...bookingInclude,
       user: { include: { profile: { include: { govtIdAsset: true } } } },
-      travelers: { include: { aadhaarAsset: true } },
-      slot: true,
-      package: true,
-      payments: { include: { refunds: true } },
-      addOns: { include: { addOn: true } },
     },
     orderBy: { createdAt: "desc" },
   });

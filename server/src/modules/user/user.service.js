@@ -1,6 +1,7 @@
 import * as userRepo from "./user.repository.js";
 import { prisma } from "../../prisma/client.js";
 import { randomUUID } from "crypto";
+import { ValidationError } from "../../core/errors/errors.js";
 import {
   createAuthenticatedDeliveryUrl,
   deleteFromCloudinary,
@@ -63,7 +64,12 @@ export const getMyProfile = async (userId) => {
 };
 
 export const updateMyProfile = async (userId, data) => {
-  // We can add data validation here if needed, stripping out admin-only fields
+  if (data.phone) {
+    const cleanPhone = String(data.phone).replace(/\D/g, "");
+    if (cleanPhone.length !== 10) {
+      throw new ValidationError("Contact number must be exactly 10 digits.");
+    }
+  }
   const profile = await userRepo.updateUserProfile(userId, editableProfileData(data));
   return serializeProfile(profile);
 };

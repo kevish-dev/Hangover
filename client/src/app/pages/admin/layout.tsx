@@ -1,6 +1,7 @@
-import { Outlet, Link, useLocation } from "react-router";
+import { Outlet, Link, useLocation, Navigate } from "react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../../contexts/AuthContext";
-import { Navigate } from "react-router";
+import { paymentApi } from "../../../lib/paymentApi";
 import {
   Sidebar,
   SidebarContent,
@@ -20,6 +21,7 @@ import {
   Home,
   MapPin,
   Map,
+  Database,
   CalendarRange,
   ClipboardCheck,
   CalendarCheck,
@@ -31,6 +33,7 @@ import {
   Image,
   BarChart3,
   Tent,
+  Users,
 } from "lucide-react";
 
 const overviewItems = [
@@ -39,9 +42,10 @@ const overviewItems = [
 ];
 
 const crmItems = [
-  { title: "Circuits", url: "/dashboard/circuits", icon: Map },
-  { title: "Trips & departures", url: "/dashboard/trips", icon: CalendarRange },
-  { title: "Festivals", url: "/dashboard/festivals", icon: Tent },
+  { title: "Users", url: "/dashboard/users", icon: Users },
+  { title: "Master data", url: "/dashboard/crm-master-data", icon: Database },
+  { title: "Itinerary trips", url: "/dashboard/crm-trips", icon: MapPin },
+  { title: "Itinerary festivals", url: "/dashboard/crm-festivals", icon: Tent },
   { title: "Bookings", url: "/dashboard/bookings", icon: CalendarCheck },
   { title: "Operations", url: "/dashboard/operations", icon: ClipboardCheck },
   { title: "Balance sheet", url: "/dashboard/ledger", icon: BookOpen },
@@ -59,6 +63,14 @@ const websiteItems = [
 export default function AdminLayout() {
   const { user, isLoading, logout } = useAuth();
   const location = useLocation();
+
+  const { data: pendingPaymentsData } = useQuery({
+    queryKey: ["admin", "payments", "pending_verification_count"],
+    queryFn: () => paymentApi.getAllPayments({ limit: 1, status: "PENDING_VERIFICATION" }),
+    enabled: !!user && user.role === "ADMIN",
+    refetchInterval: 30000,
+  });
+  const pendingPaymentsCount = pendingPaymentsData?.meta?.total || 0;
 
   if (isLoading) {
     return (
@@ -84,7 +96,12 @@ export default function AdminLayout() {
         <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
           <Link to={item.url}>
             <item.icon />
-            <span>{item.title}</span>
+            <span className="flex-1 truncate">{item.title}</span>
+            {item.title === "Payments" && pendingPaymentsCount > 0 && (
+              <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white group-data-[collapsible=icon]:hidden">
+                {pendingPaymentsCount}
+              </span>
+            )}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>

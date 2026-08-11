@@ -1,51 +1,95 @@
 import { prisma } from "../../prisma/client.js";
 
-/** Generate OperationalTasks for a new booking. Expenses enter the ledger when paid. */
-export const generateBookingOperations = async (booking, slot, chosenAddOns = []) => {
-  // Determine the circuit this booking belongs to (via trip or festival)
-  const isTrip = !!slot.tripId;
-  let circuitId = null;
-  let circuitReminderDays = 3;
+const addUtcDays = (date, days) => {
+  const value = new Date(date);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value;
+};
 
-  if (isTrip && slot.trip) {
-    circuitId = slot.trip.circuitId;
-  } else if (!isTrip && slot.festival) {
-    circuitId = slot.festival.circuitId;
-  }
+const crmTaskTitle = (title, booking) => {
+  const customer = booking.user?.profile?.fullName || booking.user?.email || "Customer";
+  return `${title} · ${booking.bookingReference} · ${customer}`;
+};
 
-  const opsToCreate = [];
+/** Fork CRM itinerary services into independently completable booking operations. */
+export const generateCrmBookingOperations = async (booking, crmSlot) => {
+  const isFestival = !!booking.crmFestivalId;
+  const entity = isFestival
+    ? await prisma.crmFestival.findUnique({
+        where: { id: booking.crmFestivalId },
+        include: {
+          itineraryDays: {
+            orderBy: { dayNumber: "asc" },
+            include: {
+              stayLocation: true,
+              property: true,
+              dropOffLocation: true,
+              activities: true,
+              commonInclusions: true,
+            },
+          },
+        },
+      })
+    : await prisma.crmTrip.findUnique({
+        where: { id: booking.crmTripId },
+        include: {
+          itineraryDays: {
+            orderBy: { dayNumber: "asc" },
+            include: {
+              stayLocation: true,
+              property: true,
+              dropOffLocation: true,
+              activities: true,
+              commonInclusions: true,
+            },
+          },
+        },
+      });
+  if (!entity || !crmSlot.startDate) return;
 
-  if (circuitId) {
-    const circuit = await prisma.circuit.findUnique({
-      where: { id: circuitId },
-      include: { days: { include: { tasks: true } } }
-    });
+  const tasks = [];
+  const addTask = (day, sourceKey, category, title, description = null, quantityNeeded = 1) => {
+    const taskObj = {
+      bookingId: booking.id,
+      crmSourceKey: sourceKey,
+      category,
+      title: crmTaskTitle(title, booking),
+      description,
+      config: { crmGenerated: true, sourceKey },
+      quantityNeeded,
+      dueAt: addUtcDays(crmSlot.startDate, (day?.dayNumber || 1) - 1),
+    };
+    if (isFestival) {
+      taskObj.crmFestivalItineraryDayId = day?.id || null;
+    } else {
+      taskObj.crmItineraryDayId = day?.id || null;
+    }
+    tasks.push(taskObj);
+  };
 
-    if (circuit) {
-      circuitReminderDays = circuit.operationsReminderDays ?? 3;
-
-      for (const day of circuit.days) {
-        for (const task of day.tasks) {
-          // Calculate dueAt: slot start - dueOffsetDays
-          const dueAt = task.dueOffsetDays != null && slot.startDate
-            ? new Date(new Date(slot.startDate).getTime() - task.dueOffsetDays * 86400000)
-            : null;
-
-          opsToCreate.push({
-            bookingId: booking.id,
-            sourceTemplateId: task.id,
-            category: task.category,
-            title: task.title,
-            description: task.description,
-            config: task.config ?? {},
-            unitPrice: task.unitPrice ?? null,
-            quantityNeeded: task.quantityNeeded ?? null,
-            dueAt,
-          });
-        }
-      }
+  for (const day of entity.itineraryDays) {
+    if (day.property || day.stayLocation) {
+      const accommodation = day.property?.name || day.stayLocation?.name;
+      addTask(day, "stay", "HOTEL", `Book stay${accommodation ? `: ${accommodation}` : ""}`, accommodation || null);
+    }
+    for (const meal of ["breakfast", "lunch", "dinner"]) {
+      if (day[meal]) addTask(day, `meal:${meal}`, "VENDOR", `Arrange ${meal}`);
+    }
+    if (day.transportEnabled) addTask(day, "transport", "TRANSPORT", "Arrange transport", day.transportText || null);
+    if (day.isDropOff) addTask(day, "drop-off", "TRANSPORT", `Arrange drop-off${day.dropOffLocation?.name ? `: ${day.dropOffLocation.name}` : ""}`, day.dropOffLocation?.name || null);
+    for (const activity of day.activities) addTask(day, `activity:${activity.id}`, "ACTIVITY", `Arrange activity: ${activity.name}`, activity.description || null);
+    for (const inclusion of day.commonInclusions) {
+      const isPermit = inclusion.key === "ILP_AND_PERMITS";
+      const label = { ILP_AND_PERMITS: "Arrange ILP and permits", BBQ: "Arrange BBQ", BONFIRE: "Arrange bonfire", TRIP_GUIDE: "Arrange trip guide" }[inclusion.key];
+      addTask(day, `inclusion:${inclusion.key}`, isPermit ? "PERMIT" : "VENDOR", label);
     }
   }
+  if (tasks.length) await prisma.operationalTask.createMany({ data: tasks });
+};
+
+export const generateBookingOperations = async (booking, slot, chosenAddOns = []) => {
+  const isTrip = !!slot.tripId;
+  const opsToCreate = [];
 
   // Also check for tasks directly on the Trip or Festival's Itinerary Days
   const itineraryDays = await prisma.itineraryDay.findMany({
@@ -111,14 +155,24 @@ const TASK_INCLUDE = {
       status: true,
       paymentStatus: true,
       tripId: true,
+      crmTripId: true,
+      crmTripSlotId: true,
+      crmFestivalId: true,
+      crmFestivalSlotId: true,
       festivalId: true,
       user: { select: { email: true, profile: { select: { fullName: true } } } },
       slot: { select: { id: true, title: true, startDate: true, endDate: true } },
+      crmTripSlot: { select: { id: true, title: true, startDate: true, endDate: true } },
+      crmFestivalSlot: { select: { id: true, title: true, startDate: true, endDate: true } },
       trip: { select: { id: true, title: true } },
+      crmTrip: { select: { id: true, name: true } },
+      crmFestival: { select: { id: true, name: true } },
       festival: { select: { id: true, title: true } },
     },
   },
   itineraryDay: { select: { id: true, dayNumber: true, title: true } },
+  crmItineraryDay: { select: { id: true, dayNumber: true } },
+  crmFestivalItineraryDay: { select: { id: true, dayNumber: true } },
 };
 
 export const listOperationalTasks = async (query = {}) => {
@@ -127,11 +181,17 @@ export const listOperationalTasks = async (query = {}) => {
   if (query.category) where.category = query.category;
   if (query.bookingId) where.bookingId = query.bookingId;
   if (query.tripId) where.booking = { tripId: query.tripId };
+  if (query.crmTripId) where.booking = { ...(where.booking || {}), crmTripId: query.crmTripId };
+  if (query.crmTripSlotId) where.booking = { ...(where.booking || {}), crmTripSlotId: query.crmTripSlotId };
+  if (query.crmFestivalId) where.booking = { ...(where.booking || {}), crmFestivalId: query.crmFestivalId };
+  if (query.crmFestivalSlotId) where.booking = { ...(where.booking || {}), crmFestivalSlotId: query.crmFestivalSlotId };
   if (query.search) {
     where.OR = [
       { title: { contains: query.search, mode: "insensitive" } },
       { booking: { bookingReference: { contains: query.search, mode: "insensitive" } } },
       { booking: { trip: { title: { contains: query.search, mode: "insensitive" } } } },
+      { booking: { crmTrip: { name: { contains: query.search, mode: "insensitive" } } } },
+      { booking: { crmFestival: { name: { contains: query.search, mode: "insensitive" } } } },
       { booking: { festival: { title: { contains: query.search, mode: "insensitive" } } } },
     ];
   }
@@ -189,7 +249,7 @@ export const updateOperationalTask = async (taskId, input) => {
   return prisma.$transaction(async (tx) => {
     const current = await tx.operationalTask.findUnique({
       where: { id: taskId },
-      include: { booking: { select: { id: true, tripId: true, festivalId: true } } },
+      include: { booking: { select: { id: true, tripId: true, festivalId: true, crmTripId: true, crmFestivalId: true } } },
     });
     if (!current) {
       const error = new Error("Operational task not found");
@@ -197,16 +257,29 @@ export const updateOperationalTask = async (taskId, input) => {
       throw error;
     }
 
+    // CRM operators commonly enter a cost for one booking task without
+    // separately entering a quantity. Treat that as one acquired unit so the
+    // cost is not silently omitted from the booking/trip ledger. A later
+    // quantity update recalculates the same auto-generated ledger row.
+    if (
+      data.quantityAcquired === undefined
+      && current.quantityAcquired == null
+      && (data.unitPrice !== undefined || (data.status === "DONE" && current.unitPrice != null))
+    ) {
+      data.quantityAcquired = current.quantityNeeded || 1;
+    }
+
     const unitPrice = data.unitPrice !== undefined ? data.unitPrice : (current.unitPrice != null ? Number(current.unitPrice) : null);
     const quantityNeeded = data.quantityNeeded !== undefined ? data.quantityNeeded : current.quantityNeeded;
     const quantityAcquired = data.quantityAcquired !== undefined ? data.quantityAcquired : current.quantityAcquired;
 
-    // Auto-complete if acquired reaches needed
+    // Auto-complete if acquired reaches needed (unless status is explicitly specified as not DONE)
     if (unitPrice != null && quantityNeeded != null && quantityAcquired != null && quantityNeeded > 0 && quantityAcquired >= quantityNeeded) {
-      data.status = "DONE";
+      if (input.status === undefined || input.status === "DONE") {
+        data.status = "DONE";
+      }
     }
 
-    // Resolve completedAt based on final status
     const finalStatus = data.status || current.status;
     if (finalStatus === "DONE") data.completedAt = new Date();
     else if (data.status && data.status !== "DONE") data.completedAt = null;
@@ -214,7 +287,7 @@ export const updateOperationalTask = async (taskId, input) => {
     const updated = await tx.operationalTask.update({ where: { id: taskId }, data });
 
     // Auto-generate ledger entry: unitPrice × quantityAcquired = cost incurred so far
-    if (data.quantityAcquired !== undefined || data.unitPrice !== undefined) {
+    if (data.quantityAcquired !== undefined || data.unitPrice !== undefined || data.status === "DONE") {
       const finalUnitPrice = data.unitPrice !== undefined ? data.unitPrice : (current.unitPrice != null ? Number(current.unitPrice) : null);
       const finalQtyAcquired = data.quantityAcquired !== undefined ? data.quantityAcquired : current.quantityAcquired;
       const ledgerAmount = finalUnitPrice != null && finalQtyAcquired != null
@@ -226,11 +299,14 @@ export const updateOperationalTask = async (taskId, input) => {
       });
 
       if (ledgerAmount != null && ledgerAmount > 0) {
+        const isFestivalScope = current.booking.festivalId || current.booking.crmFestivalId;
         const ledgerData = {
           type: "EXPENSE",
-          scope: current.booking.tripId ? "TRIP" : current.booking.festivalId ? "FESTIVAL" : "BOOKING",
+          scope: (current.booking.tripId || current.booking.crmTripId) ? "TRIP" : isFestivalScope ? "FESTIVAL" : "BOOKING",
           tripId: current.booking.tripId,
+          crmTripId: current.booking.crmTripId,
           festivalId: current.booking.festivalId,
+          crmFestivalId: current.booking.crmFestivalId,
           bookingId: current.booking.id,
           operationalTaskId: taskId,
           source: "OPERATIONAL_TASK",

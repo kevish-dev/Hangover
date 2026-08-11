@@ -1,5 +1,6 @@
 import transport from "../smtp/client.js";
 import env from "../env/env.js";
+import { prisma } from "../../prisma/client.js";
 
 const FROM = env.SMTP_FROM;
 const APP_URL = env.ORIGIN.replace(/\/+$/, "");
@@ -62,6 +63,36 @@ const safeAppUrl = (value, fallbackPath = "/") => {
   } catch {
     return fallback;
   }
+};
+
+const recordDeliveredBookingReceipt = async ({ options, travelerName, journeyTitle, transactionAmount, cumulativePaid, paidAt, type }) => {
+  const amount = Number(transactionAmount ?? cumulativePaid ?? options.totalAmount ?? 0);
+  const paymentRecordId = options.invoicePaymentId || options.paymentRecordId || null;
+  const record = {
+    customerName: travelerName,
+    customerEmail: options.to,
+    customerPhone: options.phone || null,
+    title: `${type.label} receipt · ${journeyTitle}`,
+    description: options.bookingRef ? `Booking reference: ${options.bookingRef}` : null,
+    items: [{ description: `${type.label} payment for ${journeyTitle}`, price: amount }],
+    amount,
+    currency: options.currency || "INR",
+    dueDate: paidAt ? new Date(paidAt) : new Date(),
+    status: "PAID",
+    source: "BOOKING_RECEIPT",
+    bookingId: options.bookingId || null,
+    paymentId: paymentRecordId,
+    sentAt: new Date(),
+  };
+  if (paymentRecordId) {
+    await prisma.customInvoice.upsert({
+      where: { paymentId: paymentRecordId },
+      create: record,
+      update: record,
+    });
+    return;
+  }
+  await prisma.customInvoice.create({ data: record });
 };
 
 const toNumber = (value) => {
@@ -546,9 +577,7 @@ export const sendBookingConfirmedEmail = async (options = {}) => {
 
   const dueNotice = due > 0
     ? `Your remaining balance of ${formatCurrency(due, currency)}${formatDate(balanceDueDate) ? ` is due by ${formatDate(balanceDueDate)}` : " is still payable"}. Your place remains reserved in the meantime.`
-    : type.code === "BALANCE"
-      ? "No balance remains on this booking. Please keep this email as your payment receipt."
-      : null;
+    : "Your booking is confirmed and fully paid. No balance remains on this booking. Please keep this email as your payment receipt."
 
   const fallbackPath = "/profile";
   const requestedUrl = type.code === "TOKEN" && due > 0
@@ -580,7 +609,7 @@ export const sendBookingConfirmedEmail = async (options = {}) => {
     cta,
   });
 
-  return sendTemplate({
+  const result = await sendTemplate({
     to,
     subject,
     text,
@@ -593,6 +622,12 @@ export const sendBookingConfirmedEmail = async (options = {}) => {
     cta,
     footerNote: "Keep this email for your records. Reply to it if any booking or payment detail looks incorrect.",
   });
+  try {
+    await recordDeliveredBookingReceipt({ options, travelerName, journeyTitle, transactionAmount, cumulativePaid, paidAt, type });
+  } catch (error) {
+    console.error("Failed to record delivered booking receipt:", error);
+  }
+  return result;
 };
 
 /** Send a balance payment reminder. */
@@ -627,6 +662,9 @@ export const sendPaymentReminderEmail = async (options = {}) => {
     ? options.isOverdue
     : Boolean(dueDateValue && dueDateValue.getTime() < Date.now());
   const formattedBalance = formatCurrency(balanceAmount, currency);
+  const requestedAmount = options.paymentRequestAmount === undefined ? null : formatCurrency(options.paymentRequestAmount, currency);
+  const installmentRequest = options.isInstallmentRequest === true;
+  const websitePaymentLink = options.isWebsitePaymentLink === true;
 
   const bookingRows = [
     { label: "Booking reference", value: bookingRef, emphasis: true },
@@ -640,23 +678,28 @@ export const sendPaymentReminderEmail = async (options = {}) => {
   const amountRows = [
     { label: "Booking total", value: formatCurrency(totalAmount, currency) },
     { label: "Paid to date", value: formatCurrency(amountPaid, currency) },
+    ...(installmentRequest ? [{ label: "Payment requested now", value: requestedAmount, strong: true, accent: true }] : []),
     { label: "Balance due", value: formattedBalance, strong: true, accent: true },
     { label: overdue ? "Payment was due" : "Payment due date", value: formatDate(dueDate), strong: true },
   ];
 
-  const title = overdue ? `Your balance is overdue, ${travelerName}` : `A quick payment reminder, ${travelerName}`;
+  const title = websitePaymentLink ? `Your payment page, ${travelerName}` : installmentRequest ? `Your payment link, ${travelerName}` : overdue ? `Your balance is overdue, ${travelerName}` : `A quick payment reminder, ${travelerName}`;
   const intro = overdue
     ? `The balance for ${journeyTitle} has passed its due date. Please complete the payment as soon as possible to keep your booking in good standing.`
-    : `Your remaining payment for ${journeyTitle} is coming up. We have gathered the important booking and balance details below.`;
+    : websitePaymentLink
+      ? `Open your secure Hangover Trails payment page to pay ${requestedAmount || "the amount due"} for ${journeyTitle}.`
+      : installmentRequest
+      ? `Please use this secure Razorpay link to pay ${requestedAmount} toward ${journeyTitle}. We have included your booking and remaining-balance details below.`
+      : `Your remaining payment for ${journeyTitle} is coming up. We have gathered the important booking and balance details below.`;
   const notice = "If you have already completed this payment, no action is needed. Payment updates may take a few moments to appear.";
   const cta = {
-    label: "Pay balance securely",
+    label: websitePaymentLink ? "Open secure payment page" : installmentRequest ? "Pay securely" : "Pay balance securely",
     url: safeAppUrl(paymentLink, "/profile"),
   };
 
   return sendTemplate({
     to,
-    subject: `${overdue ? "Balance payment overdue" : "Balance payment reminder"} – ${journeyTitle}${bookingRef ? ` (${bookingRef})` : ""}`,
+    subject: `${websitePaymentLink ? "Payment page" : installmentRequest ? "Payment link" : overdue ? "Balance payment overdue" : "Balance payment reminder"} – ${journeyTitle}${bookingRef ? ` (${bookingRef})` : ""}`,
     text: renderPlainText({
       title,
       intro,
@@ -667,8 +710,8 @@ export const sendPaymentReminderEmail = async (options = {}) => {
       notice,
       cta,
     }),
-    preheader: `${formattedBalance || "Your booking balance"} is ${overdue ? "overdue" : "due soon"} for ${journeyTitle}.`,
-    eyebrow: overdue ? "Payment overdue" : "Payment reminder",
+    preheader: `${websitePaymentLink ? `${requestedAmount || formattedBalance} payment requested` : installmentRequest ? `${requestedAmount} payment requested` : formattedBalance || "Your booking balance"} for ${journeyTitle}.`,
+    eyebrow: websitePaymentLink ? "Secure payment page" : installmentRequest ? "Secure payment link" : overdue ? "Payment overdue" : "Payment reminder",
     title,
     intro,
     badge: bookingRef,

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, isValid } from "date-fns";
 import {
   AlertTriangle,
@@ -15,9 +15,11 @@ import {
   UserRound,
   WalletCards,
   X,
+  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ApiPayment, paymentApi } from "../../../lib/paymentApi";
+import AdminVerifyPaymentModal from "../../components/admin/AdminVerifyPaymentModal";
 
 const currencyFormatter = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -44,16 +46,20 @@ const formatCalendarDate = (value: string | null | undefined) => {
   return format(new Date(Number(year), Number(month) - 1, Number(day)), "MMM d, yyyy");
 };
 
+const getActiveSlot = (payment: ApiPayment) => {
+  return payment.booking.slot || payment.booking.crmTripSlot || payment.booking.crmFestivalSlot;
+};
+
 const getItemDetails = (payment: ApiPayment) => {
   const customTrip = payment.booking.customTrip;
-  const festival = payment.booking.festival || payment.booking.slot?.festival;
-  const trip = payment.booking.trip || payment.booking.slot?.trip;
+  const festival = payment.booking.festival || payment.booking.crmFestival || getActiveSlot(payment)?.festival || getActiveSlot(payment)?.crmFestival;
+  const trip = payment.booking.trip || payment.booking.crmTrip || getActiveSlot(payment)?.trip || getActiveSlot(payment)?.crmTrip;
   const item = festival || trip;
 
   return {
     kind: customTrip ? "Custom trip" : festival ? "Festival" : trip ? "Trip" : "Booking",
-    title: customTrip?.title || item?.title || "Booking item unavailable",
-    location: customTrip ? "Private itinerary" : item?.location || "Location not provided",
+    title: customTrip?.title || (item as any)?.title || (item as any)?.name || "Booking item unavailable",
+    location: customTrip ? "Private itinerary" : (item as any)?.location || (item as any)?.destination?.name || "Location not provided",
   };
 };
 
@@ -72,6 +78,7 @@ const statusStyles: Record<string, string> = {
   FAILED: "border-red-200 bg-red-50 text-red-700",
   CANCELLED: "border-slate-200 bg-slate-100 text-slate-600",
   PENDING: "border-amber-200 bg-amber-50 text-amber-700",
+  PENDING_VERIFICATION: "border-amber-300 bg-amber-100 text-amber-900 font-bold",
   CREATED: "border-blue-200 bg-blue-50 text-blue-700",
 };
 
@@ -187,13 +194,13 @@ function PaymentDetailsModal({ payment, onClose }: { payment: ApiPayment; onClos
             <DetailRow label="Location">{item.location}</DetailRow>
             <DetailRow label="Package">{payment.booking.customTrip ? "Private custom trip" : payment.booking.package?.title || "Standard option"}</DetailRow>
             <DetailRow label="Slot">
-              {payment.booking.customTrip ? "Private dates" : payment.booking.slot?.title || formatCalendarDate(payment.booking.slot?.startDate)}
+              {payment.booking.customTrip ? "Private dates" : getActiveSlot(payment)?.title || formatCalendarDate(getActiveSlot(payment)?.startDate)}
             </DetailRow>
             <DetailRow label="Travel dates">
               {payment.booking.customTrip
                 ? `${formatCalendarDate(payment.booking.customTrip.startDate)} – ${formatCalendarDate(payment.booking.customTrip.endDate)}`
-                : payment.booking.slot?.startDate
-                ? `${formatCalendarDate(payment.booking.slot.startDate)} – ${formatCalendarDate(payment.booking.slot.endDate)}`
+                : getActiveSlot(payment)?.startDate
+                ? `${formatCalendarDate(getActiveSlot(payment)?.startDate)} – ${formatCalendarDate(getActiveSlot(payment)?.endDate)}`
                 : "Dates not provided"}
             </DetailRow>
           </section>
@@ -260,7 +267,9 @@ function PaymentDetailsModal({ payment, onClose }: { payment: ApiPayment; onClos
 }
 
 export default function AdminPaymentsPage() {
+  const queryClient = useQueryClient();
   const [selectedPayment, setSelectedPayment] = useState<ApiPayment | null>(null);
+  const [verifyPayment, setVerifyPayment] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [sortBy, setSortBy] = useState("date_desc");
@@ -489,7 +498,7 @@ export default function AdminPaymentsPage() {
                     <td className="max-w-[290px] px-5 py-4">
                       <div className="mb-1.5 flex flex-wrap items-center gap-2"><BookingKindBadge kind={item.kind} /><span className="font-mono text-[11px] font-semibold text-[#781216]">{payment.booking.bookingReference}</span></div>
                       <p className="break-words font-semibold text-gray-950">{item.title}</p>
-                      <p className="mt-1 truncate text-xs text-gray-500">{payment.booking.customTrip ? "Private custom trip" : payment.booking.package?.title || "Standard option"} · {payment.booking.customTrip ? formatCalendarDate(payment.booking.customTrip.startDate) : payment.booking.slot?.title || formatCalendarDate(payment.booking.slot?.startDate)}</p>
+                      <p className="mt-1 truncate text-xs text-gray-500">{payment.booking.customTrip ? "Private custom trip" : payment.booking.package?.title || "Standard option"} · {payment.booking.customTrip ? formatCalendarDate(payment.booking.customTrip.startDate) : getActiveSlot(payment)?.title || formatCalendarDate(getActiveSlot(payment)?.startDate)}</p>
                     </td>
                     <td className="max-w-[230px] px-5 py-4">
                       <p className="break-words font-semibold text-gray-900">{getCustomerName(payment)}</p>
@@ -500,7 +509,21 @@ export default function AdminPaymentsPage() {
                       <p className="mt-1 text-xs text-gray-500">{payment.paymentMethod?.toUpperCase() || "Method unavailable"}</p>
                     </td>
                     <td className="px-5 py-4 text-right"><p className="whitespace-nowrap text-base font-bold text-gray-950">{formatCurrency(payment.amount)}</p><p className="mt-1 text-xs text-gray-500">of {formatCurrency(payment.booking.totalAmount)}</p></td>
-                    <td className="px-5 py-4"><StatusBadge status={payment.status} /></td>
+                    <td className="px-5 py-4">
+                      <StatusBadge status={payment.status} />
+                      {payment.status === "PENDING_VERIFICATION" && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setVerifyPayment(payment);
+                          }}
+                          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-amber-600 active:scale-95"
+                        >
+                          <ShieldCheck className="h-3.5 w-3.5" /> Verify Payment
+                        </button>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-5 py-4"><p className="text-sm font-medium text-gray-800">{formatDate(payment.paidAt || payment.createdAt, "MMM d, yyyy")}</p><p className="mt-1 text-xs text-gray-500">{formatDate(payment.paidAt || payment.createdAt, "h:mm a")}</p></td>
                   </tr>
                 );
@@ -511,6 +534,17 @@ export default function AdminPaymentsPage() {
       </div>
 
       {selectedPayment && <PaymentDetailsModal payment={selectedPayment} onClose={() => setSelectedPayment(null)} />}
+      {verifyPayment && (
+        <AdminVerifyPaymentModal
+          payment={verifyPayment}
+          onClose={() => setVerifyPayment(null)}
+          onSuccess={() => {
+            setVerifyPayment(null);
+            refetch();
+            queryClient.invalidateQueries({ queryKey: ["admin", "payments", "pending_verification_count"] });
+          }}
+        />
+      )}
     </div>
   );
 }

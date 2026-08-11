@@ -5,7 +5,10 @@ export const createTripTag = async (req, res, next) => {
     const tag = await tripTagService.createTripTag(req.body);
     res.status(201).json(tag);
   } catch (error) {
-    if (error.code === 'P2002') { // Prisma unique constraint
+    if (error.code === 'P2002') {
+      const existing = await tripTagService.getAllTripTags();
+      const match = existing.find(t => t.tag.toLowerCase() === req.body.tag?.trim()?.toLowerCase());
+      if (match) return res.status(200).json(match);
       return res.status(400).json({ message: "Tag already exists" });
     }
     next(error);

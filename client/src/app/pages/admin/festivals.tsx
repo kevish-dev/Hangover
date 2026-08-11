@@ -260,8 +260,7 @@ export default function AdminFestivalsPage() {
   const festivals = allFestivals.filter((t: any) => {
     if (!search.trim()) return true;
     return t.title?.toLowerCase().includes(search.toLowerCase()) ||
-      t.location?.toLowerCase().includes(search.toLowerCase()) ||
-      t.circuit?.title?.toLowerCase().includes(search.toLowerCase());
+      t.location?.toLowerCase().includes(search.toLowerCase());
   });
 
   // Summary stats
@@ -361,11 +360,6 @@ export default function AdminFestivalsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          {festival.circuit && (
-                            <span className="text-[10px] font-bold text-[#8a6414] bg-[#fcf0d6] px-2 py-0.5 rounded">{festival.circuit.title}</span>
-                          )}
-                        </div>
                         <h3 className="font-bold text-gray-900 text-base leading-tight group-hover:text-[#781216] transition-colors truncate">{festival.title}</h3>
 
                         <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500 flex-wrap">

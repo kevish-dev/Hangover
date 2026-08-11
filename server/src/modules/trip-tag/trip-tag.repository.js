@@ -10,12 +10,20 @@ export const getAllTripTags = async () => {
   });
 };
 
+export const findTagByName = async (tagStr) => {
+  if (!tagStr) return null;
+  return prisma.tripTag.findFirst({
+    where: {
+      tag: { equals: tagStr.trim(), mode: "insensitive" }
+    }
+  });
+};
+
 export const getTripTagById = async (id) => {
   return prisma.tripTag.findUnique({
     where: { id },
     include: { 
       trips: { where: { isPublished: true, isListed: true } },
-      circuits: { where: { isActive: true } }
     }
   });
 };

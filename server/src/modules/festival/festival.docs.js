@@ -66,7 +66,6 @@ registry.registerPath({
           type: "object",
           properties: {
             title: { type: "string" },
-            circuitId: { type: "string", description: "Optional circuit ID to fork itinerary days from" },
             isListed: { type: "boolean", default: true, description: "Whether the festival appears in public listings" },
             isPublished: { type: "boolean", default: false },
           }

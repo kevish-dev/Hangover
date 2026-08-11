@@ -21,6 +21,7 @@ router.use(requireAuth);
 router.post("/initiate", paymentController.initiatePayment);
 router.post("/balance/initiate", paymentController.initiateBalancePayment);
 router.post("/verify", paymentController.verifyPayment);
+router.post("/submit-upi-utr", paymentController.submitUpiUtrPayment);
 router.post("/failed", paymentController.recordFailedPayment);
 router.get("/booking/:bookingId", paymentController.getPaymentHistory);
 
@@ -29,5 +30,6 @@ router.get("/", requireAdmin, paymentController.getAllPayments);
 router.post("/reminders/send", requireAdmin, paymentController.sendReminder);
 router.post("/manual", requireAdmin, paymentController.manualAdjustment);
 router.post("/:paymentId/refund", requireAdmin, paymentController.issueRefund);
+router.post("/:paymentId/verify-upi", requireAdmin, paymentController.verifyUpiPayment);
 
 export default router;

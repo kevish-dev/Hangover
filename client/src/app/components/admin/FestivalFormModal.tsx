@@ -55,7 +55,6 @@ const optionalNonnegativeInteger = z.preprocess(
   z.coerce.number().int().nonnegative().optional()
 );
 const festivalSchema = z.object({
-  circuitId: z.string().uuid().optional(),
   destinationId: z.string().uuid().optional(),
   title: z.string().min(3, "Title must be at least 3 characters"),
   location: z.string().min(2, "Location is required"),
@@ -103,6 +102,7 @@ const festivalSchema = z.object({
     )
     .optional(),
   isPublished: z.boolean().default(false),
+  isListed: z.boolean().default(true),
   isFeatured: z.boolean().default(false),
   itinerary: z.array(
     z.object({
@@ -141,6 +141,24 @@ const festivalSchema = z.object({
 
 type FestivalFormValues = z.infer<typeof festivalSchema>;
 
+type FestivalDraft = {
+  id: string;
+  name: string;
+  updatedAt: string;
+  values: FestivalFormValues;
+};
+
+const FESTIVAL_DRAFTS_KEY = "crm-festival-drafts:v1";
+
+const readFestivalDrafts = (): FestivalDraft[] => {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(FESTIVAL_DRAFTS_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
 const STEPS = [
   "Basics",
   "Logistics",
@@ -165,14 +183,12 @@ const TASK_CATEGORIES = [
 
 interface FestivalFormModalProps {
   festival?: any;
-  sourceCircuit?: any;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function FestivalFormModal({
   festival,
-  sourceCircuit,
   open,
   onOpenChange,
 }: FestivalFormModalProps) {
@@ -183,6 +199,11 @@ export function FestivalFormModal({
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [localBannerImages, setLocalBannerImages] = useState<string[]>([]);
   const [uploadingImageKey, setUploadingImageKey] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<FestivalDraft[]>([]);
+  const [isSaveDraftOpen, setIsSaveDraftOpen] = useState(false);
+  const [isDraftsOpen, setIsDraftsOpen] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [draftToDelete, setDraftToDelete] = useState<FestivalDraft | null>(null);
 
   // Highlight State
   const [highlightItems, setHighlightItems] = useState<
@@ -233,7 +254,6 @@ export function FestivalFormModal({
   const form = useForm<FestivalFormValues>({
     resolver: zodResolver(festivalSchema),
     defaultValues: {
-      circuitId: undefined,
       destinationId: undefined,
       title: "",
       location: "",
@@ -249,6 +269,7 @@ export function FestivalFormModal({
       itinerary: [],
       faqs: [],
       isPublished: false,
+      isListed: true,
       isFeatured: false,
     },
     mode: "onTouched",
@@ -257,9 +278,9 @@ export function FestivalFormModal({
   // Reset form when festival prop changes or modal opens
   useEffect(() => {
     if (open) {
+      setDrafts(readFestivalDrafts());
       if (festival) {
         form.reset({
-          circuitId: festival.circuitId || undefined,
           destinationId: festival.destinationId || undefined,
           title: festival.title || "",
           location: festival.location || "",
@@ -284,6 +305,7 @@ export function FestivalFormModal({
           itinerary: toItineraryFields(festival.itinerary),
           faqs: toFaqFields(festival.faqs),
           isPublished: festival.isPublished || false,
+          isListed: festival.isListed !== false,
           isFeatured: festival.isFeatured || false,
         });
         // Keep the field-array source of truth in sync with the values shown
@@ -305,13 +327,21 @@ export function FestivalFormModal({
           try { parsedHighlights = JSON.parse(parsedHighlights); } catch(e) { parsedHighlights = []; }
         }
         setHighlightItems(
-          Array.isArray(parsedHighlights) ? parsedHighlights.map((item: any) => ({
-            id: Math.random().toString(),
-            text: item.text || "",
-            type: "EXISTING",
-            url: item.imageUrl,
-            preview: item.imageUrl,
-          })) : []
+          Array.isArray(parsedHighlights) ? parsedHighlights.map((item: any) => {
+            let textVal = item?.text;
+            let imageVal = item?.imageUrl || "";
+            while (textVal && typeof textVal === "object") {
+              if (textVal.imageUrl && !imageVal) imageVal = textVal.imageUrl;
+              textVal = textVal.text;
+            }
+            return {
+              id: Math.random().toString(),
+              text: typeof textVal === "string" ? textVal : "",
+              type: "EXISTING" as const,
+              url: typeof imageVal === "string" ? imageVal : "",
+              preview: typeof imageVal === "string" ? imageVal : "",
+            };
+          }) : []
         );
 
         let parsedBanners = festival.bannerImages || [];
@@ -334,72 +364,8 @@ export function FestivalFormModal({
             preview: item.imageUrl,
           })) : []
         );
-      } else if (sourceCircuit) {
-        form.reset({
-          circuitId: sourceCircuit.id,
-          destinationId: sourceCircuit.destinationId || undefined,
-          title: sourceCircuit.title || "",
-          location: sourceCircuit.location || "",
-          duration: sourceCircuit.duration || 1,
-          bestTimeToVisit: sourceCircuit.bestTimeToVisit || "",
-          slots: [{ startDate: "", endDate: "", capacity: 12 }],
-          overview: sourceCircuit.overview || "",
-          inclusions: toValueFields(sourceCircuit.inclusions),
-          exclusions: toValueFields(sourceCircuit.exclusions),
-          tags: toTagFields(sourceCircuit.tags),
-          packages: toPackageFields(sourceCircuit.packages),
-          addOns: toAddOnFields(sourceCircuit.addOns),
-          itinerary: toItineraryFields(sourceCircuit.days),
-          faqs: toFaqFields(sourceCircuit.faqs),
-          isPublished: false,
-          isFeatured: false,
-        });
-        replaceSlots(form.getValues("slots"));
-        replaceInclusions(form.getValues("inclusions"));
-        replaceExclusions(form.getValues("exclusions"));
-        replaceTags(form.getValues("tags"));
-        replacePackages(form.getValues("packages"));
-        replaceAddOns(form.getValues("addOns"));
-        replaceFaqs(form.getValues("faqs"));
-        replaceItinerary(form.getValues("itinerary"));
-        form.clearErrors();
-
-        let parsedHighlights = sourceCircuit.highlights || [];
-        if (typeof parsedHighlights === "string") {
-          try { parsedHighlights = JSON.parse(parsedHighlights); } catch(e) { parsedHighlights = []; }
-        }
-        setHighlightItems(
-          toArray(parsedHighlights).map((item: any) => ({
-            id: Math.random().toString(),
-            text: item.text || "",
-            type: "EXISTING",
-            url: item.imageUrl,
-            preview: item.imageUrl,
-          }))
-        );
-
-        let parsedBanners = sourceCircuit.bannerImages || [];
-        if (typeof parsedBanners === "string") {
-          try { parsedBanners = JSON.parse(parsedBanners); } catch(e) { parsedBanners = []; }
-        }
-        setLocalBannerImages(Array.isArray(parsedBanners) ? parsedBanners : []);
-
-        let parsedStay = sourceCircuit.stayTransportImages || [];
-        if (typeof parsedStay === "string") {
-          try { parsedStay = JSON.parse(parsedStay); } catch(e) { parsedStay = []; }
-        }
-        setStayItems(
-          toArray(parsedStay).map((item: any) => ({
-            id: Math.random().toString(),
-            text: item.text || "",
-            type: "EXISTING",
-            url: item.imageUrl,
-            preview: item.imageUrl,
-          }))
-        );
       } else {
         form.reset({
-          circuitId: undefined,
           destinationId: undefined,
           title: "",
           location: "",
@@ -415,6 +381,7 @@ export function FestivalFormModal({
           faqs: [],
           itinerary: [],
           isPublished: false,
+          isListed: true,
           isFeatured: false,
         });
         replaceSlots(form.getValues("slots"));
@@ -436,7 +403,7 @@ export function FestivalFormModal({
       setVideoFile(null);
       setVideoPreview(null);
     }
-  }, [festival, sourceCircuit, open, form]);
+  }, [festival, open, form]);
 
   const {
     fields: inclusionFields,
@@ -510,6 +477,53 @@ export function FestivalFormModal({
     control: form.control,
     name: "itinerary",
   });
+
+  const persistDrafts = (nextDrafts: FestivalDraft[]) => {
+    window.localStorage.setItem(FESTIVAL_DRAFTS_KEY, JSON.stringify(nextDrafts));
+    setDrafts(nextDrafts);
+  };
+
+  const saveDraft = () => {
+    const name = draftName.trim();
+    if (!name) {
+      toast.error("Enter a name for this draft");
+      return;
+    }
+    const values = JSON.parse(JSON.stringify(form.getValues())) as FestivalFormValues;
+    const draft: FestivalDraft = {
+      id: crypto.randomUUID(),
+      name,
+      updatedAt: new Date().toISOString(),
+      values,
+    };
+    persistDrafts([draft, ...drafts]);
+    setDraftName("");
+    setIsSaveDraftOpen(false);
+    toast.success("Festival draft saved", { description: "Images and the selected video are not stored in browser drafts." });
+  };
+
+  const restoreDraft = (draft: FestivalDraft) => {
+    form.reset(draft.values);
+    replaceSlots(draft.values.slots || []);
+    replaceInclusions(draft.values.inclusions || []);
+    replaceExclusions(draft.values.exclusions || []);
+    replaceTags(draft.values.tags || []);
+    replacePackages(draft.values.packages || []);
+    replaceAddOns(draft.values.addOns || []);
+    replaceFaqs(draft.values.faqs || []);
+    replaceItinerary(draft.values.itinerary || []);
+    form.clearErrors();
+    setStep(0);
+    setIsDraftsOpen(false);
+    toast.success(`Restored draft: ${draft.name}`);
+  };
+
+  const deleteDraft = () => {
+    if (!draftToDelete) return;
+    persistDrafts(drafts.filter((draft) => draft.id !== draftToDelete.id));
+    toast.success(`Deleted draft: ${draftToDelete.name}`);
+    setDraftToDelete(null);
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -990,14 +1004,12 @@ export function FestivalFormModal({
           <div className="p-6 sm:p-8">
           <DialogHeader className="mb-6 border-b border-gray-100 pb-4">
             <DialogTitle className="text-xl sm:text-2xl font-bold pr-6">
-              {isEdit ? "Edit Festival" : sourceCircuit ? "Create festival from circuit" : "Create New Festival"}
+              {isEdit ? "Edit Itinerary Festival" : "Create New Itinerary Festival"}
             </DialogTitle>
             <DialogDescription>
               {isEdit
                 ? "Modify the details of your festival below."
-                : sourceCircuit
-                  ? `Forked from ${sourceCircuit.title}. Add specific dates and festival details.`
-                  : "Follow the steps to configure all details for the new festival."}
+                : "Follow the steps to configure all details for the new festival."}
             </DialogDescription>
           </DialogHeader>
 
@@ -1320,7 +1332,18 @@ export function FestivalFormModal({
                       className="w-4 h-4 text-[#b59410] rounded border-gray-300 focus:ring-[#b59410]"
                     />
                     <Label htmlFor="isPublished" className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block mb-0 cursor-pointer">
-                      Publish this festival (visible to public)
+                      Publish this festival
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="isListed"
+                      {...form.register("isListed")}
+                      className="w-4 h-4 text-[#b59410] rounded border-gray-300 focus:ring-[#b59410]"
+                    />
+                    <Label htmlFor="isListed" className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block mb-0 cursor-pointer">
+                      List in public catalog
                     </Label>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1331,7 +1354,7 @@ export function FestivalFormModal({
                       className="w-4 h-4 text-[#b59410] rounded border-gray-300 focus:ring-[#b59410]"
                     />
                     <Label htmlFor="isFeatured" className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-2 block mb-0 cursor-pointer">
-                      Feature this festival (highlight on homepage)
+                      Feature this festival (showcase its video on the homepage)
                     </Label>
                   </div>
                 </div>
@@ -2173,6 +2196,25 @@ export function FestivalFormModal({
 
           {step < STEPS.length - 1 ? (
             <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setDraftName(form.getValues("title") || "");
+                  setIsSaveDraftOpen(true);
+                }}
+                disabled={isSubmitting}
+              >
+                Save draft
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsDraftsOpen(true)}
+                disabled={isSubmitting}
+              >
+                My drafts ({drafts.length})
+              </Button>
               {isEdit && (
                 <Button
                   type="button"
@@ -2218,6 +2260,73 @@ export function FestivalFormModal({
         </div>
         </div>
       </DialogContent>
+
+      <Dialog open={isSaveDraftOpen} onOpenChange={setIsSaveDraftOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Name this festival draft</DialogTitle>
+            <DialogDescription>
+              Save the details entered so far and continue later. Banner images and videos need to be selected again when you restore a draft.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            autoFocus
+            value={draftName}
+            onChange={(event) => setDraftName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                saveDraft();
+              }
+            }}
+            placeholder="e.g. Sunburn Goa – January plan"
+          />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setIsSaveDraftOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={saveDraft} className="bg-[#781216] hover:bg-[#9a1a1f] text-white">Save draft</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDraftsOpen} onOpenChange={setIsDraftsOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Festival drafts</DialogTitle>
+            <DialogDescription>Restore a saved draft or remove one you no longer need.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-80 space-y-2 overflow-y-auto">
+            {drafts.length === 0 ? (
+              <p className="rounded-lg border border-dashed p-5 text-center text-sm text-gray-500">No festival drafts saved yet.</p>
+            ) : drafts.map((draft) => (
+              <div key={draft.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-gray-900">{draft.name}</p>
+                  <p className="text-xs text-gray-500">Saved {format(new Date(draft.updatedAt), "dd MMM yyyy, h:mm a")}</p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => restoreDraft(draft)}>Restore</Button>
+                  <Button type="button" size="sm" variant="outline" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setDraftToDelete(draft)}>Delete</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!draftToDelete} onOpenChange={(nextOpen) => !nextOpen && setDraftToDelete(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete festival draft?</DialogTitle>
+            <DialogDescription>
+              {draftToDelete ? `“${draftToDelete.name}” will be permanently removed from this browser.` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setDraftToDelete(null)}>Cancel</Button>
+            <Button type="button" variant="destructive" onClick={deleteDraft}>Delete draft</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

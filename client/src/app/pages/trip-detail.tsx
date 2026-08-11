@@ -41,7 +41,7 @@ import { SiteFooter } from "../components/site-footer";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiClient } from "../../lib/axios";
 import { toast } from "sonner";
-import { mediaImageUrl } from "../../lib/media";
+import { mediaImageUrl, mediaVideoUrl } from "../../lib/media";
 import { getErrorMessage } from "../../lib/errors";
 
 // ── "Not Available" inline label ──────────────────────────────────
@@ -838,7 +838,7 @@ function ItineraryAccordion({
     title?: string;
     description?: string | null;
     todos?: string[];
-    activities?: string | string[];
+    activities?: string | string[] | { title: string }[];
   }[];
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(0); // First item open by default
@@ -854,7 +854,12 @@ function ItineraryAccordion({
         if (Array.isArray(d.todos) && d.todos.length > 0) {
           acts = d.todos;
         } else if (Array.isArray(d.activities)) {
-          acts = d.activities;
+          const first = d.activities[0];
+          if (typeof first === 'object' && first !== null && 'title' in first) {
+            acts = (d.activities as { title: string }[]).map((a) => a.title);
+          } else {
+            acts = d.activities as string[];
+          }
         } else if (typeof d.activities === 'string') {
           acts = d.activities.split('\n');
         } else if (d.description) {
@@ -1126,6 +1131,9 @@ export default function TripDetail() {
         .then((res) => {
           const bookings = res.data?.data || [];
           const belongsToCurrentItem = (booking: any) => {
+            if (!isFestival && (trip as any).isCrmTrip) {
+              return booking.crmTripId === trip.id;
+            }
             const itemId = isFestival
               ? booking.festivalId || booking.festival?.id || booking.slot?.festivalId
               : booking.tripId || booking.trip?.id || booking.slot?.tripId;
@@ -1537,6 +1545,8 @@ function TripDetailContent({
 
   const safeAllImages =
     allImages.length > 0 ? allImages : [heroImage].filter(Boolean);
+  const festivalVideoUrl = isFestival ? (trip as any).videoUrl as string | null | undefined : null;
+  const showHeroVideo = Boolean(festivalVideoUrl);
   const bookingParams = new URLSearchParams();
   if (isFestival) bookingParams.set("type", "festival");
   if (selectedSlotId) bookingParams.set("slotId", selectedSlotId);
@@ -1766,10 +1776,31 @@ function TripDetailContent({
           height: "70vh",
           minHeight: "480px",
           overflow: "hidden",
-          cursor: "zoom-in",
+          cursor: showHeroVideo ? "default" : "zoom-in",
         }}
       >
-        {safeAllImages.length > 0 ? (
+        {showHeroVideo ? (
+          <motion.video
+            key={festivalVideoUrl}
+            src={mediaVideoUrl(festivalVideoUrl!)}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            initial={{ opacity: 0, scale: 1.04 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.55, ease: [0.25, 0.1, 0.25, 1] }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "center",
+            }}
+          />
+        ) : safeAllImages.length > 0 ? (
           <AnimatePresence mode="sync" initial={false}>
             <motion.img
               key={heroIndex}
@@ -1797,13 +1828,23 @@ function TripDetailContent({
             style={{
               width: "100%",
               height: "100%",
-              background: "#1e1a14",
               display: "flex",
+              flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
+              background: "linear-gradient(135deg, #1e1a14 0%, #2c1a1d 50%, #1e1a14 100%)",
+              color: "#fff",
+              textAlign: "center",
+              padding: "24px",
             }}
           >
-            <NA text="No Images Available" />
+            <MapPin size={48} strokeWidth={1.5} style={{ marginBottom: "16px", color: "#781216", opacity: 0.9 }} />
+            <h2 style={{ fontSize: "1.75rem", fontWeight: 600, letterSpacing: "0.02em", color: "#f5f0e6", margin: "0 auto", maxWidth: "600px" }}>
+              {trip.title || "Your Itinerary"}
+            </h2>
+            <p style={{ fontSize: "0.88rem", color: "rgba(245,240,230,0.6)", marginTop: "8px", fontWeight: 400, margin: 0 }}>
+              Itinerary details & travel plan
+            </p>
           </div>
         )}
         <div
@@ -1843,7 +1884,7 @@ function TripDetailContent({
         </button>
 
         {/* Prev / Next arrows */}
-        {safeAllImages.length > 1 && (
+        {!showHeroVideo && safeAllImages.length > 1 && (
           <>
             <button
               onClick={(e) => {
@@ -1911,7 +1952,7 @@ function TripDetailContent({
         )}
 
         {/* Dot indicators */}
-        {safeAllImages.length > 1 && (
+        {!showHeroVideo && safeAllImages.length > 1 && (
           <div
             style={{
               position: "absolute",
@@ -2127,12 +2168,37 @@ function TripDetailContent({
             <div id="highlights">
               <SectionTitle>Trip Highlights</SectionTitle>
               {(() => {
-                let h = trip.highlights || [];
-                if (typeof h === 'string') {
-                  try { h = JSON.parse(h); } catch(e) { h = []; }
+                let h: any[] = Array.isArray(trip.highlights) ? trip.highlights : [];
+                if (typeof trip.highlights === 'string') {
+                  try { h = JSON.parse(trip.highlights); } catch(e) { h = []; }
                 }
-                return h && h.length > 0 ? (
-                  <TripHighlightsAccordion highlights={h} />
+                // Flatten if doubly-nested (e.g. API returned [[{text,imageUrl}]])
+                if (h.length > 0 && Array.isArray(h[0])) {
+                  h = h.flat();
+                }
+                // Normalize each item to { text: string; imageUrl: string }
+                const normalizedHighlights: { text: string; imageUrl: string }[] = h
+                  .map((item: any) => {
+                    if (!item) return null;
+                    if (typeof item === 'string') return { text: item, imageUrl: '' };
+                    if (typeof item !== 'object') return null;
+
+                    let textVal = item.text ?? item.title ?? item.label ?? item.name ?? '';
+                    let imageVal = item.imageUrl ?? item.image ?? item.url ?? '';
+
+                    while (textVal && typeof textVal === 'object') {
+                      if (textVal.imageUrl && !imageVal) imageVal = textVal.imageUrl;
+                      textVal = textVal.text ?? textVal.title ?? textVal.label ?? textVal.name ?? '';
+                    }
+
+                    const textStr = typeof textVal === 'string' ? textVal : '';
+                    const imageStr = typeof imageVal === 'string' ? imageVal : '';
+                    if (!textStr && !imageStr) return null;
+                    return { text: textStr, imageUrl: imageStr };
+                  })
+                  .filter(Boolean) as { text: string; imageUrl: string }[];
+                return normalizedHighlights.length > 0 ? (
+                  <TripHighlightsAccordion highlights={normalizedHighlights} />
                 ) : (
                   <p
                     style={{
@@ -2204,33 +2270,36 @@ function TripDetailContent({
                     }}
                   >
                     {trip.inclusions && trip.inclusions.length > 0 ? (
-                      trip.inclusions.map((item) => (
-                        <div
-                          key={item}
-                          style={{
-                            display: "flex",
-                            alignItems: "flex-start",
-                            gap: "8px",
-                          }}
-                        >
-                          <CheckCircle
-                            size={14}
-                            color="#781216"
-                            strokeWidth={1.5}
-                            style={{ flexShrink: 0, marginTop: "2px" }}
-                          />
-                          <span
+                      trip.inclusions.map((item: any, idx: number) => {
+                        const label = typeof item === "string" ? item : (item?.text || String(item));
+                        return (
+                          <div
+                            key={idx}
                             style={{
-                              color: "rgba(30,26,20,0.7)",
-                              fontSize: "0.8rem",
-                              fontWeight: 300,
-                              lineHeight: 1.5,
+                              display: "flex",
+                              alignItems: "flex-start",
+                              gap: "8px",
                             }}
                           >
-                            {item}
-                          </span>
-                        </div>
-                      ))
+                            <CheckCircle
+                              size={14}
+                              color="#781216"
+                              strokeWidth={1.5}
+                              style={{ flexShrink: 0, marginTop: "2px" }}
+                            />
+                            <span
+                              style={{
+                                color: "rgba(30,26,20,0.7)",
+                                fontSize: "0.8rem",
+                                fontWeight: 300,
+                                lineHeight: 1.5,
+                              }}
+                            >
+                              {label}
+                            </span>
+                          </div>
+                        );
+                      })
                     ) : (
                       <p
                         style={{
@@ -2266,33 +2335,36 @@ function TripDetailContent({
                     }}
                   >
                     {trip.exclusions && trip.exclusions.length > 0 ? (
-                      trip.exclusions.map((item) => (
-                        <div
-                          key={item}
-                          style={{
-                            display: "flex",
-                            alignItems: "flex-start",
-                            gap: "8px",
-                          }}
-                        >
-                          <XCircle
-                            size={14}
-                            color="rgba(30,26,20,0.3)"
-                            strokeWidth={1.5}
-                            style={{ flexShrink: 0, marginTop: "2px" }}
-                          />
-                          <span
+                      trip.exclusions.map((item: any, idx: number) => {
+                        const label = typeof item === "string" ? item : (item?.text || String(item));
+                        return (
+                          <div
+                            key={idx}
                             style={{
-                              color: "rgba(30,26,20,0.52)",
-                              fontSize: "0.8rem",
-                              fontWeight: 300,
-                              lineHeight: 1.5,
+                              display: "flex",
+                              alignItems: "flex-start",
+                              gap: "8px",
                             }}
                           >
-                            {item}
-                          </span>
-                        </div>
-                      ))
+                            <XCircle
+                              size={14}
+                              color="rgba(30,26,20,0.3)"
+                              strokeWidth={1.5}
+                              style={{ flexShrink: 0, marginTop: "2px" }}
+                            />
+                            <span
+                              style={{
+                                color: "rgba(30,26,20,0.52)",
+                                fontSize: "0.8rem",
+                                fontWeight: 300,
+                                lineHeight: 1.5,
+                              }}
+                            >
+                              {label}
+                            </span>
+                          </div>
+                        );
+                      })
                     ) : (
                       <p
                         style={{

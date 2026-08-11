@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 import { SyncIndicator } from "../../components/ui/sync-indicator";
+import { OperationsCalendar } from "../../components/admin/operations/OperationsCalendar";
 
 type Task = {
   id: string;
@@ -31,6 +32,7 @@ type Task = {
     bookingReference: string;
     status: string;
     trip?: { id: string; title: string } | null;
+    crmTrip?: { id: string; name: string } | null;
     festival?: { id: string; title: string } | null;
   };
 };
@@ -151,6 +153,7 @@ export default function AdminOperationsPage() {
         task.title,
         task.booking?.bookingReference,
         task.booking?.trip?.title,
+        task.booking?.crmTrip?.name,
         task.booking?.festival?.title,
         task.booking?.user?.profile?.fullName,
       ]
@@ -163,6 +166,8 @@ export default function AdminOperationsPage() {
 
   if (query.isLoading) return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#781216]" /></div>;
   if (query.isError) return <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800"><h1 className="font-bold">Tasks could not be loaded</h1><button type="button" onClick={() => query.refetch()} className="mt-3 text-sm font-semibold underline">Try again</button></div>;
+
+  return <div className="mx-auto max-w-[1500px] space-y-5 pb-12"><header><p className="text-xs font-bold uppercase tracking-[0.18em] text-[#781216]">Execution core</p><h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-gray-950 sm:text-3xl"><FileSpreadsheet className="h-8 w-8 text-indigo-600" />Ground Operations</h1><p className="mt-2 text-sm leading-6 text-gray-600">All operational tasks, organized by due date.</p></header><div className="grid gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_180px_180px]"><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" /><Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search title or booking..." className="pl-10" /></div><Select value={status} onValueChange={setStatus}><SelectTrigger className="h-10 rounded-md border-input bg-background shadow-none"><SelectValue placeholder="All statuses" /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem>{STATUSES.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select><Select value={category} onValueChange={setCategory}><SelectTrigger className="h-10 rounded-md border-input bg-background shadow-none"><SelectValue placeholder="All categories" /></SelectTrigger><SelectContent><SelectItem value="all">All categories</SelectItem>{CATEGORIES.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div><div className="flex justify-end"><SyncIndicator isMutating={createMutation.isPending || updateMutation.isPending || deleteMutation.isPending} isError={createMutation.isError || updateMutation.isError || deleteMutation.isError} /></div><OperationsCalendar tasks={filtered} emptyMessage="No dated operations match the current filters." /></div>;
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-5 pb-12">
@@ -231,7 +236,7 @@ export default function AdminOperationsPage() {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {filtered.map((task) => (
-                <tr key={task.id} className="group hover:bg-blue-50/30">
+                <tr key={task.id} className={`group transition-colors ${task.status === "DONE" ? "bg-gray-50/80 text-gray-400 hover:bg-gray-100" : "hover:bg-blue-50/30"}`}>
                   <td className="border-r border-gray-200 p-0">
                     <div className="w-full h-full min-h-10 px-3 py-1.5 flex flex-col justify-center text-xs">
                       <span className="font-mono font-medium text-gray-700 leading-none">{task.booking?.bookingReference}</span>
@@ -273,7 +278,7 @@ export default function AdminOperationsPage() {
                       type="text"
                       defaultValue={task.title}
                       onBlur={(e) => handleCellChange(task, "title", e.target.value)}
-                      className="w-full h-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 font-medium"
+                      className={`w-full h-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 font-medium ${task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"}`}
                     />
                   </td>
                   <td className="border-r border-gray-200 p-0">

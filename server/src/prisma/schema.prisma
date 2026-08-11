@@ -7,36 +7,6 @@ datasource db {
   provider = "postgresql"
 }
 
-// =====================================================================
-// HOW THE NEW FLOW MAPS TO MODELS
-// =====================================================================
-// 1. Admin builds a CIRCUIT (e.g. "Tawang") = the baseline. Has days,
-//    inclusions/exclusions, packages, tags, FAQs, add-ons, operational
-//    task templates (hotel/transport/permit configs). NO slots.
-// 2. Admin clicks "Create Trip from Circuit" -> a TRIP is forked. It
-//    copies every field + CircuitDay -> TripDay + CircuitDayTask
-//    templates (materialized once real Slots/dates exist). Admin only
-//    has to add Slots (departure dates); everything else is editable
-//    but pre-filled.
-// 3. Trip can be linked to a Destination, and if isPublished=false the
-//    admin can generate a shareTokenHash link for direct viewing/booking.
-// 4. Every successful Payment / Refund / OperationalTask cost / AddOn
-//    purchase auto-writes a LedgerEntry (income or expense) scoped to
-//    that Trip. Admins can add/delete manual LedgerEntry rows too
-//    (scope=OTHER for non-trip income/expense like sponsorships).
-//    The "Balance Sheet" in the diagram is just LedgerEntry grouped by
-//    scope + type - there's no separate BalanceSheet table needed.
-// 5. Each Slot (a real departure) gets its own OperationalTask rows,
-//    forked from CircuitDayTask templates, because hotel/vendor
-//    arrangements differ per departure date. Status color (green/
-//    yellow/red) is computed in the app from dueAt vs now + how much
-//    of estimatedAmount has been arranged - not stored in the DB.
-// 6. AddOns are configured on the Circuit (or directly on a Trip) and
-//    purchased per Booking up until a cutoff before departure.
-// 7. Booking.status -> COMPLETED triggers the review flow (Review is
-//    unchanged, 1:1 with Booking); reviewRequestedAt tracks the prompt.
-// =====================================================================
-
 model User {
   id                String        @id @default(uuid())
   email             String        @unique
@@ -47,20 +17,17 @@ model User {
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
   bookings          Booking[]
-  circuitsCreated   Circuit[]     @relation("CircuitCreator")
   resolvedInquiries Inquiry[]     @relation("InquiryResolver")
   inquiries         Inquiry[]
-  profile           UserProfile?
-  reviews           Review[]
-  mediaUploads      MediaAsset[]  @relation("MediaAssetUploader")
   ledgerEntries     LedgerEntry[] @relation("LedgerEntryCreator")
+  mediaUploads      MediaAsset[]  @relation("MediaAssetUploader")
+  reviews           Review[]
+  profile           UserProfile?
 
   @@index([email])
   @@index([role])
 }
 
-// A single, application-wide setting row. The fixed ID keeps reads and updates
-// deterministic while allowing this setting to grow without environment flags.
 model SiteSetting {
   id              String   @id @default("default")
   maintenanceMode Boolean  @default(false)
@@ -92,89 +59,16 @@ model UserProfile {
   updatedAt                DateTime    @updatedAt
   govtIdImageUrl           String?
   govtIdAssetId            String?     @unique
-  govtIdAsset              MediaAsset? @relation("ProfileGovernmentId", fields: [govtIdAssetId], references: [id], onDelete: SetNull)
+  govtIdAsset              MediaAsset? @relation("ProfileGovernmentId", fields: [govtIdAssetId], references: [id])
   user                     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([govtIdNumber])
 }
 
-model Circuit {
-  id                     String       @id @default(uuid())
-  title                  String
-  slug                   String       @unique
-  tripType               TripType
-  location               String
-  destinationId          String?
-  destination            Destination? @relation(fields: [destinationId], references: [id])
-  overview               String
-  bestTimeToVisit        String
-  duration               Int
-  bannerImages           String[]
-  stayTransportImages    Json         @default("[]")
-  highlights             Json         @default("[]")
-  inclusions             String[]
-  exclusions             String[]
-  isActive               Boolean      @default(true)
-  operationsReminderDays Int          @default(3) // days before dueAt to send admin alert
-  internalNotes          String?
-  createdById            String?
-  createdBy              User?        @relation("CircuitCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt              DateTime     @default(now())
-  updatedAt              DateTime     @updatedAt
-
-  days      CircuitDay[]
-  packages  Package[]
-  faqs      FAQ[]
-  tags      TripTag[]    @relation("CircuitToTripTag")
-  addOns    AddOn[]
-  trips     Trip[]
-  festivals Festival[]
-
-  @@index([tripType])
-  @@index([isActive])
-  @@index([destinationId])
-}
-
-model CircuitDay {
-  id          String           @id @default(uuid())
-  circuitId   String
-  circuit     Circuit          @relation(fields: [circuitId], references: [id], onDelete: Cascade)
-  dayNumber   Int
-  title       String
-  description String?
-  todos       String[]         @default([])
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  tasks       CircuitDayTask[]
-
-  @@unique([circuitId, dayNumber])
-  @@index([circuitId])
-}
-
-model CircuitDayTask {
-  id             String                  @id @default(uuid())
-  circuitDayId   String
-  circuitDay     CircuitDay              @relation(fields: [circuitDayId], references: [id], onDelete: Cascade)
-  category       OperationalTaskCategory
-  title          String
-  description    String?
-  config         Json                    @default("{}")
-  unitPrice      Decimal?                @db.Decimal(10, 2)
-  quantityNeeded Int?
-  dueOffsetDays  Int?
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-
-  @@index([circuitDayId])
-  @@index([category])
-}
-
 model Trip {
-  id                  String       @id @default(uuid())
-  circuitId           String?
-  circuit             Circuit?     @relation(fields: [circuitId], references: [id], onDelete: SetNull)
+  id                  String         @id @default(uuid())
   title               String
-  slug                String       @unique
+  slug                String         @unique
   location            String
   bannerImages        String[]
   duration            Int
@@ -183,31 +77,30 @@ model Trip {
   inclusions          String[]
   exclusions          String[]
   tripType            TripType
-  isActive            Boolean      @default(true)
-  isFeatured          Boolean      @default(false)
-  isSignature         Boolean      @default(false)
-  signatureOrder      Int          @default(0)
+  isActive            Boolean        @default(true)
+  isFeatured          Boolean        @default(false)
+  isSignature         Boolean        @default(false)
+  signatureOrder      Int            @default(0)
   destinationId       String?
-  destination         Destination? @relation(fields: [destinationId], references: [id])
-  isPublished         Boolean      @default(false)
-  isListed            Boolean      @default(true)
-  shareTokenHash      String?      @unique // lets an unpublished trip be viewed/booked via direct link
+  isPublished         Boolean        @default(false)
+  isListed            Boolean        @default(true)
+  shareTokenHash      String?        @unique
   shareTokenExpiresAt DateTime?
-  highlights          Json         @default("[]")
-  stayTransportImages Json         @default("[]")
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
-
-  itinerary     ItineraryDay[]
-  bookings      Booking[]
-  faqs          FAQ[]
-  inquiries     Inquiry[]
-  packages      Package[]
-  slots         Slot[]
-  tripTags      TripTag[]      @relation("TripToTripTag")
-  reviews       Review[]
-  addOns        AddOn[]
-  ledgerEntries LedgerEntry[]
+  highlights          Json           @default("[]")
+  stayTransportImages Json           @default("[]")
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  addOns              AddOn[]
+  bookings            Booking[]
+  faqs                FAQ[]
+  inquiries           Inquiry[]
+  itinerary           ItineraryDay[]
+  ledgerEntries       LedgerEntry[]
+  packages            Package[]
+  reviews             Review[]
+  slots               Slot[]
+  destination         Destination?   @relation(fields: [destinationId], references: [id])
+  tripTags            TripTag[]      @relation("TripToTripTag")
 
   @@index([tripType])
   @@index([isActive])
@@ -216,24 +109,22 @@ model Trip {
   @@index([isPublished])
   @@index([location])
   @@index([destinationId])
-  @@index([circuitId])
 }
 
 model ItineraryDay {
-  id          String    @id @default(uuid())
-  tripId      String?
-  trip        Trip?     @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  festivalId  String?
-  festival    Festival? @relation(fields: [festivalId], references: [id], onDelete: Cascade)
-  dayNumber   Int
-  title       String
-  description String?
-  todos       String[]  @default([])
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  operationalTasks OperationalTask[]
+  id               String             @id @default(uuid())
+  tripId           String?
+  festivalId       String?
+  dayNumber        Int
+  title            String
+  description      String?
+  todos            String[]           @default([])
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  festival         Festival?          @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  trip             Trip?              @relation(fields: [tripId], references: [id], onDelete: Cascade)
   tasks            ItineraryDayTask[]
+  operationalTasks OperationalTask[]
 
   @@unique([tripId, dayNumber])
   @@unique([festivalId, dayNumber])
@@ -244,7 +135,6 @@ model ItineraryDay {
 model ItineraryDayTask {
   id             String                  @id @default(uuid())
   itineraryDayId String
-  itineraryDay   ItineraryDay            @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
   category       OperationalTaskCategory
   title          String
   description    String?
@@ -254,6 +144,7 @@ model ItineraryDayTask {
   dueOffsetDays  Int?
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
+  itineraryDay   ItineraryDay            @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
 
   @@index([itineraryDayId])
   @@index([category])
@@ -318,11 +209,12 @@ model LandingJourneyMilestone {
 }
 
 model FestivalTag {
-  id        String     @id @default(uuid())
-  tag       String     @unique
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  festivals Festival[] @relation("FestivalToFestivalTag")
+  id           String        @id @default(uuid())
+  tag          String        @unique
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  crmFestivals CrmFestival[] @relation("CrmFestivalToFestivalTag")
+  festivals    Festival[]    @relation("FestivalToFestivalTag")
 }
 
 model Festival {
@@ -343,24 +235,22 @@ model Festival {
   isFeatured          Boolean        @default(false)
   isPublished         Boolean        @default(false)
   isListed            Boolean        @default(true)
-  circuitId           String?
-  circuit             Circuit?       @relation(fields: [circuitId], references: [id], onDelete: SetNull)
   shareTokenHash      String?        @unique
   shareTokenExpiresAt DateTime?
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
   destinationId       String?
+  addOns              AddOn[]
   bookings            Booking[]
   faqs                FAQ[]
   destination         Destination?   @relation(fields: [destinationId], references: [id])
   inquiries           Inquiry[]
   itinerary           ItineraryDay[]
+  ledgerEntries       LedgerEntry[]
   packages            Package[]
+  reviews             Review[]
   slots               Slot[]
   tags                FestivalTag[]  @relation("FestivalToFestivalTag")
-  reviews             Review[]
-  ledgerEntries       LedgerEntry[]
-  addOns              AddOn[]
 
   @@index([isActive])
   @@index([isFeatured])
@@ -372,36 +262,429 @@ model Festival {
 model Destination {
   id          String     @id @default(uuid())
   name        String
-  state       String
+  state       String?
   subheading  String?
+  description String?
+  imageUrl    String?
+  images      Json?      @default("[]")
+  highlights  Json?      @default("[]")
   isPublished Boolean    @default(false)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   festivals   Festival[]
   trips       Trip[]
-  circuits    Circuit[]
 
   @@index([isPublished])
 }
 
-model Package {
-  id          String    @id @default(uuid())
-  circuitId   String?
-  tripId      String?
-  festivalId  String?
-  title       String
-  price       Decimal   @db.Decimal(10, 2)
-  tokenAmount Decimal   @db.Decimal(10, 2)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  bookings    Booking[]
-  circuit     Circuit?  @relation(fields: [circuitId], references: [id], onDelete: Cascade)
-  festival    Festival? @relation(fields: [festivalId], references: [id], onDelete: Cascade)
-  trip        Trip?     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+model CrmDestination {
+  id                String             @id @default(uuid())
+  name              String             @unique
+  description       String?
+  imageUrl          String?
+  images            Json?              @default("[]")
+  highlights        Json?              @default("[]")
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  festivals         CrmFestival[]
+  trips             CrmTrip[]
+  stayLocations     StayLocation[]
+  transferLocations TransferLocation[]
+}
 
-  @@index([circuitId])
+model Place {
+  id                    String                         @id @default(uuid())
+  stayLocationId        String
+  name                  String
+  description           String?
+  imageUrl              String?
+  images                Json?                          @default("[]")
+  highlights            Json?                          @default("[]")
+  isActive              Boolean                        @default(true)
+  createdAt             DateTime                       @default(now())
+  updatedAt             DateTime                       @updatedAt
+  festivalItineraryDays CrmFestivalItineraryDayPlace[]
+  itineraryDays         CrmTripItineraryDayPlace[]
+  stayLocation          StayLocation                   @relation(fields: [stayLocationId], references: [id])
+
+  @@unique([stayLocationId, name])
+  @@index([stayLocationId, isActive])
+}
+
+model StayLocation {
+  id                    String                    @id @default(uuid())
+  destinationId         String
+  name                  String
+  description           String?
+  imageUrl              String?
+  images                Json?                     @default("[]")
+  highlights            Json?                     @default("[]")
+  isActive              Boolean                   @default(true)
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  festivalItineraryDays CrmFestivalItineraryDay[]
+  itineraryDays         CrmTripItineraryDay[]
+  places                Place[]
+  properties            Property[]
+  destination           CrmDestination            @relation(fields: [destinationId], references: [id])
+
+  @@unique([destinationId, name])
+  @@index([destinationId, isActive])
+}
+
+model Property {
+  id                    String                    @id @default(uuid())
+  stayLocationId        String
+  name                  String
+  address               String?
+  description           String?
+  imageUrl              String?
+  images                Json?                     @default("[]")
+  isActive              Boolean                   @default(true)
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  festivalItineraryDays CrmFestivalItineraryDay[]
+  itineraryDays         CrmTripItineraryDay[]
+  stayLocation          StayLocation              @relation(fields: [stayLocationId], references: [id])
+
+  @@unique([stayLocationId, name])
+  @@index([stayLocationId, isActive])
+}
+
+model TransferLocation {
+  id                  String                    @id @default(uuid())
+  destinationId       String
+  name                String
+  description         String?
+  isActive            Boolean                   @default(true)
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  festivalDropOffDays CrmFestivalItineraryDay[] @relation("CrmFestivalDropOffLocation")
+  dropOffDays         CrmTripItineraryDay[]     @relation("CrmDropOffLocation")
+  destination         CrmDestination            @relation(fields: [destinationId], references: [id])
+
+  @@unique([destinationId, name])
+  @@index([destinationId, isActive])
+}
+
+model CrmTrip {
+  id                         String                   @id @default(uuid())
+  name                       String
+  numberOfNights             Int
+  totalAmount                Decimal?                 @db.Decimal(10, 2)
+  tokenAmount                Decimal?                 @db.Decimal(10, 2)
+  destinationId              String
+  tripType                   TripType?
+  bestTimeToVisit            String?
+  isActive                   Boolean                  @default(true)
+  isFeatured                 Boolean                  @default(false)
+  isPublished                Boolean                  @default(false)
+  isListed                   Boolean                  @default(true)
+  operationsReminderDays     Int                      @default(3)
+  exclusions                 String[]                 @default([])
+  websiteOverview            String?
+  websiteFaqs                Json                     @default("[]")
+  websiteBannerImages        String[]                 @default([])
+  websiteStayTransportImages Json                     @default("[]")
+  websiteHighlights          Json                     @default("[]")
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
+  addOns                     AddOn[]
+  bookings                   Booking[]
+  destination                CrmDestination           @relation(fields: [destinationId], references: [id])
+  commonInclusions           CrmTripCommonInclusion[]
+  inclusions                 CrmTripInclusion[]
+  itineraryDays              CrmTripItineraryDay[]
+  slots                      CrmTripSlot[]
+  ledgerEntries              LedgerEntry[]
+  packages                   Package[]
+  websiteTags                TripTag[]                @relation("CrmTripToTripTag")
+
+  @@index([destinationId])
+  @@index([isActive])
+  @@index([isFeatured])
+  @@index([isPublished])
+  @@index([isListed])
+  @@index([createdAt])
+}
+
+model CrmTripCommonInclusion {
+  id           String                @id @default(uuid())
+  tripId       String
+  key          CrmCommonInclusionKey
+  numberOfDays Int?
+  isIncluded   Boolean?
+  vehicleType  CrmVehicleType?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  trip         CrmTrip               @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, key])
+  @@index([tripId])
+}
+
+model CrmTripItineraryDay {
+  id                String                               @id @default(uuid())
+  tripId            String
+  dayNumber         Int
+  stayLocationId    String?
+  propertyId        String?
+  breakfast         Boolean                              @default(false)
+  lunch             Boolean                              @default(false)
+  dinner            Boolean                              @default(false)
+  transportEnabled  Boolean                              @default(false)
+  transportText     String?
+  notes             String?
+  isDropOff         Boolean                              @default(false)
+  dropOffLocationId String?
+  createdAt         DateTime                             @default(now())
+  updatedAt         DateTime                             @updatedAt
+  inclusions        CrmTripInclusion[]
+  dropOffLocation   TransferLocation?                    @relation("CrmDropOffLocation", fields: [dropOffLocationId], references: [id], onDelete: Restrict)
+  property          Property?                            @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  stayLocation      StayLocation?                        @relation(fields: [stayLocationId], references: [id], onDelete: Restrict)
+  trip              CrmTrip                              @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  activities        CrmTripItineraryDayActivity[]
+  commonInclusions  CrmTripItineraryDayCommonInclusion[]
+  visitingPlaces    CrmTripItineraryDayPlace[]
+  operationalTasks  OperationalTask[]
+
+  @@unique([tripId, dayNumber])
+  @@index([tripId])
+  @@index([stayLocationId])
+  @@index([propertyId])
+  @@index([dropOffLocationId])
+}
+
+model CrmTripItineraryDayCommonInclusion {
+  id             String                @id @default(uuid())
+  itineraryDayId String
+  key            CrmCommonInclusionKey
+  createdAt      DateTime              @default(now())
+  itineraryDay   CrmTripItineraryDay   @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+
+  @@unique([itineraryDayId, key])
+  @@index([itineraryDayId])
+}
+
+model CrmTripItineraryDayPlace {
+  id             String              @id @default(uuid())
+  itineraryDayId String
+  placeId        String
+  displayOrder   Int                 @default(0)
+  createdAt      DateTime            @default(now())
+  itineraryDay   CrmTripItineraryDay @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+  place          Place               @relation(fields: [placeId], references: [id])
+
+  @@unique([itineraryDayId, placeId])
+  @@index([itineraryDayId, displayOrder])
+  @@index([placeId])
+}
+
+model CrmTripItineraryDayActivity {
+  id             String              @id @default(uuid())
+  itineraryDayId String
+  name           String
+  description    String?
+  displayOrder   Int                 @default(0)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  itineraryDay   CrmTripItineraryDay @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+
+  @@index([itineraryDayId, displayOrder])
+}
+
+model CrmTripInclusion {
+  id             String               @id @default(uuid())
+  tripId         String
+  itineraryDayId String?
+  type           CrmInclusionType
+  sourceKey      String
+  title          String
+  description    String?
+  displayOrder   Int                  @default(0)
+  isManual       Boolean              @default(false)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  itineraryDay   CrmTripItineraryDay? @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+  trip           CrmTrip              @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, sourceKey])
+  @@index([tripId, displayOrder])
+  @@index([itineraryDayId])
+  @@index([type])
+}
+
+model CrmFestival {
+  id                         String                       @id @default(uuid())
+  name                       String
+  numberOfNights             Int
+  totalAmount                Decimal?                     @db.Decimal(10, 2)
+  tokenAmount                Decimal?                     @db.Decimal(10, 2)
+  destinationId              String
+  tripType                   TripType?
+  bestTimeToVisit            String?
+  isActive                   Boolean                      @default(true)
+  isFeatured                 Boolean                      @default(false)
+  isPublished                Boolean                      @default(false)
+  isListed                   Boolean                      @default(true)
+  operationsReminderDays     Int                          @default(3)
+  exclusions                 String[]                     @default([])
+  websiteOverview            String?
+  websiteFaqs                Json                         @default("[]")
+  websiteBannerImages        String[]                     @default([])
+  websiteStayTransportImages Json                         @default("[]")
+  websiteHighlights          Json                         @default("[]")
+  websiteVideoUrl            String?
+  createdAt                  DateTime                     @default(now())
+  updatedAt                  DateTime                     @updatedAt
+  addOns                     AddOn[]
+  bookings                   Booking[]
+  destination                CrmDestination               @relation(fields: [destinationId], references: [id])
+  commonInclusions           CrmFestivalCommonInclusion[]
+  inclusions                 CrmFestivalInclusion[]
+  itineraryDays              CrmFestivalItineraryDay[]
+  slots                      CrmFestivalSlot[]
+  ledgerEntries              LedgerEntry[]
+  packages                   Package[]
+  websiteTags                FestivalTag[]                @relation("CrmFestivalToFestivalTag")
+
+  @@index([destinationId])
+  @@index([isActive])
+  @@index([isFeatured])
+  @@index([isPublished])
+  @@index([isListed])
+  @@index([createdAt])
+}
+
+model CrmFestivalCommonInclusion {
+  id           String                @id @default(uuid())
+  festivalId   String
+  key          CrmCommonInclusionKey
+  numberOfDays Int?
+  isIncluded   Boolean?
+  vehicleType  CrmVehicleType?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  festival     CrmFestival           @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+
+  @@unique([festivalId, key])
+  @@index([festivalId])
+}
+
+model CrmFestivalItineraryDay {
+  id                String                                   @id @default(uuid())
+  festivalId        String
+  dayNumber         Int
+  stayLocationId    String?
+  propertyId        String?
+  breakfast         Boolean                                  @default(false)
+  lunch             Boolean                                  @default(false)
+  dinner            Boolean                                  @default(false)
+  transportEnabled  Boolean                                  @default(false)
+  transportText     String?
+  notes             String?
+  isDropOff         Boolean                                  @default(false)
+  dropOffLocationId String?
+  createdAt         DateTime                                 @default(now())
+  updatedAt         DateTime                                 @updatedAt
+  inclusions        CrmFestivalInclusion[]
+  dropOffLocation   TransferLocation?                        @relation("CrmFestivalDropOffLocation", fields: [dropOffLocationId], references: [id], onDelete: Restrict)
+  festival          CrmFestival                              @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  property          Property?                                @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  stayLocation      StayLocation?                            @relation(fields: [stayLocationId], references: [id], onDelete: Restrict)
+  activities        CrmFestivalItineraryDayActivity[]
+  commonInclusions  CrmFestivalItineraryDayCommonInclusion[]
+  visitingPlaces    CrmFestivalItineraryDayPlace[]
+  operationalTasks  OperationalTask[]
+
+  @@unique([festivalId, dayNumber])
+  @@index([festivalId])
+  @@index([stayLocationId])
+  @@index([propertyId])
+  @@index([dropOffLocationId])
+}
+
+model CrmFestivalItineraryDayCommonInclusion {
+  id             String                  @id @default(uuid())
+  itineraryDayId String
+  key            CrmCommonInclusionKey
+  createdAt      DateTime                @default(now())
+  itineraryDay   CrmFestivalItineraryDay @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+
+  @@unique([itineraryDayId, key])
+  @@index([itineraryDayId])
+}
+
+model CrmFestivalItineraryDayPlace {
+  id             String                  @id @default(uuid())
+  itineraryDayId String
+  placeId        String
+  displayOrder   Int                     @default(0)
+  createdAt      DateTime                @default(now())
+  itineraryDay   CrmFestivalItineraryDay @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+  place          Place                   @relation(fields: [placeId], references: [id])
+
+  @@unique([itineraryDayId, placeId])
+  @@index([itineraryDayId, displayOrder])
+  @@index([placeId])
+}
+
+model CrmFestivalItineraryDayActivity {
+  id             String                  @id @default(uuid())
+  itineraryDayId String
+  name           String
+  description    String?
+  displayOrder   Int                     @default(0)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  itineraryDay   CrmFestivalItineraryDay @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+
+  @@index([itineraryDayId, displayOrder])
+}
+
+model CrmFestivalInclusion {
+  id             String                   @id @default(uuid())
+  festivalId     String
+  itineraryDayId String?
+  type           CrmInclusionType
+  sourceKey      String
+  title          String
+  description    String?
+  displayOrder   Int                      @default(0)
+  isManual       Boolean                  @default(false)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  festival       CrmFestival              @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  itineraryDay   CrmFestivalItineraryDay? @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+
+  @@unique([festivalId, sourceKey])
+  @@index([festivalId, displayOrder])
+  @@index([itineraryDayId])
+  @@index([type])
+}
+
+model Package {
+  id            String       @id @default(uuid())
+  tripId        String?
+  festivalId    String?
+  crmTripId     String?
+  crmFestivalId String?
+  title         String
+  price         Decimal      @db.Decimal(10, 2)
+  tokenAmount   Decimal      @db.Decimal(10, 2)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  bookings      Booking[]
+  crmFestival   CrmFestival? @relation(fields: [crmFestivalId], references: [id], onDelete: Cascade)
+  crmTrip       CrmTrip?     @relation(fields: [crmTripId], references: [id], onDelete: Cascade)
+  festival      Festival?    @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  trip          Trip?        @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
   @@index([tripId])
   @@index([festivalId])
+  @@index([crmTripId])
+  @@index([crmFestivalId])
 }
 
 model Slot {
@@ -442,7 +725,7 @@ model Booking {
   confirmedAt        DateTime?
   cancelledAt        DateTime?
   completedAt        DateTime?
-  reviewRequestedAt  DateTime? // set when the post-completion review prompt is triggered
+  reviewRequestedAt  DateTime?
   cancellationReason String?
   cancelledBy        String?
   specialRequests    String?
@@ -451,30 +734,41 @@ model Booking {
   source             BookingSource     @default(CATALOG)
   packageId          String?
   slotId             String?
-  package            Package?          @relation(fields: [packageId], references: [id], onDelete: SetNull)
-  slot               Slot?             @relation(fields: [slotId], references: [id], onDelete: SetNull)
+  crmTripSlotId      String?
+  crmFestivalSlotId  String?
+  tripId             String?
+  crmTripId          String?
+  crmFestivalId      String?
+  festivalId         String?
+  crmFestival        CrmFestival?      @relation(fields: [crmFestivalId], references: [id], onDelete: Restrict)
+  crmFestivalSlot    CrmFestivalSlot?  @relation(fields: [crmFestivalSlotId], references: [id], onDelete: Restrict)
+  crmTrip            CrmTrip?          @relation(fields: [crmTripId], references: [id], onDelete: Restrict)
+  crmTripSlot        CrmTripSlot?      @relation(fields: [crmTripSlotId], references: [id], onDelete: Restrict)
+  festival           Festival?         @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  package            Package?          @relation(fields: [packageId], references: [id])
+  slot               Slot?             @relation(fields: [slotId], references: [id])
+  trip               Trip?             @relation(fields: [tripId], references: [id], onDelete: Cascade)
   user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addOns             BookingAddOn[]
+  ledgerEntries      LedgerEntry[]
+  operationalTasks   OperationalTask[]
   payments           Payment[]
   paymentIntents     PaymentIntent[]
   reminders          PaymentReminder[]
-  travelers          Traveler[]
-  trip               Trip?             @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  tripId             String?
-  festival           Festival?         @relation(fields: [festivalId], references: [id], onDelete: Cascade)
-  festivalId         String?
   review             Review?
-
-  addOns           BookingAddOn[]
-  ledgerEntries    LedgerEntry[]
-  operationalTasks OperationalTask[]
+  travelers          Traveler[]
 
   @@index([packageId])
   @@index([slotId])
+  @@index([crmTripSlotId])
+  @@index([crmFestivalSlotId])
   @@index([source])
   @@index([userId])
   @@index([status])
   @@index([paymentStatus])
   @@index([balanceDueDate])
+  @@index([crmTripId])
+  @@index([crmFestivalId])
 }
 
 model Traveler {
@@ -487,9 +781,9 @@ model Traveler {
   phone          String?
   aadhaar        String?
   aadhaarAssetId String?     @unique
-  aadhaarAsset   MediaAsset? @relation("TravelerGovernmentId", fields: [aadhaarAssetId], references: [id], onDelete: SetNull)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
+  aadhaarAsset   MediaAsset? @relation("TravelerGovernmentId", fields: [aadhaarAssetId], references: [id])
   booking        Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@index([bookingId])
@@ -509,9 +803,9 @@ model MediaAsset {
   uploadedById   String?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
-  uploadedBy     User?             @relation("MediaAssetUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
-  profileGovtId  UserProfile?      @relation("ProfileGovernmentId")
+  uploadedBy     User?             @relation("MediaAssetUploader", fields: [uploadedById], references: [id])
   travelerGovtId Traveler?         @relation("TravelerGovernmentId")
+  profileGovtId  UserProfile?      @relation("ProfileGovernmentId")
 
   @@index([uploadedById])
   @@index([deliveryType])
@@ -519,7 +813,6 @@ model MediaAsset {
 
 model FAQ {
   id         String    @id @default(uuid())
-  circuitId  String?
   tripId     String?
   festivalId String?
   question   String
@@ -527,11 +820,9 @@ model FAQ {
   order      Int
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
-  circuit    Circuit?  @relation(fields: [circuitId], references: [id], onDelete: Cascade)
   festival   Festival? @relation(fields: [festivalId], references: [id], onDelete: Cascade)
   trip       Trip?     @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
-  @@index([circuitId])
   @@index([tripId])
   @@index([festivalId])
   @@index([order])
@@ -542,8 +833,8 @@ model TripTag {
   tag       String    @unique
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  crmTrips  CrmTrip[] @relation("CrmTripToTripTag")
   trips     Trip[]    @relation("TripToTripTag")
-  circuits  Circuit[] @relation("CircuitToTripTag")
 }
 
 model Inquiry {
@@ -577,35 +868,41 @@ model Inquiry {
 }
 
 model OperationalTask {
-  id                 String                  @id @default(uuid())
-  bookingId          String
-  booking            Booking                 @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  itineraryDayId     String?
-  itineraryDay       ItineraryDay?           @relation(fields: [itineraryDayId], references: [id], onDelete: SetNull)
-  sourceTemplateId   String? // CircuitDayTask.id this was forked from, if any
-  addOnId            String? // If this task was generated from an add-on
-  category           OperationalTaskCategory
-  title              String
-  description        String?
-  config             Json                    @default("{}")
-  unitPrice          Decimal?                @db.Decimal(10, 2)
-  quantityNeeded     Int?
-  quantityAcquired   Int?
-  dueAt              DateTime?
-  status             OperationalTaskStatus   @default(PENDING)
-  assigneeId         String?
-  completedAt        DateTime?
-  completedById      String?
-  lastReminderSentAt DateTime?
-  reminderCount      Int                     @default(0)
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
-
-  reminders     OperationalTaskReminder[]
-  ledgerEntries LedgerEntry[]
+  id                        String                    @id @default(uuid())
+  bookingId                 String
+  itineraryDayId            String?
+  crmItineraryDayId         String?
+  crmFestivalItineraryDayId String?
+  crmSourceKey              String?
+  sourceTemplateId          String?
+  addOnId                   String?
+  category                  OperationalTaskCategory
+  title                     String
+  description               String?
+  config                    Json                      @default("{}")
+  unitPrice                 Decimal?                  @db.Decimal(10, 2)
+  quantityNeeded            Int?
+  quantityAcquired          Int?
+  dueAt                     DateTime?
+  status                    OperationalTaskStatus     @default(PENDING)
+  assigneeId                String?
+  completedAt               DateTime?
+  completedById             String?
+  lastReminderSentAt        DateTime?
+  reminderCount             Int                       @default(0)
+  createdAt                 DateTime                  @default(now())
+  updatedAt                 DateTime                  @updatedAt
+  ledgerEntries             LedgerEntry[]
+  booking                   Booking                   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  crmFestivalItineraryDay   CrmFestivalItineraryDay?  @relation(fields: [crmFestivalItineraryDayId], references: [id])
+  crmItineraryDay           CrmTripItineraryDay?      @relation(fields: [crmItineraryDayId], references: [id])
+  itineraryDay              ItineraryDay?             @relation(fields: [itineraryDayId], references: [id])
+  reminders                 OperationalTaskReminder[]
 
   @@index([bookingId])
   @@index([itineraryDayId])
+  @@index([crmItineraryDayId])
+  @@index([crmFestivalItineraryDayId])
   @@index([category])
   @@index([status, dueAt])
   @@index([assigneeId])
@@ -614,7 +911,6 @@ model OperationalTask {
 model OperationalTaskReminder {
   id                String          @id @default(uuid())
   operationalTaskId String
-  operationalTask   OperationalTask @relation(fields: [operationalTaskId], references: [id], onDelete: Cascade)
   channel           ReminderType    @default(AUTOMATIC)
   recipientEmail    String
   subject           String
@@ -623,6 +919,7 @@ model OperationalTaskReminder {
   providerMessageId String?
   failureReason     String?
   createdAt         DateTime        @default(now())
+  operationalTask   OperationalTask @relation(fields: [operationalTaskId], references: [id], onDelete: Cascade)
 
   @@index([operationalTaskId])
   @@index([status])
@@ -630,12 +927,10 @@ model OperationalTaskReminder {
 
 model AddOn {
   id                       String         @id @default(uuid())
-  circuitId                String?
-  circuit                  Circuit?       @relation(fields: [circuitId], references: [id], onDelete: Cascade)
   tripId                   String?
-  trip                     Trip?          @relation(fields: [tripId], references: [id], onDelete: Cascade)
   festivalId               String?
-  festival                 Festival?      @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  crmTripId                String?
+  crmFestivalId            String?
   title                    String
   description              String?
   imageUrl                 String?
@@ -646,22 +941,23 @@ model AddOn {
   isActive                 Boolean        @default(true)
   createdAt                DateTime       @default(now())
   updatedAt                DateTime       @updatedAt
+  crmFestival              CrmFestival?   @relation(fields: [crmFestivalId], references: [id], onDelete: Cascade)
+  crmTrip                  CrmTrip?       @relation(fields: [crmTripId], references: [id], onDelete: Cascade)
+  festival                 Festival?      @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  trip                     Trip?          @relation(fields: [tripId], references: [id], onDelete: Cascade)
   purchases                BookingAddOn[]
 
-  @@index([circuitId])
   @@index([tripId])
   @@index([festivalId])
+  @@index([crmTripId])
+  @@index([crmFestivalId])
   @@index([isActive])
 }
 
 model BookingAddOn {
   id            String             @id @default(uuid())
   bookingId     String
-  booking       Booking            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  // Keep the purchase when an admin removes the source add-on later. The
-  // booking is historical data; it must not be erased with catalogue edits.
   addOnId       String?
-  addOn         AddOn?             @relation(fields: [addOnId], references: [id], onDelete: SetNull)
   quantity      Int                @default(1)
   unitPrice     Decimal            @db.Decimal(10, 2)
   totalPrice    Decimal            @db.Decimal(10, 2)
@@ -669,6 +965,8 @@ model BookingAddOn {
   purchasedAt   DateTime?
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
+  addOn         AddOn?             @relation(fields: [addOnId], references: [id])
+  booking       Booking            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   ledgerEntries LedgerEntry[]
 
   @@index([bookingId])
@@ -706,6 +1004,7 @@ model Payment {
   razorpayPaymentId String?                  @unique
   razorpaySignature String?
   paymentMethod     String?
+  utr               String?
   idempotencyKey    String                   @unique
   failureCode       String?
   failureReason     String?
@@ -714,11 +1013,11 @@ model Payment {
   paidAt            DateTime?
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
-  receiptNumberInt  Int?                     @default(autoincrement())
+  receiptNumberInt  Int                      @default(autoincrement())
+  ledgerEntries     LedgerEntry[]
   booking           Booking                  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   paymentIntent     PaymentIntent?           @relation(fields: [paymentIntentId], references: [id])
   refunds           Refund[]
-  ledgerEntries     LedgerEntry[]
 
   @@index([bookingId])
   @@index([status])
@@ -783,33 +1082,18 @@ model Refund {
   @@index([createdAt])
 }
 
-// =====================================================================
-// UNIFIED LEDGER = the "Balance Sheet" from the diagram.
-// Query it grouped by (scope, type) to get:
-//   scope=OTHER,  type=INCOME   -> "Income Other than Trip"
-//   scope=TRIP,   type=INCOME   -> "Trip Income"
-//   scope=OTHER,  type=EXPENSE  -> "Expenses Other than Trip"
-//   scope=TRIP,   type=EXPENSE  -> "Trip Expenses"
-// Auto-generated rows (isAutoGenerated=true) come from Payments,
-// Refunds, OperationalTask costs and AddOn purchases. Admins can add or
-// delete manual rows (isAutoGenerated=false) from the ops dashboard.
-// =====================================================================
 model LedgerEntry {
   id                String            @id @default(uuid())
   type              LedgerEntryType
   scope             LedgerScope
   tripId            String?
-  trip              Trip?             @relation(fields: [tripId], references: [id], onDelete: SetNull)
   festivalId        String?
-  festival          Festival?         @relation(fields: [festivalId], references: [id], onDelete: SetNull)
+  crmTripId         String?
+  crmFestivalId     String?
   bookingId         String?
-  booking           Booking?          @relation(fields: [bookingId], references: [id], onDelete: SetNull)
   paymentId         String?
-  payment           Payment?          @relation(fields: [paymentId], references: [id], onDelete: SetNull)
   operationalTaskId String?
-  operationalTask   OperationalTask?  @relation(fields: [operationalTaskId], references: [id], onDelete: SetNull)
   bookingAddOnId    String?
-  bookingAddOn      BookingAddOn?     @relation(fields: [bookingAddOnId], references: [id], onDelete: SetNull)
   source            LedgerEntrySource @default(MANUAL)
   category          String
   amount            Decimal           @db.Decimal(10, 2)
@@ -818,12 +1102,22 @@ model LedgerEntry {
   isAutoGenerated   Boolean           @default(false)
   entryDate         DateTime          @default(now())
   createdById       String?
-  createdBy         User?             @relation("LedgerEntryCreator", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
+  bookingAddOn      BookingAddOn?     @relation(fields: [bookingAddOnId], references: [id])
+  booking           Booking?          @relation(fields: [bookingId], references: [id])
+  createdBy         User?             @relation("LedgerEntryCreator", fields: [createdById], references: [id])
+  crmFestival       CrmFestival?      @relation(fields: [crmFestivalId], references: [id])
+  crmTrip           CrmTrip?          @relation(fields: [crmTripId], references: [id])
+  festival          Festival?         @relation(fields: [festivalId], references: [id])
+  operationalTask   OperationalTask?  @relation(fields: [operationalTaskId], references: [id])
+  payment           Payment?          @relation(fields: [paymentId], references: [id])
+  trip              Trip?             @relation(fields: [tripId], references: [id])
 
   @@index([tripId])
   @@index([festivalId])
+  @@index([crmTripId])
+  @@index([crmFestivalId])
   @@index([bookingId])
   @@index([type, scope])
   @@index([entryDate])
@@ -831,26 +1125,86 @@ model LedgerEntry {
 }
 
 model Review {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   rating      Int
   comment     String?
   userId      String
   tripId      String?
   festivalId  String?
-  bookingId   String   @unique
-  isPublished Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trip     Trip?     @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  festival Festival? @relation(fields: [festivalId], references: [id], onDelete: Cascade)
-  booking  Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId   String    @unique
+  isPublished Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  festival    Festival? @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  trip        Trip?     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([tripId])
   @@index([festivalId])
   @@index([isPublished])
+}
+
+model CustomInvoice {
+  id            String        @id @default(uuid())
+  customerName  String
+  customerEmail String
+  customerPhone String?
+  title         String
+  description   String?
+  items         Json          @default("[]")
+  amount        Decimal       @db.Decimal(10, 2)
+  currency      String        @default("INR")
+  dueDate       DateTime?
+  status        InvoiceStatus @default(SENT)
+  source        InvoiceSource @default(CUSTOM)
+  bookingId     String?
+  paymentId     String?       @unique
+  sentAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([status])
+  @@index([source])
+  @@index([bookingId])
+  @@index([customerEmail])
+}
+
+model CrmTripSlot {
+  id          String    @id @default(uuid())
+  crmTripId   String
+  startDate   DateTime?
+  endDate     DateTime?
+  title       String?
+  priority    Int       @default(0)
+  capacity    Int
+  filledSpots Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  bookings    Booking[]
+  crmTrip     CrmTrip   @relation(fields: [crmTripId], references: [id], onDelete: Cascade)
+
+  @@index([crmTripId])
+  @@index([startDate])
+}
+
+model CrmFestivalSlot {
+  id            String      @id @default(uuid())
+  crmFestivalId String
+  startDate     DateTime?
+  endDate       DateTime?
+  title         String?
+  priority      Int         @default(0)
+  capacity      Int
+  filledSpots   Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  bookings      Booking[]
+  crmFestival   CrmFestival @relation(fields: [crmFestivalId], references: [id], onDelete: Cascade)
+
+  @@index([crmFestivalId])
+  @@index([startDate])
 }
 
 enum UserRole {
@@ -912,6 +1266,7 @@ enum BookingStatus {
 
 enum BookingSource {
   CATALOG
+  CRM
 }
 
 enum PaymentStatus {
@@ -933,6 +1288,7 @@ enum PaymentType {
 enum PaymentTransactionStatus {
   CREATED
   PENDING
+  PENDING_VERIFICATION
   SUCCESS
   FAILED
   CANCELLED
@@ -1087,31 +1443,44 @@ enum LedgerEntrySource {
   MANUAL
 }
 
-// =====================================================================
-// CUSTOM INVOICES
-// =====================================================================
-model CustomInvoice {
-  id            String        @id @default(uuid())
-  customerName  String
-  customerEmail String
-  customerPhone String?
-  title         String
-  description   String?
-  items         Json          @default("[]")
-  amount        Decimal       @db.Decimal(10, 2)
-  currency      String        @default("INR")
-  dueDate       DateTime?
-  status        InvoiceStatus @default(SENT)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-
-  @@index([status])
-  @@index([customerEmail])
-}
-
 enum InvoiceStatus {
   DRAFT
   SENT
   PAID
   CANCELLED
+}
+
+enum InvoiceSource {
+  CUSTOM
+  BOOKING_RECEIPT
+}
+
+enum CrmInclusionType {
+  ACCOMMODATION
+  MEAL
+  SIGHTSEEING
+  ACTIVITY
+  HOTEL_STAY
+  DROP_OFF_TRANSFER
+  COMMON
+  TRANSPORT
+}
+
+enum CrmCommonInclusionKey {
+  BREAKFAST
+  DINNER
+  ILP_AND_PERMITS
+  TRAVEL
+  VEHICLE_TYPE
+  BBQ
+  BONFIRE
+  TRIP_GUIDE
+  FIRST_AID_KIT
+}
+
+enum CrmVehicleType {
+  SEDAN
+  SUV
+  INNOVA
+  TRAVELLER
 }
