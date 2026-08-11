@@ -702,10 +702,7 @@ export default function AdminBookingDetailPage() {
                   </span>
                   <span className="font-bold text-red-600 text-right">
                     ₹
-                    {Math.max(
-                      0,
-                      Number(booking.totalAmount) - Number(booking.amountPaid),
-                    ).toLocaleString()}
+                    {Number(booking.amountDue).toLocaleString()}
                   </span>
                 </div>
               </div>

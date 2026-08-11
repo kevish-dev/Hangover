@@ -267,6 +267,8 @@ export default function PayBalancePage() {
   const totalAmount = Number(booking?.totalAmount || 0);
   const amountPaid = Number(booking?.amountPaid || 0);
   const amountDue = Number(booking?.amountDue || 0);
+  const bookingSubtotal = totalAmount / 1.05;
+  const bookingGst = totalAmount - bookingSubtotal;
   const paymentProgress = totalAmount > 0 ? Math.min(100, Math.max(0, (amountPaid / totalAmount) * 100)) : 0;
   const isInitialPayment = booking?.status === "PENDING" && (booking?.paymentStatus === "PENDING" || booking?.paymentStatus === "FAILED");
   const initialPaymentAmount = booking?.initialPaymentType === "TOKEN" ? Number(booking?.tokenAmount || 0) : totalAmount;
@@ -524,7 +526,9 @@ export default function PayBalancePage() {
                 <div style={{ height: 6, borderRadius: 999, background: "rgba(30,26,20,0.08)", overflow: "hidden" }}><div style={{ height: "100%", width: `${paymentProgress}%`, borderRadius: 999, background: "linear-gradient(90deg,#b8943a,#781216)", transition: "width 0.4s ease" }} /></div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingBottom: 18, marginBottom: 18, borderBottom: "1px solid rgba(30,26,20,0.08)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: "0.72rem" }}><span style={{ color: "rgba(30,26,20,0.5)" }}>Total booking value</span><span style={{ color: "#1e1a14", fontWeight: 500 }}>{formatCurrency(totalAmount)}</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: "0.72rem" }}><span style={{ color: "rgba(30,26,20,0.5)" }}>Booking subtotal</span><span style={{ color: "#1e1a14", fontWeight: 500 }}>{formatCurrency(bookingSubtotal)}</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: "0.72rem" }}><span style={{ color: "rgba(30,26,20,0.5)" }}>GST (5%)</span><span style={{ color: "#1e1a14", fontWeight: 500 }}>{formatCurrency(bookingGst)}</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: "0.72rem" }}><span style={{ color: "rgba(30,26,20,0.5)" }}>Total booking value (incl. GST)</span><span style={{ color: "#1e1a14", fontWeight: 500 }}>{formatCurrency(totalAmount)}</span></div>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: "0.72rem" }}><span style={{ color: "rgba(30,26,20,0.5)" }}>Already paid</span><span style={{ color: "#228b22", fontWeight: 500 }}>− {formatCurrency(amountPaid)}</span></div>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: "0.8rem" }}><span style={{ color: "#1e1a14", fontWeight: 600 }}>Balance to pay</span><span style={{ color: "#781216", fontWeight: 700 }}>{formatCurrency(amountDue)}</span></div>
               </div>

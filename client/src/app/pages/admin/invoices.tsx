@@ -252,6 +252,9 @@ export default function InvoicesPage() {
     if (items.length === 0) return 0;
     return items.reduce((acc, item) => acc + (Number(item.price) || 0), 0);
   };
+  const invoiceSubtotal = calculateTotal();
+  const invoiceGst = Math.round(invoiceSubtotal * 5) / 100;
+  const invoiceTotal = invoiceSubtotal + invoiceGst;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -260,7 +263,7 @@ export default function InvoicesPage() {
       return;
     }
 
-    const totalAmount = items.length > 0 ? calculateTotal() : 0;
+    const totalAmount = items.length > 0 ? invoiceTotal : 0;
 
     setIsSubmitting(true);
     try {
@@ -435,8 +438,10 @@ export default function InvoicesPage() {
                         </Button>
                       </div>
                     ))}
-                    <div className="flex justify-end pt-2 text-sm font-medium">
-                      Total: {formatCurrency(calculateTotal())}
+                    <div className="ml-auto w-full max-w-xs space-y-1 border-t pt-2 text-sm">
+                      <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{formatCurrency(invoiceSubtotal)}</span></div>
+                      <div className="flex justify-between text-gray-500"><span>GST (5%)</span><span>{formatCurrency(invoiceGst)}</span></div>
+                      <div className="flex justify-between font-bold text-gray-950"><span>Total including GST</span><span>{formatCurrency(invoiceTotal)}</span></div>
                     </div>
                   </div>
                 )}

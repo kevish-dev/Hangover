@@ -209,10 +209,14 @@ function PaymentDetailsModal({ payment, onClose }: { payment: ApiPayment; onClos
             <h3 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-800">
               <WalletCards className="h-4 w-4 text-[#781216]" /> Payment breakdown
             </h3>
-            <DetailRow label="This payment"><span className="text-base font-bold">{formatCurrency(payment.amount)}</span></DetailRow>
+            <DetailRow label="Payment subtotal">{formatCurrency(Number(payment.amount) / 1.05)}</DetailRow>
+            <DetailRow label="GST (5%)">{formatCurrency(Number(payment.amount) - Number(payment.amount) / 1.05)}</DetailRow>
+            <DetailRow label="This payment (incl. GST)"><span className="text-base font-bold">{formatCurrency(payment.amount)}</span></DetailRow>
             <DetailRow label="Payment type">{payment.type}</DetailRow>
             <DetailRow label="Method">{payment.paymentMethod?.toUpperCase() || "Not recorded"}</DetailRow>
-            <DetailRow label="Booking total">{formatCurrency(payment.booking.totalAmount)}</DetailRow>
+            <DetailRow label="Booking subtotal">{formatCurrency(Number(payment.booking.totalAmount) / 1.05)}</DetailRow>
+            <DetailRow label="Booking GST (5%)">{formatCurrency(Number(payment.booking.totalAmount) - Number(payment.booking.totalAmount) / 1.05)}</DetailRow>
+            <DetailRow label="Booking total (incl. GST)">{formatCurrency(payment.booking.totalAmount)}</DetailRow>
             <DetailRow label="Total paid"><span className="text-emerald-700">{formatCurrency(payment.booking.amountPaid)}</span></DetailRow>
             <DetailRow label="Balance due"><span className={Number(payment.booking.amountDue) > 0 ? "text-red-600" : "text-gray-900"}>{formatCurrency(payment.booking.amountDue)}</span></DetailRow>
             <DetailRow label="Refunded">{formatCurrency(successfulRefundTotal)}</DetailRow>
@@ -508,7 +512,7 @@ export default function AdminPaymentsPage() {
                       <p className="font-semibold text-gray-800">{payment.type}</p>
                       <p className="mt-1 text-xs text-gray-500">{payment.paymentMethod?.toUpperCase() || "Method unavailable"}</p>
                     </td>
-                    <td className="px-5 py-4 text-right"><p className="whitespace-nowrap text-base font-bold text-gray-950">{formatCurrency(payment.amount)}</p><p className="mt-1 text-xs text-gray-500">of {formatCurrency(payment.booking.totalAmount)}</p></td>
+                    <td className="px-5 py-4 text-right"><p className="whitespace-nowrap text-base font-bold text-gray-950">{formatCurrency(payment.amount)}</p><p className="mt-1 text-xs text-gray-500">incl. 5% GST · of {formatCurrency(payment.booking.totalAmount)}</p></td>
                     <td className="px-5 py-4">
                       <StatusBadge status={payment.status} />
                       {payment.status === "PENDING_VERIFICATION" && (

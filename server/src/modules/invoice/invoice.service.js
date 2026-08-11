@@ -2,6 +2,7 @@ import { prisma } from "../../prisma/client.js";
 import { sendCustomInvoiceEmail } from "../../core/services/email.service.js";
 import { AppError } from "../../core/errors/errors.js";
 import { getBookingJourney } from "../booking/booking-journey.js";
+import { addGst, gstBreakdown } from "../../utils/gst.js";
 
 const receiptBookingInclude = {
   user: { include: { profile: true } },
@@ -28,6 +29,7 @@ const bookingContext = (booking) => {
     paymentStatus: booking.paymentStatus,
     numberOfTravelers: booking.numberOfTravelers,
     totalAmount: booking.totalAmount,
+    tax: gstBreakdown(booking.totalAmount),
     amountPaid: booking.amountPaid,
     amountDue: booking.amountDue,
     balanceDueDate: booking.balanceDueDate,
@@ -55,6 +57,7 @@ const paymentContext = (payment) => {
     type: payment.type,
     status: payment.status,
     amount: payment.amount,
+    tax: gstBreakdown(payment.amount),
     currency: payment.currency,
     paymentMethod: payment.paymentMethod,
     utr: payment.utr,
@@ -118,7 +121,12 @@ const receiptSync = (invoice, booking, payment) => {
 };
 
 export const createInvoice = async (data) => {
-  const { customerName, customerEmail, customerPhone, title, description, items, amount, currency, dueDate } = data;
+  const { customerName, customerEmail, customerPhone, title, description, items, currency, dueDate } = data;
+  const normalizedItems = Array.isArray(items) ? items : [];
+  const subtotal = normalizedItems.reduce((sum, item) => sum + number(item?.price), 0);
+  // Custom receipt line items are entered before tax. Persist and email the
+  // GST-inclusive amount so the record and displayed total cannot diverge.
+  const amount = addGst(subtotal);
 
   const invoice = await prisma.customInvoice.create({
     data: {
@@ -127,7 +135,7 @@ export const createInvoice = async (data) => {
       customerPhone: customerPhone || null,
       title,
       description: description || null,
-      items: items || [],
+      items: normalizedItems,
       amount,
       currency: currency || "INR",
       dueDate: dueDate ? new Date(dueDate) : null,
@@ -143,7 +151,7 @@ export const createInvoice = async (data) => {
       customerName,
       title,
       description,
-      items,
+      items: normalizedItems,
       amount,
       currency: currency || "INR",
       dueDate: dueDate ? new Date(dueDate) : null,

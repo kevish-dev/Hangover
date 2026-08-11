@@ -538,6 +538,8 @@ export const sendBookingConfirmedEmail = async (options = {}) => {
   const dateRange = formatDateRange(tripStartDate, tripEndDate);
   const subtotal = total === null ? null : total / 1.05;
   const gstAmount = total === null ? null : total - subtotal;
+  const paymentSubtotal = transactionAmount === null ? null : transactionAmount / 1.05;
+  const paymentGstAmount = transactionAmount === null ? null : transactionAmount - paymentSubtotal;
   const destination = itemLocation || tripLocation || location;
   const selectedSlot = slotTitle || options.slotLabel;
   const travelDates = dateRange || slotName;
@@ -565,9 +567,11 @@ export const sendBookingConfirmedEmail = async (options = {}) => {
 
   const amountRows = [
     { label: `${packageName || journeyTitle} subtotal`, value: formatCurrency(subtotal, currency) },
-    { label: "GST (5%)", value: formatCurrency(gstAmount, currency) },
+    { label: "GST (5%) on booking", value: formatCurrency(gstAmount, currency) },
     { label: "Booking total (including GST)", value: formatCurrency(total, currency), strong: true },
-    { label: "This payment", value: formatCurrency(transactionAmount, currency), accent: true },
+    { label: "This payment subtotal", value: formatCurrency(paymentSubtotal, currency) },
+    { label: "GST (5%) on this payment", value: formatCurrency(paymentGstAmount, currency) },
+    { label: "This payment (including GST)", value: formatCurrency(transactionAmount, currency), accent: true },
     ...(previousPaid > 0
       ? [{ label: "Previously paid", value: formatCurrency(previousPaid, currency) }]
       : []),
@@ -1124,6 +1128,12 @@ export const sendCustomInvoiceEmail = async (options = {}) => {
     dueDate,
   } = options;
 
+  const subtotal = (Array.isArray(items) ? items : []).reduce(
+    (sum, item) => sum + Number(item?.price || 0),
+    0,
+  );
+  const gstAmount = Number(amount || 0) - subtotal;
+
   const invoiceRows = [
     { label: "Billed to", value: customerName, emphasis: true },
     { label: "Invoice Title", value: title },
@@ -1138,7 +1148,9 @@ export const sendCustomInvoiceEmail = async (options = {}) => {
 
   const summaryRows = [
     ...amountRows,
-    { label: "Total Amount Paid", value: formatCurrency(amount, currency), strong: true, accent: true },
+    { label: "Subtotal", value: formatCurrency(subtotal, currency) },
+    { label: "GST (5%)", value: formatCurrency(gstAmount, currency) },
+    { label: "Total Amount (including GST)", value: formatCurrency(amount, currency), strong: true, accent: true },
   ];
 
   const intro = `Please find your payment receipt details below.`;

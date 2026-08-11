@@ -4,6 +4,7 @@ import env from "../../core/env/env.js";
 import { NotFoundError, ValidationError } from "../../core/errors/errors.js";
 import { generateCrmBookingOperations } from "../operations/operations.service.js";
 import { reserveBookingSlotCapacity } from "../booking/slot-capacity.service.js";
+import { addGst, amountDueAfterPayment } from "../../utils/gst.js";
 
 const round = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 const paymentPageUrl = (bookingId) => `${env.ORIGIN.replace(/\/$/, "")}/bookings/${bookingId}/pay-balance`;
@@ -114,7 +115,9 @@ const emailPaymentRequest = async ({ booking, trip, payment, paymentLink }) => {
 };
 
 const createInstallment = async ({ booking, trip, data, adminId, isInitial = false }) => {
-  const amount = round(data.paymentAmount);
+  // Admin-entered installments are pre-tax amounts. Convert them once here;
+  // the stored payment and booking balance are always GST-inclusive.
+  const amount = data.amountIncludesGst ? round(data.paymentAmount) : addGst(data.paymentAmount);
   const dueBefore = Number(booking.amountDue);
   if (!Number.isFinite(amount) || amount <= 0 || amount > dueBefore) {
     throw new ValidationError(`Installment amount must be between ₹0.01 and ₹${dueBefore.toFixed(2)}`);
@@ -143,7 +146,7 @@ const createInstallment = async ({ booking, trip, data, adminId, isInitial = fal
         },
       });
       const newPaid = round(Number(booking.amountPaid) + amount);
-      const newDue = round(Math.max(0, Number(booking.totalAmount) - newPaid));
+      const newDue = amountDueAfterPayment(booking.totalAmount, newPaid);
       const updatedBooking = await tx.booking.update({
         where: { id: booking.id },
         data: {
@@ -254,9 +257,9 @@ export const createCrmBooking = async (crmTripId, data, adminId) => {
   }
 
   const packagePrice = selectedPackage ? Number(selectedPackage.price) : Number(trip.totalAmount || 0);
-  const totalAmount = round(packagePrice * travelers + addOnsTotal);
+  const totalAmount = addGst(packagePrice * travelers + addOnsTotal);
 
-  const initialPaymentAmount = round(data.paymentAmount);
+  const initialPaymentAmount = addGst(data.paymentAmount);
   if (!Number.isFinite(initialPaymentAmount) || initialPaymentAmount <= 0 || initialPaymentAmount > totalAmount) {
     throw new ValidationError(`Initial payment must be between ₹0.01 and ₹${totalAmount.toFixed(2)}`);
   }
@@ -290,7 +293,13 @@ export const createCrmBooking = async (crmTripId, data, adminId) => {
     return created;
   });
   await generateCrmBookingOperations(booking, crmTripSlot);
-  return createInstallment({ booking, trip, data, adminId, isInitial: true });
+  return createInstallment({
+    booking,
+    trip,
+    data: { ...data, paymentAmount: initialPaymentAmount, amountIncludesGst: true },
+    adminId,
+    isInitial: true,
+  });
 };
 
 /**
@@ -407,8 +416,8 @@ export const createPublicCrmBooking = async (crmTripId, data, userId) => {
     bookingAddOns.push({ addOnId, quantity, unitPrice, totalPrice, status: "PENDING" });
   }
 
-  const totalAmount = round(Number(selectedPackage.price) * travelers + addOnsTotal);
-  const tokenAmount = round(Number(selectedPackage.tokenAmount) * travelers);
+  const totalAmount = addGst(Number(selectedPackage.price) * travelers + addOnsTotal);
+  const tokenAmount = addGst(Number(selectedPackage.tokenAmount) * travelers);
   const initialPaymentType = tokenAmount > 0 && data.initialPaymentType === "TOKEN" ? "TOKEN" : "FULL";
   const amountDue = initialPaymentType === "FULL" ? 0 : round(totalAmount - tokenAmount);
   const balanceDueDate = new Date(crmTripSlot.startDate);
@@ -474,7 +483,7 @@ export const captureHostedCrmPayment = async ({ paymentLinkId, razorpayPayment }
     const current = await tx.booking.findUnique({ where: { id: queued.bookingId }, include: { user: { include: { profile: true } } } });
     const amount = Number(queued.amount);
     const newPaid = round(Number(current.amountPaid) + amount);
-    const newDue = round(Math.max(0, Number(current.totalAmount) - newPaid));
+    const newDue = amountDueAfterPayment(current.totalAmount, newPaid);
     const booking = await tx.booking.update({ where: { id: current.id }, data: { amountPaid: newPaid, amountDue: newDue, paymentStatus: newDue === 0 ? "PAID" : "PARTIALLY_PAID", status: newDue === 0 ? "CONFIRMED" : "RESERVED", confirmedAt: newDue === 0 ? new Date() : undefined, reservedAt: newDue === 0 ? undefined : new Date() }, include: { user: { include: { profile: true } } } });
     if (current.status === "PENDING") {
       await reserveBookingSlotCapacity(tx, current);

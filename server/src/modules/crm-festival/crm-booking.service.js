@@ -4,6 +4,7 @@ import env from "../../core/env/env.js";
 import { NotFoundError, ValidationError } from "../../core/errors/errors.js";
 import { generateCrmBookingOperations } from "../operations/operations.service.js";
 import { reserveBookingSlotCapacity } from "../booking/slot-capacity.service.js";
+import { addGst, amountDueAfterPayment } from "../../utils/gst.js";
 
 const round = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 const paymentPageUrl = (bookingId) => `${env.ORIGIN.replace(/\/$/, "")}/bookings/${bookingId}/pay-balance`;
@@ -114,7 +115,9 @@ const emailPaymentRequest = async ({ booking, festival, payment, paymentLink }) 
 };
 
 const createInstallment = async ({ booking, festival, data, adminId, isInitial = false }) => {
-  const amount = round(data.paymentAmount);
+  // Admin-entered installments are pre-tax amounts. Convert them once here;
+  // the stored payment and booking balance are always GST-inclusive.
+  const amount = data.amountIncludesGst ? round(data.paymentAmount) : addGst(data.paymentAmount);
   const dueBefore = Number(booking.amountDue);
   if (!Number.isFinite(amount) || amount <= 0 || amount > dueBefore) {
     throw new ValidationError(`Installment amount must be between ₹0.01 and ₹${dueBefore.toFixed(2)}`);
@@ -143,7 +146,7 @@ const createInstallment = async ({ booking, festival, data, adminId, isInitial =
         },
       });
       const newPaid = round(Number(booking.amountPaid) + amount);
-      const newDue = round(Math.max(0, Number(booking.totalAmount) - newPaid));
+      const newDue = amountDueAfterPayment(booking.totalAmount, newPaid);
       const updatedBooking = await tx.booking.update({
         where: { id: booking.id },
         data: {
@@ -183,14 +186,15 @@ export const createCrmFestivalBooking = async (crmFestivalId, data, adminId) => 
   }
   if (!data.crmFestivalSlotId) throw new ValidationError("Choose a departure slot for this booking");
   const festival = await getFestivalWithPricing(crmFestivalId);
-  const initialPaymentAmount = round(data.paymentAmount);
-  if (!Number.isFinite(initialPaymentAmount) || initialPaymentAmount <= 0 || initialPaymentAmount > Number(festival.totalAmount)) {
-    throw new ValidationError(`Initial payment must be between ₹0.01 and ₹${Number(festival.totalAmount).toFixed(2)}`);
+  const totalAmount = addGst(festival.totalAmount);
+  const initialPaymentAmount = addGst(data.paymentAmount);
+  if (!Number.isFinite(initialPaymentAmount) || initialPaymentAmount <= 0 || initialPaymentAmount > totalAmount) {
+    throw new ValidationError(`Initial payment must be between ₹0.01 and ₹${totalAmount.toFixed(2)} (including GST)`);
   }
   if (!["MANUAL", "SEND_LINK"].includes(data.paymentAction)) {
     throw new ValidationError("Choose manual collection or send the website payment link");
   }
-  const initialPaymentType = paymentTypeFor(initialPaymentAmount, Number(festival.totalAmount));
+  const initialPaymentType = paymentTypeFor(initialPaymentAmount, totalAmount);
   const crmFestivalSlot = await prisma.crmFestivalSlot.findFirst({
     where: { id: data.crmFestivalSlotId, crmFestivalId, startDate: { not: null }, endDate: { not: null } },
   });
@@ -217,7 +221,7 @@ export const createCrmFestivalBooking = async (crmFestivalId, data, adminId) => 
       data: {
         id: bookingReference, bookingReference, userId: user.id, crmFestivalId, crmFestivalSlotId: crmFestivalSlot.id, source: "CRM",
         numberOfTravelers: travelers,
-        totalAmount: festival.totalAmount, tokenAmount: initialPaymentType === "FULL" ? festival.totalAmount : initialPaymentAmount, amountPaid: 0, amountDue: festival.totalAmount,
+        totalAmount, tokenAmount: initialPaymentType === "FULL" ? totalAmount : initialPaymentAmount, amountPaid: 0, amountDue: totalAmount,
         initialPaymentType, status: "PENDING", paymentStatus: "PENDING",
         specialRequests: data.specialRequests?.trim() || null,
         travelers: { create: additionalTravelers },
@@ -227,7 +231,13 @@ export const createCrmFestivalBooking = async (crmFestivalId, data, adminId) => 
     return created;
   });
   await generateCrmBookingOperations(booking, crmFestivalSlot);
-  return createInstallment({ booking, festival, data, adminId, isInitial: true });
+  return createInstallment({
+    booking,
+    festival,
+    data: { ...data, paymentAmount: initialPaymentAmount, amountIncludesGst: true },
+    adminId,
+    isInitial: true,
+  });
 };
 
 export const createPublicCrmFestivalBooking = async (crmFestivalId, data, userId) => {
@@ -339,8 +349,8 @@ export const createPublicCrmFestivalBooking = async (crmFestivalId, data, userId
     bookingAddOns.push({ addOnId, quantity, unitPrice, totalPrice, status: "PENDING" });
   }
 
-  const totalAmount = round(Number(selectedPackage.price) * travelers + addOnsTotal);
-  const tokenAmount = round(Number(selectedPackage.tokenAmount) * travelers);
+  const totalAmount = addGst(Number(selectedPackage.price) * travelers + addOnsTotal);
+  const tokenAmount = addGst(Number(selectedPackage.tokenAmount) * travelers);
   const initialPaymentType = tokenAmount > 0 && data.initialPaymentType === "TOKEN" ? "TOKEN" : "FULL";
   const amountDue = initialPaymentType === "FULL" ? 0 : round(totalAmount - tokenAmount);
   const balanceDueDate = new Date(crmFestivalSlot.startDate);

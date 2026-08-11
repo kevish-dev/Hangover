@@ -2636,10 +2636,10 @@ function CreateCrmBookingModal({
             <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">Initial Payment Setup</h4>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block space-y-1">
-                <span className="text-xs font-semibold text-gray-500 uppercase">Payment Amount (₹)</span>
+                <span className="text-xs font-semibold text-gray-500 uppercase">Payment Amount before GST (₹)</span>
                 <Input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder="₹" />
                 <span className="text-[10px] text-gray-400 block mt-0.5">
-                  Prefilled recommended token. (Total: ₹{totalPrice.toLocaleString("en-IN")})
+                  GST at 5% is added at collection. Amount charged: ₹{(Number(paymentAmount || 0) * 1.05).toFixed(2)} (trip total incl. GST: ₹{(totalPrice * 1.05).toFixed(2)})
                 </span>
               </label>
               <label className="block space-y-1">
@@ -2681,15 +2681,16 @@ function AddInstallmentModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [paymentAmount, setPaymentAmount] = useState(String(booking.amountDue || ""));
+  const [paymentAmount, setPaymentAmount] = useState(String(Math.round((Number(booking.amountDue || 0) / 1.05) * 100) / 100));
   const [paymentAction, setPaymentAction] = useState<"MANUAL" | "SEND_LINK">("MANUAL");
   const [submitting, setSubmitting] = useState(false);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const amt = Number(paymentAmount);
-    if (!Number.isFinite(amt) || amt <= 0 || amt > Number(booking.amountDue)) {
-      toast.error(`Please enter a payment amount between ₹1 and ₹${Number(booking.amountDue).toFixed(2)}`);
+    const payableAmount = Math.round(amt * 1.05 * 100) / 100;
+    if (!Number.isFinite(amt) || amt <= 0 || payableAmount > Number(booking.amountDue)) {
+      toast.error(`Please enter a pre-GST payment amount between ₹1 and ₹${(Number(booking.amountDue) / 1.05).toFixed(2)}`);
       return;
     }
 
@@ -2733,8 +2734,9 @@ function AddInstallmentModal({
           </div>
 
           <label className="block space-y-1">
-            <span className="text-xs font-semibold text-gray-500 uppercase">Payment Amount (₹)</span>
-            <Input required type="number" max={Number(booking.amountDue)} value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder="₹" />
+            <span className="text-xs font-semibold text-gray-500 uppercase">Payment Amount before GST (₹)</span>
+            <Input required type="number" max={Number(booking.amountDue) / 1.05} value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder="₹" />
+            <span className="block text-xs text-gray-500">GST at 5% is added at collection. Amount charged: ₹{(Number(paymentAmount || 0) * 1.05).toFixed(2)}</span>
           </label>
           <label className="block space-y-1">
             <span className="text-xs font-semibold text-gray-500 uppercase">Payment Collection Action</span>

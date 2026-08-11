@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon .",
+    "payments:reconcile-balances": "node src/utils/scripts/reconcilePaymentBalances.js",
     "media:prune": "node src/utils/scripts/pruneMediaAssets.js",
     "test:custom-trips": "node src/utils/scripts/smokeCustomTrips.js"
   },

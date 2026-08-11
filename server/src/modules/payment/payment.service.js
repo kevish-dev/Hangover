@@ -7,6 +7,7 @@ import { AppError, NotFoundError, ForbiddenError, ValidationError } from "../../
 import env from "../../core/env/env.js";
 import crypto from "crypto";
 import { getBookingJourney } from "../booking/booking-journey.js";
+import { amountDueAfterPayment } from "../../utils/gst.js";
 import {
   cancelBookingOperations,
   releaseBookingSlotCapacity,
@@ -257,6 +258,12 @@ const _processSuccessfulPayment = async (intent, rzpPaymentId, rzpSignature, rzp
         status: "RESERVED",
         paymentStatus: "PARTIALLY_PAID",
         amountPaid: { increment: Number(intent.amount) },
+        // Never trust a stale amountDue value. This is especially important
+        // for token/installment flows where the booking total includes GST.
+        amountDue: amountDueAfterPayment(
+          booking.totalAmount,
+          Number(booking.amountPaid) + Number(intent.amount),
+        ),
         reservedAt: new Date(),
       };
       bookingWhere = { id: booking.id, status: "PENDING", paymentStatus: { in: ["PENDING", "FAILED"] } };
@@ -560,7 +567,7 @@ export const recordFailedPayment = async (userId, { razorpayOrderId, razorpayPay
     const retryLink = getRetryPaymentLink(booking, intent.type);
     const outstandingAmount = intent.type === "BALANCE"
       ? Number(booking.amountDue)
-      : toDecimal2(Math.max(0, Number(booking.totalAmount) - Number(booking.amountPaid)));
+      : Number(booking.amountDue);
     email.sendPaymentFailedEmail({
       to: userEmail,
       name: userName,
@@ -739,7 +746,7 @@ export const handleWebhook = async (rawBody, signature, webhookEventId) => {
                 const isBookingFullyRefunded = newAmountPaid === 0;
                 const newAmountDue = isBookingFullyRefunded
                   ? 0
-                  : toDecimal2(Number(booking.totalAmount) - newAmountPaid);
+                  : amountDueAfterPayment(booking.totalAmount, newAmountPaid);
                 await bookingRepo.updateBooking(payment.bookingId, {
                   amountPaid: newAmountPaid,
                   amountDue: newAmountDue,
@@ -901,7 +908,7 @@ export const issueRefund = async (paymentId, amount, reason, adminId) => {
     const isBookingFullyRefunded = newAmountPaid === 0;
     const newAmountDue = isBookingFullyRefunded
       ? 0
-      : toDecimal2(Number(booking.totalAmount) - newAmountPaid);
+      : amountDueAfterPayment(booking.totalAmount, newAmountPaid);
 
     // 4. Update booking payment status and booking status
     if (isBookingFullyRefunded) {
@@ -1073,7 +1080,7 @@ export const manualAdjustment = async (bookingId, amount, notes, adminId) => {
 
   const adjustAmount = toDecimal2(Number(amount));
   if (adjustAmount <= 0) throw new ValidationError("Adjustment amount must be positive.");
-  const remaining = toDecimal2(Math.max(0, Number(booking.totalAmount) - Number(booking.amountPaid)));
+  const remaining = toDecimal2(Number(booking.amountDue));
   if (adjustAmount > remaining) {
     throw new ValidationError(`Adjustment amount exceeds the outstanding balance of Rs.${remaining}.`);
   }
@@ -1099,7 +1106,7 @@ export const manualAdjustment = async (bookingId, amount, notes, adminId) => {
     });
 
     const newAmountPaid = toDecimal2(Number(booking.amountPaid) + adjustAmount);
-    const newAmountDue = Math.max(0, toDecimal2(Number(booking.totalAmount) - newAmountPaid));
+    const newAmountDue = amountDueAfterPayment(booking.totalAmount, newAmountPaid);
 
     const movedBooking = await tx.booking.updateMany({
       where: {
@@ -1312,7 +1319,13 @@ export const verifyUpiPayment = async (adminId, paymentId, action, reason) => {
       ? { id: booking.id, status: "PENDING", paymentStatus: { in: ["PENDING", "FAILED"] } }
       : { id: booking.id, status: "RESERVED", paymentStatus: "PARTIALLY_PAID" };
     const bookingUpdate = payment.type === "TOKEN"
-      ? { status: "RESERVED", paymentStatus: "PARTIALLY_PAID", amountPaid: { increment: amount }, reservedAt: new Date() }
+      ? {
+          status: "RESERVED",
+          paymentStatus: "PARTIALLY_PAID",
+          amountPaid: { increment: amount },
+          amountDue: amountDueAfterPayment(booking.totalAmount, Number(booking.amountPaid) + amount),
+          reservedAt: new Date(),
+        }
       : { status: "CONFIRMED", paymentStatus: "PAID", amountPaid: { increment: amount }, amountDue: 0, confirmedAt: new Date() };
     const movedBooking = await tx.booking.updateMany({ where: bookingWhere, data: bookingUpdate });
     if (!movedBooking.count) throw new ValidationError("This booking is no longer eligible for this payment.");

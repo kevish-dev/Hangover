@@ -1,5 +1,6 @@
 import * as repo from "./booking.repository.js";
 import { prisma } from "../../prisma/client.js";
+import { addGst } from "../../utils/gst.js";
 import {
   AppError,
   NotFoundError,
@@ -317,10 +318,12 @@ export const createBooking = async (userId, data) => {
   }
 
   const baseTotalAmount = (itemPrice * numberOfTravelers) + addOnsTotalCost;
-  const totalAmount = isCrmTrip ? toDecimal2(baseTotalAmount) : toDecimal2(baseTotalAmount + (baseTotalAmount * 0.05));
+  // Keep every booking total tax-inclusive, regardless of whether it came
+  // from the catalog or the CRM itinerary flow.
+  const totalAmount = addGst(baseTotalAmount);
 
   const baseTokenAmount = itemToken * numberOfTravelers;
-  const tokenAmount = isCrmTrip ? toDecimal2(baseTokenAmount) : toDecimal2(baseTokenAmount + (baseTokenAmount * 0.05));
+  const tokenAmount = addGst(baseTokenAmount);
 
   let initialPaymentType = data.initialPaymentType || "TOKEN";
   if (!["TOKEN", "FULL"].includes(initialPaymentType)) {
@@ -595,10 +598,10 @@ export const adminCreateBooking = async (adminId, data) => {
   }
 
   const baseTotalAmount = (itemPrice * numberOfTravelers) + addOnsTotalCost;
-  const totalAmount = toDecimal2(baseTotalAmount + (baseTotalAmount * 0.05));
+  const totalAmount = addGst(baseTotalAmount);
 
   const baseTokenAmount = itemToken * numberOfTravelers;
-  const tokenAmount = toDecimal2(baseTokenAmount + (baseTokenAmount * 0.05));
+  const tokenAmount = addGst(baseTokenAmount);
 
   let initialPaymentType = data.initialPaymentType || "TOKEN";
   if (tokenAmount === 0) initialPaymentType = "FULL";
@@ -735,8 +738,9 @@ export const adminCreateBooking = async (adminId, data) => {
         tripEndDate: slot.endDate,
         packageName: selectedPackage?.title,
         travelersCount: numberOfTravelers,
-        amountPaid: amountPaid,
-        balanceAmount: booking.amountDue,
+        transactionAmount: amountPaid,
+        cumulativeAmountPaid: booking.amountPaid,
+        amountDue: booking.amountDue,
         totalAmount: booking.totalAmount,
         dueDate: booking.balanceDueDate,
         bookingId: booking.id,
