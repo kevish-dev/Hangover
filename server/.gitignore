@@ -2,5 +2,8 @@
 .DS_Store
 node_modules
 backups/
+*.dump
+prod_dump.sql
+local_prod_dump.sql
 
 src/prisma/generated/prisma
