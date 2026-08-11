@@ -2198,6 +2198,9 @@ function InstallmentDialog(
   useEffect(() => {
     setAmount(booking ? String(booking.amountDue) : "");
   }, [booking?.id, booking?.amountDue]);
+  useEffect(() => {
+    if (action === "SEND_LINK" && booking) setAmount(String(booking.amountDue));
+  }, [action, booking?.id, booking?.amountDue]);
   const submit = async () => {
     if (!booking || !Number(amount)) {
       return toast.error("Enter an installment amount");
@@ -2236,17 +2239,6 @@ function InstallmentDialog(
                 ₹{Number(booking.amountDue).toLocaleString("en-IN")}
               </strong>
             </p>
-            <Field label="Installment amount (including GST)">
-              <Input
-                min="0.01"
-                max={String(booking.amountDue)}
-                step="0.01"
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-              <p className="text-xs text-gray-500">Use the displayed balance to send a final payment link. It already includes 5% GST.</p>
-            </Field>
             <Field label="Collection method">
               <select
                 className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
@@ -2256,6 +2248,27 @@ function InstallmentDialog(
                 <option value="MANUAL">Received manually</option>
                 <option value="SEND_LINK">Send website payment link</option>
               </select>
+            </Field>
+            <Field label={action === "SEND_LINK" ? "Payment-link amount (including GST)" : "Installment amount (including GST)"}>
+              {action === "SEND_LINK" ? (
+                <select
+                  className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
+                  value={String(booking.amountDue)}
+                  onChange={(e) => setAmount(e.target.value)}
+                >
+                  <option value={String(booking.amountDue)}>Full outstanding balance — ₹{Number(booking.amountDue).toLocaleString("en-IN")}</option>
+                </select>
+              ) : (
+                <Input
+                  min="0.01"
+                  max={String(booking.amountDue)}
+                  step="0.01"
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+              )}
+              <p className="text-xs text-gray-500">{action === "SEND_LINK" ? "Website checkout can collect the full outstanding balance only." : "This amount includes 5% GST."}</p>
             </Field>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => onOpenChange(false)}>
