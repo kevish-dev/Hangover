@@ -2681,16 +2681,15 @@ function AddInstallmentModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [paymentAmount, setPaymentAmount] = useState(String(Math.round((Number(booking.amountDue || 0) / 1.05) * 100) / 100));
+  const [paymentAmount, setPaymentAmount] = useState(String(booking.amountDue || ""));
   const [paymentAction, setPaymentAction] = useState<"MANUAL" | "SEND_LINK">("MANUAL");
   const [submitting, setSubmitting] = useState(false);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const amt = Number(paymentAmount);
-    const payableAmount = Math.round(amt * 1.05 * 100) / 100;
-    if (!Number.isFinite(amt) || amt <= 0 || payableAmount > Number(booking.amountDue)) {
-      toast.error(`Please enter a pre-GST payment amount between ₹1 and ₹${(Number(booking.amountDue) / 1.05).toFixed(2)}`);
+    if (!Number.isFinite(amt) || amt <= 0 || amt > Number(booking.amountDue)) {
+      toast.error(`Please enter a payment amount between ₹1 and ₹${Number(booking.amountDue).toFixed(2)}`);
       return;
     }
 
@@ -2734,9 +2733,9 @@ function AddInstallmentModal({
           </div>
 
           <label className="block space-y-1">
-            <span className="text-xs font-semibold text-gray-500 uppercase">Payment Amount before GST (₹)</span>
-            <Input required type="number" max={Number(booking.amountDue) / 1.05} value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder="₹" />
-            <span className="block text-xs text-gray-500">GST at 5% is added at collection. Amount charged: ₹{(Number(paymentAmount || 0) * 1.05).toFixed(2)}</span>
+            <span className="text-xs font-semibold text-gray-500 uppercase">Payment Amount including GST (₹)</span>
+            <Input required type="number" max={Number(booking.amountDue)} value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder="₹" />
+            <span className="block text-xs text-gray-500">This amount already includes GST at 5%.</span>
           </label>
           <label className="block space-y-1">
             <span className="text-xs font-semibold text-gray-500 uppercase">Payment Collection Action</span>

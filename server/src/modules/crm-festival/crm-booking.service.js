@@ -115,9 +115,9 @@ const emailPaymentRequest = async ({ booking, festival, payment, paymentLink }) 
 };
 
 const createInstallment = async ({ booking, festival, data, adminId, isInitial = false }) => {
-  // Admin-entered installments are pre-tax amounts. Convert them once here;
-  // the stored payment and booking balance are always GST-inclusive.
-  const amount = data.amountIncludesGst ? round(data.paymentAmount) : addGst(data.paymentAmount);
+  // Payment amounts accepted by this API are the GST-inclusive values shown
+  // in the admin UI and on the customer payment page.
+  const amount = round(data.paymentAmount);
   const dueBefore = Number(booking.amountDue);
   if (!Number.isFinite(amount) || amount <= 0 || amount > dueBefore) {
     throw new ValidationError(`Installment amount must be between ₹0.01 and ₹${dueBefore.toFixed(2)}`);
@@ -125,7 +125,7 @@ const createInstallment = async ({ booking, festival, data, adminId, isInitial =
   if (!["MANUAL", "SEND_LINK"].includes(data.paymentAction)) {
     throw new ValidationError("Choose manual collection or send the website payment link");
   }
-  if (!isInitial && data.paymentAction === "SEND_LINK" && amount !== dueBefore) {
+  if (!isInitial && data.paymentAction === "SEND_LINK" && round(amount) !== round(dueBefore)) {
     throw new ValidationError(`The website payment page collects the full outstanding balance of ₹${dueBefore.toFixed(2)}. Use manual collection for a partial installment.`);
   }
 

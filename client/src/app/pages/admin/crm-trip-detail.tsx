@@ -2195,6 +2195,9 @@ function InstallmentDialog(
   const [amount, setAmount] = useState("");
   const [action, setAction] = useState("MANUAL");
   const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    setAmount(booking ? String(booking.amountDue) : "");
+  }, [booking?.id, booking?.amountDue]);
   const submit = async () => {
     if (!booking || !Number(amount)) {
       return toast.error("Enter an installment amount");
@@ -2233,7 +2236,7 @@ function InstallmentDialog(
                 ₹{Number(booking.amountDue).toLocaleString("en-IN")}
               </strong>
             </p>
-            <Field label="Installment amount">
+            <Field label="Installment amount (including GST)">
               <Input
                 min="0.01"
                 max={String(booking.amountDue)}
@@ -2242,6 +2245,7 @@ function InstallmentDialog(
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
               />
+              <p className="text-xs text-gray-500">Use the displayed balance to send a final payment link. It already includes 5% GST.</p>
             </Field>
             <Field label="Collection method">
               <select
