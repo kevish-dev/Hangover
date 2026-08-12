@@ -451,6 +451,10 @@ const toPublicFestival = (festival) => {
     destination: festival.destination,
     videoUrl: festival.websiteVideoUrl || null,
     websiteVideoUrl: festival.websiteVideoUrl || null,
+    isActive: festival.isActive,
+    isPublished: festival.isPublished,
+    isFeatured: festival.isFeatured,
+    isListed: festival.isListed,
     isCrmTrip: true,
     isCrmFestival: true,
   };

@@ -49,7 +49,7 @@ export const findPublicMany = () => prisma.crmFestival.findMany({
 });
 
 export const findFeaturedPublic = () => prisma.crmFestival.findMany({
-  where: { isActive: true, isPublished: true, isFeatured: true, websiteBannerImages: { isEmpty: false } },
+  where: { isActive: true, isPublished: true, isFeatured: true },
   orderBy: { createdAt: "desc" },
   include: PUBLIC_CRM_FESTIVAL_INCLUDE,
 });

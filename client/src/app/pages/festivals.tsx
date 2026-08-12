@@ -703,7 +703,7 @@ export default function FestivalsPage() {
     setError(null);
     fetchAllFestivals()
       .then((all) => {
-        const active = all.filter((f) => f.isActive && f.isPublished);
+        const active = all.filter((f) => (f.isActive ?? true) && (f.isPublished ?? true));
         const hero = active.find((f) => f.isFeatured) ?? null;
         setFeaturedFestival(hero);
         setAllFestivals(active);

@@ -49,7 +49,7 @@ export const findPublicMany = () => prisma.crmTrip.findMany({
 });
 
 export const findFeaturedPublic = () => prisma.crmTrip.findMany({
-  where: { isActive: true, isPublished: true, isFeatured: true, websiteBannerImages: { isEmpty: false } },
+  where: { isActive: true, isPublished: true, isFeatured: true },
   orderBy: { createdAt: "desc" },
   include: PUBLIC_CRM_TRIP_INCLUDE,
 });

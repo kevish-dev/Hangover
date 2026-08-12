@@ -118,21 +118,33 @@ export interface ApiFeaturedFestivalsResponse {
 // ── Fetch functions ───────────────────────────────────────────────
 
 export async function fetchAllFestivals(): Promise<ApiFestival[]> {
-  // Fetch with a high limit to get all festivals for client-side filtering
-  const res = await apiClient.get<ApiFestivalsResponse>("/festivals", {
-    params: { page: 1, limit: 200 },
-  });
-  return res.data.data;
+  const [festivalsResult, crmFestivalsResult] = await Promise.allSettled([
+    apiClient.get<ApiFestivalsResponse>("/festivals", { params: { page: 1, limit: 200 } }),
+    apiClient.get<{ data: ApiFestival[] }>("/crm-festivals/public"),
+  ]);
+  const festivals = festivalsResult.status === "fulfilled" ? (festivalsResult.value.data?.data || []) : [];
+  const crmFestivals = crmFestivalsResult.status === "fulfilled" ? (crmFestivalsResult.value.data?.data || []) : [];
+  return [...festivals, ...crmFestivals];
 }
 
 export async function fetchFestivalBySlug(slug: string): Promise<ApiFestival> {
-  const res = await apiClient.get<ApiFestival>(`/festivals/${slug}`);
-  return res.data;
+  try {
+    const res = await apiClient.get<ApiFestival>(`/festivals/${slug}`);
+    return res.data;
+  } catch (error) {
+    const res = await apiClient.get<ApiFestival>(`/crm-festivals/public/${slug}`);
+    return res.data;
+  }
 }
 
 export async function fetchFeaturedFestivals(): Promise<ApiFestival[]> {
-  const res = await apiClient.get<ApiFeaturedFestivalsResponse>("/festivals/featured");
-  return res.data.result;
+  const [featuredResult, crmFeaturedResult] = await Promise.allSettled([
+    apiClient.get<ApiFeaturedFestivalsResponse>("/festivals/featured"),
+    apiClient.get<{ data: ApiFestival[] }>("/crm-festivals/public/featured"),
+  ]);
+  const featured = featuredResult.status === "fulfilled" ? (featuredResult.value.data?.result || featuredResult.value.data?.data || []) : [];
+  const crmFeatured = crmFeaturedResult.status === "fulfilled" ? (crmFeaturedResult.value.data?.data || []) : [];
+  return [...featured, ...crmFeatured];
 }
 
 // ── Formatting helpers ────────────────────────────────────────────

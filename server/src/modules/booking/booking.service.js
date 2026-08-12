@@ -146,7 +146,9 @@ export const createBooking = async (userId, data) => {
   });
 
   let crmTripSlot = null;
+  let crmFestivalSlot = null;
   let isCrmTrip = false;
+  let isCrmFestival = false;
   let isTrip = false;
   let isFestival = false;
   let item = null;
@@ -166,22 +168,34 @@ export const createBooking = async (userId, data) => {
     if (crmTripSlot) {
       isCrmTrip = true;
       item = crmTripSlot.crmTrip;
+    } else {
+      crmFestivalSlot = await prisma.crmFestivalSlot.findUnique({
+        where: { id: targetSlotId },
+        include: {
+          crmFestival: { include: { packages: true, addOns: true, destination: true } },
+        },
+      });
+
+      if (crmFestivalSlot) {
+        isCrmFestival = true;
+        item = crmFestivalSlot.crmFestival;
+      }
     }
   }
 
-  if (!slot && !crmTripSlot) {
+  if (!slot && !crmTripSlot && !crmFestivalSlot) {
     throw new NotFoundError("Booking slot not found");
   }
 
   if (!item) throw new NotFoundError("Booking item not found");
   if (!item.isActive)
     throw new ValidationError("This item is no longer available for booking.");
-  if (isCrmTrip && (!item.isPublished || !item.isListed)) {
-    throw new ValidationError("This CRM trip is not available for public booking.");
+  if ((isCrmTrip || isCrmFestival) && (!item.isPublished || !item.isListed)) {
+    throw new ValidationError("This item is not available for public booking.");
   }
 
-  const startDate = slot ? slot.startDate : crmTripSlot.startDate;
-  const endDate = slot ? slot.endDate : crmTripSlot.endDate;
+  const startDate = slot ? slot.startDate : (crmTripSlot ? crmTripSlot.startDate : crmFestivalSlot.startDate);
+  const endDate = slot ? slot.endDate : (crmTripSlot ? crmTripSlot.endDate : crmFestivalSlot.endDate);
   if (!startDate || !endDate) {
     throw new ValidationError("The selected departure is missing its travel dates and cannot be booked yet.");
   }
@@ -206,6 +220,28 @@ export const createBooking = async (userId, data) => {
         throw new ValidationError("You already have a pending booking for this trip. Please complete the payment or ask support to cancel it.");
       } else {
         throw new ValidationError("You already have an active booking for this trip. You cannot book another slot or package until your trip is completed.");
+      }
+    }
+  } else if (isCrmFestival) {
+    const siblingCrmSlots = await prisma.crmFestivalSlot.findMany({
+      where: { crmFestivalId: crmFestivalSlot.crmFestivalId },
+      select: { id: true },
+    });
+    const siblingCrmSlotIds = siblingCrmSlots.map((s) => s.id);
+
+    const existingBooking = await prisma.booking.findFirst({
+      where: {
+        userId,
+        crmFestivalSlotId: { in: siblingCrmSlotIds },
+        status: { in: ["PENDING", "RESERVED", "CONFIRMED"] },
+      },
+    });
+
+    if (existingBooking) {
+      if (existingBooking.status === "PENDING") {
+        throw new ValidationError("You already have a pending booking for this festival. Please complete the payment or ask support to cancel it.");
+      } else {
+        throw new ValidationError("You already have an active booking for this festival. You cannot book another slot or package until your festival is completed.");
       }
     }
   } else {
@@ -239,8 +275,8 @@ export const createBooking = async (userId, data) => {
   }
 
   // Check capacity on the slot
-  const currentCapacity = slot ? slot.capacity : crmTripSlot.capacity;
-  const currentFilledSpots = slot ? slot.filledSpots : crmTripSlot.filledSpots;
+  const currentCapacity = slot ? slot.capacity : (crmTripSlot ? crmTripSlot.capacity : crmFestivalSlot.capacity);
+  const currentFilledSpots = slot ? slot.filledSpots : (crmTripSlot ? crmTripSlot.filledSpots : crmFestivalSlot.filledSpots);
   const spotsLeft = currentCapacity - currentFilledSpots;
   if (numberOfTravelers > spotsLeft) {
     throw new ValidationError(
@@ -282,6 +318,8 @@ export const createBooking = async (userId, data) => {
       if (addOnModel.maxQuantityPerSlot) {
         const filterWhere = isCrmTrip
           ? { crmTripSlotId: crmTripSlot.id, status: { in: ["RESERVED", "CONFIRMED"] } }
+          : isCrmFestival
+          ? { crmFestivalSlotId: crmFestivalSlot.id, status: { in: ["RESERVED", "CONFIRMED"] } }
           : { slotId: slot.id, status: { in: ["RESERVED", "CONFIRMED"] } };
 
         const bookedAddOns = await prisma.bookingAddOn.aggregate({
@@ -301,7 +339,7 @@ export const createBooking = async (userId, data) => {
       if (addOnModel.purchaseCutoffOffsetDays != null && startDate) {
         const cutoff = new Date(startDate).getTime() - addOnModel.purchaseCutoffOffsetDays * 86400000;
         if (Date.now() > cutoff) {
-          throw new ValidationError(`${addOnModel.title} is no longer available for this departure.`);
+          throw new ValidationError(`${addOnModel.title} is no longer available for this departure date.`);
         }
       }
       const price = Number(addOnModel.price);
@@ -346,6 +384,7 @@ export const createBooking = async (userId, data) => {
     totalAmount,
     tokenAmount,
     amountDue,
+    amountPaid: 0,
     balanceDueDate,
     specialRequests: data.specialRequests || null,
   };
@@ -390,6 +429,8 @@ export const createBooking = async (userId, data) => {
   // Check if there is an existing PENDING booking to reuse
   const pendingWhere = isCrmTrip
     ? { userId, crmTripSlotId: crmTripSlot.id, status: "PENDING" }
+    : isCrmFestival
+    ? { userId, crmFestivalSlotId: crmFestivalSlot.id, status: "PENDING" }
     : { userId, slotId: slot.id, status: "PENDING" };
 
   const existingPending = await prisma.booking.findFirst({
@@ -426,6 +467,9 @@ export const createBooking = async (userId, data) => {
   if (isCrmTrip) {
     bookingData.crmTripId = crmTripSlot.crmTripId;
     bookingData.crmTripSlotId = crmTripSlot.id;
+  } else if (isCrmFestival) {
+    bookingData.crmFestivalId = crmFestivalSlot.crmFestivalId;
+    bookingData.crmFestivalSlotId = crmFestivalSlot.id;
   } else if (isTrip) {
     bookingData.slotId = slot.id;
     bookingData.tripId = slot.tripId;
@@ -433,7 +477,7 @@ export const createBooking = async (userId, data) => {
     bookingData.slotId = slot.id;
     bookingData.festivalId = slot.festivalId;
   }
-  bookingData.source = isCrmTrip ? "CRM" : "CATALOG";
+  bookingData.source = (isCrmTrip || isCrmFestival) ? "CRM" : "CATALOG";
   if (selectedPackage) bookingData.packageId = selectedPackage.id;
   bookingData.status = "PENDING";
   bookingData.paymentStatus = "PENDING";
@@ -451,6 +495,10 @@ export const createBooking = async (userId, data) => {
   if (isCrmTrip) {
     operationsService.generateCrmBookingOperations(booking, crmTripSlot).catch(
       (err) => console.error("[OpsGen] Failed to generate operations for CRM booking", booking.id, err)
+    );
+  } else if (isCrmFestival) {
+    operationsService.generateCrmFestivalBookingOperations?.(booking, crmFestivalSlot).catch(
+      (err) => console.error("[OpsGen] Failed to generate operations for CRM festival booking", booking.id, err)
     );
   } else {
     operationsService.generateBookingOperations(booking, slot, data.addOns || []).catch(
@@ -516,24 +564,65 @@ export const adminCreateBooking = async (adminId, data) => {
     throw new ValidationError("Must provide a slotId to book.");
   }
 
-  const slot = await prisma.slot.findUnique({ 
+  let slot = await prisma.slot.findUnique({ 
     where: { id: data.slotId },
     include: {
       trip: { include: { packages: true, addOns: true } },
       festival: { include: { packages: true, addOns: true } },
     }
   });
-  if (!slot) {
+
+  let crmTripSlot = null;
+  let crmFestivalSlot = null;
+  let isCrmTrip = false;
+  let isCrmFestival = false;
+  let isTrip = false;
+  let isFestival = false;
+  let item = null;
+
+  if (slot) {
+    isTrip = !!slot.tripId;
+    isFestival = !isTrip;
+    item = isTrip ? slot.trip : slot.festival;
+  } else {
+    crmTripSlot = await prisma.crmTripSlot.findUnique({
+      where: { id: data.slotId },
+      include: {
+        crmTrip: { include: { packages: true, addOns: true, destination: true } },
+      },
+    });
+
+    if (crmTripSlot) {
+      isCrmTrip = true;
+      item = crmTripSlot.crmTrip;
+    } else {
+      crmFestivalSlot = await prisma.crmFestivalSlot.findUnique({
+        where: { id: data.slotId },
+        include: {
+          crmFestival: { include: { packages: true, addOns: true, destination: true } },
+        },
+      });
+
+      if (crmFestivalSlot) {
+        isCrmFestival = true;
+        item = crmFestivalSlot.crmFestival;
+      }
+    }
+  }
+
+  if (!slot && !crmTripSlot && !crmFestivalSlot) {
     throw new NotFoundError("Booking slot not found");
   }
 
-  const isTrip = !!slot.tripId;
-  const item = isTrip ? slot.trip : slot.festival;
   if (!item) throw new NotFoundError("Booking item not found");
   if (!item.isActive) throw new ValidationError("This item is no longer available.");
 
+  const startDate = slot ? slot.startDate : (crmTripSlot ? crmTripSlot.startDate : crmFestivalSlot.startDate);
+  const capacity = slot ? slot.capacity : (crmTripSlot ? crmTripSlot.capacity : crmFestivalSlot.capacity);
+  const filledSpots = slot ? slot.filledSpots : (crmTripSlot ? crmTripSlot.filledSpots : crmFestivalSlot.filledSpots);
+
   const numberOfTravelers = data.numberOfTravelers || 1;
-  const spotsLeft = slot.capacity - slot.filledSpots;
+  const spotsLeft = capacity - filledSpots;
   if (numberOfTravelers > spotsLeft) {
     throw new ValidationError(`Only ${spotsLeft} spot(s) remaining.`);
   }
@@ -566,12 +655,18 @@ export const adminCreateBooking = async (adminId, data) => {
         throw new ValidationError(`${addOnModel.title} is limited to ${addOnModel.maxQuantityPerBooking} per booking.`);
       }
       if (addOnModel.maxQuantityPerSlot) {
+        const filterWhere = isCrmTrip
+          ? { crmTripSlotId: crmTripSlot.id, status: { in: ["RESERVED", "CONFIRMED"] } }
+          : isCrmFestival
+          ? { crmFestivalSlotId: crmFestivalSlot.id, status: { in: ["RESERVED", "CONFIRMED"] } }
+          : { slotId: slot.id, status: { in: ["RESERVED", "CONFIRMED"] } };
+
         const bookedAddOns = await prisma.bookingAddOn.aggregate({
           _sum: { quantity: true },
           where: {
             addOnId: addOnModel.id,
             status: { notIn: ["CANCELLED", "REFUNDED"] },
-            booking: { slotId: slot.id, status: { in: ["RESERVED", "CONFIRMED"] } },
+            booking: filterWhere,
           },
         });
         const alreadyBooked = bookedAddOns._sum.quantity || 0;
@@ -579,8 +674,8 @@ export const adminCreateBooking = async (adminId, data) => {
           throw new ValidationError(`${addOnModel.title} only has ${Math.max(0, addOnModel.maxQuantityPerSlot - alreadyBooked)} spots left for this departure.`);
         }
       }
-      if (addOnModel.purchaseCutoffOffsetDays != null && slot.startDate) {
-        const cutoff = new Date(slot.startDate).getTime() - addOnModel.purchaseCutoffOffsetDays * 86400000;
+      if (addOnModel.purchaseCutoffOffsetDays != null && startDate) {
+        const cutoff = new Date(startDate).getTime() - addOnModel.purchaseCutoffOffsetDays * 86400000;
         if (Date.now() > cutoff) {
           throw new ValidationError(`${addOnModel.title} is no longer available for this departure.`);
         }
@@ -607,7 +702,7 @@ export const adminCreateBooking = async (adminId, data) => {
   if (tokenAmount === 0) initialPaymentType = "FULL";
   const amountDue = initialPaymentType === "FULL" ? 0 : toDecimal2(totalAmount - tokenAmount);
 
-  const balanceDueDate = new Date(slot.startDate);
+  const balanceDueDate = new Date(startDate);
   balanceDueDate.setDate(balanceDueDate.getDate() - 10);
 
   let status = "PENDING";
@@ -627,7 +722,6 @@ export const adminCreateBooking = async (adminId, data) => {
     id: customBookingId,
     bookingReference: customBookingId,
     userId: user.id,
-    slotId: data.slotId,
     numberOfTravelers,
     initialPaymentType,
     totalAmount,
@@ -638,11 +732,23 @@ export const adminCreateBooking = async (adminId, data) => {
     specialRequests: data.specialRequests || null,
     status,
     paymentStatus,
-    source: "CATALOG",
+    source: (isCrmTrip || isCrmFestival) ? "CRM" : "CATALOG",
   };
 
-  if (isTrip) bookingData.tripId = slot.tripId;
-  else bookingData.festivalId = slot.festivalId;
+  if (isCrmTrip) {
+    bookingData.crmTripId = crmTripSlot.crmTripId;
+    bookingData.crmTripSlotId = crmTripSlot.id;
+  } else if (isCrmFestival) {
+    bookingData.crmFestivalId = crmFestivalSlot.crmFestivalId;
+    bookingData.crmFestivalSlotId = crmFestivalSlot.id;
+  } else if (isTrip) {
+    bookingData.slotId = data.slotId;
+    bookingData.tripId = slot.tripId;
+  } else {
+    bookingData.slotId = data.slotId;
+    bookingData.festivalId = slot.festivalId;
+  }
+
   if (selectedPackage) bookingData.packageId = selectedPackage.id;
 
   if (bookingAddOnsData.length > 0) {
