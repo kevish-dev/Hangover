@@ -298,7 +298,7 @@ export const createBooking = async (userId, data) => {
   }
 
   const itemPrice = Number(selectedPackage.price);
-  const itemToken = Number(selectedPackage.tokenAmount);
+  const itemToken = Number(selectedPackage.tokenAmount != null ? selectedPackage.tokenAmount : selectedPackage.price);
 
   let addOnsTotalCost = 0;
   const bookingAddOnsData = [];
@@ -639,7 +639,7 @@ export const adminCreateBooking = async (adminId, data) => {
   }
 
   const itemPrice = Number(selectedPackage.price);
-  const itemToken = Number(selectedPackage.tokenAmount);
+  const itemToken = Number(selectedPackage.tokenAmount != null ? selectedPackage.tokenAmount : selectedPackage.price);
 
   let addOnsTotalCost = 0;
   const bookingAddOnsData = [];

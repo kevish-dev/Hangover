@@ -61,6 +61,14 @@ export interface ApiBooking {
     destination?: { name?: string | null } | null;
   } | null;
   crmTripSlot?: { startDate?: string | null; endDate?: string | null; title?: string | null } | null;
+  crmFestival?: {
+    id: string;
+    name: string;
+    numberOfNights: number;
+    websiteBannerImages?: string[];
+    destination?: { name?: string | null } | null;
+  } | null;
+  crmFestivalSlot?: { startDate?: string | null; endDate?: string | null; title?: string | null } | null;
   customTrip?: {
     id: string; reference: string; title: string; bannerImages: string[];
     startDate: string; endDate: string; durationDays: number;
@@ -97,7 +105,7 @@ export function isUpcomingBooking(b: ApiBooking): boolean {
   const activeStatuses: BookingStatus[] = ["PENDING", "RESERVED", "CONFIRMED"];
   if (!activeStatuses.includes(b.status)) return false;
   
-  const startDate = b.customTrip?.startDate || b.slot?.startDate;
+  const startDate = b.customTrip?.startDate || b.slot?.startDate || b.crmTripSlot?.startDate || b.crmFestivalSlot?.startDate;
   if (!startDate) return true;
   const tripStart = new Date(startDate);
   const now = new Date();
@@ -106,7 +114,7 @@ export function isUpcomingBooking(b: ApiBooking): boolean {
 
 export function isPastBooking(b: ApiBooking): boolean {
   if (b.status === "COMPLETED" || b.status === "CANCELLED") return true;
-  const startDate = b.customTrip?.startDate || b.slot?.startDate;
+  const startDate = b.customTrip?.startDate || b.slot?.startDate || b.crmTripSlot?.startDate || b.crmFestivalSlot?.startDate;
   if (!startDate) return false;
   
   const tripStart = new Date(startDate);

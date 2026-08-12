@@ -74,17 +74,17 @@ function StatusBadge({ status }: { status: string }) {
 
 function BookingCard({ booking }: { booking: ApiBooking }) {
   const [hovered, setHovered] = useState(false);
-  const item: any = booking.customTrip || booking.trip || booking.festival || booking.crmTrip;
+  const item: any = booking.customTrip || booking.trip || booking.festival || booking.crmTrip || booking.crmFestival;
   const isCustom = booking.source === "CUSTOM" || Boolean(booking.customTrip);
-  const isFestival = !!booking.festival;
-  const isCrm = booking.source === "CRM" || Boolean(booking.crmTrip);
+  const isFestival = Boolean(booking.festival || booking.crmFestival);
+  const isCrm = booking.source === "CRM" || Boolean(booking.crmTrip || booking.crmFestival);
   const isCrmTripViewable = isCrm && (
     item?.isPublished || 
     (booking.status !== "PENDING" && booking.status !== "CANCELLED")
   );
-  const heroImage = item?.bannerImages?.[0] || booking.crmTrip?.websiteBannerImages?.[0] || "";
-  const state = isCustom ? "Private custom trip" : (item as any)?.destination?.state || booking.crmTrip?.destination?.name || (item as any)?.location || "";
-  const travelStart = booking.customTrip?.startDate || booking.slot?.startDate || booking.crmTripSlot?.startDate;
+  const heroImage = item?.bannerImages?.[0] || item?.websiteBannerImages?.[0] || booking.crmTrip?.websiteBannerImages?.[0] || booking.crmFestival?.websiteBannerImages?.[0] || "";
+  const state = isCustom ? "Private custom trip" : (item as any)?.destination?.state || (item as any)?.destination?.name || booking.crmTrip?.destination?.name || booking.crmFestival?.destination?.name || (item as any)?.location || "";
+  const travelStart = booking.customTrip?.startDate || booking.slot?.startDate || booking.crmTripSlot?.startDate || booking.crmFestivalSlot?.startDate;
   const paid = parseFloat(booking.amountPaid || "0");
   const due = parseFloat(booking.amountDue || "0");
   const isFullyRefunded = booking.paymentStatus === "REFUNDED";

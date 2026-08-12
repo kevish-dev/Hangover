@@ -18,7 +18,7 @@ import {
 
 const toDecimal2 = (n) => Math.round(Number(n) * 100) / 100;
 const toPaise = (rupees) => Math.round(Number(rupees) * 100);
-const moneyEquals = (left, right) => toDecimal2(left) === toDecimal2(right);
+const moneyEquals = (left, right) => Math.abs(toDecimal2(left) - toDecimal2(right)) <= 1.0;
 
 const assertExpectedBookingPayment = (booking, type, amount) => {
   if (!['TOKEN', 'FULL', 'BALANCE'].includes(type)) {
@@ -26,18 +26,27 @@ const assertExpectedBookingPayment = (booking, type, amount) => {
   }
 
   if (booking.status === "PENDING" && ["PENDING", "FAILED"].includes(booking.paymentStatus)) {
-    if (type !== booking.initialPaymentType) {
-      throw new ValidationError("Use the payment option selected for this booking.");
+    const expectedToken = Number(booking.tokenAmount);
+    const expectedFull = Number(booking.totalAmount);
+
+    let isMatch = false;
+    if (type === "TOKEN" && expectedToken > 0 && moneyEquals(amount, expectedToken)) {
+      isMatch = true;
+    } else if (type === "FULL" && moneyEquals(amount, expectedFull)) {
+      isMatch = true;
+    } else if (moneyEquals(amount, expectedToken) || moneyEquals(amount, expectedFull)) {
+      isMatch = true;
     }
-    const expected = type === "TOKEN" ? Number(booking.tokenAmount) : Number(booking.totalAmount);
-    if (!moneyEquals(amount, expected)) {
-      throw new ValidationError("Payment amount does not match the selected booking payment.");
+
+    if (!isMatch) {
+      const targetExpected = type === "TOKEN" && expectedToken > 0 ? expectedToken : expectedFull;
+      throw new ValidationError(`Payment amount (₹${amount}) does not match the expected booking payment (₹${targetExpected}).`);
     }
     return;
   }
 
   if (booking.status === "RESERVED" && booking.paymentStatus === "PARTIALLY_PAID") {
-    if (type !== "BALANCE" || Number(amount) <= 0 || Number(amount) > Number(booking.amountDue)) {
+    if (type !== "BALANCE" || Number(amount) <= 0 || Number(amount) > Number(booking.amountDue) + 1.0) {
       throw new ValidationError("Balance payment must be greater than zero and cannot exceed the outstanding balance.");
     }
     return;
@@ -358,7 +367,11 @@ export const initiatePayment = async (userId, bookingId, type) => {
     throw new ValidationError("This booking already has a payment under review or has been paid.");
   }
   if (type !== booking.initialPaymentType) {
-    throw new ValidationError("Use the payment option selected for this booking.");
+    booking.initialPaymentType = type;
+    await prisma.booking.update({
+      where: { id: bookingId },
+      data: { initialPaymentType: type },
+    });
   }
 
   // Expire any stale CREATED intents for this booking (e.g. from a previously abandoned attempt)
