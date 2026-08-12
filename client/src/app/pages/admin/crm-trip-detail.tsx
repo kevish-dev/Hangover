@@ -1664,8 +1664,7 @@ function CrmBookingDetailsDialog(
     const everyAdditionalTravelerComplete = form.additionalTravelers.every((
       traveler,
     ) =>
-      traveler.fullName.trim() && traveler.email.trim() &&
-      traveler.phone.trim() && traveler.gender && traveler.dateOfBirth &&
+      traveler.fullName.trim() && traveler.gender && traveler.dateOfBirth &&
       traveler.aadhaarAssetId
     );
     if (!leadComplete) {
@@ -1675,7 +1674,7 @@ function CrmBookingDetailsDialog(
     }
     if (!everyAdditionalTravelerComplete) {
       return toast.error(
-        "Enter all details and upload an Aadhaar card for every traveler",
+        "Enter full name, gender, date of birth, and upload an Aadhaar card for every additional traveler",
       );
     }
     if (!form.crmTripSlotId || !amount) {
@@ -1985,61 +1984,158 @@ function CrmBookingDetailsDialog(
               placeholder="Optional notes"
             />
           </Field>
-          <div className="rounded-lg border p-3">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="First payment *">
-                {form.paymentAction === "SEND_LINK" ? (
-                  <>
-                    <select
-                      className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
-                      value={linkAmountChoice}
-                      onChange={(e) => setPaymentLinkAmount(e.target.value)}
-                    >
-                      {paymentLinkOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.value === "100" ? "Full payment" : `${option.value}% payment`} — ₹{option.amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </option>
-                      ))}
-                      <option value="CUSTOM">Custom amount…</option>
-                    </select>
-                    {linkAmountChoice === "CUSTOM" && (
-                      <Input
-                        min="0.01"
-                        max={String(totalWithGst)}
-                        step="0.01"
-                        type="number"
-                        value={form.paymentAmount}
-                        onChange={(e) => update("paymentAmount", e.target.value)}
-                        placeholder="Enter GST-inclusive amount"
-                      />
+          <div className="space-y-4 border-t pt-4">
+            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+              Payment & Summary Setup
+            </h3>
+
+            {/* Collection Action Selector Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div 
+                onClick={() => setPaymentAction("MANUAL")}
+                className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                  form.paymentAction === "MANUAL"
+                    ? "border-[#c8a96e] bg-[#c8a96e]/10 text-gray-900 font-medium ring-1 ring-[#c8a96e]"
+                    : "border-gray-200 bg-white hover:border-gray-300 text-gray-600"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider">Collect Offline / Mark Paid</span>
+                  <input type="radio" checked={form.paymentAction === "MANUAL"} readOnly className="accent-[#781216]" />
+                </div>
+                <p className="text-[11px] text-gray-500 mt-1">Record cash or manual bank transfer. 5% GST is added at collection.</p>
+              </div>
+
+              <div 
+                onClick={() => setPaymentAction("SEND_LINK")}
+                className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                  form.paymentAction === "SEND_LINK"
+                    ? "border-[#c8a96e] bg-[#c8a96e]/10 text-gray-900 font-medium ring-1 ring-[#c8a96e]"
+                    : "border-gray-200 bg-white hover:border-gray-300 text-gray-600"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider">Send Payment Link</span>
+                  <input type="radio" checked={form.paymentAction === "SEND_LINK"} readOnly className="accent-[#781216]" />
+                </div>
+                <p className="text-[11px] text-gray-500 mt-1">Generate Razorpay link & email to customer (charges exact GST-inclusive amount).</p>
+              </div>
+            </div>
+
+            {/* Payment Preset Selection */}
+            <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 space-y-3">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
+                Initial Payment Amount {form.paymentAction === "MANUAL" ? "(before 5% GST)" : "(including 5% GST)"}
+              </label>
+
+              {form.paymentAction === "SEND_LINK" ? (
+                <div className="space-y-2">
+                  <select
+                    className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e]"
+                    value={linkAmountChoice}
+                    onChange={(e) => setPaymentLinkAmount(e.target.value)}
+                  >
+                    {paymentLinkOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.value === "100" ? "Full Payment" : `${option.value}% Payment`} — ₹{option.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })} (incl. GST)
+                      </option>
+                    ))}
+                    <option value="CUSTOM">Custom Amount…</option>
+                  </select>
+                  {linkAmountChoice === "CUSTOM" && (
+                    <Input
+                      min="0.01"
+                      max={String(totalWithGst)}
+                      step="0.01"
+                      type="number"
+                      value={form.paymentAmount}
+                      onChange={(e) => update("paymentAmount", e.target.value)}
+                      placeholder="Enter GST-inclusive amount (₹)"
+                    />
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {recommendedTokenPrice > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => update("paymentAmount", String(recommendedTokenPrice))}
+                        className={`py-2 px-3 rounded-lg border text-xs font-medium text-left transition-all ${
+                          Number(form.paymentAmount) === recommendedTokenPrice
+                            ? "border-[#781216] bg-[#781216]/10 text-[#781216] font-bold"
+                            : "border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+                        }`}
+                      >
+                        <div>Token Payment</div>
+                        <div className="text-[11px] opacity-80">₹{recommendedTokenPrice.toLocaleString("en-IN")}</div>
+                      </button>
                     )}
-                  </>
+                    <button
+                      type="button"
+                      onClick={() => update("paymentAmount", String(totalPrice))}
+                      className={`py-2 px-3 rounded-lg border text-xs font-medium text-left transition-all ${
+                        Number(form.paymentAmount) === totalPrice
+                          ? "border-[#781216] bg-[#781216]/10 text-[#781216] font-bold"
+                          : "border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+                      }`}
+                    >
+                      <div>Full Payment</div>
+                      <div className="text-[11px] opacity-80">₹{totalPrice.toLocaleString("en-IN")}</div>
+                    </button>
+                  </div>
+                  <div className="pt-1">
+                    <label className="text-[11px] text-gray-500 block mb-1">Custom Amount before GST (₹)</label>
+                    <Input
+                      min="0.01"
+                      max={String(totalPrice)}
+                      step="0.01"
+                      type="number"
+                      value={form.paymentAmount}
+                      onChange={(e) => update("paymentAmount", e.target.value)}
+                      placeholder="Enter pre-GST amount (₹)"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Financial Summary Breakdown */}
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-2 text-xs">
+              <h4 className="font-bold text-gray-900 uppercase tracking-wider text-[11px] border-b border-gray-200 pb-2 mb-2">Price Breakdown & Tax Summary</h4>
+              <div className="flex justify-between text-gray-600">
+                <span>Base Package (x{numTravelers})</span>
+                <span className="font-medium">₹{(basePrice * numTravelers).toLocaleString("en-IN")}</span>
+              </div>
+              {addOnsPrice > 0 && (
+                <div className="flex justify-between text-gray-600">
+                  <span>Add-ons Total</span>
+                  <span className="font-medium">₹{addOnsPrice.toLocaleString("en-IN")}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-gray-600 border-t border-gray-200 pt-2">
+                <span>Subtotal (before GST)</span>
+                <span className="font-medium text-gray-900">₹{totalPrice.toLocaleString("en-IN")}</span>
+              </div>
+              <div className="flex justify-between text-gray-600">
+                <span>GST (5%)</span>
+                <span className="font-medium text-gray-900">₹{(totalPrice * 0.05).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold text-gray-900 border-t border-gray-200 pt-2">
+                <span>Total Booking Cost (incl. GST)</span>
+                <span className="text-[#781216]">₹{totalWithGst.toLocaleString("en-IN")}</span>
+              </div>
+              <div className="mt-2 pt-2 border-t border-gray-200/80 text-[11px] text-gray-500 font-medium">
+                {form.paymentAction === "MANUAL" ? (
+                  <span>
+                    Initial collection: <strong className="text-gray-900">₹{Number(form.paymentAmount || 0).toLocaleString("en-IN")}</strong> + 5% GST = <strong className="text-green-700">₹{(Number(form.paymentAmount || 0) * 1.05).toFixed(2)}</strong> charged
+                  </span>
                 ) : (
-                  <Input
-                    min="0.01"
-                    max={String(totalPrice)}
-                    step="0.01"
-                    type="number"
-                    value={form.paymentAmount}
-                    onChange={(e) => update("paymentAmount", e.target.value)}
-                  />
+                  <span>
+                    Payment link amount: <strong className="text-green-700">₹{Number(form.paymentAmount || 0).toLocaleString("en-IN")}</strong> (incl. 5% GST)
+                  </span>
                 )}
-                <span className="text-[10px] text-gray-400 block mt-1">
-                  {form.paymentAction === "SEND_LINK"
-                    ? `Payment link amounts include 5% GST. Total: ₹${totalWithGst.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
-                    : `Prefilled recommended token. 5% GST is added when recorded. (Total before GST: ₹${totalPrice.toLocaleString("en-IN")})`}
-                </span>
-              </Field>
-              <Field label="Collection">
-                <select
-                  className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
-                  value={form.paymentAction}
-                  onChange={(e) => setPaymentAction(e.target.value)}
-                >
-                  <option value="MANUAL">Received manually</option>
-                  <option value="SEND_LINK">Send website payment link</option>
-                </select>
-              </Field>
+              </div>
             </div>
           </div>
           <div className="flex justify-end gap-2">

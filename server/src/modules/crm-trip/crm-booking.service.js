@@ -47,12 +47,12 @@ const ensureUser = async (data) => {
   });
 };
 
-const travelerData = (travelers = []) => travelers
+const travelerData = (travelers = [], defaultEmail = null, defaultPhone = null) => travelers
   .filter((traveler) => traveler?.fullName?.trim())
   .map((traveler) => ({
     fullName: traveler.fullName.trim(),
-    email: traveler.email?.trim() || null,
-    phone: traveler.phone?.trim() || null,
+    email: traveler.email?.trim() || defaultEmail,
+    phone: traveler.phone?.trim() || defaultPhone,
     gender: traveler.gender || null,
     dateOfBirth: traveler.dateOfBirth ? new Date(traveler.dateOfBirth) : null,
     aadhaar: traveler.aadhaar?.trim() || null,
@@ -198,12 +198,14 @@ export const createCrmBooking = async (crmTripId, data, adminId) => {
   if (!crmTripSlot) throw new ValidationError("Choose a valid dated departure slot for this CRM trip");
 
   const travelers = Number(data.numberOfTravelers) || 1;
-  const additionalTravelers = travelerData(data.additionalTravelers);
+  const leadEmail = data.email?.trim()?.toLowerCase() || null;
+  const leadPhone = data.phone?.trim() || null;
+  const additionalTravelers = travelerData(data.additionalTravelers, leadEmail, leadPhone);
   if (additionalTravelers.length !== travelers - 1) {
     throw new ValidationError("Enter details for every additional traveler");
   }
-  if (additionalTravelers.some((traveler) => !traveler.email || !traveler.phone || !traveler.gender || !traveler.dateOfBirth || (!traveler.aadhaar && !traveler.aadhaarAssetId))) {
-    throw new ValidationError("Each additional traveler needs email, phone, gender, date of birth, and Aadhaar card");
+  if (additionalTravelers.some((traveler) => !traveler.gender || !traveler.dateOfBirth || (!traveler.aadhaar && !traveler.aadhaarAssetId))) {
+    throw new ValidationError("Each additional traveler needs gender, date of birth, and Aadhaar card");
   }
   if (crmTripSlot.filledSpots + travelers > crmTripSlot.capacity) {
     throw new ValidationError("This departure does not have enough remaining capacity");
@@ -359,12 +361,12 @@ export const createPublicCrmBooking = async (crmTripId, data, userId) => {
     : trip.packages[0];
   if (!selectedPackage) throw new ValidationError("Choose a valid package for this CRM trip");
 
-  const additionalTravelers = travelerData(data.additionalTravelers);
+  const additionalTravelers = travelerData(data.additionalTravelers, user.email, profile.phone);
   if (additionalTravelers.length !== travelers - 1) {
     throw new ValidationError("Enter details for every additional traveler");
   }
-  if (additionalTravelers.some((traveler) => !traveler.email || !traveler.phone || !traveler.gender || !traveler.dateOfBirth || !traveler.aadhaarAssetId)) {
-    throw new ValidationError("Each additional traveler needs email, phone, gender, date of birth, and Aadhaar card");
+  if (additionalTravelers.some((traveler) => !traveler.gender || !traveler.dateOfBirth || !traveler.aadhaarAssetId)) {
+    throw new ValidationError("Each additional traveler needs gender, date of birth, and Aadhaar card");
   }
 
   for (const traveler of additionalTravelers) {

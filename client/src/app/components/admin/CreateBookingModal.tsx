@@ -52,7 +52,10 @@ export default function CreateBookingModal({
     queryFn: () => apiClient.get("/crm-festivals?limit=100").then(res => res.data)
   });
 
-  const items = formData.itemType === "TRIP" ? (tripsData?.data || tripsData || []) : (festivalsData?.data || festivalsData || []);
+  const rawItems = formData.itemType === "TRIP" ? tripsData : festivalsData;
+  const items = Array.isArray(rawItems) 
+    ? rawItems 
+    : (Array.isArray(rawItems?.data) ? rawItems.data : (Array.isArray(rawItems?.data?.data) ? rawItems.data.data : []));
   
   const { data: itemDetails, isLoading: isLoadingItemDetails } = useQuery({
     queryKey: ["admin", "item-details", formData.itemType, formData.itemId],
@@ -138,12 +141,14 @@ export default function CreateBookingModal({
         setIsUploadingGovtId(true);
       }
       
-      const res = await uploadGenericImageDirect(file, "document");
-      if (res.assetId) {
+      const res = await apiClient.post("/bookings/traveler/govt-id", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      if (res.data?.assetId) {
         if (index !== undefined) {
-          handleAdditionalTravelerChange(index, "aadhaarAssetId", res.assetId);
+          handleAdditionalTravelerChange(index, "aadhaarAssetId", res.data.assetId);
         } else {
-          updateForm("govtIdAssetId", res.assetId);
+          updateForm("govtIdAssetId", res.data.assetId);
         }
         toast.success("Document uploaded successfully");
       }
@@ -178,7 +183,10 @@ export default function CreateBookingModal({
         ? `/crm-trips/${formData.itemId}/bookings` 
         : `/crm-festivals/${formData.itemId}/bookings`;
         
-      const paymentAmount = formData.initialPaymentType === "TOKEN" ? totalToken : total;
+      const preGstToken = tokenPerPerson * formData.numberOfTravelers;
+      const paymentAmount = formData.initialPaymentType === "TOKEN"
+        ? (formData.paymentAction === "SEND_LINK" ? totalToken : (preGstToken > 0 ? preGstToken : totalToken))
+        : (formData.paymentAction === "SEND_LINK" ? total : subTotal);
 
       const payload = {
         ...formData,
@@ -284,9 +292,10 @@ export default function CreateBookingModal({
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#c8a96e]"
                   >
                     <option value="">Select Gender</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                    <option value="OTHER">Other</option>
+                    <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
                   </select>
                 </div>
                 <div>
@@ -356,7 +365,9 @@ export default function CreateBookingModal({
                   >
                     <option value="">-- Select --</option>
                     {items.map((item: any) => (
-                      <option key={item.id} value={item.id}>{item.title}</option>
+                      <option key={item.id} value={item.id}>
+                        {item.name || item.title || item.destination?.name || "Untitled Trip"}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -457,7 +468,30 @@ export default function CreateBookingModal({
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Aadhaar Card (PDF/Img)</label>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Gender *</label>
+                        <select 
+                          value={traveler.gender}
+                          onChange={(e) => handleAdditionalTravelerChange(index, "gender", e.target.value)}
+                          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#c8a96e]"
+                        >
+                          <option value="">Select Gender</option>
+                          <option value="MALE">Male</option>
+                          <option value="FEMALE">Female</option>
+                          <option value="OTHER">Other</option>
+                          <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Date of Birth *</label>
+                        <input 
+                          type="date" 
+                          value={traveler.dateOfBirth}
+                          onChange={(e) => handleAdditionalTravelerChange(index, "dateOfBirth", e.target.value)}
+                          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#c8a96e]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Aadhaar Card (PDF/Img) *</label>
                         <input 
                           type="file" 
                           accept="image/*,.pdf"
@@ -565,9 +599,9 @@ export default function CreateBookingModal({
                   </div>
                 </div>
                 
-                <div className="border border-gray-200 rounded-xl p-4 flex gap-3 cursor-pointer hover:border-[#c8a96e]" onClick={() => updateForm("paymentAction", "MARK_PAID")}>
+                <div className="border border-gray-200 rounded-xl p-4 flex gap-3 cursor-pointer hover:border-[#c8a96e]" onClick={() => updateForm("paymentAction", "MANUAL")}>
                   <div className="mt-1">
-                    <input type="radio" checked={formData.paymentAction === "MARK_PAID"} readOnly />
+                    <input type="radio" checked={formData.paymentAction === "MANUAL"} readOnly />
                   </div>
                   <div>
                     <h4 className="font-medium text-gray-900">Mark as Paid</h4>

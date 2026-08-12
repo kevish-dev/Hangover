@@ -1272,11 +1272,11 @@ export default function BookingPage() {
 
   const numTravelers = 1 + travelers.length;
   const baseTotalAmount = basePrice * numTravelers + addOnTotal;
-  const totalGst = isCrmTrip ? 0 : baseTotalAmount * 0.05;
+  const totalGst = baseTotalAmount * 0.05;
   const totalAmountDue = baseTotalAmount + totalGst;
 
   const baseTokenTotal = baseToken * numTravelers;
-  const tokenGst = isCrmTrip ? 0 : baseTokenTotal * 0.05;
+  const tokenGst = baseTokenTotal * 0.05;
   const tokenAmountDue = baseTokenTotal + tokenGst;
   const isTokenZero = tokenAmountDue === 0;
 

@@ -2360,14 +2360,16 @@ function CreateCrmBookingModal({
     if (addon) addOnsPrice += Number(addon.price) * qty;
   });
 
-  const totalPrice = basePrice * numberOfTravelers + addOnsPrice;
-  const recommendedTokenPrice = tokenPrice * numberOfTravelers;
+  const totalWithGst = Math.round((totalPrice * 1.05 + Number.EPSILON) * 100) / 100;
+  const recommendedTokenWithGst = Math.round((recommendedTokenPrice * 1.05 + Number.EPSILON) * 100) / 100;
 
   useEffect(() => {
-    if (recommendedTokenPrice > 0) {
+    if (paymentAction === "SEND_LINK") {
+      setPaymentAmount(String(recommendedTokenWithGst > 0 ? recommendedTokenWithGst : totalWithGst));
+    } else if (recommendedTokenPrice > 0) {
       setPaymentAmount(String(recommendedTokenPrice));
     }
-  }, [recommendedTokenPrice]);
+  }, [recommendedTokenPrice, paymentAction, totalWithGst, recommendedTokenWithGst]);
 
   useEffect(() => {
     const extraCount = Math.max(0, numberOfTravelers - 1);
@@ -2406,13 +2408,14 @@ function CreateCrmBookingModal({
       toast.error("Enter all lead traveler details and upload their Aadhaar card");
       return;
     }
-    if (additionalTravelers.some((traveler) => !traveler.fullName.trim() || !traveler.email.trim() || !traveler.phone.trim() || !traveler.gender || !traveler.dateOfBirth || !traveler.aadhaarAssetId)) {
-      toast.error("Enter all details and upload an Aadhaar card for every traveler");
+    if (additionalTravelers.some((traveler) => !traveler.fullName.trim() || !traveler.gender || !traveler.dateOfBirth || !traveler.aadhaarAssetId)) {
+      toast.error("Enter full name, gender, date of birth, and upload an Aadhaar card for every additional traveler");
       return;
     }
     const amt = Number(paymentAmount);
-    if (!Number.isFinite(amt) || amt <= 0 || amt > totalPrice) {
-      toast.error(`Please enter a payment amount between ₹1 and ₹${totalPrice.toFixed(2)}`);
+    const maxAmount = paymentAction === "SEND_LINK" ? totalWithGst : totalPrice;
+    if (!Number.isFinite(amt) || amt <= 0 || amt > maxAmount) {
+      toast.error(`Please enter a payment amount between ₹1 and ₹${maxAmount.toFixed(2)}`);
       return;
     }
 
@@ -2641,10 +2644,12 @@ function CreateCrmBookingModal({
             <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">Initial Payment Setup</h4>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block space-y-1">
-                <span className="text-xs font-semibold text-gray-500 uppercase">Payment Amount before GST (₹)</span>
+                <span className="text-xs font-semibold text-gray-500 uppercase">{paymentAction === "SEND_LINK" ? "Payment-link amount including GST (₹)" : "Manual payment before GST (₹)"}</span>
                 <Input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder="₹" />
                 <span className="text-[10px] text-gray-400 block mt-0.5">
-                  GST at 5% is added at collection. Amount charged: ₹{(Number(paymentAmount || 0) * 1.05).toFixed(2)} (festival total incl. GST: ₹{(totalPrice * 1.05).toFixed(2)})
+                  {paymentAction === "SEND_LINK"
+                    ? `Payment link charges the exact amount including 5% GST. (Festival total incl. GST: ₹${totalWithGst.toLocaleString("en-IN")})`
+                    : `GST at 5% is added at collection. Amount charged: ₹${(Number(paymentAmount || 0) * 1.05).toFixed(2)} (festival total incl. GST: ₹${totalWithGst.toLocaleString("en-IN")})`}
                 </span>
               </label>
               <label className="block space-y-1">
