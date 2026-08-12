@@ -2686,15 +2686,23 @@ function AddInstallmentModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [paymentAmount, setPaymentAmount] = useState(String(booking.amountDue || ""));
+  const [paymentAmount, setPaymentAmount] = useState((Number(booking.amountDue || 0) / 1.05).toFixed(2));
   const [paymentAction, setPaymentAction] = useState<"MANUAL" | "SEND_LINK">("MANUAL");
+  const [linkAmountChoice, setLinkAmountChoice] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  useEffect(() => {
+    const defaultAmount = paymentAction === "SEND_LINK" ? String(booking.amountDue) : (Number(booking.amountDue || 0) / 1.05).toFixed(2);
+    setPaymentAmount(defaultAmount);
+    if (paymentAction === "SEND_LINK") setLinkAmountChoice(defaultAmount);
+  }, [paymentAction, booking.amountDue]);
+  const linkAmounts = [...new Set([0.1, 0.25, 0.5, 0.75, 1].map((fraction) => (Math.round(Number(booking.amountDue) * fraction * 100) / 100).toFixed(2)))];
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const amt = Number(paymentAmount);
-    if (!Number.isFinite(amt) || amt <= 0 || amt > Number(booking.amountDue)) {
-      toast.error(`Please enter a payment amount between ₹1 and ₹${Number(booking.amountDue).toFixed(2)}`);
+    const chargedAmount = paymentAction === "SEND_LINK" ? amt : Math.round(amt * 1.05 * 100) / 100;
+    if (!Number.isFinite(amt) || amt <= 0 || chargedAmount > Number(booking.amountDue)) {
+      toast.error(`Please enter a payment amount up to ₹${(Number(booking.amountDue) / 1.05).toFixed(2)} before GST.`);
       return;
     }
 
@@ -2738,16 +2746,16 @@ function AddInstallmentModal({
           </div>
 
           <label className="block space-y-1">
-            <span className="text-xs font-semibold text-gray-500 uppercase">Payment Amount including GST (₹)</span>
-            <Input required type="number" max={Number(booking.amountDue)} value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder="₹" />
-            <span className="block text-xs text-gray-500">This amount already includes GST at 5%.</span>
-          </label>
-          <label className="block space-y-1">
             <span className="text-xs font-semibold text-gray-500 uppercase">Payment Collection Action</span>
             <select className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm" value={paymentAction} onChange={(e) => setPaymentAction(e.target.value as any)}>
               <option value="MANUAL">Collect Offline (Mark Paid)</option>
               <option value="SEND_LINK">Send Website Payment Link</option>
             </select>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-gray-500 uppercase">{paymentAction === "SEND_LINK" ? "Payment-link amount including GST (₹)" : "Manual payment before GST (₹)"}</span>
+            {paymentAction === "SEND_LINK" ? <><select className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm" value={linkAmountChoice} onChange={(e) => { setLinkAmountChoice(e.target.value); if (e.target.value !== "CUSTOM") setPaymentAmount(e.target.value); }}>{linkAmounts.map((value) => <option key={value} value={value}>Pay ₹{Number(value).toLocaleString("en-IN")}</option>)}<option value="CUSTOM">Custom amount…</option></select>{linkAmountChoice === "CUSTOM" && <Input required type="number" min="0.01" max={Number(booking.amountDue)} value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder="₹" />}</> : <Input required type="number" max={Number(booking.amountDue) / 1.05} value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder="₹" />}
+            <span className="block text-xs text-gray-500">{paymentAction === "SEND_LINK" ? "Choose a suggested GST-inclusive amount, or enter any amount up to the balance." : `5% GST is added. Customer is charged ₹${(Number(paymentAmount || 0) * 1.05).toFixed(2)}.`}</span>
           </label>
 
           <div className="flex justify-end gap-2 border-t pt-3">

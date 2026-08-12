@@ -7,7 +7,7 @@ import { reserveBookingSlotCapacity } from "../booking/slot-capacity.service.js"
 import { addGst, amountDueAfterPayment } from "../../utils/gst.js";
 
 const round = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
-const paymentPageUrl = (bookingId) => `${env.ORIGIN.replace(/\/$/, "")}/bookings/${bookingId}/pay-balance`;
+const paymentPageUrl = (bookingId, amount) => `${env.ORIGIN.replace(/\/$/, "")}/bookings/${bookingId}/pay-balance${amount ? `?amount=${encodeURIComponent(amount)}` : ""}`;
 const getReference = async () => {
   try {
     const rows = await prisma.$queryRaw`SELECT nextval('"BookingReferenceSequence"') AS "sequence"`;
@@ -115,18 +115,18 @@ const emailPaymentRequest = async ({ booking, festival, payment, paymentLink }) 
 };
 
 const createInstallment = async ({ booking, festival, data, adminId, isInitial = false }) => {
-  // Payment amounts accepted by this API are the GST-inclusive values shown
-  // in the admin UI and on the customer payment page.
-  const amount = round(data.paymentAmount);
+  // Manual entries are tax-exclusive amounts, so GST is added to every
+  // collection. A payment link charges the GST-inclusive amount selected by
+  // the admin, so it must not have GST added a second time.
+  const amount = data.amountIncludesGst || data.paymentAction === "SEND_LINK"
+    ? round(data.paymentAmount)
+    : addGst(data.paymentAmount);
   const dueBefore = Number(booking.amountDue);
   if (!Number.isFinite(amount) || amount <= 0 || amount > dueBefore) {
     throw new ValidationError(`Installment amount must be between ₹0.01 and ₹${dueBefore.toFixed(2)}`);
   }
   if (!["MANUAL", "SEND_LINK"].includes(data.paymentAction)) {
     throw new ValidationError("Choose manual collection or send the website payment link");
-  }
-  if (!isInitial && data.paymentAction === "SEND_LINK" && round(amount) !== round(dueBefore)) {
-    throw new ValidationError(`The website payment page collects the full outstanding balance of ₹${dueBefore.toFixed(2)}. Use manual collection for a partial installment.`);
   }
 
   const type = isInitial ? paymentTypeFor(amount, dueBefore) : "BALANCE";
@@ -174,7 +174,7 @@ const createInstallment = async ({ booking, festival, data, adminId, isInitial =
     return { ...result, paymentLink: null };
   }
 
-  const paymentLink = paymentPageUrl(booking.id);
+  const paymentLink = paymentPageUrl(booking.id, amount);
   await emailPaymentRequest({ booking, festival, payment: { amount }, paymentLink }).catch(console.error);
   return { booking, payment: null, paymentLink };
 };
@@ -187,7 +187,10 @@ export const createCrmFestivalBooking = async (crmFestivalId, data, adminId) => 
   if (!data.crmFestivalSlotId) throw new ValidationError("Choose a departure slot for this booking");
   const festival = await getFestivalWithPricing(crmFestivalId);
   const totalAmount = addGst(festival.totalAmount);
-  const initialPaymentAmount = addGst(data.paymentAmount);
+  // Payment-link values are already GST-inclusive; manual entry remains tax-exclusive.
+  const initialPaymentAmount = data.paymentAction === "SEND_LINK"
+    ? round(data.paymentAmount)
+    : addGst(data.paymentAmount);
   if (!Number.isFinite(initialPaymentAmount) || initialPaymentAmount <= 0 || initialPaymentAmount > totalAmount) {
     throw new ValidationError(`Initial payment must be between ₹0.01 and ₹${totalAmount.toFixed(2)} (including GST)`);
   }

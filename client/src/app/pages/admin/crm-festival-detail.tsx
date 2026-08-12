@@ -1267,6 +1267,9 @@ function CrmBookingDialog(
       setSaving(false);
     }
   };
+  const linkAmounts = booking
+    ? [...new Set([0.1, 0.25, 0.5, 0.75, 1].map((fraction) => (Math.round(Number(booking.amountDue) * fraction * 100) / 100).toFixed(2)))]
+    : [];
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
@@ -1501,6 +1504,7 @@ function CrmBookingDetailsDialog(
   });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [linkAmountChoice, setLinkAmountChoice] = useState("100");
 
   const packages = festival.packages || [];
   const addOns = festival.addOns || [];
@@ -1527,12 +1531,25 @@ function CrmBookingDetailsDialog(
 
   const totalPrice = basePrice * numTravelers + addOnsPrice;
   const recommendedTokenPrice = tokenPrice * numTravelers;
+  const totalWithGst = Math.round((totalPrice * 1.05 + Number.EPSILON) * 100) / 100;
+  const paymentLinkOptions = [10, 25, 50, 75, 100].map((percentage) => ({
+    value: String(percentage),
+    amount: Math.round((totalWithGst * percentage / 100 + Number.EPSILON) * 100) / 100,
+  })).filter((option, index, options) => option.amount > 0 &&
+    options.findIndex((candidate) => candidate.amount === option.amount) === index
+  );
 
   useEffect(() => {
-    if (recommendedTokenPrice > 0) {
+    if (recommendedTokenPrice > 0 && form.paymentAction === "MANUAL") {
       setForm((current) => ({ ...current, paymentAmount: String(recommendedTokenPrice) }));
     }
-  }, [recommendedTokenPrice]);
+  }, [recommendedTokenPrice, form.paymentAction]);
+
+  useEffect(() => {
+    if (form.paymentAction !== "SEND_LINK" || linkAmountChoice === "CUSTOM") return;
+    const option = paymentLinkOptions.find((item) => item.value === linkAmountChoice);
+    if (option) setForm((current) => ({ ...current, paymentAmount: String(option.amount) }));
+  }, [totalWithGst, form.paymentAction, linkAmountChoice]);
 
   useEffect(() => {
     if (open) {
@@ -1619,6 +1636,24 @@ function CrmBookingDetailsDialog(
     });
     setPackageId(packages[0]?.id || "");
     setSelectedAddOns({});
+    setLinkAmountChoice("100");
+  };
+  const setPaymentAction = (paymentAction: string) => {
+    update("paymentAction", paymentAction);
+    if (paymentAction === "SEND_LINK") {
+      setLinkAmountChoice("100");
+      update("paymentAmount", String(totalWithGst));
+    } else {
+      setLinkAmountChoice("100");
+      update("paymentAmount", String(recommendedTokenPrice));
+    }
+  };
+  const setPaymentLinkAmount = (choice: string) => {
+    setLinkAmountChoice(choice);
+    if (choice !== "CUSTOM") {
+      const option = paymentLinkOptions.find((item) => item.value === choice);
+      if (option) update("paymentAmount", String(option.amount));
+    }
   };
   const submit = async () => {
     const travelers = Math.max(1, Number(form.numberOfTravelers) || 1);
@@ -1646,7 +1681,8 @@ function CrmBookingDetailsDialog(
     if (!form.crmFestivalSlotId || !amount) {
       return toast.error("Departure and first payment are required");
     }
-    if (amount > totalPrice) {
+    const maximumPayment = form.paymentAction === "SEND_LINK" ? totalWithGst : totalPrice;
+    if (amount > maximumPayment) {
       return toast.error("The first payment cannot exceed the total booking price");
     }
     const slot = festival.slots.find((item) => item.id === form.crmFestivalSlotId);
@@ -1952,23 +1988,53 @@ function CrmBookingDetailsDialog(
           <div className="rounded-lg border p-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="First payment *">
-                <Input
-                  min="0.01"
-                  max={String(totalPrice)}
-                  step="0.01"
-                  type="number"
-                  value={form.paymentAmount}
-                  onChange={(e) => update("paymentAmount", e.target.value)}
-                />
+                {form.paymentAction === "SEND_LINK" ? (
+                  <>
+                    <select
+                      className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
+                      value={linkAmountChoice}
+                      onChange={(e) => setPaymentLinkAmount(e.target.value)}
+                    >
+                      {paymentLinkOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.value === "100" ? "Full payment" : `${option.value}% payment`} — ₹{option.amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </option>
+                      ))}
+                      <option value="CUSTOM">Custom amount…</option>
+                    </select>
+                    {linkAmountChoice === "CUSTOM" && (
+                      <Input
+                        min="0.01"
+                        max={String(totalWithGst)}
+                        step="0.01"
+                        type="number"
+                        value={form.paymentAmount}
+                        onChange={(e) => update("paymentAmount", e.target.value)}
+                        placeholder="Enter GST-inclusive amount"
+                      />
+                    )}
+                  </>
+                ) : (
+                  <Input
+                    min="0.01"
+                    max={String(totalPrice)}
+                    step="0.01"
+                    type="number"
+                    value={form.paymentAmount}
+                    onChange={(e) => update("paymentAmount", e.target.value)}
+                  />
+                )}
                 <span className="text-[10px] text-gray-400 block mt-1">
-                  Prefilled recommended token. (Total: ₹{totalPrice.toLocaleString("en-IN")})
+                  {form.paymentAction === "SEND_LINK"
+                    ? `Payment link amounts include 5% GST. Total: ₹${totalWithGst.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+                    : `Prefilled recommended token. 5% GST is added when recorded. (Total before GST: ₹${totalPrice.toLocaleString("en-IN")})`}
                 </span>
               </Field>
               <Field label="Collection">
                 <select
                   className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
                   value={form.paymentAction}
-                  onChange={(e) => update("paymentAction", e.target.value)}
+                  onChange={(e) => setPaymentAction(e.target.value)}
                 >
                   <option value="MANUAL">Received manually</option>
                   <option value="SEND_LINK">Send website payment link</option>
@@ -2194,22 +2260,24 @@ function InstallmentDialog(
 ) {
   const [amount, setAmount] = useState("");
   const [action, setAction] = useState("MANUAL");
+  const [linkAmountChoice, setLinkAmountChoice] = useState("");
   const [saving, setSaving] = useState(false);
   useEffect(() => {
-    setAmount(booking ? String(booking.amountDue) : "");
-  }, [booking?.id, booking?.amountDue]);
-  useEffect(() => {
-    if (action === "SEND_LINK" && booking) setAmount(String(booking.amountDue));
+    if (!booking) return setAmount("");
+    const defaultAmount = action === "SEND_LINK" ? String(booking.amountDue) : (Number(booking.amountDue) / 1.05).toFixed(2);
+    setAmount(defaultAmount);
+    if (action === "SEND_LINK") setLinkAmountChoice(defaultAmount);
   }, [action, booking?.id, booking?.amountDue]);
   const submit = async () => {
-    if (!booking || !Number(amount)) {
+    const selectedAmount = Number(amount);
+    if (!booking || !selectedAmount) {
       return toast.error("Enter an installment amount");
     }
     setSaving(true);
     try {
       await apiClient.post(
         `/crm-festivals/${festivalId}/bookings/${booking.id}/installments`,
-        { paymentAmount: Number(amount), paymentAction: action },
+        { paymentAmount: selectedAmount, paymentAction: action },
       );
       toast.success(
         action === "SEND_LINK"
@@ -2249,26 +2317,33 @@ function InstallmentDialog(
                 <option value="SEND_LINK">Send website payment link</option>
               </select>
             </Field>
-            <Field label={action === "SEND_LINK" ? "Payment-link amount (including GST)" : "Installment amount (including GST)"}>
+            <Field label={action === "SEND_LINK" ? "Payment-link amount (including GST)" : "Manual installment before GST"}>
               {action === "SEND_LINK" ? (
+                <>
                 <select
                   className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
-                  value={String(booking.amountDue)}
-                  onChange={(e) => setAmount(e.target.value)}
+                  value={linkAmountChoice}
+                  onChange={(e) => {
+                    setLinkAmountChoice(e.target.value);
+                    if (e.target.value !== "CUSTOM") setAmount(e.target.value);
+                  }}
                 >
-                  <option value={String(booking.amountDue)}>Full outstanding balance — ₹{Number(booking.amountDue).toLocaleString("en-IN")}</option>
+                  {linkAmounts.map((value) => <option key={value} value={value}>Pay ₹{Number(value).toLocaleString("en-IN")}</option>)}
+                  <option value="CUSTOM">Custom amount…</option>
                 </select>
+                {linkAmountChoice === "CUSTOM" && <Input min="0.01" max={String(booking.amountDue)} step="0.01" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />}
+                </>
               ) : (
                 <Input
                   min="0.01"
-                  max={String(booking.amountDue)}
+                  max={String(Number(booking.amountDue) / 1.05)}
                   step="0.01"
                   type="number"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                 />
               )}
-              <p className="text-xs text-gray-500">{action === "SEND_LINK" ? "Website checkout can collect the full outstanding balance only." : "This amount includes 5% GST."}</p>
+              <p className="text-xs text-gray-500">{action === "SEND_LINK" ? "Choose a suggested GST-inclusive amount, or enter any amount up to the outstanding balance." : `5% GST will be added. Customer is charged ₹${(Number(amount || 0) * 1.05).toFixed(2)}.`}</p>
             </Field>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => onOpenChange(false)}>

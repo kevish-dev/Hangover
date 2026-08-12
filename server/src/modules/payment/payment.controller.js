@@ -12,9 +12,9 @@ export const initiatePayment = async (req, res, next) => {
 
 export const initiateBalancePayment = async (req, res, next) => {
   try {
-    const { bookingId } = req.body;
+    const { bookingId, amount } = req.body;
     const isAdmin = req.user.role === "ADMIN";
-    const result = await paymentService.initiateBalancePayment(req.user.id, bookingId, isAdmin);
+    const result = await paymentService.initiateBalancePayment(req.user.id, bookingId, isAdmin, amount);
     res.status(200).json(result);
   } catch (error) {
     next(error);
@@ -131,4 +131,3 @@ export const verifyUpiPayment = async (req, res, next) => {
     next(error);
   }
 };
-

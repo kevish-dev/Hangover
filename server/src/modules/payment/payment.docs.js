@@ -41,7 +41,7 @@ registry.registerPath({
     body: {
       content: {
         "application/json": {
-          schema: z.object({ bookingId: z.string().uuid() }),
+          schema: z.object({ bookingId: z.string().uuid(), amount: z.number().positive().optional() }),
         },
       },
     },

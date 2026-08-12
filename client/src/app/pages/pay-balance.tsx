@@ -149,6 +149,7 @@ function ResultPage({
     : "/trips";
   const isVerifying = type === "verifying";
   const isSuccess = type === "success";
+  const hasRemainingBalance = Number(booking?.amountDue || 0) > 0;
   const Icon = isVerifying ? Loader2 : isSuccess ? CheckCircle2 : AlertCircle;
   const iconColor = isSuccess ? "#228b22" : type === "failed" ? "#c0392b" : "#b8943a";
 
@@ -161,10 +162,10 @@ function ResultPage({
             <Icon size={30} color={iconColor} strokeWidth={1.4} className={isVerifying ? "animate-spin" : ""} />
           </div>
           <p style={{ color: "#b8943a", margin: "0 0 8px", fontSize: "0.64rem", letterSpacing: "0.2em", fontWeight: 600, textTransform: "uppercase" }}>
-            {isVerifying ? "/ Payment Received" : isSuccess ? "/ Booking Confirmed" : "/ Verification Support"}
+            {isVerifying ? "/ Payment Received" : isSuccess ? (hasRemainingBalance ? "/ Installment Received" : "/ Booking Confirmed") : "/ Verification Support"}
           </p>
           <h1 style={{ color: "#f2ede4", margin: 0, fontSize: "clamp(1.75rem,5vw,2.35rem)", fontWeight: 300, letterSpacing: "-0.03em" }}>
-            {isVerifying ? "Confirming your payment" : isSuccess ? "Your balance is settled" : "We need a closer look"}
+            {isVerifying ? "Confirming your payment" : isSuccess ? (hasRemainingBalance ? "Your installment is received" : "Your balance is settled") : "We need a closer look"}
           </h1>
         </div>
         <div style={{ padding: "clamp(28px,6vw,46px)", textAlign: "center" }}>
@@ -172,7 +173,9 @@ function ResultPage({
             {isVerifying
               ? "Razorpay has returned your payment. We are securely matching it with your booking now—please keep this page open."
               : isSuccess
-                ? `Your place on ${itemTitle} is confirmed. A detailed payment receipt will be sent to your email.`
+                ? hasRemainingBalance
+                  ? `Your installment for ${itemTitle} is recorded. Your remaining balance is ${formatCurrency(booking.amountDue)}.`
+                  : `Your place on ${itemTitle} is confirmed. A detailed payment receipt will be sent to your email.`
                 : "Your payment may already be captured, so please do not make another payment. Our team can verify it safely for you."}
           </p>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "9px 14px", borderRadius: 999, background: "#f7f3eb", color: "#781216", fontSize: "0.72rem", fontWeight: 600, letterSpacing: "0.06em", marginBottom: 28 }}>
@@ -267,6 +270,10 @@ export default function PayBalancePage() {
   const totalAmount = Number(booking?.totalAmount || 0);
   const amountPaid = Number(booking?.amountPaid || 0);
   const amountDue = Number(booking?.amountDue || 0);
+  const requestedLinkAmount = Number(new URLSearchParams(window.location.search).get("amount"));
+  const requestedBalanceAmount = Number.isFinite(requestedLinkAmount) && requestedLinkAmount > 0 && requestedLinkAmount <= amountDue
+    ? Math.round(requestedLinkAmount * 100) / 100
+    : amountDue;
   const bookingSubtotal = totalAmount / 1.05;
   const bookingGst = totalAmount - bookingSubtotal;
   const paymentProgress = totalAmount > 0 ? Math.min(100, Math.max(0, (amountPaid / totalAmount) * 100)) : 0;
@@ -282,7 +289,7 @@ export default function PayBalancePage() {
   const isPaid = booking?.status === "CONFIRMED" || booking?.paymentStatus === "PAID";
   const isRefunded = booking?.paymentStatus === "REFUNDED" || booking?.paymentStatus === "PARTIALLY_REFUNDED";
   const isCancelled = booking?.status === "CANCELLED";
-  const displayAmount = isPaid || isCancelled || isRefunded ? amountPaid : (isInitialPayment ? initialPaymentAmount : amountDue);
+  const displayAmount = isPaid || isCancelled || isRefunded ? amountPaid : (isInitialPayment ? initialPaymentAmount : requestedBalanceAmount);
   const statusLabel = hasPendingUtr
     ? "UTR Verification Pending"
     : isEligible
@@ -362,7 +369,7 @@ export default function PayBalancePage() {
       const endpoint = isInitial ? "/payments/initiate" : "/payments/balance/initiate";
       const payload = isInitial 
         ? { bookingId: booking.id, type: booking.initialPaymentType || "FULL" }
-        : { bookingId: booking.id };
+        : { bookingId: booking.id, amount: requestedBalanceAmount };
 
       const initiateResponse = await apiClient.post(endpoint, payload);
       const { razorpayOrderId, razorpayKeyId, amount, currency } = initiateResponse.data;

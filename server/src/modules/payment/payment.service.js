@@ -7,7 +7,7 @@ import { AppError, NotFoundError, ForbiddenError, ValidationError } from "../../
 import env from "../../core/env/env.js";
 import crypto from "crypto";
 import { getBookingJourney } from "../booking/booking-journey.js";
-import { amountDueAfterPayment } from "../../utils/gst.js";
+import { addGst, amountDueAfterPayment } from "../../utils/gst.js";
 import {
   cancelBookingOperations,
   releaseBookingSlotCapacity,
@@ -37,8 +37,8 @@ const assertExpectedBookingPayment = (booking, type, amount) => {
   }
 
   if (booking.status === "RESERVED" && booking.paymentStatus === "PARTIALLY_PAID") {
-    if (type !== "BALANCE" || !moneyEquals(amount, Number(booking.amountDue))) {
-      throw new ValidationError("Balance payment must match the full outstanding balance.");
+    if (type !== "BALANCE" || Number(amount) <= 0 || Number(amount) > Number(booking.amountDue)) {
+      throw new ValidationError("Balance payment must be greater than zero and cannot exceed the outstanding balance.");
     }
     return;
   }
@@ -268,12 +268,14 @@ const _processSuccessfulPayment = async (intent, rzpPaymentId, rzpSignature, rzp
       };
       bookingWhere = { id: booking.id, status: "PENDING", paymentStatus: { in: ["PENDING", "FAILED"] } };
     } else if (intent.type === "BALANCE") {
+      const newAmountPaid = Number(booking.amountPaid) + Number(intent.amount);
+      const newAmountDue = amountDueAfterPayment(booking.totalAmount, newAmountPaid);
       bookingUpdate = {
-        status: "CONFIRMED",
-        paymentStatus: "PAID",
+        status: newAmountDue === 0 ? "CONFIRMED" : "RESERVED",
+        paymentStatus: newAmountDue === 0 ? "PAID" : "PARTIALLY_PAID",
         amountPaid: { increment: Number(intent.amount) },
-        amountDue: 0,
-        confirmedAt: new Date(),
+        amountDue: newAmountDue,
+        ...(newAmountDue === 0 && { confirmedAt: new Date() }),
       };
       bookingWhere = { id: booking.id, status: "RESERVED", paymentStatus: "PARTIALLY_PAID" };
     }
@@ -289,7 +291,10 @@ const _processSuccessfulPayment = async (intent, rzpPaymentId, rzpSignature, rzp
     }
 
     // 5. Update Add-ons status
-    if (intent.type === "FULL" || intent.type === "BALANCE") {
+    const completesBooking = intent.type === "FULL" || (
+      intent.type === "BALANCE" && Number(bookingUpdate.amountDue) === 0
+    );
+    if (completesBooking) {
       await tx.bookingAddOn.updateMany({
         where: { bookingId: booking.id, status: "PENDING" },
         data: { status: "PAID", purchasedAt: new Date() },
@@ -403,7 +408,7 @@ export const initiatePayment = async (userId, bookingId, type) => {
  * Initiate a BALANCE payment for a RESERVED / PARTIALLY_PAID booking.
  * Expires any stale CREATED intents before creating a new one.
  */
-export const initiateBalancePayment = async (userId, bookingId, isAdmin = false) => {
+export const initiateBalancePayment = async (userId, bookingId, isAdmin = false, requestedAmount = null) => {
   const booking = await bookingRepo.getBookingById(bookingId);
   assertBookingOwner(booking, userId, isAdmin);
 
@@ -411,8 +416,10 @@ export const initiateBalancePayment = async (userId, bookingId, isAdmin = false)
     throw new ValidationError("Balance payment can only be initiated for RESERVED / PARTIALLY_PAID bookings.");
   }
 
-  const amount = booking.amountDue;
-  if (Number(amount) <= 0) {
+  const amount = requestedAmount === null || requestedAmount === undefined
+    ? Number(booking.amountDue)
+    : toDecimal2(requestedAmount);
+  if (Number(amount) <= 0 || Number(amount) > Number(booking.amountDue)) {
     throw new ValidationError("No outstanding balance for this booking.");
   }
 
@@ -1078,11 +1085,14 @@ export const manualAdjustment = async (bookingId, amount, notes, adminId) => {
     throw new ValidationError("Manual payments can only be recorded for pending or reserved bookings.");
   }
 
-  const adjustAmount = toDecimal2(Number(amount));
-  if (adjustAmount <= 0) throw new ValidationError("Adjustment amount must be positive.");
+  const enteredAmount = toDecimal2(Number(amount));
+  if (enteredAmount <= 0) throw new ValidationError("Adjustment amount must be positive.");
+  // Manual collections are entered before GST; the transaction itself always
+  // records the 5% GST-inclusive amount.
+  const adjustAmount = addGst(enteredAmount);
   const remaining = toDecimal2(Number(booking.amountDue));
   if (adjustAmount > remaining) {
-    throw new ValidationError(`Adjustment amount exceeds the outstanding balance of Rs.${remaining}.`);
+    throw new ValidationError(`Payment including 5% GST exceeds the outstanding balance of Rs.${remaining}.`);
   }
 
   const idempotencyKey = `manual-${bookingId}-${Date.now()}-${adminId}`;
@@ -1318,6 +1328,7 @@ export const verifyUpiPayment = async (adminId, paymentId, action, reason) => {
     const bookingWhere = isInitialPayment
       ? { id: booking.id, status: "PENDING", paymentStatus: { in: ["PENDING", "FAILED"] } }
       : { id: booking.id, status: "RESERVED", paymentStatus: "PARTIALLY_PAID" };
+    const balanceDueAfterPayment = amountDueAfterPayment(booking.totalAmount, Number(booking.amountPaid) + amount);
     const bookingUpdate = payment.type === "TOKEN"
       ? {
           status: "RESERVED",
@@ -1326,7 +1337,15 @@ export const verifyUpiPayment = async (adminId, paymentId, action, reason) => {
           amountDue: amountDueAfterPayment(booking.totalAmount, Number(booking.amountPaid) + amount),
           reservedAt: new Date(),
         }
-      : { status: "CONFIRMED", paymentStatus: "PAID", amountPaid: { increment: amount }, amountDue: 0, confirmedAt: new Date() };
+      : payment.type === "BALANCE"
+        ? {
+            status: balanceDueAfterPayment === 0 ? "CONFIRMED" : "RESERVED",
+            paymentStatus: balanceDueAfterPayment === 0 ? "PAID" : "PARTIALLY_PAID",
+            amountPaid: { increment: amount },
+            amountDue: balanceDueAfterPayment,
+            ...(balanceDueAfterPayment === 0 && { confirmedAt: new Date() }),
+          }
+        : { status: "CONFIRMED", paymentStatus: "PAID", amountPaid: { increment: amount }, amountDue: 0, confirmedAt: new Date() };
     const movedBooking = await tx.booking.updateMany({ where: bookingWhere, data: bookingUpdate });
     if (!movedBooking.count) throw new ValidationError("This booking is no longer eligible for this payment.");
 
@@ -1337,7 +1356,7 @@ export const verifyUpiPayment = async (adminId, paymentId, action, reason) => {
     });
     const updatedPayment = await tx.payment.findUnique({ where: { id: paymentId } });
 
-    if (payment.type === "FULL" || payment.type === "BALANCE") {
+    if (payment.type === "FULL" || (payment.type === "BALANCE" && balanceDueAfterPayment === 0)) {
       await tx.bookingAddOn.updateMany({
         where: { bookingId: booking.id, status: "PENDING" },
         data: { status: "PAID", purchasedAt: new Date() },
