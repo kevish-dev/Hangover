@@ -379,8 +379,72 @@ export const normalizeHighlights = (arr) => {
   return arr.map(normalizeHighlightItem).filter(Boolean);
 };
 
+export const extractStayLocationImagesFromDays = (itineraryDays) => {
+  if (!Array.isArray(itineraryDays)) return [];
+  const images = [];
+  const addedUrls = new Set();
+
+  for (const day of itineraryDays) {
+    const sl = day?.stayLocation;
+    if (sl) {
+      const name = sl.name || "Stay Location";
+      if (sl.imageUrl && typeof sl.imageUrl === "string" && !addedUrls.has(sl.imageUrl)) {
+        addedUrls.add(sl.imageUrl);
+        images.push({ text: name, imageUrl: sl.imageUrl });
+      }
+      let slImages = sl.images;
+      if (typeof slImages === "string") {
+        try { slImages = JSON.parse(slImages); } catch { slImages = []; }
+      }
+      if (Array.isArray(slImages)) {
+        for (const img of slImages) {
+          const url = typeof img === "string" ? img : img?.url || img?.imageUrl;
+          const caption = typeof img === "object" ? img?.caption || name : name;
+          if (url && typeof url === "string" && !addedUrls.has(url)) {
+            addedUrls.add(url);
+            images.push({ text: caption, imageUrl: url });
+          }
+        }
+      }
+    }
+
+    const prop = day?.property;
+    if (prop) {
+      const name = prop.name || "Property";
+      if (prop.imageUrl && typeof prop.imageUrl === "string" && !addedUrls.has(prop.imageUrl)) {
+        addedUrls.add(prop.imageUrl);
+        images.push({ text: name, imageUrl: prop.imageUrl });
+      }
+      let propImages = prop.images;
+      if (typeof propImages === "string") {
+        try { propImages = JSON.parse(propImages); } catch { propImages = []; }
+      }
+      if (Array.isArray(propImages)) {
+        for (const img of propImages) {
+          const url = typeof img === "string" ? img : img?.url || img?.imageUrl;
+          const caption = typeof img === "object" ? img?.caption || name : name;
+          if (url && typeof url === "string" && !addedUrls.has(url)) {
+            addedUrls.add(url);
+            images.push({ text: caption, imageUrl: url });
+          }
+        }
+      }
+    }
+  }
+
+  return images;
+};
+
 const toPublicTrip = (trip) => {
   const firstSlot = trip.slots?.[0] || null;
+  const explicitStayImages = normalizeStayTransportImages(trip.websiteStayTransportImages);
+  const autoStayImages = extractStayLocationImagesFromDays(trip.itineraryDays);
+  const explicitUrls = new Set(explicitStayImages.map((item) => item.imageUrl));
+  const combinedStayImages = [
+    ...explicitStayImages,
+    ...autoStayImages.filter((item) => !explicitUrls.has(item.imageUrl)),
+  ];
+
   return {
     id: trip.id,
     slug: trip.id,
@@ -393,7 +457,7 @@ const toPublicTrip = (trip) => {
     highlights: normalizeHighlights(trip.websiteHighlights),
     inclusions: (trip.inclusions || []).map((item) => item.title),
     exclusions: trip.exclusions || [],
-    stayTransportImages: normalizeStayTransportImages(trip.websiteStayTransportImages),
+    stayTransportImages: combinedStayImages,
     capacity: firstSlot?.capacity || 0,
     filledSpots: firstSlot?.filledSpots || 0,
     startDate: firstSlot?.startDate || null,

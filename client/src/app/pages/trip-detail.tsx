@@ -22,6 +22,14 @@ import {
   Truck,
   HelpCircle,
   AlertCircle,
+  Share2,
+  Copy,
+  Check,
+  Mail,
+  Send,
+  Link2,
+  Sparkles,
+  Globe,
 } from "lucide-react";
 import {
   fetchTripBySlug,
@@ -633,7 +641,10 @@ function AccommodationSection({
                     }}
                   >
                     <img
-                      src={mediaImageUrl(p.imageUrl, { width: 960, height: 720 })}
+                      src={mediaImageUrl(p.imageUrl, {
+                        width: 960,
+                        height: 720,
+                      })}
                       alt={p.text}
                       loading="lazy"
                       decoding="async"
@@ -844,35 +855,45 @@ function ItineraryAccordion({
   const [openIndex, setOpenIndex] = useState<number | null>(0); // First item open by default
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "12px", fontFamily: "'Poppins', sans-serif" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "12px",
+        fontFamily: "'Poppins', sans-serif",
+      }}
+    >
       {days.map((d, index) => {
-        const rawDay = d.day || d.dayNumber || (index + 1);
-        const numericDay = String(rawDay).replace(/day/i, '').trim();
+        const rawDay = d.day || d.dayNumber || index + 1;
+        const numericDay = String(rawDay).replace(/day/i, "").trim();
         const titleText = d.title || "";
-        
+
         let acts: string[] = [];
         if (Array.isArray(d.todos) && d.todos.length > 0) {
           acts = d.todos;
         } else if (Array.isArray(d.activities)) {
           const first = d.activities[0];
-          if (typeof first === 'object' && first !== null && 'title' in first) {
+          if (typeof first === "object" && first !== null && "title" in first) {
             acts = (d.activities as { title: string }[]).map((a) => a.title);
           } else {
             acts = d.activities as string[];
           }
-        } else if (typeof d.activities === 'string') {
-          acts = d.activities.split('\n');
+        } else if (typeof d.activities === "string") {
+          acts = d.activities.split("\n");
         } else if (d.description) {
           acts = [d.description];
         }
 
-        acts = acts.map((activity) => activity.trim()).filter((activity) => activity.length > 0);
+        acts = acts
+          .map((activity) => activity.trim())
+          .filter((activity) => activity.length > 0);
         const description = d.description?.trim();
-        if (description && !acts.includes(description)) acts.unshift(description);
+        if (description && !acts.includes(description))
+          acts.unshift(description);
         const isOpen = openIndex === index;
 
         return (
-          <div 
+          <div
             className="trip-itinerary-card"
             key={index}
             style={{
@@ -881,41 +902,79 @@ function ItineraryAccordion({
               padding: "14px 18px",
               cursor: "pointer",
               boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-              transition: "box-shadow 0.2s ease"
+              transition: "box-shadow 0.2s ease",
             }}
             onClick={() => setOpenIndex(isOpen ? null : index)}
           >
-            <div className="trip-itinerary-header" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px" }}>
-              <div className="trip-itinerary-heading" style={{ display: "flex", gap: "16px", alignItems: "flex-start", minWidth: 0 }}>
+            <div
+              className="trip-itinerary-header"
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: "16px",
+              }}
+            >
+              <div
+                className="trip-itinerary-heading"
+                style={{
+                  display: "flex",
+                  gap: "16px",
+                  alignItems: "flex-start",
+                  minWidth: 0,
+                }}
+              >
                 {/* Number Badge */}
-                <div style={{
-                  width: "30px", height: "30px", borderRadius: "50%",
-                  background: isOpen ? "#781216" : "#f2e8e3",
-                  color: isOpen ? "#ffffff" : "#781216",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "0.8rem", fontWeight: 700, flexShrink: 0,
-                  transition: "all 0.2s ease"
-                }}>
+                <div
+                  style={{
+                    width: "30px",
+                    height: "30px",
+                    borderRadius: "50%",
+                    background: isOpen ? "#781216" : "#f2e8e3",
+                    color: isOpen ? "#ffffff" : "#781216",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "0.8rem",
+                    fontWeight: 700,
+                    flexShrink: 0,
+                    transition: "all 0.2s ease",
+                  }}
+                >
                   {numericDay}
                 </div>
                 {/* Text */}
                 <div style={{ paddingTop: "2px", minWidth: 0 }}>
-                  <div style={{
-                    fontSize: "0.55rem", fontWeight: 600, color: "rgba(30,26,20,0.4)",
-                    letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "4px"
-                  }}>
+                  <div
+                    style={{
+                      fontSize: "0.55rem",
+                      fontWeight: 600,
+                      color: "rgba(30,26,20,0.4)",
+                      letterSpacing: "0.15em",
+                      textTransform: "uppercase",
+                      marginBottom: "4px",
+                    }}
+                  >
                     DAY {numericDay}
                   </div>
-                  <div className="trip-itinerary-title" style={{
-                    fontSize: "0.95rem", fontWeight: 600, color: "#1e1a14",
-                    letterSpacing: "-0.01em"
-                  }}>
+                  <div
+                    className="trip-itinerary-title"
+                    style={{
+                      fontSize: "0.95rem",
+                      fontWeight: 600,
+                      color: "#1e1a14",
+                      letterSpacing: "-0.01em",
+                    }}
+                  >
                     {titleText || `Day ${numericDay} Itinerary`}
                   </div>
                 </div>
               </div>
               <div style={{ paddingTop: "8px", color: "rgba(30,26,20,0.3)" }}>
-                <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                <motion.div
+                  animate={{ rotate: isOpen ? 180 : 0 }}
+                  transition={{ duration: 0.2 }}
+                >
                   <ChevronDown size={16} />
                 </motion.div>
               </div>
@@ -930,22 +989,38 @@ function ItineraryAccordion({
                   transition={{ duration: 0.3 }}
                   style={{ overflow: "hidden" }}
                 >
-                  <div className="trip-itinerary-content" style={{
-                    paddingTop: "12px", paddingLeft: "46px",
-                    color: "rgba(30,26,20,0.65)", fontSize: "0.8rem", lineHeight: 1.5
-                  }}>
+                  <div
+                    className="trip-itinerary-content"
+                    style={{
+                      paddingTop: "12px",
+                      paddingLeft: "46px",
+                      color: "rgba(30,26,20,0.65)",
+                      fontSize: "0.8rem",
+                      lineHeight: 1.5,
+                    }}
+                  >
                     {acts.length > 0 ? (
-                      <ul style={{ listStyleType: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
+                      <ul
+                        style={{
+                          listStyleType: "none",
+                          padding: 0,
+                          margin: 0,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "8px",
+                        }}
+                      >
                         {acts.map((act, i) => {
-                          // Render the first item as a paragraph without a bullet if it seems like a long description, 
+                          // Render the first item as a paragraph without a bullet if it seems like a long description,
                           // or if we just want to follow the screenshot exactly (which has one paragraph, then bullets).
                           // To keep it simple and robust, let's check if the first item doesn't look like a bullet and is reasonably long.
-                          // But we can also just render it as a bullet if we aren't sure. 
+                          // But we can also just render it as a bullet if we aren't sure.
                           // Let's just make it a bullet for consistency, as per previous instructions.
                           // Or we can just render the first one without a bullet if it's the first item!
                           // Let's do that for the exact match with screenshot.
-                          const isDescription = i === 0 && act.length > 40 && acts.length > 1;
-                          
+                          const isDescription =
+                            i === 0 && act.length > 40 && acts.length > 1;
+
                           if (isDescription) {
                             return (
                               <li key={i} style={{ marginBottom: "6px" }}>
@@ -953,20 +1028,40 @@ function ItineraryAccordion({
                               </li>
                             );
                           }
-                          
+
                           return (
-                            <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
-                              <div style={{ 
-                                width: "5px", height: "5px", borderRadius: "50%", 
-                                background: "#C8A96E", marginTop: "6px", flexShrink: 0 
-                              }} />
+                            <li
+                              key={i}
+                              style={{
+                                display: "flex",
+                                alignItems: "flex-start",
+                                gap: "8px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: "5px",
+                                  height: "5px",
+                                  borderRadius: "50%",
+                                  background: "#C8A96E",
+                                  marginTop: "6px",
+                                  flexShrink: 0,
+                                }}
+                              />
                               <span>{act.trim()}</span>
                             </li>
                           );
                         })}
                       </ul>
                     ) : (
-                      <span style={{ fontStyle: "italic", color: "rgba(30,26,20,0.4)" }}>No activities listed</span>
+                      <span
+                        style={{
+                          fontStyle: "italic",
+                          color: "rgba(30,26,20,0.4)",
+                        }}
+                      >
+                        No activities listed
+                      </span>
                     )}
                   </div>
                 </motion.div>
@@ -1086,7 +1181,9 @@ export default function TripDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasBooked, setHasBooked] = useState(false);
-  const [reservedBookingId, setReservedBookingId] = useState<string | null>(null);
+  const [reservedBookingId, setReservedBookingId] = useState<string | null>(
+    null,
+  );
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
 
   const loadTrip = useCallback(async () => {
@@ -1094,10 +1191,15 @@ export default function TripDetail() {
     setLoading(true);
     setError(null);
     try {
-      const data = await (isFestival ? fetchFestivalBySlug(slug) : fetchTripBySlug(slug, shareToken));
+      const data = await (isFestival
+        ? fetchFestivalBySlug(slug)
+        : fetchTripBySlug(slug, shareToken));
       setTrip(data);
     } catch (error) {
-      const message = getErrorMessage(error, isFestival ? "Festival not found" : "Trip not found");
+      const message = getErrorMessage(
+        error,
+        isFestival ? "Festival not found" : "Trip not found",
+      );
       setError(message);
       toast.error(message, { id: `trip-detail-load-${slug}` });
     } finally {
@@ -1135,20 +1237,27 @@ export default function TripDetail() {
               return booking.crmTripId === trip.id;
             }
             const itemId = isFestival
-              ? booking.festivalId || booking.festival?.id || booking.slot?.festivalId
+              ? booking.festivalId ||
+                booking.festival?.id ||
+                booking.slot?.festivalId
               : booking.tripId || booking.trip?.id || booking.slot?.tripId;
             return itemId === trip.id;
           };
           const confirmed = bookings.find(
-            (b: any) => belongsToCurrentItem(b) && b.status === "CONFIRMED"
+            (b: any) => belongsToCurrentItem(b) && b.status === "CONFIRMED",
           );
           const reserved = bookings.find(
-            (b: any) => belongsToCurrentItem(b) && b.status === "RESERVED"
+            (b: any) => belongsToCurrentItem(b) && b.status === "RESERVED",
           );
           setHasBooked(!!confirmed);
           setReservedBookingId(reserved?.id || null);
         })
-        .catch((error) => toast.error(getErrorMessage(error, "Your booking status could not be checked"), { id: `trip-booking-status-${trip.id}` }));
+        .catch((error) =>
+          toast.error(
+            getErrorMessage(error, "Your booking status could not be checked"),
+            { id: `trip-booking-status-${trip.id}` },
+          ),
+        );
     }
   }, [user, trip, isFestival]);
 
@@ -1194,12 +1303,25 @@ export default function TripDetail() {
               background: "none",
               border: "none",
               cursor: "pointer",
-              padding: 0
+              padding: 0,
             }}
           >
             Try again
           </button>
-          <button type="button" onClick={() => navigate(-1)} style={{ marginLeft: "18px", color: "rgba(30,26,20,0.6)", fontSize: "0.82rem", background: "none", border: "none", cursor: "pointer" }}>← Go back</button>
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            style={{
+              marginLeft: "18px",
+              color: "rgba(30,26,20,0.6)",
+              fontSize: "0.82rem",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            ← Go back
+          </button>
         </div>
       </div>
     );
@@ -1213,20 +1335,21 @@ export default function TripDetail() {
   const priceStr = formatPrice(tripPrice);
   const durationStr = formatDuration(trip.duration);
   const slots = Array.isArray(trip.slots) ? trip.slots : [];
-  const spots = slots.length > 0
-    ? slots.reduce(
-        (total: number, slot: any) =>
-          total + Math.max(0, slot.capacity - (slot.filledSpots || 0)),
-        0,
-      )
-    : spotsLeft(trip.capacity, trip.filledSpots);
+  const spots =
+    slots.length > 0
+      ? slots.reduce(
+          (total: number, slot: any) =>
+            total + Math.max(0, slot.capacity - (slot.filledSpots || 0)),
+          0,
+        )
+      : spotsLeft(trip.capacity, trip.filledSpots);
   const tags = trip.tripTags?.map((t: any) => t.tag) || [];
   const stayItems = (
     Array.isArray(trip.stayTransportImages) ? trip.stayTransportImages : []
   ) as { text: string; imageUrl: string }[];
 
   // Flatten itinerary days
-  const itineraryDays = Array.isArray(trip.itinerary) 
+  const itineraryDays = Array.isArray(trip.itinerary)
     ? [...trip.itinerary]
         .map((d: any) => ({ ...d, dayNumber: d.dayNumber || d.day }))
         .sort((a: any, b: any) => a.dayNumber - b.dayNumber)
@@ -1351,7 +1474,15 @@ function HighlightAccordionPanel({
           padding: "20px 16px",
         }}
       >
-        <p style={{ color: "#fff", fontSize: "0.82rem", fontWeight: 300, lineHeight: 1.5, margin: 0 }}>
+        <p
+          style={{
+            color: "#fff",
+            fontSize: "0.82rem",
+            fontWeight: 300,
+            lineHeight: 1.5,
+            margin: 0,
+          }}
+        >
           {highlight.text}
         </p>
       </motion.div>
@@ -1399,7 +1530,8 @@ function HighlightMobilePanel({
         style={{
           position: "absolute",
           inset: 0,
-          background: "linear-gradient(to top, rgba(11,11,11,0.85) 0%, rgba(11,11,11,0.4) 100%)",
+          background:
+            "linear-gradient(to top, rgba(11,11,11,0.85) 0%, rgba(11,11,11,0.4) 100%)",
         }}
       />
       {!isActive && (
@@ -1440,7 +1572,15 @@ function HighlightMobilePanel({
             padding: "20px 16px",
           }}
         >
-          <p style={{ color: "#fff", fontSize: "0.85rem", fontWeight: 300, lineHeight: 1.5, margin: 0 }}>
+          <p
+            style={{
+              color: "#fff",
+              fontSize: "0.85rem",
+              fontWeight: 300,
+              lineHeight: 1.5,
+              margin: 0,
+            }}
+          >
             {highlight.text}
           </p>
         </div>
@@ -1499,6 +1639,447 @@ function TripHighlightsAccordion({ highlights }: { highlights: any[] }) {
   );
 }
 
+function ShareModal({
+  open,
+  onClose,
+  title,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+
+  if (!open) return null;
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      toast.success("Trip link copied to clipboard!");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Failed to copy link");
+    }
+  };
+
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title,
+          text: `Check out ${title} on Hangover Trails!`,
+          url: shareUrl,
+        });
+      } catch (err: any) {
+        if (err.name !== "AbortError") {
+          toast.error("Could not share via device");
+        }
+      }
+    }
+  };
+
+  const formattedTitle = title
+    ? title.charAt(0).toUpperCase() + title.slice(1)
+    : "Itinerary";
+  const encodedTitle = encodeURIComponent(
+    `Check out ${formattedTitle} on Hangover Trails!`,
+  );
+  const encodedUrl = encodeURIComponent(shareUrl);
+
+  const whatsappUrl = `https://api.whatsapp.com/send?text=${encodedTitle}%20${encodedUrl}`;
+  const mailUrl = `mailto:?subject=${encodeURIComponent(`Explore ${formattedTitle}`)}&body=${encodedTitle}%0A%0A${encodedUrl}`;
+  const twitterUrl = `https://twitter.com/intent/tweet?text=${encodedTitle}&url=${encodedUrl}`;
+  const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 600,
+          background: "rgba(10, 8, 6, 0.75)",
+          backdropFilter: "blur(10px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "16px",
+          boxSizing: "border-box",
+        }}
+      >
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0, y: 12 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.95, opacity: 0, y: 12 }}
+          transition={{ type: "spring", damping: 26, stiffness: 320 }}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: "#ffffff",
+            borderRadius: "20px",
+            width: "100%",
+            maxWidth: "420px",
+            maxHeight: "90vh",
+            overflowY: "auto",
+            padding: "24px",
+            boxShadow: "0 25px 50px -12px rgba(0,0,0,0.3)",
+            border: "1px solid rgba(0,0,0,0.08)",
+            boxSizing: "border-box",
+            fontFamily: "'Poppins', sans-serif",
+            position: "relative",
+          }}
+        >
+          {/* Close button */}
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              position: "absolute",
+              top: "18px",
+              right: "18px",
+              background: "rgba(0,0,0,0.05)",
+              border: "none",
+              borderRadius: "50%",
+              width: "32px",
+              height: "32px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              transition: "background 0.2s ease",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = "rgba(0,0,0,0.1)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = "rgba(0,0,0,0.05)")
+            }
+          >
+            <X size={16} color="#1e1a14" />
+          </button>
+
+          {/* Header */}
+          <div style={{ marginBottom: "20px", paddingRight: "36px" }}>
+            <h3
+              style={{
+                fontSize: "1.3rem",
+                fontWeight: 600,
+                color: "#1e1a14",
+                margin: "6px 0 2px",
+                letterSpacing: "-0.01em",
+                lineHeight: 1.25,
+                wordBreak: "break-word",
+              }}
+            >
+              {formattedTitle}
+            </h3>
+            <p
+              style={{
+                fontSize: "0.78rem",
+                color: "rgba(30, 26, 20, 0.58)",
+                margin: 0,
+                fontWeight: 300,
+              }}
+            >
+              Invite friends or family to explore this trip
+            </p>
+          </div>
+
+          {/* Link Copy Field */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              background: "#f5f3ef",
+              border: "1px solid rgba(0, 0, 0, 0.12)",
+              borderRadius: "12px",
+              padding: "4px 4px 4px 12px",
+              width: "100%",
+              boxSizing: "border-box",
+              marginBottom: "18px",
+            }}
+          >
+            <Link2
+              size={16}
+              style={{
+                color: "#781216",
+                flexShrink: 0,
+                marginRight: "8px",
+                opacity: 0.8,
+              }}
+            />
+            <span
+              style={{
+                flex: 1,
+                minWidth: 0,
+                fontSize: "0.78rem",
+                color: "#333333",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                fontFamily: "'Poppins', sans-serif",
+              }}
+            >
+              {shareUrl}
+            </span>
+            <button
+              type="button"
+              onClick={handleCopy}
+              style={{
+                background: copied ? "#15803d" : "#781216",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "8px",
+                padding: "8px 14px",
+                fontSize: "0.78rem",
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: "5px",
+                cursor: "pointer",
+                flexShrink: 0,
+                marginLeft: "8px",
+                transition: "all 0.2s ease",
+              }}
+            >
+              {copied ? <Check size={14} /> : <Copy size={14} />}
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+
+          {/* Official Brand Share Buttons */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: "10px",
+              width: "100%",
+              boxSizing: "border-box",
+              marginBottom: "16px",
+            }}
+          >
+            {/* WhatsApp */}
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                padding: "12px 14px",
+                borderRadius: "12px",
+                background: "#25D366",
+                color: "#ffffff",
+                textDecoration: "none",
+                fontSize: "0.82rem",
+                fontWeight: 600,
+                minWidth: 0,
+                boxSizing: "border-box",
+                transition: "opacity 0.2s ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+            >
+              <svg
+                style={{
+                  width: 18,
+                  height: 18,
+                  flexShrink: 0,
+                  fill: "currentColor",
+                }}
+                viewBox="0 0 24 24"
+              >
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.461c-1.852 0-3.666-.499-5.263-1.442l-.377-.224-3.91 1.025 1.043-3.813-.246-.391A10.87 10.87 0 012.04 11.96C2.04 6.45 6.5 1.99 12.01 1.99c2.67 0 5.178 1.041 7.062 2.927 1.884 1.886 2.923 4.394 2.922 7.065 0 5.51-4.46 9.97-9.943 9.97M12.01 0C5.402 0 .034 5.367.034 11.971c0 2.106.548 4.16 1.591 5.973L0 24l6.236-1.635a11.9 11.9 0 005.77 1.487h.005c6.606 0 11.975-5.368 11.975-11.972C23.986 3.633 18.618 0 12.01 0z" />
+              </svg>
+              <span
+                style={{
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                WhatsApp
+              </span>
+            </a>
+
+            {/* Email */}
+            <a
+              href={mailUrl}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                padding: "12px 14px",
+                borderRadius: "12px",
+                background: "#EA4335",
+                color: "#ffffff",
+                textDecoration: "none",
+                fontSize: "0.82rem",
+                fontWeight: 600,
+                minWidth: 0,
+                boxSizing: "border-box",
+                transition: "opacity 0.2s ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+            >
+              <svg
+                style={{
+                  width: 18,
+                  height: 18,
+                  flexShrink: 0,
+                  fill: "currentColor",
+                }}
+                viewBox="0 0 24 24"
+              >
+                <path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L12 9.545l8.073-6.052C21.69 2.28 24 3.434 24 5.457z" />
+              </svg>
+              <span
+                style={{
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Email
+              </span>
+            </a>
+
+            {/* X / Twitter */}
+            <a
+              href={twitterUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                padding: "12px 14px",
+                borderRadius: "12px",
+                background: "#000000",
+                color: "#ffffff",
+                textDecoration: "none",
+                fontSize: "0.82rem",
+                fontWeight: 600,
+                minWidth: 0,
+                boxSizing: "border-box",
+                transition: "opacity 0.2s ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+            >
+              <svg
+                style={{
+                  width: 16,
+                  height: 16,
+                  flexShrink: 0,
+                  fill: "currentColor",
+                }}
+                viewBox="0 0 24 24"
+              >
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+              </svg>
+              <span
+                style={{
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                X / Twitter
+              </span>
+            </a>
+
+            {/* Facebook */}
+            <a
+              href={facebookUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                padding: "12px 14px",
+                borderRadius: "12px",
+                background: "#1877F2",
+                color: "#ffffff",
+                textDecoration: "none",
+                fontSize: "0.82rem",
+                fontWeight: 600,
+                minWidth: 0,
+                boxSizing: "border-box",
+                transition: "opacity 0.2s ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+            >
+              <svg
+                style={{
+                  width: 18,
+                  height: 18,
+                  flexShrink: 0,
+                  fill: "currentColor",
+                }}
+                viewBox="0 0 24 24"
+              >
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+              </svg>
+              <span
+                style={{
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Facebook
+              </span>
+            </a>
+          </div>
+
+          {/* Native / System Options */}
+          {typeof navigator !== "undefined" && "share" in navigator && (
+            <button
+              type="button"
+              onClick={handleNativeShare}
+              style={{
+                width: "100%",
+                background: "#f5f0e6",
+                border: "1px solid rgba(120, 18, 22, 0.2)",
+                borderRadius: "12px",
+                padding: "11px 16px",
+                fontSize: "0.82rem",
+                fontWeight: 600,
+                color: "#781216",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                cursor: "pointer",
+                boxSizing: "border-box",
+                transition: "background 0.2s ease",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "#ede5d5")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "#f5f0e6")
+              }
+            >
+              <Share2 size={16} color="#781216" /> More Sharing Options...
+            </button>
+          )}
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 function TripDetailContent({
   trip,
   heroImage,
@@ -1542,10 +2123,13 @@ function TripDetailContent({
   const [heroIndex, setHeroIndex] = useState(0);
   const navigate = useNavigate();
   const [lightbox, setLightbox] = useState<number | null>(null);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   const safeAllImages =
     allImages.length > 0 ? allImages : [heroImage].filter(Boolean);
-  const festivalVideoUrl = isFestival ? (trip as any).videoUrl as string | null | undefined : null;
+  const festivalVideoUrl = isFestival
+    ? ((trip as any).videoUrl as string | null | undefined)
+    : null;
   const showHeroVideo = Boolean(festivalVideoUrl);
   const bookingParams = new URLSearchParams();
   if (isFestival) bookingParams.set("type", "festival");
@@ -1681,7 +2265,11 @@ function TripDetailContent({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.96 }}
                 transition={{ duration: 0.22 }}
-                src={mediaImageUrl(safeAllImages[lightbox], { width: 2560, fit: "limit", quality: "auto:good" })}
+                src={mediaImageUrl(safeAllImages[lightbox], {
+                  width: 2560,
+                  fit: "limit",
+                  quality: "auto:good",
+                })}
                 alt={trip.title}
                 onClick={(e) => e.stopPropagation()}
                 style={{
@@ -1804,7 +2392,10 @@ function TripDetailContent({
           <AnimatePresence mode="sync" initial={false}>
             <motion.img
               key={heroIndex}
-              src={mediaImageUrl(safeAllImages[heroIndex], { width: 1920, fit: "fit" })}
+              src={mediaImageUrl(safeAllImages[heroIndex], {
+                width: 1920,
+                fit: "fit",
+              })}
               alt={trip.title}
               fetchPriority="high"
               decoding="async"
@@ -1832,17 +2423,39 @@ function TripDetailContent({
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              background: "linear-gradient(135deg, #1e1a14 0%, #2c1a1d 50%, #1e1a14 100%)",
+              background:
+                "linear-gradient(135deg, #1e1a14 0%, #2c1a1d 50%, #1e1a14 100%)",
               color: "#fff",
               textAlign: "center",
               padding: "24px",
             }}
           >
-            <MapPin size={48} strokeWidth={1.5} style={{ marginBottom: "16px", color: "#781216", opacity: 0.9 }} />
-            <h2 style={{ fontSize: "1.75rem", fontWeight: 600, letterSpacing: "0.02em", color: "#f5f0e6", margin: "0 auto", maxWidth: "600px" }}>
+            <MapPin
+              size={48}
+              strokeWidth={1.5}
+              style={{ marginBottom: "16px", color: "#781216", opacity: 0.9 }}
+            />
+            <h2
+              style={{
+                fontSize: "1.75rem",
+                fontWeight: 600,
+                letterSpacing: "0.02em",
+                color: "#f5f0e6",
+                margin: "0 auto",
+                maxWidth: "600px",
+              }}
+            >
               {trip.title || "Your Itinerary"}
             </h2>
-            <p style={{ fontSize: "0.88rem", color: "rgba(245,240,230,0.6)", marginTop: "8px", fontWeight: 400, margin: 0 }}>
+            <p
+              style={{
+                fontSize: "0.88rem",
+                color: "rgba(245,240,230,0.6)",
+                marginTop: "8px",
+                fontWeight: 400,
+                margin: 0,
+              }}
+            >
               Itinerary details & travel plan
             </p>
           </div>
@@ -1877,10 +2490,38 @@ function TripDetailContent({
             background: "none",
             border: "none",
             cursor: "pointer",
-            padding: 0
+            padding: 0,
           }}
         >
           <ArrowLeft size={14} /> Go Back
+        </button>
+
+        {/* Share button */}
+        <button
+          type="button"
+          onClick={() => setShareModalOpen(true)}
+          style={{
+            position: "absolute",
+            top: "90px",
+            right: "clamp(1.5rem,5vw,6rem)",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            color: "#f2ede4",
+            fontSize: "0.75rem",
+            fontWeight: 500,
+            letterSpacing: "0.05em",
+            fontFamily: "'Poppins', sans-serif",
+            background: "rgba(30,26,20,0.6)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid rgba(255,255,255,0.25)",
+            borderRadius: "20px",
+            cursor: "pointer",
+            padding: "6px 14px",
+            zIndex: 10,
+          }}
+        >
+          <Share2 size={14} /> Share
         </button>
 
         {/* Prev / Next arrows */}
@@ -2075,17 +2716,21 @@ function TripDetailContent({
             }}
           >
             {/* Quick stats row */}
-            <div className="trip-quick-stats" style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
+            <div
+              className="trip-quick-stats"
+              style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}
+            >
               {[
                 { icon: Clock, label: "Duration", value: durationStr },
                 {
                   icon: Calendar,
                   label: "Dates",
-                  value: trip.slots && trip.slots.length > 0
-                    ? trip.slots.length === 1 
-                      ? `${new Date(trip.slots[0].startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` 
-                      : `${trip.slots.length} Slots Available`
-                    : null,
+                  value:
+                    trip.slots && trip.slots.length > 0
+                      ? trip.slots.length === 1
+                        ? `${new Date(trip.slots[0].startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                        : `${trip.slots.length} Slots Available`
+                      : null,
                 },
                 {
                   icon: Calendar,
@@ -2168,31 +2813,50 @@ function TripDetailContent({
             <div id="highlights">
               <SectionTitle>Trip Highlights</SectionTitle>
               {(() => {
-                let h: any[] = Array.isArray(trip.highlights) ? trip.highlights : [];
-                if (typeof trip.highlights === 'string') {
-                  try { h = JSON.parse(trip.highlights); } catch(e) { h = []; }
+                let h: any[] = Array.isArray(trip.highlights)
+                  ? trip.highlights
+                  : [];
+                if (typeof trip.highlights === "string") {
+                  try {
+                    h = JSON.parse(trip.highlights);
+                  } catch (e) {
+                    h = [];
+                  }
                 }
                 // Flatten if doubly-nested (e.g. API returned [[{text,imageUrl}]])
                 if (h.length > 0 && Array.isArray(h[0])) {
                   h = h.flat();
                 }
                 // Normalize each item to { text: string; imageUrl: string }
-                const normalizedHighlights: { text: string; imageUrl: string }[] = h
+                const normalizedHighlights: {
+                  text: string;
+                  imageUrl: string;
+                }[] = h
                   .map((item: any) => {
                     if (!item) return null;
-                    if (typeof item === 'string') return { text: item, imageUrl: '' };
-                    if (typeof item !== 'object') return null;
+                    if (typeof item === "string")
+                      return { text: item, imageUrl: "" };
+                    if (typeof item !== "object") return null;
 
-                    let textVal = item.text ?? item.title ?? item.label ?? item.name ?? '';
-                    let imageVal = item.imageUrl ?? item.image ?? item.url ?? '';
+                    let textVal =
+                      item.text ?? item.title ?? item.label ?? item.name ?? "";
+                    let imageVal =
+                      item.imageUrl ?? item.image ?? item.url ?? "";
 
-                    while (textVal && typeof textVal === 'object') {
-                      if (textVal.imageUrl && !imageVal) imageVal = textVal.imageUrl;
-                      textVal = textVal.text ?? textVal.title ?? textVal.label ?? textVal.name ?? '';
+                    while (textVal && typeof textVal === "object") {
+                      if (textVal.imageUrl && !imageVal)
+                        imageVal = textVal.imageUrl;
+                      textVal =
+                        textVal.text ??
+                        textVal.title ??
+                        textVal.label ??
+                        textVal.name ??
+                        "";
                     }
 
-                    const textStr = typeof textVal === 'string' ? textVal : '';
-                    const imageStr = typeof imageVal === 'string' ? imageVal : '';
+                    const textStr = typeof textVal === "string" ? textVal : "";
+                    const imageStr =
+                      typeof imageVal === "string" ? imageVal : "";
                     if (!textStr && !imageStr) return null;
                     return { text: textStr, imageUrl: imageStr };
                   })
@@ -2233,8 +2897,6 @@ function TripDetailContent({
               )}
             </div>
 
-
-
             {/* Accommodation & Transport */}
             <AccommodationSection items={stayItems} />
 
@@ -2271,7 +2933,10 @@ function TripDetailContent({
                   >
                     {trip.inclusions && trip.inclusions.length > 0 ? (
                       trip.inclusions.map((item: any, idx: number) => {
-                        const label = typeof item === "string" ? item : (item?.text || String(item));
+                        const label =
+                          typeof item === "string"
+                            ? item
+                            : item?.text || String(item);
                         return (
                           <div
                             key={idx}
@@ -2336,7 +3001,10 @@ function TripDetailContent({
                   >
                     {trip.exclusions && trip.exclusions.length > 0 ? (
                       trip.exclusions.map((item: any, idx: number) => {
-                        const label = typeof item === "string" ? item : (item?.text || String(item));
+                        const label =
+                          typeof item === "string"
+                            ? item
+                            : item?.text || String(item);
                         return (
                           <div
                             key={idx}
@@ -2442,8 +3110,6 @@ function TripDetailContent({
                   </p>
                 </div>
 
-
-
                 {/* Key info */}
                 <div
                   style={{
@@ -2492,7 +3158,6 @@ function TripDetailContent({
                 </div>
 
                 {/* Slot Selection */}
-
 
                 {/* Book button */}
                 {hasBooked ? (
@@ -2615,6 +3280,34 @@ function TripDetailContent({
                   Solve your queries on WhatsApp
                 </a>
 
+                {/* Share button */}
+                <button
+                  type="button"
+                  onClick={() => setShareModalOpen(true)}
+                  style={{
+                    width: "100%",
+                    background: "rgba(30,26,20,0.04)",
+                    color: "#1e1a14",
+                    border: "1px solid rgba(30,26,20,0.15)",
+                    borderRadius: "8px",
+                    padding: "11px",
+                    fontFamily: "'Poppins', sans-serif",
+                    fontSize: "0.78rem",
+                    fontWeight: 500,
+                    letterSpacing: "0.05em",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    marginTop: "8px",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  <Share2 size={15} color="#781216" />
+                  Share This Trip
+                </button>
+
                 {/* Partial payment note */}
                 <div
                   style={{
@@ -2725,21 +3418,49 @@ function TripDetailContent({
         }}
       >
         <div style={{ minWidth: 0, flex: 1 }}>
-          <p style={{ margin: 0, color: "rgba(30,26,20,0.46)", fontSize: "0.58rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+          <p
+            style={{
+              margin: 0,
+              color: "rgba(30,26,20,0.46)",
+              fontSize: "0.58rem",
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+            }}
+          >
             Starting from
           </p>
-          <p style={{ margin: "2px 0 0", color: "#1e1a14", fontSize: "1rem", fontWeight: 700, whiteSpace: "nowrap" }}>
+          <p
+            style={{
+              margin: "2px 0 0",
+              color: "#1e1a14",
+              fontSize: "1rem",
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+            }}
+          >
             {priceStr}
           </p>
-          <p style={{ margin: "1px 0 0", color: spots > 0 ? "#4f7a46" : "#c0392b", fontSize: "0.62rem", fontWeight: 500 }}>
+          <p
+            style={{
+              margin: "1px 0 0",
+              color: spots > 0 ? "#4f7a46" : "#c0392b",
+              fontSize: "0.62rem",
+              fontWeight: 500,
+            }}
+          >
             {spots > 0 ? `${spots} spots available` : "Currently sold out"}
           </p>
         </div>
 
         {hasBooked ? (
-          <div className="mobile-booking-action mobile-booking-action-disabled">Already Booked</div>
+          <div className="mobile-booking-action mobile-booking-action-disabled">
+            Already Booked
+          </div>
         ) : reservedBookingId ? (
-          <Link className="mobile-booking-action mobile-booking-action-balance" to={`/bookings/${reservedBookingId}/pay-balance`}>
+          <Link
+            className="mobile-booking-action mobile-booking-action-balance"
+            to={`/bookings/${reservedBookingId}/pay-balance`}
+          >
             Pay Balance
           </Link>
         ) : spots > 0 && selectedSlotId ? (
@@ -2747,12 +3468,16 @@ function TripDetailContent({
             Book Now
           </Link>
         ) : (
-          <div className="mobile-booking-action mobile-booking-action-disabled">Sold Out</div>
+          <div className="mobile-booking-action mobile-booking-action-disabled">
+            Sold Out
+          </div>
         )}
       </div>
 
       {/* ── Related Trips ── */}
-      {!isFestival && <RelatedTrips currentId={trip.id} currentType={trip.tripType} />}
+      {!isFestival && (
+        <RelatedTrips currentId={trip.id} currentType={trip.tripType} />
+      )}
 
       {/* ── WhatsApp FAB — always visible ── */}
       <a
@@ -2896,6 +3621,11 @@ function TripDetailContent({
           }
         }
       `}</style>
+      <ShareModal
+        open={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        title={trip.title}
+      />
     </div>
   );
 }

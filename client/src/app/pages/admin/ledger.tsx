@@ -55,6 +55,7 @@ export default function AdminLedgerPage() {
   const [search, setSearch] = useState("");
   const [type, setType] = useState("");
   const [scope, setScope] = useState("");
+  const [selectedTripId, setSelectedTripId] = useState("");
   
   const query = useQuery({
     queryKey: ["admin", "ledger"],
@@ -78,6 +79,11 @@ export default function AdminLedgerPage() {
     return allEntries.filter((entry) => {
       if (type && entry.type !== type) return false;
       if (scope && entry.scope !== scope) return false;
+      if (selectedTripId) {
+        const directTripId = entry.tripId || entry.trip?.id;
+        const bookingTripId = (entry.booking as any)?.crmTripId || (entry.booking as any)?.crmTrip?.id;
+        if (directTripId !== selectedTripId && bookingTripId !== selectedTripId) return false;
+      }
       const needle = search.trim().toLowerCase();
       if (!needle) return true;
       return [
@@ -93,7 +99,27 @@ export default function AdminLedgerPage() {
         .toLowerCase()
         .includes(needle);
     });
-  }, [allEntries, type, scope, search]);
+  }, [allEntries, type, scope, selectedTripId, search]);
+
+  const selectedTrip = useMemo(() => {
+    if (!selectedTripId) return null;
+    return trips.find((t: any) => t.id === selectedTripId) || null;
+  }, [trips, selectedTripId]);
+
+  const filteredSummary = useMemo(() => {
+    let income = 0;
+    let expense = 0;
+    for (const entry of entries) {
+      const amt = Number(entry.amount) || 0;
+      if (entry.type === "INCOME") income += amt;
+      else if (entry.type === "EXPENSE") expense += amt;
+    }
+    return {
+      totalIncome: income,
+      totalExpense: expense,
+      netBalance: income - expense,
+    };
+  }, [entries]);
 
   const summary = query.data?.summary || { tripIncome: 0, tripExpense: 0, otherIncome: 0, otherExpense: 0, totalIncome: 0, totalExpense: 0, netBalance: 0 };
 
@@ -205,11 +231,19 @@ export default function AdminLedgerPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_180px_180px]">
+      <div className="grid gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_220px_140px_140px]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Category, trip, booking, or description" className="pl-10" />
         </div>
+        <select value={selectedTripId} onChange={(e) => setSelectedTripId(e.target.value)} className="flex h-10 rounded-md border border-input bg-background px-3 text-sm truncate font-medium">
+          <option value="">Filter by Trip (All Trips)</option>
+          {trips.map((t: any) => (
+            <option key={t.id} value={t.id}>
+              {t.title}
+            </option>
+          ))}
+        </select>
         <select value={type} onChange={(e) => setType(e.target.value)} className="flex h-10 rounded-md border border-input bg-background px-3 text-sm">
           <option value="">All types</option>
           <option>INCOME</option>
@@ -223,6 +257,40 @@ export default function AdminLedgerPage() {
           <option value="OTHER">Other</option>
         </select>
       </div>
+
+      {(selectedTripId || scope === "TRIP" || search.trim()) && (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">
+              {selectedTripId ? "Trip Financial Summary" : "Filtered Entries Financials"}
+            </p>
+            <h3 className="text-lg font-bold text-gray-900 mt-0.5">
+              {selectedTrip ? selectedTrip.title : `${entries.length} Filtered Entries`}
+            </h3>
+            <p className="text-xs text-gray-500">
+              Showing calculated totals for the current selection
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-6">
+            <div>
+              <p className="text-xs font-semibold text-gray-500">Total Income</p>
+              <p className="text-xl font-bold text-emerald-600">{money(filteredSummary.totalIncome)}</p>
+            </div>
+            <div className="hidden sm:block h-8 w-px bg-blue-200" />
+            <div>
+              <p className="text-xs font-semibold text-gray-500">Total Expense</p>
+              <p className="text-xl font-bold text-red-600">{money(filteredSummary.totalExpense)}</p>
+            </div>
+            <div className="hidden sm:block h-8 w-px bg-blue-200" />
+            <div>
+              <p className="text-xs font-semibold text-gray-500">Net Balance</p>
+              <p className={`text-xl font-bold ${filteredSummary.netBalance >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+                {filteredSummary.netBalance >= 0 ? "+" : ""}{money(filteredSummary.netBalance)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="flex justify-end items-center mb-3">
         <SyncIndicator isMutating={createMutation.isPending || updateMutation.isPending || deleteMutation.isPending} isError={createMutation.isError || updateMutation.isError || deleteMutation.isError} />
