@@ -1,4 +1,2 @@
 
   # Hangover Trails
-
-deploy check
