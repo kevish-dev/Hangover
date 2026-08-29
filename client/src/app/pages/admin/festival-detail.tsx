@@ -3,7 +3,13 @@ import { useNavigate, useParams } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../lib/axios";
 import { format } from "date-fns";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
 import { SyncIndicator } from "../../components/ui/sync-indicator";
 import {
   ArrowLeft,
@@ -43,12 +49,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
-import { Label } from "../../components/ui/label";
-import { Textarea } from "../../components/ui/textarea";
-import { BookingDetailModal } from "../../components/admin/BookingDetailModal";
 import { FestivalFormModal } from "../../components/admin/FestivalFormModal";
-import { formatTripType } from "../../../lib/festivalApi";
 import { paymentApi } from "../../../lib/paymentApi";
 import { showErrorToast } from "../../../lib/errors";
 import CreateBookingModal from "../../components/admin/CreateBookingModal";
@@ -252,7 +253,7 @@ function BookingsTab({ festivalId }: { festivalId: string }) {
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3 bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-          <button 
+          <button
             onClick={() => setShowCreateModal(true)}
             className="px-4 py-2 bg-[#c8a96e] hover:bg-[#b09561] text-white rounded-xl text-sm font-medium transition-colors shadow-sm flex items-center justify-center gap-2 whitespace-nowrap"
           >
@@ -269,10 +270,7 @@ function BookingsTab({ festivalId }: { festivalId: string }) {
               className="pl-9 pr-4 py-2 w-full border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/40"
             />
           </div>
-          <Select
-            value={statusFilter}
-            onValueChange={setStatusFilter}
-          >
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 bg-white h-auto w-[180px]">
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
@@ -364,7 +362,7 @@ function BookingsTab({ festivalId }: { festivalId: string }) {
       </div>
 
       {showCreateModal && (
-        <CreateBookingModal 
+        <CreateBookingModal
           onClose={() => setShowCreateModal(false)}
           onSuccess={() => {
             setShowCreateModal(false);
@@ -405,8 +403,13 @@ function OperationsTab({ festivalId }: { festivalId: string }) {
   const [statusFilter, setStatusFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [newRow, setNewRow] = useState<any>({
-    bookingId: "", title: "", category: "GENERAL", status: "PENDING",
-    unitPrice: "", quantityNeeded: "", quantityAcquired: "",
+    bookingId: "",
+    title: "",
+    category: "GENERAL",
+    status: "PENDING",
+    unitPrice: "",
+    quantityNeeded: "",
+    quantityAcquired: "",
     dueAt: format(new Date(), "yyyy-MM-dd"),
   });
 
@@ -421,7 +424,9 @@ function OperationsTab({ festivalId }: { festivalId: string }) {
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["admin", "festival-ops", festivalId],
     queryFn: async () => {
-      const res = await apiClient.get(`/operations`, { params: { festivalId, limit: 500 } });
+      const res = await apiClient.get(`/operations`, {
+        params: { festivalId, limit: 500 },
+      });
       return res.data as any[];
     },
   });
@@ -430,7 +435,9 @@ function OperationsTab({ festivalId }: { festivalId: string }) {
     mutationFn: ({ taskId, payload }: { taskId: string; payload: any }) =>
       apiClient.patch(`/operations/${taskId}`, payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["admin", "festival-ops", festivalId] });
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "festival-ops", festivalId],
+      });
     },
     onError: (err: any) => showErrorToast(err, "Failed to update task"),
   });
@@ -439,9 +446,12 @@ function OperationsTab({ festivalId }: { festivalId: string }) {
     mutationFn: (taskId: string) => apiClient.delete(`/operations/${taskId}`),
     onSuccess: async () => {
       toast.success("Task deleted");
-      await queryClient.invalidateQueries({ queryKey: ["admin", "festival-ops", festivalId] });
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "festival-ops", festivalId],
+      });
     },
-    onError: (err: any) => toast.error(err?.response?.data?.message || "Failed to delete task"),
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.message || "Failed to delete task"),
   });
 
   const createMutation = useMutation({
@@ -451,10 +461,22 @@ function OperationsTab({ festivalId }: { festivalId: string }) {
     },
     onSuccess: async () => {
       toast.success("Task created");
-      await queryClient.invalidateQueries({ queryKey: ["admin", "festival-ops", festivalId] });
-      setNewRow({ bookingId: "", title: "", category: "GENERAL", status: "PENDING", unitPrice: "", quantityNeeded: "", quantityAcquired: "", dueAt: format(new Date(), "yyyy-MM-dd") });
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "festival-ops", festivalId],
+      });
+      setNewRow({
+        bookingId: "",
+        title: "",
+        category: "GENERAL",
+        status: "PENDING",
+        unitPrice: "",
+        quantityNeeded: "",
+        quantityAcquired: "",
+        dueAt: format(new Date(), "yyyy-MM-dd"),
+      });
     },
-    onError: (err: any) => toast.error(err?.response?.data?.message || "Failed to create task"),
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.message || "Failed to create task"),
   });
 
   const handleCellChange = (task: any, field: string, value: any) => {
@@ -474,8 +496,10 @@ function OperationsTab({ festivalId }: { festivalId: string }) {
       dueAt: newRow.dueAt ? new Date(newRow.dueAt).toISOString() : null,
     };
     if (newRow.unitPrice !== "") payload.unitPrice = Number(newRow.unitPrice);
-    if (newRow.quantityNeeded !== "") payload.quantityNeeded = Number(newRow.quantityNeeded);
-    if (newRow.quantityAcquired !== "") payload.quantityAcquired = Number(newRow.quantityAcquired);
+    if (newRow.quantityNeeded !== "")
+      payload.quantityNeeded = Number(newRow.quantityNeeded);
+    if (newRow.quantityAcquired !== "")
+      payload.quantityAcquired = Number(newRow.quantityAcquired);
     createMutation.mutate(payload);
   };
 
@@ -484,17 +508,31 @@ function OperationsTab({ festivalId }: { festivalId: string }) {
     if (categoryFilter && t.category !== categoryFilter) return false;
     if (!search.trim()) return true;
     const q = search.toLowerCase();
-    return [t.title, t.description, t.booking?.bookingReference, t.booking?.user?.profile?.fullName, t.booking?.user?.email]
-      .filter(Boolean).join(" ").toLowerCase().includes(q);
+    return [
+      t.title,
+      t.description,
+      t.booking?.bookingReference,
+      t.booking?.user?.profile?.fullName,
+      t.booking?.user?.email,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(q);
   });
 
-  const openTasks = tasks.filter((t: any) => !["DONE", "CANCELLED"].includes(t.status));
+  const openTasks = tasks.filter(
+    (t: any) => !["DONE", "CANCELLED"].includes(t.status),
+  );
   const overdue = tasks.filter((t: any) => {
     if (["DONE", "CANCELLED"].includes(t.status)) return false;
     const due = t.dueAt ? new Date(t.dueAt).getTime() : null;
     return due !== null && due < Date.now();
   });
-  const totalSpend = tasks.reduce((s: number, t: any) => s + Number(t.amountPaid || 0), 0);
+  const totalSpend = tasks.reduce(
+    (s: number, t: any) => s + Number(t.amountPaid || 0),
+    0,
+  );
 
   if (isLoading)
     return (
@@ -503,24 +541,79 @@ function OperationsTab({ festivalId }: { festivalId: string }) {
       </div>
     );
 
-  return <div className="space-y-4"><div className="grid grid-cols-2 gap-3 md:grid-cols-4">{[{ label: "Open tasks", value: openTasks.length }, { label: "Overdue", value: overdue.length }, { label: "Total tasks", value: tasks.length }, { label: "Spent", value: money(totalSpend) }].map((item) => <div key={item.label} className="rounded-xl border border-gray-200 bg-white p-4"><p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{item.label}</p><p className="mt-1 text-xl font-bold text-gray-900">{item.value}</p></div>)}</div><OperationsCalendar tasks={filtered} emptyMessage="No dated festival operations match the current filters." /></div>;
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {[
+          { label: "Open tasks", value: openTasks.length },
+          { label: "Overdue", value: overdue.length },
+          { label: "Total tasks", value: tasks.length },
+          { label: "Spent", value: money(totalSpend) },
+        ].map((item) => (
+          <div
+            key={item.label}
+            className="rounded-xl border border-gray-200 bg-white p-4"
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              {item.label}
+            </p>
+            <p className="mt-1 text-xl font-bold text-gray-900">{item.value}</p>
+          </div>
+        ))}
+      </div>
+      <OperationsCalendar
+        tasks={filtered}
+        emptyMessage="No dated festival operations match the current filters."
+      />
+    </div>
+  );
 
   return (
     <div className="space-y-4">
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: "Open Tasks", value: openTasks.length, icon: SlidersHorizontal, color: "text-blue-700 bg-blue-50" },
-          { label: "Overdue", value: overdue.length, icon: AlertTriangle, color: overdue.length > 0 ? "text-red-700 bg-red-50" : "text-gray-500 bg-gray-100" },
-          { label: "Total Tasks", value: tasks.length, icon: CheckCircle2, color: "text-gray-700 bg-gray-100" },
-          { label: "Spent", value: money(totalSpend), icon: IndianRupee, color: "text-[#781216] bg-red-50" },
+          {
+            label: "Open Tasks",
+            value: openTasks.length,
+            icon: SlidersHorizontal,
+            color: "text-blue-700 bg-blue-50",
+          },
+          {
+            label: "Overdue",
+            value: overdue.length,
+            icon: AlertTriangle,
+            color:
+              overdue.length > 0
+                ? "text-red-700 bg-red-50"
+                : "text-gray-500 bg-gray-100",
+          },
+          {
+            label: "Total Tasks",
+            value: tasks.length,
+            icon: CheckCircle2,
+            color: "text-gray-700 bg-gray-100",
+          },
+          {
+            label: "Spent",
+            value: money(totalSpend),
+            icon: IndianRupee,
+            color: "text-[#781216] bg-red-50",
+          },
         ].map((s) => (
-          <div key={s.label} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-2 ${s.color.split(" ").slice(1).join(" ")}`}>
+          <div
+            key={s.label}
+            className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm"
+          >
+            <div
+              className={`w-9 h-9 rounded-xl flex items-center justify-center mb-2 ${s.color.split(" ").slice(1).join(" ")}`}
+            >
               <s.icon className={`w-4 h-4 ${s.color.split(" ")[0]}`} />
             </div>
             <p className="text-xl font-bold text-gray-900">{s.value}</p>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">{s.label}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">
+              {s.label}
+            </p>
           </div>
         ))}
       </div>
@@ -529,32 +622,61 @@ function OperationsTab({ festivalId }: { festivalId: string }) {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-white rounded-2xl border border-gray-100 p-4 shadow-sm items-center">
         <div className="relative md:col-span-2">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" placeholder="Task, booking, traveler..." value={search}
+          <input
+            type="text"
+            placeholder="Task, booking, traveler..."
+            value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 pr-4 py-2 w-full border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/40" />
+            className="pl-9 pr-4 py-2 w-full border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/40"
+          />
         </div>
-        <Select value={statusFilter || "all"} onValueChange={(val) => setStatusFilter(val === "all" ? "" : val)}>
+        <Select
+          value={statusFilter || "all"}
+          onValueChange={(val) => setStatusFilter(val === "all" ? "" : val)}
+        >
           <SelectTrigger className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 bg-white h-auto">
             <SelectValue placeholder="All Statuses" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
-            {STATUSES_OPS.map((s) => <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>)}
+            {STATUSES_OPS.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s.replace(/_/g, " ")}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
-        <Select value={categoryFilter || "all"} onValueChange={(val) => setCategoryFilter(val === "all" ? "" : val)}>
+        <Select
+          value={categoryFilter || "all"}
+          onValueChange={(val) => setCategoryFilter(val === "all" ? "" : val)}
+        >
           <SelectTrigger className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 bg-white h-auto">
             <SelectValue placeholder="All Categories" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c.replace(/_/g, " ")}</SelectItem>)}
+            {CATEGORIES.map((c) => (
+              <SelectItem key={c} value={c}>
+                {c.replace(/_/g, " ")}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
 
       <div className="flex justify-end items-center mb-3">
-        <SyncIndicator isMutating={createMutation.isPending || updateMutation.isPending || deleteMutation.isPending} isError={createMutation.isError || updateMutation.isError || deleteMutation.isError} />
+        <SyncIndicator
+          isMutating={
+            createMutation.isPending ||
+            updateMutation.isPending ||
+            deleteMutation.isPending
+          }
+          isError={
+            createMutation.isError ||
+            updateMutation.isError ||
+            deleteMutation.isError
+          }
+        />
       </div>
 
       {/* Excel Grid */}
@@ -563,169 +685,316 @@ function OperationsTab({ festivalId }: { festivalId: string }) {
           <table className="w-full text-left text-sm border-collapse">
             <thead className="bg-gray-100 border-b-2 border-gray-300 sticky top-0 z-10">
               <tr>
-                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-40">Booking</th>
-                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-32">Status</th>
-                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-36">Category</th>
-                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300">Title</th>
-                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-32">Due Date</th>
-                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-24 text-right">Unit Price</th>
-                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-24 text-right">Qty Need</th>
-                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-24 text-right">Qty Acq</th>
-                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-28 text-right">Total ₹</th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-40">
+                  Booking
+                </th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-32">
+                  Status
+                </th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-36">
+                  Category
+                </th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300">
+                  Title
+                </th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-32">
+                  Due Date
+                </th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-24 text-right">
+                  Unit Price
+                </th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-24 text-right">
+                  Qty Need
+                </th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-24 text-right">
+                  Qty Acq
+                </th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-28 text-right">
+                  Total ₹
+                </th>
                 <th className="px-2 py-2.5 text-gray-600 w-10"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
+              {/* New row */}
+              <tr className="bg-indigo-50/40 border-b-2 border-indigo-200">
+                <td className="border-r border-gray-200 p-0">
+                  <Select
+                    value={newRow.bookingId}
+                    onValueChange={(val) =>
+                      setNewRow({ ...newRow, bookingId: val })
+                    }
+                  >
+                    <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-indigo-100 text-xs font-mono font-bold text-[#781216]">
+                      <SelectValue placeholder="Select booking..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bookings.map((b: any) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.bookingReference}{" "}
+                          {b.user?.profile?.fullName
+                            ? `(${b.user.profile.fullName})`
+                            : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <Select
+                    value={newRow.status}
+                    onValueChange={(val) =>
+                      setNewRow({ ...newRow, status: val })
+                    }
+                  >
+                    <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-indigo-100 text-[11px] font-bold text-gray-500">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUSES_OPS.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <Select
+                    value={newRow.category}
+                    onValueChange={(val) =>
+                      setNewRow({ ...newRow, category: val })
+                    }
+                  >
+                    <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-indigo-100 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <input
+                    type="text"
+                    value={newRow.title}
+                    placeholder="New task title..."
+                    onChange={(e) =>
+                      setNewRow({ ...newRow, title: e.target.value })
+                    }
+                    onKeyDown={(e) => e.key === "Enter" && handleNewRowSubmit()}
+                    className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-indigo-100 font-medium text-gray-900 placeholder:text-gray-300"
+                  />
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <input
+                    type="date"
+                    value={newRow.dueAt}
+                    onChange={(e) =>
+                      setNewRow({ ...newRow, dueAt: e.target.value })
+                    }
+                    className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-indigo-100 text-xs"
+                  />
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newRow.unitPrice}
+                    onChange={(e) =>
+                      setNewRow({ ...newRow, unitPrice: e.target.value })
+                    }
+                    placeholder="₹"
+                    className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono focus:bg-indigo-100"
+                  />
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <input
+                    type="number"
+                    value={newRow.quantityNeeded}
+                    onChange={(e) =>
+                      setNewRow({ ...newRow, quantityNeeded: e.target.value })
+                    }
+                    placeholder="0"
+                    className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono focus:bg-indigo-100"
+                  />
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <input
+                    type="number"
+                    value={newRow.quantityAcquired}
+                    onChange={(e) =>
+                      setNewRow({ ...newRow, quantityAcquired: e.target.value })
+                    }
+                    placeholder="0"
+                    className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-blue-600 focus:bg-indigo-100"
+                  />
+                </td>
+                <td className="border-r border-gray-200 p-0 bg-gray-50/50">
+                  <div className="w-full min-h-10 px-3 flex items-center justify-end text-gray-500 font-mono text-sm">
+                    {newRow.unitPrice && newRow.quantityNeeded
+                      ? (
+                          Number(newRow.unitPrice) *
+                          Number(newRow.quantityNeeded)
+                        ).toFixed(2)
+                      : "—"}
+                  </div>
+                </td>
+                <td className="p-0 text-center">
+                  <button
+                    onClick={handleNewRowSubmit}
+                    disabled={createMutation.isPending}
+                    className="text-indigo-500 hover:text-indigo-700 transition-colors p-1.5"
+                  >
+                    {createMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Plus className="w-5 h-5" />
+                    )}
+                  </button>
+                </td>
+              </tr>
+
               {filtered.map((task: any) => (
-                <tr key={task.id} className={`group transition-colors ${task.status === "DONE" ? "bg-gray-50/80 text-gray-400 hover:bg-gray-100" : "hover:bg-blue-50/20"}`}>
+                <tr
+                  key={task.id}
+                  className={`group transition-colors ${task.status === "DONE" ? "bg-gray-50/80 text-gray-400 hover:bg-gray-100" : "hover:bg-blue-50/20"}`}
+                >
                   <td className="border-r border-gray-200 p-0">
                     <div className="w-full min-h-10 px-3 flex items-center text-xs font-mono font-bold text-[#781216]">
                       {task.booking?.bookingReference}
                       <span className="text-gray-400 font-normal ml-1 truncate block max-w-[80px]">
-                        {task.booking?.user?.profile?.fullName?.split(" ")[0] || ""}
+                        {task.booking?.user?.profile?.fullName?.split(" ")[0] ||
+                          ""}
                       </span>
                     </div>
                   </td>
                   <td className="border-r border-gray-200 p-0">
-                    <Select defaultValue={task.status}
-                      onValueChange={(val) => handleCellChange(task, "status", val)}
+                    <Select
+                      defaultValue={task.status}
+                      onValueChange={(val) =>
+                        handleCellChange(task, "status", val)
+                      }
                     >
-                      <SelectTrigger className={`h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 font-bold text-[11px] tracking-wide ${STATUS_COLORS[task.status] || "text-gray-600"}`}>
+                      <SelectTrigger
+                        className={`h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 font-bold text-[11px] tracking-wide ${STATUS_COLORS[task.status] || "text-gray-600"}`}
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {STATUSES_OPS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                        {STATUSES_OPS.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </td>
                   <td className="border-r border-gray-200 p-0">
-                    <Select defaultValue={task.category}
-                      onValueChange={(val) => handleCellChange(task, "category", val)}
+                    <Select
+                      defaultValue={task.category}
+                      onValueChange={(val) =>
+                        handleCellChange(task, "category", val)
+                      }
                     >
                       <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 text-xs text-gray-600">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        {CATEGORIES.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </td>
                   <td className="border-r border-gray-200 p-0">
-                    <input type="text" defaultValue={task.title}
-                      onBlur={(e) => handleCellChange(task, "title", e.target.value)}
-                      className={`w-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 font-medium ${task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"}`} />
+                    <input
+                      type="text"
+                      defaultValue={task.title}
+                      onBlur={(e) =>
+                        handleCellChange(task, "title", e.target.value)
+                      }
+                      className={`w-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 font-medium ${task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"}`}
+                    />
                   </td>
                   <td className="border-r border-gray-200 p-0">
-                    <input type="date" defaultValue={task.dueAt ? format(new Date(task.dueAt), "yyyy-MM-dd") : ""}
-                      onBlur={(e) => handleCellChange(task, "dueAt", e.target.value)}
-                      className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 text-xs text-gray-600" />
+                    <input
+                      type="date"
+                      defaultValue={
+                        task.dueAt
+                          ? format(new Date(task.dueAt), "yyyy-MM-dd")
+                          : ""
+                      }
+                      onBlur={(e) =>
+                        handleCellChange(task, "dueAt", e.target.value)
+                      }
+                      className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 text-xs text-gray-600"
+                    />
                   </td>
                   <td className="border-r border-gray-200 p-0">
-                    <input type="number" step="0.01" defaultValue={task.unitPrice ?? ""}
-                      onBlur={(e) => handleCellChange(task, "unitPrice", e.target.value)}
-                      className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-gray-700 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400" />
+                    <input
+                      type="number"
+                      step="0.01"
+                      defaultValue={task.unitPrice ?? ""}
+                      onBlur={(e) =>
+                        handleCellChange(task, "unitPrice", e.target.value)
+                      }
+                      className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-gray-700 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400"
+                    />
                   </td>
                   <td className="border-r border-gray-200 p-0">
-                    <input type="number" defaultValue={task.quantityNeeded ?? ""}
-                      onBlur={(e) => handleCellChange(task, "quantityNeeded", e.target.value)}
-                      className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-gray-700 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400" />
+                    <input
+                      type="number"
+                      defaultValue={task.quantityNeeded ?? ""}
+                      onBlur={(e) =>
+                        handleCellChange(task, "quantityNeeded", e.target.value)
+                      }
+                      className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-gray-700 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400"
+                    />
                   </td>
                   <td className="border-r border-gray-200 p-0">
-                    <input type="number" defaultValue={task.quantityAcquired ?? ""}
-                      onBlur={(e) => handleCellChange(task, "quantityAcquired", e.target.value)}
-                      className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-blue-600 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400" />
+                    <input
+                      type="number"
+                      defaultValue={task.quantityAcquired ?? ""}
+                      onBlur={(e) =>
+                        handleCellChange(
+                          task,
+                          "quantityAcquired",
+                          e.target.value,
+                        )
+                      }
+                      className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-blue-600 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400"
+                    />
                   </td>
                   <td className="border-r border-gray-200 p-0 bg-gray-50/50">
                     <div className="w-full min-h-10 px-3 flex items-center justify-end text-gray-600 font-mono text-sm">
                       {task.unitPrice && task.quantityNeeded
-                        ? (Number(task.unitPrice) * Number(task.quantityNeeded)).toFixed(2)
+                        ? (
+                            Number(task.unitPrice) * Number(task.quantityNeeded)
+                          ).toFixed(2)
                         : "—"}
                     </div>
                   </td>
                   <td className="p-0 text-center">
-                    <button onClick={() => { if (window.confirm("Delete this task?")) deleteMutation.mutate(task.id); }}
+                    <button
+                      onClick={() => {
+                        if (window.confirm("Delete this task?"))
+                          deleteMutation.mutate(task.id);
+                      }}
                       disabled={deleteMutation.isPending}
-                      className="text-gray-300 hover:text-red-500 transition-colors p-1.5 opacity-0 group-hover:opacity-100">
+                      className="text-gray-300 hover:text-red-500 transition-colors p-1.5 opacity-0 group-hover:opacity-100"
+                    >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </td>
                 </tr>
               ))}
-
-              {/* New row */}
-              <tr className="bg-indigo-50/40 border-t-2 border-indigo-200">
-                <td className="border-r border-gray-200 p-0">
-                  <Select value={newRow.bookingId} onValueChange={(val) => setNewRow({...newRow, bookingId: val})}>
-                    <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-indigo-100 text-xs font-mono font-bold text-[#781216]">
-                      <SelectValue placeholder="Select booking..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {bookings.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.bookingReference} {b.user?.profile?.fullName ? `(${b.user.profile.fullName})` : ""}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </td>
-                <td className="border-r border-gray-200 p-0">
-                  <Select value={newRow.status} onValueChange={(val) => setNewRow({...newRow, status: val})}>
-                    <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-indigo-100 text-[11px] font-bold text-gray-500">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUSES_OPS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </td>
-                <td className="border-r border-gray-200 p-0">
-                  <Select value={newRow.category} onValueChange={(val) => setNewRow({...newRow, category: val})}>
-                    <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-indigo-100 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </td>
-                <td className="border-r border-gray-200 p-0">
-                  <input type="text" value={newRow.title} placeholder="New task title..."
-                    onChange={(e) => setNewRow({...newRow, title: e.target.value})}
-                    onKeyDown={(e) => e.key === "Enter" && handleNewRowSubmit()}
-                    className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-indigo-100 font-medium text-gray-900 placeholder:text-gray-300" />
-                </td>
-                <td className="border-r border-gray-200 p-0">
-                  <input type="date" value={newRow.dueAt} onChange={(e) => setNewRow({...newRow, dueAt: e.target.value})}
-                    className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-indigo-100 text-xs" />
-                </td>
-                <td className="border-r border-gray-200 p-0">
-                  <input type="number" step="0.01" value={newRow.unitPrice}
-                    onChange={(e) => setNewRow({...newRow, unitPrice: e.target.value})}
-                    placeholder="₹"
-                    className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono focus:bg-indigo-100" />
-                </td>
-                <td className="border-r border-gray-200 p-0">
-                  <input type="number" value={newRow.quantityNeeded}
-                    onChange={(e) => setNewRow({...newRow, quantityNeeded: e.target.value})}
-                    placeholder="0"
-                    className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono focus:bg-indigo-100" />
-                </td>
-                <td className="border-r border-gray-200 p-0">
-                  <input type="number" value={newRow.quantityAcquired}
-                    onChange={(e) => setNewRow({...newRow, quantityAcquired: e.target.value})}
-                    placeholder="0"
-                    className="w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-blue-600 focus:bg-indigo-100" />
-                </td>
-                <td className="border-r border-gray-200 p-0 bg-gray-50/50">
-                  <div className="w-full min-h-10 px-3 flex items-center justify-end text-gray-500 font-mono text-sm">
-                    {newRow.unitPrice && newRow.quantityNeeded
-                      ? (Number(newRow.unitPrice) * Number(newRow.quantityNeeded)).toFixed(2)
-                      : "—"}
-                  </div>
-                </td>
-                <td className="p-0 text-center">
-                  <button onClick={handleNewRowSubmit} disabled={createMutation.isPending}
-                    className="text-indigo-500 hover:text-indigo-700 transition-colors p-1.5">
-                    {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-5 h-5" />}
-                  </button>
-                </td>
-              </tr>
             </tbody>
           </table>
         </div>
@@ -734,9 +1003,22 @@ function OperationsTab({ festivalId }: { festivalId: string }) {
   );
 }
 
-
 // ─── Tab 3: Ledger ────────────────────────────────────────────────
-const LEDGER_CATEGORIES = ["HOTEL", "TRANSPORT", "PERMIT", "VENDOR", "ACTIVITY", "DOCUMENTATION", "PAYMENT_COLLECTION", "SALARY", "MARKETING", "BOOKING_PAYMENT", "REFUND", "OTHER_INCOME", "OTHER_EXPENSE"];
+const LEDGER_CATEGORIES = [
+  "HOTEL",
+  "TRANSPORT",
+  "PERMIT",
+  "VENDOR",
+  "ACTIVITY",
+  "DOCUMENTATION",
+  "PAYMENT_COLLECTION",
+  "SALARY",
+  "MARKETING",
+  "BOOKING_PAYMENT",
+  "REFUND",
+  "OTHER_INCOME",
+  "OTHER_EXPENSE",
+];
 
 function LedgerTab({ festivalId }: { festivalId: string }) {
   const queryClient = useQueryClient();
@@ -756,7 +1038,7 @@ function LedgerTab({ festivalId }: { festivalId: string }) {
     queryFn: async () => {
       const res = await apiClient.get(`/bookings/festival/${festivalId}`);
       return res.data as any[];
-    }
+    },
   });
 
   const { data, isLoading } = useQuery({
@@ -772,33 +1054,51 @@ function LedgerTab({ festivalId }: { festivalId: string }) {
   const addMutation = useMutation({
     mutationFn: (payload: any) => apiClient.post(`/ledgers/entries`, payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["admin", "festival-ledger", festivalId] });
-      setNewEntry({ type: "EXPENSE", category: "HOTEL", amount: "", description: "", entryDate: format(new Date(), "yyyy-MM-dd"), bookingId: "FESTIVAL" });
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "festival-ledger", festivalId],
+      });
+      setNewEntry({
+        type: "EXPENSE",
+        category: "HOTEL",
+        amount: "",
+        description: "",
+        entryDate: format(new Date(), "yyyy-MM-dd"),
+        bookingId: "FESTIVAL",
+      });
     },
-    onError: (err: any) => toast.error(err?.response?.data?.message || "Failed to add entry"),
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.message || "Failed to add entry"),
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => apiClient.patch(`/ledgers/entries/${id}`, data),
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      apiClient.patch(`/ledgers/entries/${id}`, data),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["admin", "festival-ledger", festivalId] });
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "festival-ledger", festivalId],
+      });
     },
-    onError: (err: any) => toast.error(err?.response?.data?.message || "Failed to update entry"),
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.message || "Failed to update entry"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/ledgers/entries/${id}`),
     onSuccess: async () => {
       toast.success("Entry deleted");
-      await queryClient.invalidateQueries({ queryKey: ["admin", "festival-ledger", festivalId] });
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "festival-ledger", festivalId],
+      });
     },
-    onError: (err: any) => toast.error(err?.response?.data?.message || "Failed to delete"),
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.message || "Failed to delete"),
   });
 
   const handleCellChange = (entry: any, field: string, value: any) => {
     if (entry.isAutoGenerated) return;
     if (entry[field] == value) return;
-    if (field === "entryDate") value = value ? new Date(value).toISOString() : null;
+    if (field === "entryDate")
+      value = value ? new Date(value).toISOString() : null;
     updateMutation.mutate({ id: entry.id, data: { [field]: value } });
   };
 
@@ -809,7 +1109,8 @@ function LedgerTab({ festivalId }: { festivalId: string }) {
       type: newEntry.type,
       scope: newEntry.bookingId === "FESTIVAL" ? "FESTIVAL" : "BOOKING",
       festivalId,
-      bookingId: newEntry.bookingId === "FESTIVAL" ? undefined : newEntry.bookingId,
+      bookingId:
+        newEntry.bookingId === "FESTIVAL" ? undefined : newEntry.bookingId,
       category: newEntry.category,
       amount,
       description: newEntry.description.trim() || undefined,
@@ -841,11 +1142,18 @@ function LedgerTab({ festivalId }: { festivalId: string }) {
       <div className="flex flex-col sm:flex-row gap-3 bg-white rounded-2xl border border-gray-100 p-4 shadow-sm items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" placeholder="Category, description, booking ref..."
-            value={search} onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 pr-4 py-2 w-full border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/40" />
+          <input
+            type="text"
+            placeholder="Category, description, booking ref..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 pr-4 py-2 w-full border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/40"
+          />
         </div>
-        <Select value={typeFilter || "all"} onValueChange={(val) => setTypeFilter(val === "all" ? "" : val)}>
+        <Select
+          value={typeFilter || "all"}
+          onValueChange={(val) => setTypeFilter(val === "all" ? "" : val)}
+        >
           <SelectTrigger className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 bg-white h-auto w-[150px]">
             <SelectValue placeholder="All Types" />
           </SelectTrigger>
@@ -858,7 +1166,18 @@ function LedgerTab({ festivalId }: { festivalId: string }) {
       </div>
 
       <div className="flex justify-end items-center mb-3">
-        <SyncIndicator isMutating={addMutation.isPending || updateMutation.isPending || deleteMutation.isPending} isError={addMutation.isError || updateMutation.isError || deleteMutation.isError} />
+        <SyncIndicator
+          isMutating={
+            addMutation.isPending ||
+            updateMutation.isPending ||
+            deleteMutation.isPending
+          }
+          isError={
+            addMutation.isError ||
+            updateMutation.isError ||
+            deleteMutation.isError
+          }
+        />
       </div>
 
       {/* Excel grid */}
@@ -867,33 +1186,178 @@ function LedgerTab({ festivalId }: { festivalId: string }) {
           <table className="w-full text-left text-sm border-collapse">
             <thead className="bg-gray-100 border-b-2 border-gray-300 sticky top-0 z-10">
               <tr>
-                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-32">Date</th>
-                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-28">Type</th>
-                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-40">Category</th>
-                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300">Description</th>
-                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-24 text-center">Context</th>
-                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-32 text-right">Amount ₹</th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-32">
+                  Date
+                </th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-28">
+                  Type
+                </th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-40">
+                  Category
+                </th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300">
+                  Description
+                </th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-24 text-center">
+                  Context
+                </th>
+                <th className="px-3 py-2.5 font-semibold text-gray-600 border-r border-gray-300 w-32 text-right">
+                  Amount ₹
+                </th>
                 <th className="px-2 py-2.5 text-gray-600 w-10"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
+              {/* New row */}
+              <tr className="bg-emerald-50/30 border-b-2 border-emerald-200">
+                <td className="border-r border-gray-200 p-0">
+                  <input
+                    type="date"
+                    value={newEntry.entryDate}
+                    onChange={(e) =>
+                      setNewEntry({ ...newEntry, entryDate: e.target.value })
+                    }
+                    className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-emerald-100 text-xs"
+                  />
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <Select
+                    value={newEntry.type}
+                    onValueChange={(val) =>
+                      setNewEntry({ ...newEntry, type: val })
+                    }
+                  >
+                    <SelectTrigger
+                      className={`h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-emerald-100 font-bold text-[11px] ${newEntry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="INCOME">INCOME</SelectItem>
+                      <SelectItem value="EXPENSE">EXPENSE</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <Select
+                    value={newEntry.category}
+                    onValueChange={(val) =>
+                      setNewEntry({ ...newEntry, category: val })
+                    }
+                  >
+                    <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-emerald-100 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LEDGER_CATEGORIES.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <input
+                    type="text"
+                    value={newEntry.description}
+                    placeholder="Description (optional)"
+                    onChange={(e) =>
+                      setNewEntry({ ...newEntry, description: e.target.value })
+                    }
+                    onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                    className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-emerald-100 text-gray-600 placeholder:text-gray-300"
+                  />
+                </td>
+                <td className="border-r border-gray-200 p-0 bg-gray-50/50">
+                  <Select
+                    value={newEntry.bookingId}
+                    onValueChange={(val) =>
+                      setNewEntry({ ...newEntry, bookingId: val })
+                    }
+                  >
+                    <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-emerald-100 text-[10px] font-mono">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="FESTIVAL">Trip</SelectItem>
+                      {bookings.map((b: any) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.bookingReference}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </td>
+                <td className="border-r border-gray-200 p-0">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newEntry.amount}
+                    placeholder="Amount..."
+                    onChange={(e) =>
+                      setNewEntry({ ...newEntry, amount: e.target.value })
+                    }
+                    onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                    className={`w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono font-semibold focus:bg-emerald-100 placeholder:text-gray-300 ${newEntry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`}
+                  />
+                </td>
+                <td className="p-0 text-center">
+                  <button
+                    onClick={handleAdd}
+                    disabled={addMutation.isPending}
+                    className="text-emerald-500 hover:text-emerald-700 transition-colors p-1.5"
+                  >
+                    {addMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Plus className="w-5 h-5" />
+                    )}
+                  </button>
+                </td>
+              </tr>
+
               {entries.map((entry: any) => (
-                <tr key={entry.id} className={`group transition-colors ${entry.isAutoGenerated ? "bg-gray-50/50" : "hover:bg-blue-50/20"}`}>
+                <tr
+                  key={entry.id}
+                  className={`group transition-colors ${entry.isAutoGenerated ? "bg-gray-50/50" : "hover:bg-blue-50/20"}`}
+                >
                   <td className="border-r border-gray-200 p-0">
-                    <input type="date" defaultValue={format(new Date(entry.entryDate), "yyyy-MM-dd")}
+                    <input
+                      type="date"
+                      defaultValue={format(
+                        new Date(entry.entryDate),
+                        "yyyy-MM-dd",
+                      )}
                       disabled={entry.isAutoGenerated}
-                      onBlur={(e) => handleCellChange(entry, "entryDate", e.target.value)}
-                      className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 text-xs disabled:opacity-50 disabled:cursor-not-allowed" />
+                      onBlur={(e) =>
+                        handleCellChange(entry, "entryDate", e.target.value)
+                      }
+                      className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
                   </td>
                   <td className="border-r border-gray-200 p-0">
                     {entry.isAutoGenerated ? (
                       <div className="min-h-10 px-3 flex items-center gap-1.5">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${entry.type === "INCOME" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{entry.type}</span>
-                        <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">AUTO</span>
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${entry.type === "INCOME" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}
+                        >
+                          {entry.type}
+                        </span>
+                        <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">
+                          AUTO
+                        </span>
                       </div>
                     ) : (
-                      <Select defaultValue={entry.type} onValueChange={(val) => handleCellChange(entry, "type", val)}>
-                        <SelectTrigger className={`h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 font-bold text-[11px] ${entry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`}>
+                      <Select
+                        defaultValue={entry.type}
+                        onValueChange={(val) =>
+                          handleCellChange(entry, "type", val)
+                        }
+                      >
+                        <SelectTrigger
+                          className={`h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 font-bold text-[11px] ${entry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`}
+                        >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -905,38 +1369,66 @@ function LedgerTab({ festivalId }: { festivalId: string }) {
                   </td>
                   <td className="border-r border-gray-200 p-0">
                     {entry.isAutoGenerated ? (
-                      <div className="min-h-10 px-3 flex items-center text-gray-700 font-medium text-xs">{entry.category}</div>
+                      <div className="min-h-10 px-3 flex items-center text-gray-700 font-medium text-xs">
+                        {entry.category}
+                      </div>
                     ) : (
-                      <Select defaultValue={entry.category} onValueChange={(val) => handleCellChange(entry, "category", val)}>
+                      <Select
+                        defaultValue={entry.category}
+                        onValueChange={(val) =>
+                          handleCellChange(entry, "category", val)
+                        }
+                      >
                         <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {LEDGER_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                          {LEDGER_CATEGORIES.map((c) => (
+                            <SelectItem key={c} value={c}>
+                              {c}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     )}
                   </td>
                   <td className="border-r border-gray-200 p-0">
-                    <input type="text" defaultValue={entry.description || ""}
+                    <input
+                      type="text"
+                      defaultValue={entry.description || ""}
                       disabled={entry.isAutoGenerated}
-                      onBlur={(e) => handleCellChange(entry, "description", e.target.value)}
-                      placeholder={entry.isAutoGenerated ? entry.source || "" : "Description..."}
-                      className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed" />
+                      onBlur={(e) =>
+                        handleCellChange(entry, "description", e.target.value)
+                      }
+                      placeholder={
+                        entry.isAutoGenerated
+                          ? entry.source || ""
+                          : "Description..."
+                      }
+                      className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
                   </td>
                   <td className="border-r border-gray-200 p-0">
                     {entry.isAutoGenerated ? (
                       <div className="min-h-10 px-2 flex items-center justify-center">
-                        <span className="text-[10px] font-mono text-gray-400">{entry.booking?.bookingReference || "Festival"}</span>
+                        <span className="text-[10px] font-mono text-gray-400">
+                          {entry.booking?.bookingReference || "Festival"}
+                        </span>
                       </div>
                     ) : (
-                      <Select 
-                        value={entry.bookingId || "FESTIVAL"} 
+                      <Select
+                        value={entry.bookingId || "FESTIVAL"}
                         onValueChange={(val) => {
                           if (val === "FESTIVAL") {
-                            updateMutation.mutate({ id: entry.id, data: { scope: "FESTIVAL", bookingId: null } });
+                            updateMutation.mutate({
+                              id: entry.id,
+                              data: { scope: "FESTIVAL", bookingId: null },
+                            });
                           } else {
-                            updateMutation.mutate({ id: entry.id, data: { scope: "BOOKING", bookingId: val } });
+                            updateMutation.mutate({
+                              id: entry.id,
+                              data: { scope: "BOOKING", bookingId: val },
+                            });
                           }
                         }}
                       >
@@ -946,88 +1438,41 @@ function LedgerTab({ festivalId }: { festivalId: string }) {
                         <SelectContent>
                           <SelectItem value="FESTIVAL">Trip</SelectItem>
                           {bookings.map((b: any) => (
-                            <SelectItem key={b.id} value={b.id}>{b.bookingReference}</SelectItem>
+                            <SelectItem key={b.id} value={b.id}>
+                              {b.bookingReference}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     )}
                   </td>
                   <td className="border-r border-gray-200 p-0">
-                    <input type="number" step="0.01" defaultValue={entry.amount}
+                    <input
+                      type="number"
+                      step="0.01"
+                      defaultValue={entry.amount}
                       disabled={entry.isAutoGenerated}
-                      onBlur={(e) => handleCellChange(entry, "amount", e.target.value)}
-                      className={`w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono font-semibold focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed ${entry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`} />
+                      onBlur={(e) =>
+                        handleCellChange(entry, "amount", e.target.value)
+                      }
+                      className={`w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono font-semibold focus:bg-blue-50 focus:ring-1 focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed ${entry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`}
+                    />
                   </td>
                   <td className="p-0 text-center">
                     {!entry.isAutoGenerated && (
-                      <button onClick={() => window.confirm("Delete this entry?") && deleteMutation.mutate(entry.id)}
-                        className="text-gray-300 hover:text-red-500 transition-colors p-1.5 opacity-0 group-hover:opacity-100">
+                      <button
+                        onClick={() =>
+                          window.confirm("Delete this entry?") &&
+                          deleteMutation.mutate(entry.id)
+                        }
+                        className="text-gray-300 hover:text-red-500 transition-colors p-1.5 opacity-0 group-hover:opacity-100"
+                      >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     )}
                   </td>
                 </tr>
               ))}
-
-              {/* New row */}
-              <tr className="bg-emerald-50/30 border-t-2 border-emerald-200">
-                <td className="border-r border-gray-200 p-0">
-                  <input type="date" value={newEntry.entryDate} onChange={(e) => setNewEntry({...newEntry, entryDate: e.target.value})}
-                    className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-emerald-100 text-xs" />
-                </td>
-                <td className="border-r border-gray-200 p-0">
-                  <Select value={newEntry.type} onValueChange={(val) => setNewEntry({...newEntry, type: val})}>
-                    <SelectTrigger className={`h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-emerald-100 font-bold text-[11px] ${newEntry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="INCOME">INCOME</SelectItem>
-                      <SelectItem value="EXPENSE">EXPENSE</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </td>
-                <td className="border-r border-gray-200 p-0">
-                  <Select value={newEntry.category} onValueChange={(val) => setNewEntry({...newEntry, category: val})}>
-                    <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-emerald-100 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LEDGER_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </td>
-                <td className="border-r border-gray-200 p-0">
-                  <input type="text" value={newEntry.description} placeholder="Description (optional)"
-                    onChange={(e) => setNewEntry({...newEntry, description: e.target.value})}
-                    onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                    className="w-full min-h-10 px-3 bg-transparent outline-none focus:bg-emerald-100 text-gray-600 placeholder:text-gray-300" />
-                </td>
-                <td className="border-r border-gray-200 p-0 bg-gray-50/50">
-                  <Select value={newEntry.bookingId} onValueChange={(val) => setNewEntry({...newEntry, bookingId: val})}>
-                    <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-emerald-100 text-[10px] font-mono">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="FESTIVAL">Trip</SelectItem>
-                      {bookings.map((b: any) => (
-                        <SelectItem key={b.id} value={b.id}>{b.bookingReference}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </td>
-                <td className="border-r border-gray-200 p-0">
-                  <input type="number" step="0.01" value={newEntry.amount} placeholder="Amount..."
-                    onChange={(e) => setNewEntry({...newEntry, amount: e.target.value})}
-                    onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                    className={`w-full min-h-10 px-3 bg-transparent outline-none text-right font-mono font-semibold focus:bg-emerald-100 placeholder:text-gray-300 ${newEntry.type === "INCOME" ? "text-emerald-700" : "text-red-700"}`} />
-                </td>
-                <td className="p-0 text-center">
-                  <button onClick={handleAdd} disabled={addMutation.isPending}
-                    className="text-emerald-500 hover:text-emerald-700 transition-colors p-1.5">
-                    {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-5 h-5" />}
-                  </button>
-                </td>
-              </tr>
             </tbody>
           </table>
         </div>
@@ -1419,15 +1864,22 @@ function PaymentsTab({ festivalId }: { festivalId: string }) {
     queryFn: () => paymentApi.getAllPayments({ limit: 2000 }),
   });
 
-  if (isLoading) return (
-    <div className="flex items-center justify-center py-20 gap-2 text-gray-400">
-      <Loader2 className="w-5 h-5 animate-spin" /> Loading payments...
-    </div>
-  );
+  if (isLoading)
+    return (
+      <div className="flex items-center justify-center py-20 gap-2 text-gray-400">
+        <Loader2 className="w-5 h-5 animate-spin" /> Loading payments...
+      </div>
+    );
 
   const allPayments = data?.data || [];
-  const payments = allPayments.filter((p: any) => p.booking?.festival?.id === festivalId || p.booking?.slot?.festival?.id === festivalId);
-  const totalReceived = payments.filter((p: any) => p.status === "SUCCESS").reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+  const payments = allPayments.filter(
+    (p: any) =>
+      p.booking?.festival?.id === festivalId ||
+      p.booking?.slot?.festival?.id === festivalId,
+  );
+  const totalReceived = payments
+    .filter((p: any) => p.status === "SUCCESS")
+    .reduce((sum: number, p: any) => sum + Number(p.amount), 0);
 
   return (
     <div className="space-y-4">
@@ -1436,43 +1888,66 @@ function PaymentsTab({ festivalId }: { festivalId: string }) {
           <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2 bg-emerald-50 text-emerald-700">
             <IndianRupee className="w-4 h-4" />
           </div>
-          <p className="text-xl font-bold text-gray-900">{money(totalReceived)}</p>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Total Received</p>
+          <p className="text-xl font-bold text-gray-900">
+            {money(totalReceived)}
+          </p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">
+            Total Received
+          </p>
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2 bg-blue-50 text-blue-700">
             <CreditCard className="w-4 h-4" />
           </div>
           <p className="text-xl font-bold text-gray-900">{payments.length}</p>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Total Transactions</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">
+            Total Transactions
+          </p>
         </div>
       </div>
 
       {payments.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
           <CreditCard className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium">No payments found for this festival</p>
+          <p className="text-gray-500 font-medium">
+            No payments found for this festival
+          </p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-500">{payments.length} payment(s)</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
+              {payments.length} payment(s)
+            </p>
           </div>
           <div className="divide-y divide-gray-50">
             {payments.map((p: any) => (
-              <div key={p.id} className="w-full text-left px-4 py-4 hover:bg-gray-50 transition-colors flex items-center justify-between gap-3">
+              <div
+                key={p.id}
+                className="w-full text-left px-4 py-4 hover:bg-gray-50 transition-colors flex items-center justify-between gap-3"
+              >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-xs font-bold text-[#781216]">{p.booking?.bookingReference}</span>
+                    <span className="font-mono text-xs font-bold text-[#781216]">
+                      {p.booking?.bookingReference}
+                    </span>
                     <TransactionStatusBadge status={p.status} />
                   </div>
-                  <p className="font-semibold text-gray-900 mt-1">{p.booking?.user?.profile?.fullName || p.booking?.user?.email}</p>
-                  <p className="text-xs text-gray-500">{format(new Date(p.createdAt), "PPp")}</p>
+                  <p className="font-semibold text-gray-900 mt-1">
+                    {p.booking?.user?.profile?.fullName ||
+                      p.booking?.user?.email}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {format(new Date(p.createdAt), "PPp")}
+                  </p>
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="font-bold text-gray-900">{money(p.amount)}</p>
                   <p className="text-xs text-gray-500">{p.type}</p>
-                  <button onClick={() => navigate(`/dashboard/payments`)} className="inline-flex items-center gap-1 text-xs font-semibold text-[#781216] mt-1 hover:underline">
+                  <button
+                    onClick={() => navigate(`/dashboard/payments`)}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-[#781216] mt-1 hover:underline"
+                  >
                     View in Payments <ArrowUpRight className="w-3 h-3" />
                   </button>
                 </div>
@@ -1522,7 +1997,9 @@ export default function AdminFestivalDetailPage() {
       await apiClient.put(`/festivals/${festival.id}`, {
         isPublished: !festival.isPublished,
       });
-      toast.success(festival.isPublished ? "Festival unpublished" : "Festival published");
+      toast.success(
+        festival.isPublished ? "Festival unpublished" : "Festival published",
+      );
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["admin", "festivals"] });
     } catch (err) {
@@ -1548,9 +2025,12 @@ export default function AdminFestivalDetailPage() {
       const expiresAt = new Date(
         Date.now() + 30 * 24 * 60 * 60 * 1000,
       ).toISOString();
-      const { data } = await apiClient.post(`/festivals/${festival.id}/share-link`, {
-        expiresAt,
-      });
+      const { data } = await apiClient.post(
+        `/festivals/${festival.id}/share-link`,
+        {
+          expiresAt,
+        },
+      );
       const url = `${window.location.origin}/festivals/${festival.id}?share=${encodeURIComponent(data.token)}`;
       setGeneratedShareLink({ title: festival.title, url });
       try {
@@ -1641,7 +2121,10 @@ export default function AdminFestivalDetailPage() {
                   {festival.slots?.[0]?.startDate && (
                     <span className="flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5" />
-                      {format(new Date(festival.slots[0].startDate), "MMM d, yyyy")}
+                      {format(
+                        new Date(festival.slots[0].startDate),
+                        "MMM d, yyyy",
+                      )}
                     </span>
                   )}
                   <span className="flex items-center gap-1.5">
@@ -1651,7 +2134,9 @@ export default function AdminFestivalDetailPage() {
                   {festival.packages?.[0]?.price && (
                     <span className="flex items-center gap-1.5 font-semibold text-[#781216]">
                       <IndianRupee className="w-3.5 h-3.5" />
-                      {parseInt(festival.packages[0].price).toLocaleString("en-IN")}
+                      {parseInt(festival.packages[0].price).toLocaleString(
+                        "en-IN",
+                      )}
                     </span>
                   )}
                 </div>

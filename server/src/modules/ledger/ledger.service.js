@@ -5,9 +5,21 @@ export const getUnifiedLedger = async (query = {}) => {
   const where = {};
   if (query.type) where.type = query.type;
   if (query.scope) where.scope = query.scope;
-  if (query.tripId) where.tripId = query.tripId;
-  if (query.crmTripId) where.booking = { ...(where.booking || {}), crmTripId: query.crmTripId };
-  if (query.crmFestivalId) where.booking = { ...(where.booking || {}), crmFestivalId: query.crmFestivalId };
+  if (query.tripId) {
+    where.OR = [
+      { tripId: query.tripId },
+      { crmTripId: query.tripId },
+      { booking: { crmTripId: query.tripId } },
+      { booking: { tripId: query.tripId } },
+    ];
+  }
+  if (query.crmTripId)
+    where.booking = { ...(where.booking || {}), crmTripId: query.crmTripId };
+  if (query.crmFestivalId)
+    where.booking = {
+      ...(where.booking || {}),
+      crmFestivalId: query.crmFestivalId,
+    };
   if (query.source) where.source = query.source;
   if (query.from || query.to) {
     where.entryDate = {};
@@ -21,16 +33,35 @@ export const getUnifiedLedger = async (query = {}) => {
       festival: { select: { id: true, title: true } },
       crmTrip: { select: { id: true, name: true } },
       crmFestival: { select: { id: true, name: true } },
-      booking: { select: { id: true, bookingReference: true, crmTrip: { select: { id: true, name: true } }, crmFestival: { select: { id: true, name: true } }, user: { select: { email: true, profile: { select: { fullName: true } } } } } },
-      createdBy: { select: { email: true, profile: { select: { fullName: true } } } },
+      booking: {
+        select: {
+          id: true,
+          bookingReference: true,
+          crmTrip: { select: { id: true, name: true } },
+          crmFestival: { select: { id: true, name: true } },
+          user: {
+            select: { email: true, profile: { select: { fullName: true } } },
+          },
+        },
+      },
+      createdBy: {
+        select: { email: true, profile: { select: { fullName: true } } },
+      },
     },
     orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }],
     take: Math.min(Math.max(Number(query.limit) || 1000, 1), 2000),
   });
 
-  const sum = (type, tripScoped) => entries
-    .filter((entry) => entry.type === type && (tripScoped ? ["TRIP", "FESTIVAL", "BOOKING"].includes(entry.scope) : entry.scope === "OTHER"))
-    .reduce((total, entry) => total + Number(entry.amount), 0);
+  const sum = (type, tripScoped) =>
+    entries
+      .filter(
+        (entry) =>
+          entry.type === type &&
+          (tripScoped
+            ? ["TRIP", "FESTIVAL", "BOOKING"].includes(entry.scope)
+            : entry.scope === "OTHER"),
+      )
+      .reduce((total, entry) => total + Number(entry.amount), 0);
   const tripIncome = sum("INCOME", true);
   const tripExpense = sum("EXPENSE", true);
   const otherIncome = sum("INCOME", false);
@@ -53,22 +84,55 @@ export const addManualLedgerEntry = async (data, adminId) => {
   if (!data.type || !["INCOME", "EXPENSE"].includes(data.type)) {
     throw new ValidationError("type must be INCOME or EXPENSE");
   }
-  if (!data.scope || !["TRIP", "FESTIVAL", "BOOKING", "OTHER"].includes(data.scope)) {
+  if (
+    !data.scope ||
+    !["TRIP", "FESTIVAL", "BOOKING", "OTHER"].includes(data.scope)
+  ) {
     throw new ValidationError("A valid ledger scope is required");
   }
   const amount = Number(data.amount);
-  if (!Number.isFinite(amount) || amount <= 0) throw new ValidationError("amount must be a positive number");
+  if (!Number.isFinite(amount) || amount <= 0)
+    throw new ValidationError("amount must be a positive number");
   if (!data.category?.trim()) throw new ValidationError("category is required");
-  if (data.scope === "TRIP" && !data.tripId) throw new ValidationError("Select a trip for a trip-scoped entry");
-  if (data.scope === "FESTIVAL" && !data.festivalId) throw new ValidationError("Select a festival for a festival-scoped entry");
-  if (data.scope === "BOOKING" && !data.bookingId) throw new ValidationError("Select a booking for a booking-scoped entry");
+  if (data.scope === "TRIP" && !data.tripId)
+    throw new ValidationError("Select a trip for a trip-scoped entry");
+  if (data.scope === "FESTIVAL" && !data.festivalId)
+    throw new ValidationError("Select a festival for a festival-scoped entry");
+  if (data.scope === "BOOKING" && !data.bookingId)
+    throw new ValidationError("Select a booking for a booking-scoped entry");
+
+  let tripId = null;
+  let crmTripId = null;
+  if (data.scope === "TRIP" && data.tripId) {
+    const crmCount = await prisma.crmTrip.count({ where: { id: data.tripId } });
+    if (crmCount > 0) {
+      crmTripId = data.tripId;
+    } else {
+      tripId = data.tripId;
+    }
+  }
+
+  let festivalId = null;
+  let crmFestivalId = null;
+  if (data.scope === "FESTIVAL" && data.festivalId) {
+    const crmCount = await prisma.crmFestival.count({
+      where: { id: data.festivalId },
+    });
+    if (crmCount > 0) {
+      crmFestivalId = data.festivalId;
+    } else {
+      festivalId = data.festivalId;
+    }
+  }
 
   return prisma.ledgerEntry.create({
     data: {
       type: data.type,
       scope: data.scope,
-      tripId: data.scope === "TRIP" ? data.tripId : null,
-      festivalId: data.scope === "FESTIVAL" ? data.festivalId : null,
+      tripId,
+      crmTripId,
+      festivalId,
+      crmFestivalId,
       bookingId: data.scope === "BOOKING" ? data.bookingId : null,
       source: "MANUAL",
       category: data.category.trim(),
@@ -86,19 +150,56 @@ export const updateManualLedgerEntry = async (entryId, data) => {
   const entry = await prisma.ledgerEntry.findUnique({ where: { id: entryId } });
   if (!entry) throw new NotFoundError("Ledger entry not found");
   if (entry.isAutoGenerated) {
-    throw new ValidationError("Cannot directly edit auto-generated ledger entries");
+    throw new ValidationError(
+      "Cannot directly edit auto-generated ledger entries",
+    );
   }
 
   const updateData = {};
   if (data.type !== undefined) updateData.type = data.type;
   if (data.scope !== undefined) updateData.scope = data.scope;
-  if (data.tripId !== undefined) updateData.tripId = data.tripId || null;
-  if (data.festivalId !== undefined) updateData.festivalId = data.festivalId || null;
-  if (data.bookingId !== undefined) updateData.bookingId = data.bookingId || null;
+  if (data.tripId !== undefined) {
+    if (!data.tripId) {
+      updateData.tripId = null;
+      updateData.crmTripId = null;
+    } else {
+      const crmCount = await prisma.crmTrip.count({
+        where: { id: data.tripId },
+      });
+      if (crmCount > 0) {
+        updateData.crmTripId = data.tripId;
+        updateData.tripId = null;
+      } else {
+        updateData.tripId = data.tripId;
+        updateData.crmTripId = null;
+      }
+    }
+  }
+  if (data.festivalId !== undefined) {
+    if (!data.festivalId) {
+      updateData.festivalId = null;
+      updateData.crmFestivalId = null;
+    } else {
+      const crmCount = await prisma.crmFestival.count({
+        where: { id: data.festivalId },
+      });
+      if (crmCount > 0) {
+        updateData.crmFestivalId = data.festivalId;
+        updateData.festivalId = null;
+      } else {
+        updateData.festivalId = data.festivalId;
+        updateData.crmFestivalId = null;
+      }
+    }
+  }
+  if (data.bookingId !== undefined)
+    updateData.bookingId = data.bookingId || null;
   if (data.category !== undefined) updateData.category = data.category.trim();
   if (data.amount !== undefined) updateData.amount = Number(data.amount);
-  if (data.description !== undefined) updateData.description = data.description?.trim() || null;
-  if (data.entryDate !== undefined) updateData.entryDate = new Date(data.entryDate);
+  if (data.description !== undefined)
+    updateData.description = data.description?.trim() || null;
+  if (data.entryDate !== undefined)
+    updateData.entryDate = new Date(data.entryDate);
 
   return prisma.ledgerEntry.update({
     where: { id: entryId },
@@ -184,7 +285,9 @@ export const removeLedgerEntry = async (entryId, bookingId) => {
   if (!entry) throw new NotFoundError("Ledger entry not found");
 
   if (entry.isAutoGenerated) {
-    throw new ValidationError("Automatic ledger entries must be changed at their source transaction.");
+    throw new ValidationError(
+      "Automatic ledger entries must be changed at their source transaction.",
+    );
   }
 
   return prisma.ledgerEntry.delete({ where: { id: entryId } });
@@ -194,7 +297,9 @@ export const removeManualLedgerEntry = async (entryId) => {
   const entry = await prisma.ledgerEntry.findUnique({ where: { id: entryId } });
   if (!entry) throw new NotFoundError("Ledger entry not found");
   if (entry.isAutoGenerated) {
-    throw new ValidationError("Automatic ledger entries must be changed at their source transaction.");
+    throw new ValidationError(
+      "Automatic ledger entries must be changed at their source transaction.",
+    );
   }
   return prisma.ledgerEntry.delete({ where: { id: entryId } });
 };
