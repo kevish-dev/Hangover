@@ -184,10 +184,27 @@ export function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
   return (
     <div className="p-4 md:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-gray-900"><ClipboardCheck className="h-4 w-4 text-[#781216]" />Ground operations</h3>
-        <SyncIndicator isMutating={createMutation.isPending || updateMutation.isPending || deleteMutation.isPending} isError={createMutation.isError || updateMutation.isError || deleteMutation.isError} />
+        <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-gray-900">
+          <ClipboardCheck className="h-4 w-4 text-[#781216]" />
+          Ground operations
+        </h3>
+        <SyncIndicator
+          isMutating={
+            createMutation.isPending ||
+            updateMutation.isPending ||
+            deleteMutation.isPending
+          }
+          isError={
+            createMutation.isError ||
+            updateMutation.isError ||
+            deleteMutation.isError
+          }
+        />
       </div>
-      <OperationsCalendar tasks={tasks} emptyMessage="No operational tasks have been scheduled for this booking." />
+      <OperationsCalendar
+        tasks={tasks}
+        emptyMessage="No operational tasks have been scheduled for this booking."
+      />
     </div>
   );
 
@@ -244,124 +261,7 @@ export function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {tasks.map((task) => (
-                  <tr key={task.id} className={`group transition-colors ${task.status === "DONE" ? "bg-gray-50/80 text-gray-400 hover:bg-gray-100" : "hover:bg-blue-50/30"}`}>
-                    <td className="border-r border-gray-200 p-0">
-                      <Select
-                        defaultValue={task.status}
-                        onValueChange={(val) =>
-                          handleCellChange(task, "status", val)
-                        }
-                      >
-                        <SelectTrigger
-                          className={`h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 font-semibold text-[10px] tracking-wide ${task.status === "DONE" ? "text-emerald-700" : task.status === "CANCELLED" ? "text-red-700" : "text-blue-700"}`}
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUSES.map((s) => (
-                            <SelectItem key={s} value={s}>
-                              {s}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="border-r border-gray-200 p-0">
-                      <Select
-                        defaultValue={task.category}
-                        onValueChange={(val) =>
-                          handleCellChange(task, "category", val)
-                        }
-                      >
-                        <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CATEGORIES.map((c) => (
-                            <SelectItem key={c} value={c}>
-                              {c}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="border-r border-gray-200 p-0">
-                      <input
-                        type="text"
-                        defaultValue={task.title}
-                        onBlur={(e) =>
-                          handleCellChange(task, "title", e.target.value)
-                        }
-                        className={`w-full h-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 font-medium ${task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"}`}
-                      />
-                    </td>
-                    <td className="border-r border-gray-200 p-0">
-                      <input
-                        type="date"
-                        defaultValue={
-                          task.dueAt
-                            ? format(new Date(task.dueAt), "yyyy-MM-dd")
-                            : ""
-                        }
-                        onBlur={(e) =>
-                          handleCellChange(task, "dueAt", e.target.value)
-                        }
-                        className="w-full h-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 text-xs"
-                      />
-                    </td>
-                    <td className="border-r border-gray-200 p-0">
-                      <input
-                        type="number"
-                        step="0.01"
-                        defaultValue={task.unitPrice ?? ""}
-                        onBlur={(e) =>
-                          handleCellChange(task, "unitPrice", e.target.value)
-                        }
-                        className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-gray-700 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="border-r border-gray-200 p-0">
-                      <input
-                        type="number"
-                        defaultValue={task.quantityNeeded ?? ""}
-                        onBlur={(e) =>
-                          handleCellChange(
-                            task,
-                            "quantityNeeded",
-                            e.target.value,
-                          )
-                        }
-                        className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-gray-700 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="border-r border-gray-200 p-0">
-                      <input
-                        type="number"
-                        defaultValue={task.quantityAcquired ?? ""}
-                        onBlur={(e) =>
-                          handleCellChange(
-                            task,
-                            "quantityAcquired",
-                            e.target.value,
-                          )
-                        }
-                        className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-blue-600 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500"
-                      />
-                    </td>
-
-                    <td className="p-0 text-center align-middle">
-                      <button
-                        onClick={() => deleteMutation.mutate(task.id)}
-                        className="text-gray-400 hover:text-red-600 transition-colors mx-auto p-1.5 opacity-0 group-hover:opacity-100"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-
-                <tr className="bg-indigo-50/30 border-t-2 border-indigo-200">
+                <tr className="bg-indigo-50/30 border-b-2 border-indigo-200">
                   <td className="border-r border-gray-200 p-0">
                     <Select
                       value={newRow.status}
@@ -485,6 +385,126 @@ export function BookingOperationsGrid({ bookingId }: { bookingId: string }) {
                     </button>
                   </td>
                 </tr>
+
+                {tasks.map((task) => (
+                  <tr
+                    key={task.id}
+                    className={`group transition-colors ${task.status === "DONE" ? "bg-gray-50/80 text-gray-400 hover:bg-gray-100" : "hover:bg-blue-50/30"}`}
+                  >
+                    <td className="border-r border-gray-200 p-0">
+                      <Select
+                        defaultValue={task.status}
+                        onValueChange={(val) =>
+                          handleCellChange(task, "status", val)
+                        }
+                      >
+                        <SelectTrigger
+                          className={`h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 font-semibold text-[10px] tracking-wide ${task.status === "DONE" ? "text-emerald-700" : task.status === "CANCELLED" ? "text-red-700" : "text-blue-700"}`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STATUSES.map((s) => (
+                            <SelectItem key={s} value={s}>
+                              {s}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="border-r border-gray-200 p-0">
+                      <Select
+                        defaultValue={task.category}
+                        onValueChange={(val) =>
+                          handleCellChange(task, "category", val)
+                        }
+                      >
+                        <SelectTrigger className="h-full min-h-10 border-0 rounded-none bg-transparent shadow-none px-2 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CATEGORIES.map((c) => (
+                            <SelectItem key={c} value={c}>
+                              {c}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="border-r border-gray-200 p-0">
+                      <input
+                        type="text"
+                        defaultValue={task.title}
+                        onBlur={(e) =>
+                          handleCellChange(task, "title", e.target.value)
+                        }
+                        className={`w-full h-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 font-medium ${task.status === "DONE" ? "text-gray-400 line-through" : "text-gray-900"}`}
+                      />
+                    </td>
+                    <td className="border-r border-gray-200 p-0">
+                      <input
+                        type="date"
+                        defaultValue={
+                          task.dueAt
+                            ? format(new Date(task.dueAt), "yyyy-MM-dd")
+                            : ""
+                        }
+                        onBlur={(e) =>
+                          handleCellChange(task, "dueAt", e.target.value)
+                        }
+                        className="w-full h-full min-h-10 px-3 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 text-xs"
+                      />
+                    </td>
+                    <td className="border-r border-gray-200 p-0">
+                      <input
+                        type="number"
+                        step="0.01"
+                        defaultValue={task.unitPrice ?? ""}
+                        onBlur={(e) =>
+                          handleCellChange(task, "unitPrice", e.target.value)
+                        }
+                        className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-gray-700 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500"
+                      />
+                    </td>
+                    <td className="border-r border-gray-200 p-0">
+                      <input
+                        type="number"
+                        defaultValue={task.quantityNeeded ?? ""}
+                        onBlur={(e) =>
+                          handleCellChange(
+                            task,
+                            "quantityNeeded",
+                            e.target.value,
+                          )
+                        }
+                        className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-gray-700 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500"
+                      />
+                    </td>
+                    <td className="border-r border-gray-200 p-0">
+                      <input
+                        type="number"
+                        defaultValue={task.quantityAcquired ?? ""}
+                        onBlur={(e) =>
+                          handleCellChange(
+                            task,
+                            "quantityAcquired",
+                            e.target.value,
+                          )
+                        }
+                        className="w-full h-full min-h-10 px-3 bg-transparent outline-none text-right font-mono text-blue-600 focus:bg-blue-50 focus:ring-1 focus:ring-blue-500"
+                      />
+                    </td>
+
+                    <td className="p-0 text-center align-middle">
+                      <button
+                        onClick={() => deleteMutation.mutate(task.id)}
+                        className="text-gray-400 hover:text-red-600 transition-colors mx-auto p-1.5 opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -550,9 +570,10 @@ export default function AdminBookingDetailPage() {
   const journeySlot =
     booking.crmTripSlot || booking.crmFestivalSlot || booking.slot || null;
   const journeyName = journey?.name || journey?.title || "N/A";
-  const journeyType = booking.crmFestival || booking.festival || booking.slot?.festival
-    ? "Festival"
-    : "Trip";
+  const journeyType =
+    booking.crmFestival || booking.festival || booking.slot?.festival
+      ? "Festival"
+      : "Trip";
   const journeyDates = journeySlot?.startDate
     ? [
         format(new Date(journeySlot.startDate), "MMM d, yyyy"),
@@ -701,8 +722,7 @@ export default function AdminBookingDetailPage() {
                     Balance Due:
                   </span>
                   <span className="font-bold text-red-600 text-right">
-                    ₹
-                    {Number(booking.amountDue).toLocaleString()}
+                    ₹{Number(booking.amountDue).toLocaleString()}
                   </span>
                 </div>
               </div>
