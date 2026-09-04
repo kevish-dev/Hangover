@@ -15,6 +15,9 @@ import {
   Trash2,
   UserPlus,
   Utensils,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "../../../lib/axios";
@@ -162,41 +165,49 @@ export default function CrmTripDetailPage() {
   const placesQuery = useQuery({
     queryKey: ["crm", "places"],
     queryFn: async () =>
-      (await apiClient.get("/places", {
-        params: { activeOnly: true, limit: 500 },
-      })).data.data as Master[],
+      (
+        await apiClient.get("/places", {
+          params: { activeOnly: true, limit: 500 },
+        })
+      ).data.data as Master[],
     enabled: Boolean(trip),
   });
   const staysQuery = useQuery({
     queryKey: ["crm", "stays", trip?.destination.id],
     queryFn: async () =>
-      (await apiClient.get("/stay-locations", {
-        params: {
-          destinationId: trip!.destination.id,
-          activeOnly: true,
-          limit: 200,
-        },
-      })).data.data as Master[],
+      (
+        await apiClient.get("/stay-locations", {
+          params: {
+            destinationId: trip!.destination.id,
+            activeOnly: true,
+            limit: 200,
+          },
+        })
+      ).data.data as Master[],
     enabled: Boolean(trip),
   });
   const propertiesQuery = useQuery({
     queryKey: ["crm", "properties"],
     queryFn: async () =>
-      (await apiClient.get("/properties", {
-        params: { activeOnly: true, limit: 500 },
-      })).data.data as Master[],
+      (
+        await apiClient.get("/properties", {
+          params: { activeOnly: true, limit: 500 },
+        })
+      ).data.data as Master[],
     enabled: Boolean(trip),
   });
   const transfersQuery = useQuery({
     queryKey: ["crm", "transfers", trip?.destination.id],
     queryFn: async () =>
-      (await apiClient.get("/transfer-locations", {
-        params: {
-          destinationId: trip!.destination.id,
-          activeOnly: true,
-          limit: 200,
-        },
-      })).data.data as Master[],
+      (
+        await apiClient.get("/transfer-locations", {
+          params: {
+            destinationId: trip!.destination.id,
+            activeOnly: true,
+            limit: 200,
+          },
+        })
+      ).data.data as Master[],
     enabled: Boolean(trip),
   });
   const refresh = () =>
@@ -216,8 +227,8 @@ export default function CrmTripDetailPage() {
   if (tripQuery.isLoading) {
     return (
       <div className="py-20 text-center text-gray-500">
-        <Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />Loading
-        itinerary…
+        <Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />
+        Loading itinerary…
       </div>
     );
   }
@@ -235,7 +246,8 @@ export default function CrmTripDetailPage() {
         to="/dashboard/crm-trips"
         className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-[#781216]"
       >
-        <ArrowLeft className="h-4 w-4" />All itinerary trips
+        <ArrowLeft className="h-4 w-4" />
+        All itinerary trips
       </Link>
       <header className="rounded-xl border border-gray-200 bg-white p-5 md:p-6">
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
@@ -248,11 +260,9 @@ export default function CrmTripDetailPage() {
             </h1>
             <p className="mt-2 text-sm text-gray-500">
               {trip.numberOfNights} nights · {trip.itineraryDays.length}{" "}
-              itinerary days · ₹{Number(trip.totalAmount).toLocaleString(
-                "en-IN",
-              )} total · ₹{Number(trip.tokenAmount).toLocaleString("en-IN")}
-              {" "}
-              token
+              itinerary days · ₹
+              {Number(trip.totalAmount).toLocaleString("en-IN")} total · ₹
+              {Number(trip.tokenAmount).toLocaleString("en-IN")} token
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -260,7 +270,8 @@ export default function CrmTripDetailPage() {
               onClick={() => setCreateBookingOpen(true)}
               className="bg-[#781216] text-white hover:bg-[#5f0e11]"
             >
-              <UserPlus className="mr-2 h-4 w-4" />Create booking
+              <UserPlus className="mr-2 h-4 w-4" />
+              Create booking
             </Button>
           </div>
         </div>
@@ -311,105 +322,108 @@ export default function CrmTripDetailPage() {
           Ledger
         </button>
       </div>
-      {activeTab === "stays"
-        ? (
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-            <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">
-                    Itinerary builder
-                  </h2>
-                  <p className="text-sm text-gray-500">
-                    Every change updates generated inclusions automatically.
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    request(
-                      () =>
-                        apiClient.post(`/crm-trips/${id}/itinerary-days`, {}),
-                      "Day added",
-                    )}
-                >
-                  <Plus className="mr-1.5 h-4 w-4" />Add day
-                </Button>
+      {activeTab === "stays" ? (
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">
+                  Itinerary builder
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Every change updates generated inclusions automatically.
+                </p>
               </div>
-              {trip.itineraryDays.map((day, index) => (
-                <DayCard
-                  key={day.id}
-                  day={day}
-                  places={placesQuery.data || []}
-                  stays={staysQuery.data || []}
-                  properties={propertiesQuery.data || []}
-                  transfers={transfersQuery.data || []}
-                  request={request}
-                  canDelete={trip.itineraryDays.length > 1 &&
-                    index === trip.itineraryDays.length - 1}
-                  onDelete={() =>
-                    request(
-                      () =>
-                        apiClient.delete(`/crm-trips/itinerary-days/${day.id}`),
-                      "Final day removed",
-                    )}
-                />
-              ))}
-            </section>
-            <aside className="space-y-4 xl:sticky xl:top-4 xl:h-fit">
-              <CommonInclusions
-                commonInclusions={trip.commonInclusions || []}
-                tripId={id}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  request(
+                    () => apiClient.post(`/crm-trips/${id}/itinerary-days`, {}),
+                    "Day added",
+                  )
+                }
+              >
+                <Plus className="mr-1.5 h-4 w-4" />
+                Add day
+              </Button>
+            </div>
+            {trip.itineraryDays.map((day, index) => (
+              <DayCard
+                key={day.id}
+                day={day}
+                places={placesQuery.data || []}
+                stays={staysQuery.data || []}
+                properties={propertiesQuery.data || []}
+                transfers={transfersQuery.data || []}
                 request={request}
+                canDelete={
+                  trip.itineraryDays.length > 1 &&
+                  index === trip.itineraryDays.length - 1
+                }
+                onDelete={() =>
+                  request(
+                    () =>
+                      apiClient.delete(`/crm-trips/itinerary-days/${day.id}`),
+                    "Final day removed",
+                  )
+                }
               />
-              <div className="rounded-xl border border-gray-200 bg-white">
-                <div className="border-b px-5 py-4">
-                  <h2 className="font-bold text-gray-900">
-                    Generated inclusions
-                  </h2>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Read-only and synchronized from the itinerary.
-                  </p>
-                </div>
-                <div className="divide-y divide-gray-100">
-                  {trip.inclusions.map((inclusion) => (
-                    <div key={inclusion.id} className="px-5 py-3">
-                      <p className="flex items-start gap-2 text-sm font-medium text-gray-800">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                        {inclusion.title}
-                      </p>
-                      {inclusion.description && (
-                        <p className="ml-6 mt-1 text-xs leading-relaxed text-gray-500">
-                          {inclusion.description}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                  {!trip.inclusions.length && (
-                    <p className="px-5 py-8 text-center text-sm text-gray-500">
-                      No inclusions yet.
-                    </p>
-                  )}
-                </div>
+            ))}
+          </section>
+          <aside className="space-y-4 xl:sticky xl:top-4 xl:h-fit">
+            <CommonInclusions
+              commonInclusions={trip.commonInclusions || []}
+              tripId={id}
+              request={request}
+            />
+            <div className="rounded-xl border border-gray-200 bg-white">
+              <div className="border-b px-5 py-4">
+                <h2 className="font-bold text-gray-900">
+                  Generated inclusions
+                </h2>
+                <p className="mt-1 text-xs text-gray-500">
+                  Read-only and synchronized from the itinerary.
+                </p>
               </div>
-            </aside>
-          </div>
-        )
-        : activeTab === "bookings"
-        ? (
-          <BookingPanel
-            bookings={bookingsQuery.data || []}
-            loading={bookingsQuery.isLoading}
-            onCreate={() => setCreateBookingOpen(true)}
-            onInstallment={setInstallmentBooking}
-            onOpen={(booking) =>
-              navigate(`/dashboard/crm-trips/${id}/bookings/${booking.id}`)}
-          />
-        )
-        : activeTab === "operations"
-        ? <CrmOperationsCalendar tripId={id} />
-        : <CrmTripLedger tripId={id} />}
+              <div className="divide-y divide-gray-100">
+                {trip.inclusions.map((inclusion) => (
+                  <div key={inclusion.id} className="px-5 py-3">
+                    <p className="flex items-start gap-2 text-sm font-medium text-gray-800">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                      {inclusion.title}
+                    </p>
+                    {inclusion.description && (
+                      <p className="ml-6 mt-1 text-xs leading-relaxed text-gray-500">
+                        {inclusion.description}
+                      </p>
+                    )}
+                  </div>
+                ))}
+                {!trip.inclusions.length && (
+                  <p className="px-5 py-8 text-center text-sm text-gray-500">
+                    No inclusions yet.
+                  </p>
+                )}
+              </div>
+            </div>
+          </aside>
+        </div>
+      ) : activeTab === "bookings" ? (
+        <BookingPanel
+          bookings={bookingsQuery.data || []}
+          loading={bookingsQuery.isLoading}
+          onCreate={() => setCreateBookingOpen(true)}
+          onInstallment={setInstallmentBooking}
+          onOpen={(booking) =>
+            navigate(`/dashboard/crm-trips/${id}/bookings/${booking.id}`)
+          }
+        />
+      ) : activeTab === "operations" ? (
+        <CrmOperationsCalendar tripId={id} />
+      ) : (
+        <CrmTripLedger tripId={id} />
+      )}
       <CrmBookingDetailsDialog
         open={createBookingOpen}
         onOpenChange={setCreateBookingOpen}
@@ -471,17 +485,21 @@ function CrmOperationsCalendar({ tripId }: { tripId: string }) {
   const operationsQuery = useQuery({
     queryKey: ["crm-trip-operations", tripId, slotId],
     queryFn: async () =>
-      (await apiClient.get(`/crm-trips/${tripId}/operations`, {
-        params: slotId ? { slotId } : {},
-      })).data,
+      (
+        await apiClient.get(`/crm-trips/${tripId}/operations`, {
+          params: slotId ? { slotId } : {},
+        })
+      ).data,
     enabled: Boolean(tripId),
   });
-  const data = operationsQuery.data as {
-    slots: CrmSlot[];
-    slot: CrmSlot;
-    tasks: CalendarTask[];
-    bookings: CalendarBooking[];
-  } | undefined;
+  const data = operationsQuery.data as
+    | {
+        slots: CrmSlot[];
+        slot: CrmSlot;
+        tasks: CalendarTask[];
+        bookings: CalendarBooking[];
+      }
+    | undefined;
   const refresh = () => {
     queryClient.invalidateQueries({
       queryKey: ["crm-trip-operations", tripId],
@@ -493,8 +511,8 @@ function CrmOperationsCalendar({ tripId }: { tripId: string }) {
   if (operationsQuery.isLoading) {
     return (
       <div className="py-16 text-center text-sm text-gray-500">
-        <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading
-        operations…
+        <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
+        Loading operations…
       </div>
     );
   }
@@ -538,7 +556,9 @@ function CrmOperationsCalendar({ tripId }: { tripId: string }) {
                 {new Date(slot.startDate).toLocaleDateString("en-IN", {
                   day: "numeric",
                   month: "short",
-                })} – {new Date(slot.endDate).toLocaleDateString("en-IN", {
+                })}{" "}
+                –{" "}
+                {new Date(slot.endDate).toLocaleDateString("en-IN", {
                   day: "numeric",
                   month: "short",
                 })}
@@ -552,7 +572,8 @@ function CrmOperationsCalendar({ tripId }: { tripId: string }) {
             onClick={() => setManualOpen(true)}
             disabled={!data.bookings.length}
           >
-            <Plus className="mr-1 h-4 w-4" />Task
+            <Plus className="mr-1 h-4 w-4" />
+            Task
           </Button>
         </div>
       </div>
@@ -560,18 +581,18 @@ function CrmOperationsCalendar({ tripId }: { tripId: string }) {
         {calendarDates(data.slot.startDate, data.slot.endDate).map((date) => {
           const tasks = tasksByDate.get(date) || [];
           const active = tasks.filter((task) => task.status !== "CANCELLED");
-          const overdue = active.some((task) =>
-            task.status !== "DONE" && date < today
+          const overdue = active.some(
+            (task) => task.status !== "DONE" && date < today,
           );
-          const allDone = active.length > 0 &&
-            active.every((task) => task.status === "DONE");
+          const allDone =
+            active.length > 0 && active.every((task) => task.status === "DONE");
           const state = overdue
             ? "border-red-300 bg-red-50"
             : !active.length
-            ? "border-gray-200 bg-white"
-            : allDone
-            ? "border-emerald-300 bg-emerald-50"
-            : "border-amber-300 bg-amber-50";
+              ? "border-gray-200 bg-white"
+              : allDone
+                ? "border-emerald-300 bg-emerald-50"
+                : "border-amber-300 bg-amber-50";
           return (
             <div
               key={date}
@@ -640,13 +661,15 @@ function CrmOperationsCalendar({ tripId }: { tripId: string }) {
   );
 }
 
-function TaskCompletionDialog(
-  { task, onOpenChange, onSaved }: {
-    task: CalendarTask | null;
-    onOpenChange: (value: boolean) => void;
-    onSaved: () => void;
-  },
-) {
+function TaskCompletionDialog({
+  task,
+  onOpenChange,
+  onSaved,
+}: {
+  task: CalendarTask | null;
+  onOpenChange: (value: boolean) => void;
+  onSaved: () => void;
+}) {
   const [unitPrice, setUnitPrice] = useState("");
   const [quantity, setQuantity] = useState("");
   const [done, setDone] = useState(false);
@@ -732,7 +755,8 @@ function TaskCompletionDialog(
                 checked={done || task.status === "DONE"}
                 disabled={task.status === "DONE"}
                 onChange={(e) => setDone(e.target.checked)}
-              />Mark this task complete
+              />
+              Mark this task complete
             </label>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -743,9 +767,8 @@ function TaskCompletionDialog(
                 onClick={save}
                 className="bg-[#781216] text-white hover:bg-[#5f0e11]"
               >
-                {saving && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}Save
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save
               </Button>
             </div>
           </div>
@@ -755,15 +778,19 @@ function TaskCompletionDialog(
   );
 }
 
-function ManualCalendarTaskDialog(
-  { open, onOpenChange, bookings, dates, onSaved }: {
-    open: boolean;
-    onOpenChange: (value: boolean) => void;
-    bookings: CalendarBooking[];
-    dates: string[];
-    onSaved: () => void;
-  },
-) {
+function ManualCalendarTaskDialog({
+  open,
+  onOpenChange,
+  bookings,
+  dates,
+  onSaved,
+}: {
+  open: boolean;
+  onOpenChange: (value: boolean) => void;
+  bookings: CalendarBooking[];
+  dates: string[];
+  onSaved: () => void;
+}) {
   const [bookingId, setBookingId] = useState("");
   const [title, setTitle] = useState("");
   const [dueAt, setDueAt] = useState(dates[0] || "");
@@ -866,9 +893,10 @@ type CrmLedgerEntry = {
   amount: string | number;
   booking?: {
     bookingReference: string;
-    user?:
-      | { email: string; profile?: { fullName?: string | null } | null }
-      | null;
+    user?: {
+      email: string;
+      profile?: { fullName?: string | null } | null;
+    } | null;
   } | null;
 };
 
@@ -878,13 +906,13 @@ function CrmTripLedger({ tripId }: { tripId: string }) {
     queryFn: async () =>
       (await apiClient.get("/ledgers", { params: { crmTripId: tripId } }))
         .data as {
-          entries: CrmLedgerEntry[];
-          summary: {
-            tripIncome: number;
-            tripExpense: number;
-            netBalance: number;
-          };
-        },
+        entries: CrmLedgerEntry[];
+        summary: {
+          tripIncome: number;
+          tripExpense: number;
+          netBalance: number;
+        };
+      },
     enabled: Boolean(tripId),
   });
   const data = ledgerQuery.data;
@@ -893,8 +921,8 @@ function CrmTripLedger({ tripId }: { tripId: string }) {
   if (ledgerQuery.isLoading) {
     return (
       <div className="py-16 text-center text-sm text-gray-500">
-        <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading trip
-        ledger…
+        <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
+        Loading trip ledger…
       </div>
     );
   }
@@ -912,25 +940,106 @@ function CrmTripLedger({ tripId }: { tripId: string }) {
           appear once a task has both a unit cost and acquired quantity.
         </p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <LedgerSummary
-          label="Booking income"
-          value={data?.summary.tripIncome || 0}
-          tone="text-emerald-700"
-        />
-        <LedgerSummary
-          label="Operation costs"
-          value={data?.summary.tripExpense || 0}
-          tone="text-red-700"
-        />
-        <LedgerSummary
-          label="Net collected"
-          value={data?.summary.netBalance || 0}
-          tone={(data?.summary.netBalance || 0) < 0
-            ? "text-red-700"
-            : "text-gray-900"}
-        />
-      </div>
+      {(() => {
+        const income = data?.summary.tripIncome || 0;
+        const expense = data?.summary.tripExpense || 0;
+        const netCollected = data?.summary.netBalance || 0;
+        const netProfitLoss = income - expense;
+        const isProfit = netProfitLoss > 0;
+        const isLoss = netProfitLoss < 0;
+
+        return (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Booking Income
+                </p>
+                <span className="rounded-full bg-emerald-50 p-1.5 text-emerald-600">
+                  <TrendingUp className="h-4 w-4" />
+                </span>
+              </div>
+              <p className="mt-2 text-2xl font-bold text-emerald-700">
+                ₹{income.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Operation Costs
+                </p>
+                <span className="rounded-full bg-red-50 p-1.5 text-red-600">
+                  <TrendingDown className="h-4 w-4" />
+                </span>
+              </div>
+              <p className="mt-2 text-2xl font-bold text-red-700">
+                ₹{expense.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Net Collected
+                </p>
+                <span className="rounded-full bg-blue-50 p-1.5 text-blue-600">
+                  <DollarSign className="h-4 w-4" />
+                </span>
+              </div>
+              <p
+                className={`mt-2 text-2xl font-bold ${netCollected < 0 ? "text-red-700" : "text-gray-900"}`}
+              >
+                ₹
+                {netCollected.toLocaleString("en-IN", {
+                  maximumFractionDigits: 2,
+                })}
+              </p>
+            </div>
+
+            <div
+              className={`rounded-xl border p-4 shadow-sm ${
+                isProfit
+                  ? "border-emerald-200 bg-emerald-50/40"
+                  : isLoss
+                    ? "border-red-200 bg-red-50/40"
+                    : "border-gray-200 bg-white"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-600">
+                  Profit & Loss (P&L)
+                </p>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                    isProfit
+                      ? "bg-emerald-100 text-emerald-800"
+                      : isLoss
+                        ? "bg-red-100 text-red-800"
+                        : "bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  {isProfit ? "PROFIT" : isLoss ? "LOSS" : "BREAK EVEN"}
+                </span>
+              </div>
+              <p
+                className={`mt-2 text-2xl font-bold ${
+                  isProfit
+                    ? "text-emerald-700"
+                    : isLoss
+                      ? "text-red-700"
+                      : "text-gray-900"
+                }`}
+              >
+                {isProfit ? "+" : ""}₹
+                {Math.abs(netProfitLoss).toLocaleString("en-IN", {
+                  maximumFractionDigits: 2,
+                })}
+              </p>
+            </div>
+          </div>
+        );
+      })()}
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         <div className="border-b px-5 py-4">
           <h3 className="font-bold text-gray-900">Entries</h3>
@@ -938,93 +1047,98 @@ function CrmTripLedger({ tripId }: { tripId: string }) {
             Automatically linked to CRM bookings in this itinerary.
           </p>
         </div>
-        {!data?.entries.length
-          ? (
-            <div className="p-10 text-center text-sm text-gray-500">
-              No booking receipts or operation costs have been recorded yet.
-            </div>
-          )
-          : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-sm">
-                <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                  <tr>
-                    <th className="px-5 py-3 font-semibold">Date</th>
-                    <th className="px-5 py-3 font-semibold">Entry</th>
-                    <th className="px-5 py-3 font-semibold">Booking</th>
-                    <th className="px-5 py-3 font-semibold">Source</th>
-                    <th className="px-5 py-3 text-right font-semibold">
-                      Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {data.entries.map((entry) => {
-                    const customer = entry.booking?.user?.profile?.fullName ||
-                      entry.booking?.user?.email || "CRM booking";
-                    return (
-                      <tr key={entry.id}>
-                        <td className="whitespace-nowrap px-5 py-3 text-gray-600">
-                          {new Date(entry.entryDate).toLocaleDateString(
-                            "en-IN",
-                            { day: "numeric", month: "short", year: "numeric" },
-                          )}
-                        </td>
-                        <td className="px-5 py-3">
-                          <p className="font-medium text-gray-900">
-                            {entry.category}
+        {!data?.entries.length ? (
+          <div className="p-10 text-center text-sm text-gray-500">
+            No booking receipts or operation costs have been recorded yet.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th className="px-5 py-3 font-semibold">Date</th>
+                  <th className="px-5 py-3 font-semibold">Entry</th>
+                  <th className="px-5 py-3 font-semibold">Booking</th>
+                  <th className="px-5 py-3 font-semibold">Source</th>
+                  <th className="px-5 py-3 text-right font-semibold">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {data.entries.map((entry) => {
+                  const customer =
+                    entry.booking?.user?.profile?.fullName ||
+                    entry.booking?.user?.email ||
+                    "CRM booking";
+                  return (
+                    <tr key={entry.id}>
+                      <td className="whitespace-nowrap px-5 py-3 text-gray-600">
+                        {new Date(entry.entryDate).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </td>
+                      <td className="px-5 py-3">
+                        <p className="font-medium text-gray-900">
+                          {entry.category}
+                        </p>
+                        {entry.description && (
+                          <p className="mt-0.5 text-xs text-gray-500">
+                            {entry.description}
                           </p>
-                          {entry.description && (
-                            <p className="mt-0.5 text-xs text-gray-500">
-                              {entry.description}
-                            </p>
-                          )}
-                        </td>
-                        <td className="px-5 py-3">
-                          <p className="font-medium text-gray-800">
-                            {entry.booking?.bookingReference || "—"}
-                          </p>
-                          <p className="text-xs text-gray-500">{customer}</p>
-                        </td>
-                        <td className="px-5 py-3">
-                          <span
-                            className={`rounded-full px-2 py-1 text-[11px] font-bold ${
-                              entry.type === "INCOME"
-                                ? "bg-emerald-50 text-emerald-700"
-                                : "bg-red-50 text-red-700"
-                            }`}
-                          >
-                            {entry.type === "INCOME" ? "Income" : "Expense"}
-                          </span>
-                          <p className="mt-1 text-[11px] text-gray-500">
-                            {entry.source}
-                          </p>
-                        </td>
-                        <td
-                          className={`px-5 py-3 text-right font-bold ${
+                        )}
+                      </td>
+                      <td className="px-5 py-3">
+                        <p className="font-medium text-gray-800">
+                          {entry.booking?.bookingReference || "—"}
+                        </p>
+                        <p className="text-xs text-gray-500">{customer}</p>
+                      </td>
+                      <td className="px-5 py-3">
+                        <span
+                          className={`rounded-full px-2 py-1 text-[11px] font-bold ${
                             entry.type === "INCOME"
-                              ? "text-emerald-700"
-                              : "text-red-700"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-red-50 text-red-700"
                           }`}
                         >
-                          {entry.type === "INCOME" ? "+" : "−"}
-                          {amount(entry.amount)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                          {entry.type === "INCOME" ? "Income" : "Expense"}
+                        </span>
+                        <p className="mt-1 text-[11px] text-gray-500">
+                          {entry.source}
+                        </p>
+                      </td>
+                      <td
+                        className={`px-5 py-3 text-right font-bold ${
+                          entry.type === "INCOME"
+                            ? "text-emerald-700"
+                            : "text-red-700"
+                        }`}
+                      >
+                        {entry.type === "INCOME" ? "+" : "−"}
+                        {amount(entry.amount)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </section>
   );
 }
 
-function LedgerSummary(
-  { label, value, tone }: { label: string; value: number; tone: string },
-) {
+function LedgerSummary({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: string;
+}) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -1060,22 +1174,23 @@ function BookingPanel({
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={onCreate}>
-          <Plus className="mr-1 h-3.5 w-3.5" />New
+          <Plus className="mr-1 h-3.5 w-3.5" />
+          New
         </Button>
       </div>
       <div className="divide-y divide-gray-100">
-        {loading
-          ? (
-            <div className="p-5 text-center text-sm text-gray-500">
-              <Loader2 className="mx-auto mb-2 h-4 w-4 animate-spin" />Loading
-              bookings…
-            </div>
-          )
-          : bookings.map((booking) => {
+        {loading ? (
+          <div className="p-5 text-center text-sm text-gray-500">
+            <Loader2 className="mx-auto mb-2 h-4 w-4 animate-spin" />
+            Loading bookings…
+          </div>
+        ) : (
+          bookings.map((booking) => {
             const paid = Number(booking.amountPaid);
             const due = Number(booking.amountDue);
-            const activeLink = booking.payments.find((payment) =>
-              payment.status === "CREATED" || payment.status === "PENDING"
+            const activeLink = booking.payments.find(
+              (payment) =>
+                payment.status === "CREATED" || payment.status === "PENDING",
             );
             return (
               <div
@@ -1097,8 +1212,7 @@ function BookingPanel({
                       {booking.user.profile?.fullName || booking.user.email}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {booking.bookingReference} · {booking.numberOfTravelers}
-                      {" "}
+                      {booking.bookingReference} · {booking.numberOfTravelers}{" "}
                       traveler{booking.numberOfTravelers === 1 ? "" : "s"}
                     </p>
                   </div>
@@ -1113,14 +1227,14 @@ function BookingPanel({
                   </span>
                 </div>
                 <p className="text-xs text-gray-600">
-                  Paid <strong>₹{paid.toLocaleString("en-IN")}</strong> · Due
-                  {" "}
+                  Paid <strong>₹{paid.toLocaleString("en-IN")}</strong> · Due{" "}
                   <strong>₹{due.toLocaleString("en-IN")}</strong>
                 </p>
                 {activeLink && (
                   <p className="rounded bg-blue-50 px-2 py-1 text-xs text-blue-700">
-                    Razorpay link for ₹{Number(activeLink.amount)
-                      .toLocaleString("en-IN")} is awaiting payment.
+                    Razorpay link for ₹
+                    {Number(activeLink.amount).toLocaleString("en-IN")} is
+                    awaiting payment.
                   </p>
                 )}
                 {due > 0 && (
@@ -1134,13 +1248,14 @@ function BookingPanel({
                       onInstallment(booking);
                     }}
                   >
-                    <CreditCard className="mr-1.5 h-3.5 w-3.5" />Record or
-                    request installment
+                    <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+                    Record or request installment
                   </Button>
                 )}
               </div>
             );
-          })}
+          })
+        )}
         {!loading && !bookings.length && (
           <div className="p-6 text-center text-sm text-gray-500">
             No CRM bookings yet.
@@ -1151,14 +1266,17 @@ function BookingPanel({
   );
 }
 
-function CrmBookingDialog(
-  { open, onOpenChange, trip, onCreated }: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    trip: Trip;
-    onCreated: () => void;
-  },
-) {
+function CrmBookingDialog({
+  open,
+  onOpenChange,
+  trip,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  trip: Trip;
+  onCreated: () => void;
+}) {
   const [form, setForm] = useState({
     email: "",
     fullName: "",
@@ -1268,7 +1386,15 @@ function CrmBookingDialog(
     }
   };
   const linkAmounts = booking
-    ? [...new Set([0.1, 0.25, 0.5, 0.75, 1].map((fraction) => (Math.round(Number(booking.amountDue) * fraction * 100) / 100).toFixed(2)))]
+    ? [
+        ...new Set(
+          [0.1, 0.25, 0.5, 0.75, 1].map((fraction) =>
+            (
+              Math.round(Number(booking.amountDue) * fraction * 100) / 100
+            ).toFixed(2),
+          ),
+        ),
+      ]
     : [];
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1279,11 +1405,9 @@ function CrmBookingDialog(
         <div className="space-y-6">
           <div className="rounded-lg bg-[#fcf4e7] p-4 text-sm text-[#6f4c08]">
             <strong>{trip.name}</strong>
-            <br />Trip total ₹{Number(trip.totalAmount).toLocaleString("en-IN")}
-            {" "}
-            · Token reference ₹{Number(trip.tokenAmount).toLocaleString(
-              "en-IN",
-            )}
+            <br />
+            Trip total ₹{Number(trip.totalAmount).toLocaleString("en-IN")} ·
+            Token reference ₹{Number(trip.tokenAmount).toLocaleString("en-IN")}
           </div>
           <div>
             <h3 className="mb-3 text-sm font-bold text-gray-900">
@@ -1340,8 +1464,8 @@ function CrmBookingDialog(
                   {uploading === "lead"
                     ? "Uploading…"
                     : form.govtIdAssetId
-                    ? "Uploaded"
-                    : "Optional"}
+                      ? "Uploaded"
+                      : "Optional"}
                 </p>
               </Field>
             </div>
@@ -1370,31 +1494,36 @@ function CrmBookingDialog(
                     placeholder={`Traveler ${index + 2} name`}
                     value={traveler.fullName}
                     onChange={(e) =>
-                      updateTraveler(index, "fullName", e.target.value)}
+                      updateTraveler(index, "fullName", e.target.value)
+                    }
                   />
                   <Input
                     placeholder="Email"
                     value={traveler.email}
                     onChange={(e) =>
-                      updateTraveler(index, "email", e.target.value)}
+                      updateTraveler(index, "email", e.target.value)
+                    }
                   />
                   <Input
                     placeholder="Phone"
                     value={traveler.phone}
                     onChange={(e) =>
-                      updateTraveler(index, "phone", e.target.value)}
+                      updateTraveler(index, "phone", e.target.value)
+                    }
                   />
                   <Input
                     type="date"
                     value={traveler.dateOfBirth}
                     onChange={(e) =>
-                      updateTraveler(index, "dateOfBirth", e.target.value)}
+                      updateTraveler(index, "dateOfBirth", e.target.value)
+                    }
                   />
                   <select
                     className="h-9 rounded-md border border-input bg-white px-3 text-sm"
                     value={traveler.gender}
                     onChange={(e) =>
-                      updateTraveler(index, "gender", e.target.value)}
+                      updateTraveler(index, "gender", e.target.value)
+                    }
                   >
                     <option value="">Gender</option>
                     <option value="Male">Male</option>
@@ -1406,7 +1535,8 @@ function CrmBookingDialog(
                     accept="image/*,.pdf"
                     disabled={uploading === `traveler-${index}`}
                     onChange={(e) =>
-                      upload(e.target.files?.[0], `traveler-${index}`, index)}
+                      upload(e.target.files?.[0], `traveler-${index}`, index)
+                    }
                   />
                 </div>
               ))}
@@ -1480,14 +1610,17 @@ type CrmAdditionalTraveler = {
   aadhaarAssetId: string;
 };
 
-function CrmBookingDetailsDialog(
-  { open, onOpenChange, trip, onCreated }: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    trip: Trip;
-    onCreated: () => void;
-  },
-) {
+function CrmBookingDetailsDialog({
+  open,
+  onOpenChange,
+  trip,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  trip: Trip;
+  onCreated: () => void;
+}) {
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -1510,7 +1643,9 @@ function CrmBookingDetailsDialog(
   const addOns = trip.addOns || [];
 
   const [packageId, setPackageId] = useState("");
-  const [selectedAddOns, setSelectedAddOns] = useState<Record<string, number>>({});
+  const [selectedAddOns, setSelectedAddOns] = useState<Record<string, number>>(
+    {},
+  );
 
   useEffect(() => {
     if (packages.length > 0 && !packageId) {
@@ -1519,8 +1654,12 @@ function CrmBookingDetailsDialog(
   }, [packages, packageId]);
 
   const selectedPackage = packages.find((p: any) => p.id === packageId);
-  const basePrice = selectedPackage ? Number(selectedPackage.price) : Number(trip.totalAmount || 0);
-  const tokenPrice = selectedPackage ? Number(selectedPackage.tokenAmount) : Number(trip.tokenAmount || 0);
+  const basePrice = selectedPackage
+    ? Number(selectedPackage.price)
+    : Number(trip.totalAmount || 0);
+  const tokenPrice = selectedPackage
+    ? Number(selectedPackage.tokenAmount)
+    : Number(trip.tokenAmount || 0);
   const numTravelers = Math.max(1, Number(form.numberOfTravelers) || 1);
 
   let addOnsPrice = 0;
@@ -1531,24 +1670,42 @@ function CrmBookingDetailsDialog(
 
   const totalPrice = basePrice * numTravelers + addOnsPrice;
   const recommendedTokenPrice = tokenPrice * numTravelers;
-  const totalWithGst = Math.round((totalPrice * 1.05 + Number.EPSILON) * 100) / 100;
-  const paymentLinkOptions = [10, 25, 50, 75, 100].map((percentage) => ({
-    value: String(percentage),
-    amount: Math.round((totalWithGst * percentage / 100 + Number.EPSILON) * 100) / 100,
-  })).filter((option, index, options) => option.amount > 0 &&
-    options.findIndex((candidate) => candidate.amount === option.amount) === index
-  );
+  const totalWithGst =
+    Math.round((totalPrice * 1.05 + Number.EPSILON) * 100) / 100;
+  const paymentLinkOptions = [10, 25, 50, 75, 100]
+    .map((percentage) => ({
+      value: String(percentage),
+      amount:
+        Math.round(((totalWithGst * percentage) / 100 + Number.EPSILON) * 100) /
+        100,
+    }))
+    .filter(
+      (option, index, options) =>
+        option.amount > 0 &&
+        options.findIndex((candidate) => candidate.amount === option.amount) ===
+          index,
+    );
 
   useEffect(() => {
     if (recommendedTokenPrice > 0 && form.paymentAction === "MANUAL") {
-      setForm((current) => ({ ...current, paymentAmount: String(recommendedTokenPrice) }));
+      setForm((current) => ({
+        ...current,
+        paymentAmount: String(recommendedTokenPrice),
+      }));
     }
   }, [recommendedTokenPrice, form.paymentAction]);
 
   useEffect(() => {
-    if (form.paymentAction !== "SEND_LINK" || linkAmountChoice === "CUSTOM") return;
-    const option = paymentLinkOptions.find((item) => item.value === linkAmountChoice);
-    if (option) setForm((current) => ({ ...current, paymentAmount: String(option.amount) }));
+    if (form.paymentAction !== "SEND_LINK" || linkAmountChoice === "CUSTOM")
+      return;
+    const option = paymentLinkOptions.find(
+      (item) => item.value === linkAmountChoice,
+    );
+    if (option)
+      setForm((current) => ({
+        ...current,
+        paymentAmount: String(option.amount),
+      }));
   }, [totalWithGst, form.paymentAction, linkAmountChoice]);
 
   useEffect(() => {
@@ -1566,10 +1723,10 @@ function CrmBookingDetailsDialog(
   ) =>
     setForm((current) => ({
       ...current,
-      additionalTravelers: current.additionalTravelers.map((
-        traveler,
-        travelerIndex,
-      ) => travelerIndex === index ? { ...traveler, [key]: value } : traveler),
+      additionalTravelers: current.additionalTravelers.map(
+        (traveler, travelerIndex) =>
+          travelerIndex === index ? { ...traveler, [key]: value } : traveler,
+      ),
     }));
   const setTravelers = (value: string) =>
     setForm((current) => {
@@ -1607,11 +1764,9 @@ function CrmBookingDetailsDialog(
       });
       if (travelerIndex === undefined) {
         update("govtIdAssetId", result.data.assetId);
-      } else {updateTraveler(
-          travelerIndex,
-          "aadhaarAssetId",
-          result.data.assetId,
-        );}
+      } else {
+        updateTraveler(travelerIndex, "aadhaarAssetId", result.data.assetId);
+      }
       toast.success("Aadhaar card uploaded");
     } catch {
       toast.error("Could not upload Aadhaar card");
@@ -1658,14 +1813,19 @@ function CrmBookingDetailsDialog(
   const submit = async () => {
     const travelers = Math.max(1, Number(form.numberOfTravelers) || 1);
     const amount = Number(form.paymentAmount);
-    const leadComplete = form.fullName.trim() && form.email.trim() &&
-      form.phone.trim() && form.gender && form.dateOfBirth &&
+    const leadComplete =
+      form.fullName.trim() &&
+      form.email.trim() &&
+      form.phone.trim() &&
+      form.gender &&
+      form.dateOfBirth &&
       form.govtIdAssetId;
-    const everyAdditionalTravelerComplete = form.additionalTravelers.every((
-      traveler,
-    ) =>
-      traveler.fullName.trim() && traveler.gender && traveler.dateOfBirth &&
-      traveler.aadhaarAssetId
+    const everyAdditionalTravelerComplete = form.additionalTravelers.every(
+      (traveler) =>
+        traveler.fullName.trim() &&
+        traveler.gender &&
+        traveler.dateOfBirth &&
+        traveler.aadhaarAssetId,
     );
     if (!leadComplete) {
       return toast.error(
@@ -1680,9 +1840,12 @@ function CrmBookingDetailsDialog(
     if (!form.crmTripSlotId || !amount) {
       return toast.error("Departure and first payment are required");
     }
-    const maximumPayment = form.paymentAction === "SEND_LINK" ? totalWithGst : totalPrice;
+    const maximumPayment =
+      form.paymentAction === "SEND_LINK" ? totalWithGst : totalPrice;
     if (amount > maximumPayment) {
-      return toast.error("The first payment cannot exceed the total booking price");
+      return toast.error(
+        "The first payment cannot exceed the total booking price",
+      );
     }
     const slot = trip.slots.find((item) => item.id === form.crmTripSlotId);
     if (!slot || slot.capacity - slot.filledSpots < travelers) {
@@ -1698,7 +1861,10 @@ function CrmBookingDetailsDialog(
         numberOfTravelers: travelers,
         paymentAmount: amount,
         packageId: packageId || null,
-        addOns: Object.entries(selectedAddOns).map(([addOnId, quantity]) => ({ addOnId, quantity })),
+        addOns: Object.entries(selectedAddOns).map(([addOnId, quantity]) => ({
+          addOnId,
+          quantity,
+        })),
       });
       toast.success(
         form.paymentAction === "SEND_LINK"
@@ -1723,7 +1889,8 @@ function CrmBookingDetailsDialog(
         <div className="space-y-6">
           <div className="rounded-md bg-[#fcf4e7] p-3 text-sm text-[#6f4c08]">
             <strong>{trip.name}</strong>
-            <br />Record complete traveler details before creating the booking.
+            <br />
+            Record complete traveler details before creating the booking.
           </div>
           <section>
             <h3 className="mb-3 text-sm font-bold text-gray-900">
@@ -1781,8 +1948,8 @@ function CrmBookingDetailsDialog(
                   {uploading === "lead"
                     ? "Uploading…"
                     : form.govtIdAssetId
-                    ? "Uploaded"
-                    : "Clear photo or PDF"}
+                      ? "Uploaded"
+                      : "Clear photo or PDF"}
                 </p>
               </Field>
             </div>
@@ -1817,27 +1984,31 @@ function CrmBookingDetailsDialog(
                       placeholder="Full name *"
                       value={traveler.fullName}
                       onChange={(e) =>
-                        updateTraveler(index, "fullName", e.target.value)}
+                        updateTraveler(index, "fullName", e.target.value)
+                      }
                     />
                     <Input
                       type="email"
                       placeholder="Email *"
                       value={traveler.email}
                       onChange={(e) =>
-                        updateTraveler(index, "email", e.target.value)}
+                        updateTraveler(index, "email", e.target.value)
+                      }
                     />
                     <Input
                       type="tel"
                       placeholder="Phone *"
                       value={traveler.phone}
                       onChange={(e) =>
-                        updateTraveler(index, "phone", e.target.value)}
+                        updateTraveler(index, "phone", e.target.value)
+                      }
                     />
                     <select
                       className="h-9 rounded-md border border-input bg-white px-3 text-sm"
                       value={traveler.gender}
                       onChange={(e) =>
-                        updateTraveler(index, "gender", e.target.value)}
+                        updateTraveler(index, "gender", e.target.value)
+                      }
                     >
                       <option value="">Gender *</option>
                       <option value="MALE">Male</option>
@@ -1851,7 +2022,8 @@ function CrmBookingDetailsDialog(
                       type="date"
                       value={traveler.dateOfBirth}
                       onChange={(e) =>
-                        updateTraveler(index, "dateOfBirth", e.target.value)}
+                        updateTraveler(index, "dateOfBirth", e.target.value)
+                      }
                     />
                     <div>
                       <Input
@@ -1863,14 +2035,15 @@ function CrmBookingDetailsDialog(
                             e.target.files?.[0],
                             `traveler-${index}`,
                             index,
-                          )}
+                          )
+                        }
                       />
                       <p className="mt-1 text-xs text-gray-500">
                         {uploading === `traveler-${index}`
                           ? "Uploading…"
                           : traveler.aadhaarAssetId
-                          ? "Aadhaar uploaded"
-                          : "Aadhaar card *"}
+                            ? "Aadhaar uploaded"
+                            : "Aadhaar card *"}
                       </p>
                     </div>
                   </div>
@@ -1897,11 +2070,14 @@ function CrmBookingDetailsDialog(
                       day: "numeric",
                       month: "short",
                       year: "numeric",
-                    })} – {new Date(slot.endDate).toLocaleDateString("en-IN", {
+                    })}{" "}
+                    –{" "}
+                    {new Date(slot.endDate).toLocaleDateString("en-IN", {
                       day: "numeric",
                       month: "short",
                       year: "numeric",
-                    })} ({remaining} seats left)
+                    })}{" "}
+                    ({remaining} seats left)
                   </option>
                 );
               })}
@@ -1918,7 +2094,9 @@ function CrmBookingDetailsDialog(
               >
                 {packages.map((pkg: any) => (
                   <option key={pkg.id} value={pkg.id}>
-                    {pkg.title} - ₹{Number(pkg.price).toLocaleString("en-IN")} (Token: ₹{Number(pkg.tokenAmount).toLocaleString("en-IN")} / person)
+                    {pkg.title} - ₹{Number(pkg.price).toLocaleString("en-IN")}{" "}
+                    (Token: ₹{Number(pkg.tokenAmount).toLocaleString("en-IN")} /
+                    person)
                   </option>
                 ))}
               </select>
@@ -1927,23 +2105,36 @@ function CrmBookingDetailsDialog(
 
           {addOns.length > 0 && (
             <div className="space-y-3 border-t pt-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">Add-Ons</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">
+                Add-Ons
+              </h4>
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {addOns.map((addon: any) => {
                   const qty = selectedAddOns[addon.id] || 0;
                   return (
-                    <div key={addon.id} className="flex items-center justify-between p-2.5 border border-gray-100 rounded-lg bg-gray-50/50 text-xs">
+                    <div
+                      key={addon.id}
+                      className="flex items-center justify-between p-2.5 border border-gray-100 rounded-lg bg-gray-50/50 text-xs"
+                    >
                       <div>
-                        <div className="font-semibold text-gray-900">{addon.title}</div>
-                        {addon.description && <div className="text-gray-400 mt-0.5 line-clamp-1">{addon.description}</div>}
-                        <div className="font-medium text-[#781216] mt-0.5">₹{Number(addon.price).toLocaleString("en-IN")}</div>
+                        <div className="font-semibold text-gray-900">
+                          {addon.title}
+                        </div>
+                        {addon.description && (
+                          <div className="text-gray-400 mt-0.5 line-clamp-1">
+                            {addon.description}
+                          </div>
+                        )}
+                        <div className="font-medium text-[#781216] mt-0.5">
+                          ₹{Number(addon.price).toLocaleString("en-IN")}
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => {
                             const newQty = Math.max(0, qty - 1);
-                            setSelectedAddOns(prev => {
+                            setSelectedAddOns((prev) => {
                               const updated = { ...prev };
                               if (newQty === 0) delete updated[addon.id];
                               else updated[addon.id] = newQty;
@@ -1954,16 +2145,26 @@ function CrmBookingDetailsDialog(
                         >
                           -
                         </button>
-                        <span className="w-4 text-center font-medium">{qty}</span>
+                        <span className="w-4 text-center font-medium">
+                          {qty}
+                        </span>
                         <button
                           type="button"
                           onClick={() => {
                             const newQty = qty + 1;
-                            if (addon.maxQuantityPerBooking && newQty > addon.maxQuantityPerBooking) {
-                              toast.error(`Maximum limit of ${addon.maxQuantityPerBooking} reached for this add-on`);
+                            if (
+                              addon.maxQuantityPerBooking &&
+                              newQty > addon.maxQuantityPerBooking
+                            ) {
+                              toast.error(
+                                `Maximum limit of ${addon.maxQuantityPerBooking} reached for this add-on`,
+                              );
                               return;
                             }
-                            setSelectedAddOns(prev => ({ ...prev, [addon.id]: newQty }));
+                            setSelectedAddOns((prev) => ({
+                              ...prev,
+                              [addon.id]: newQty,
+                            }));
                           }}
                           className="w-6 h-6 rounded-full border border-[#c8a96e] bg-[#c8a96e]/10 flex items-center justify-center hover:bg-[#c8a96e]/20 text-[#781216] font-bold"
                         >
@@ -1991,7 +2192,7 @@ function CrmBookingDetailsDialog(
 
             {/* Collection Action Selector Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div 
+              <div
                 onClick={() => setPaymentAction("MANUAL")}
                 className={`p-3 rounded-xl border cursor-pointer transition-all ${
                   form.paymentAction === "MANUAL"
@@ -2000,13 +2201,23 @@ function CrmBookingDetailsDialog(
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider">Collect Offline / Mark Paid</span>
-                  <input type="radio" checked={form.paymentAction === "MANUAL"} readOnly className="accent-[#781216]" />
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    Collect Offline / Mark Paid
+                  </span>
+                  <input
+                    type="radio"
+                    checked={form.paymentAction === "MANUAL"}
+                    readOnly
+                    className="accent-[#781216]"
+                  />
                 </div>
-                <p className="text-[11px] text-gray-500 mt-1">Record cash or manual bank transfer. 5% GST is added at collection.</p>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Record cash or manual bank transfer. 5% GST is added at
+                  collection.
+                </p>
               </div>
 
-              <div 
+              <div
                 onClick={() => setPaymentAction("SEND_LINK")}
                 className={`p-3 rounded-xl border cursor-pointer transition-all ${
                   form.paymentAction === "SEND_LINK"
@@ -2015,17 +2226,30 @@ function CrmBookingDetailsDialog(
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider">Send Payment Link</span>
-                  <input type="radio" checked={form.paymentAction === "SEND_LINK"} readOnly className="accent-[#781216]" />
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    Send Payment Link
+                  </span>
+                  <input
+                    type="radio"
+                    checked={form.paymentAction === "SEND_LINK"}
+                    readOnly
+                    className="accent-[#781216]"
+                  />
                 </div>
-                <p className="text-[11px] text-gray-500 mt-1">Generate Razorpay link & email to customer (charges exact GST-inclusive amount).</p>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Generate Razorpay link & email to customer (charges exact
+                  GST-inclusive amount).
+                </p>
               </div>
             </div>
 
             {/* Payment Preset Selection */}
             <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 space-y-3">
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
-                Initial Payment Amount {form.paymentAction === "MANUAL" ? "(before 5% GST)" : "(including 5% GST)"}
+                Initial Payment Amount{" "}
+                {form.paymentAction === "MANUAL"
+                  ? "(before 5% GST)"
+                  : "(including 5% GST)"}
               </label>
 
               {form.paymentAction === "SEND_LINK" ? (
@@ -2037,7 +2261,14 @@ function CrmBookingDetailsDialog(
                   >
                     {paymentLinkOptions.map((option) => (
                       <option key={option.value} value={option.value}>
-                        {option.value === "100" ? "Full Payment" : `${option.value}% Payment`} — ₹{option.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })} (incl. GST)
+                        {option.value === "100"
+                          ? "Full Payment"
+                          : `${option.value}% Payment`}{" "}
+                        — ₹
+                        {option.amount.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}{" "}
+                        (incl. GST)
                       </option>
                     ))}
                     <option value="CUSTOM">Custom Amount…</option>
@@ -2060,7 +2291,9 @@ function CrmBookingDetailsDialog(
                     {recommendedTokenPrice > 0 && (
                       <button
                         type="button"
-                        onClick={() => update("paymentAmount", String(recommendedTokenPrice))}
+                        onClick={() =>
+                          update("paymentAmount", String(recommendedTokenPrice))
+                        }
                         className={`py-2 px-3 rounded-lg border text-xs font-medium text-left transition-all ${
                           Number(form.paymentAmount) === recommendedTokenPrice
                             ? "border-[#781216] bg-[#781216]/10 text-[#781216] font-bold"
@@ -2068,12 +2301,16 @@ function CrmBookingDetailsDialog(
                         }`}
                       >
                         <div>Token Payment</div>
-                        <div className="text-[11px] opacity-80">₹{recommendedTokenPrice.toLocaleString("en-IN")}</div>
+                        <div className="text-[11px] opacity-80">
+                          ₹{recommendedTokenPrice.toLocaleString("en-IN")}
+                        </div>
                       </button>
                     )}
                     <button
                       type="button"
-                      onClick={() => update("paymentAmount", String(totalPrice))}
+                      onClick={() =>
+                        update("paymentAmount", String(totalPrice))
+                      }
                       className={`py-2 px-3 rounded-lg border text-xs font-medium text-left transition-all ${
                         Number(form.paymentAmount) === totalPrice
                           ? "border-[#781216] bg-[#781216]/10 text-[#781216] font-bold"
@@ -2081,11 +2318,15 @@ function CrmBookingDetailsDialog(
                       }`}
                     >
                       <div>Full Payment</div>
-                      <div className="text-[11px] opacity-80">₹{totalPrice.toLocaleString("en-IN")}</div>
+                      <div className="text-[11px] opacity-80">
+                        ₹{totalPrice.toLocaleString("en-IN")}
+                      </div>
                     </button>
                   </div>
                   <div className="pt-1">
-                    <label className="text-[11px] text-gray-500 block mb-1">Custom Amount before GST (₹)</label>
+                    <label className="text-[11px] text-gray-500 block mb-1">
+                      Custom Amount before GST (₹)
+                    </label>
                     <Input
                       min="0.01"
                       max={String(totalPrice)}
@@ -2102,37 +2343,65 @@ function CrmBookingDetailsDialog(
 
             {/* Financial Summary Breakdown */}
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-2 text-xs">
-              <h4 className="font-bold text-gray-900 uppercase tracking-wider text-[11px] border-b border-gray-200 pb-2 mb-2">Price Breakdown & Tax Summary</h4>
+              <h4 className="font-bold text-gray-900 uppercase tracking-wider text-[11px] border-b border-gray-200 pb-2 mb-2">
+                Price Breakdown & Tax Summary
+              </h4>
               <div className="flex justify-between text-gray-600">
                 <span>Base Package (x{numTravelers})</span>
-                <span className="font-medium">₹{(basePrice * numTravelers).toLocaleString("en-IN")}</span>
+                <span className="font-medium">
+                  ₹{(basePrice * numTravelers).toLocaleString("en-IN")}
+                </span>
               </div>
               {addOnsPrice > 0 && (
                 <div className="flex justify-between text-gray-600">
                   <span>Add-ons Total</span>
-                  <span className="font-medium">₹{addOnsPrice.toLocaleString("en-IN")}</span>
+                  <span className="font-medium">
+                    ₹{addOnsPrice.toLocaleString("en-IN")}
+                  </span>
                 </div>
               )}
               <div className="flex justify-between text-gray-600 border-t border-gray-200 pt-2">
                 <span>Subtotal (before GST)</span>
-                <span className="font-medium text-gray-900">₹{totalPrice.toLocaleString("en-IN")}</span>
+                <span className="font-medium text-gray-900">
+                  ₹{totalPrice.toLocaleString("en-IN")}
+                </span>
               </div>
               <div className="flex justify-between text-gray-600">
                 <span>GST (5%)</span>
-                <span className="font-medium text-gray-900">₹{(totalPrice * 0.05).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className="font-medium text-gray-900">
+                  ₹
+                  {(totalPrice * 0.05).toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
               </div>
               <div className="flex justify-between text-sm font-bold text-gray-900 border-t border-gray-200 pt-2">
                 <span>Total Booking Cost (incl. GST)</span>
-                <span className="text-[#781216]">₹{totalWithGst.toLocaleString("en-IN")}</span>
+                <span className="text-[#781216]">
+                  ₹{totalWithGst.toLocaleString("en-IN")}
+                </span>
               </div>
               <div className="mt-2 pt-2 border-t border-gray-200/80 text-[11px] text-gray-500 font-medium">
                 {form.paymentAction === "MANUAL" ? (
                   <span>
-                    Initial collection: <strong className="text-gray-900">₹{Number(form.paymentAmount || 0).toLocaleString("en-IN")}</strong> + 5% GST = <strong className="text-green-700">₹{(Number(form.paymentAmount || 0) * 1.05).toFixed(2)}</strong> charged
+                    Initial collection:{" "}
+                    <strong className="text-gray-900">
+                      ₹{Number(form.paymentAmount || 0).toLocaleString("en-IN")}
+                    </strong>{" "}
+                    + 5% GST ={" "}
+                    <strong className="text-green-700">
+                      ₹{(Number(form.paymentAmount || 0) * 1.05).toFixed(2)}
+                    </strong>{" "}
+                    charged
                   </span>
                 ) : (
                   <span>
-                    Payment link amount: <strong className="text-green-700">₹{Number(form.paymentAmount || 0).toLocaleString("en-IN")}</strong> (incl. 5% GST)
+                    Payment link amount:{" "}
+                    <strong className="text-green-700">
+                      ₹{Number(form.paymentAmount || 0).toLocaleString("en-IN")}
+                    </strong>{" "}
+                    (incl. 5% GST)
                   </span>
                 )}
               </div>
@@ -2159,14 +2428,17 @@ function CrmBookingDetailsDialog(
   );
 }
 
-function CrmBookingDialogWithSlot(
-  { open, onOpenChange, trip, onCreated }: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    trip: Trip;
-    onCreated: () => void;
-  },
-) {
+function CrmBookingDialogWithSlot({
+  open,
+  onOpenChange,
+  trip,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  trip: Trip;
+  onCreated: () => void;
+}) {
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -2184,9 +2456,12 @@ function CrmBookingDialogWithSlot(
     const travelers = Math.max(1, Number(form.numberOfTravelers) || 1);
     const amount = Number(form.paymentAmount);
     if (
-      !form.fullName.trim() || !form.email.trim() || !form.crmTripSlotId ||
+      !form.fullName.trim() ||
+      !form.email.trim() ||
+      !form.crmTripSlotId ||
       !amount
-    ) return toast.error("Customer, departure, and first payment are required");
+    )
+      return toast.error("Customer, departure, and first payment are required");
     const slot = trip.slots.find((item) => item.id === form.crmTripSlotId);
     if (!slot || slot.capacity - slot.filledSpots < travelers) {
       return toast.error("Choose a departure with enough remaining capacity");
@@ -2233,7 +2508,8 @@ function CrmBookingDialogWithSlot(
         <div className="space-y-4">
           <div className="rounded-md bg-[#fcf4e7] p-3 text-sm text-[#6f4c08]">
             <strong>{trip.name}</strong>
-            <br />Choose a dated departure to create its operations checklist.
+            <br />
+            Choose a dated departure to create its operations checklist.
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Customer name">
@@ -2283,13 +2559,15 @@ function CrmBookingDialogWithSlot(
                       day: "numeric",
                       month: "short",
                       year: "numeric",
-                    })} – {new Date(slot.endDate).toLocaleDateString("en-IN", {
+                    })}{" "}
+                    –{" "}
+                    {new Date(slot.endDate).toLocaleDateString("en-IN", {
                       day: "numeric",
                       month: "short",
                       year: "numeric",
                     })}
-                    {slot.title ? ` · ${slot.title}` : ""} ({remaining}{" "}
-                    seats left)
+                    {slot.title ? ` · ${slot.title}` : ""} ({remaining} seats
+                    left)
                   </option>
                 );
               })}
@@ -2346,21 +2624,27 @@ function CrmBookingDialogWithSlot(
   );
 }
 
-function InstallmentDialog(
-  { tripId, booking, onOpenChange, onCreated }: {
-    tripId: string;
-    booking: Booking | null;
-    onOpenChange: (open: boolean) => void;
-    onCreated: () => void;
-  },
-) {
+function InstallmentDialog({
+  tripId,
+  booking,
+  onOpenChange,
+  onCreated,
+}: {
+  tripId: string;
+  booking: Booking | null;
+  onOpenChange: (open: boolean) => void;
+  onCreated: () => void;
+}) {
   const [amount, setAmount] = useState("");
   const [action, setAction] = useState("MANUAL");
   const [linkAmountChoice, setLinkAmountChoice] = useState("");
   const [saving, setSaving] = useState(false);
   useEffect(() => {
     if (!booking) return setAmount("");
-    const defaultAmount = action === "SEND_LINK" ? String(booking.amountDue) : (Number(booking.amountDue) / 1.05).toFixed(2);
+    const defaultAmount =
+      action === "SEND_LINK"
+        ? String(booking.amountDue)
+        : (Number(booking.amountDue) / 1.05).toFixed(2);
     setAmount(defaultAmount);
     if (action === "SEND_LINK") setLinkAmountChoice(defaultAmount);
   }, [action, booking?.id, booking?.amountDue]);
@@ -2413,21 +2697,41 @@ function InstallmentDialog(
                 <option value="SEND_LINK">Send website payment link</option>
               </select>
             </Field>
-            <Field label={action === "SEND_LINK" ? "Payment-link amount (including GST)" : "Manual installment before GST"}>
+            <Field
+              label={
+                action === "SEND_LINK"
+                  ? "Payment-link amount (including GST)"
+                  : "Manual installment before GST"
+              }
+            >
               {action === "SEND_LINK" ? (
                 <>
-                <select
-                  className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
-                  value={linkAmountChoice}
-                  onChange={(e) => {
-                    setLinkAmountChoice(e.target.value);
-                    if (e.target.value !== "CUSTOM") setAmount(e.target.value);
-                  }}
-                >
-                  {linkAmounts.map((value) => <option key={value} value={value}>Pay ₹{Number(value).toLocaleString("en-IN")}</option>)}
-                  <option value="CUSTOM">Custom amount…</option>
-                </select>
-                {linkAmountChoice === "CUSTOM" && <Input min="0.01" max={String(booking.amountDue)} step="0.01" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />}
+                  <select
+                    className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
+                    value={linkAmountChoice}
+                    onChange={(e) => {
+                      setLinkAmountChoice(e.target.value);
+                      if (e.target.value !== "CUSTOM")
+                        setAmount(e.target.value);
+                    }}
+                  >
+                    {linkAmounts.map((value) => (
+                      <option key={value} value={value}>
+                        Pay ₹{Number(value).toLocaleString("en-IN")}
+                      </option>
+                    ))}
+                    <option value="CUSTOM">Custom amount…</option>
+                  </select>
+                  {linkAmountChoice === "CUSTOM" && (
+                    <Input
+                      min="0.01"
+                      max={String(booking.amountDue)}
+                      step="0.01"
+                      type="number"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                    />
+                  )}
                 </>
               ) : (
                 <Input
@@ -2439,7 +2743,11 @@ function InstallmentDialog(
                   onChange={(e) => setAmount(e.target.value)}
                 />
               )}
-              <p className="text-xs text-gray-500">{action === "SEND_LINK" ? "Choose a suggested GST-inclusive amount, or enter any amount up to the outstanding balance." : `5% GST will be added. Customer is charged ₹${(Number(amount || 0) * 1.05).toFixed(2)}.`}</p>
+              <p className="text-xs text-gray-500">
+                {action === "SEND_LINK"
+                  ? "Choose a suggested GST-inclusive amount, or enter any amount up to the outstanding balance."
+                  : `5% GST will be added. Customer is charged ₹${(Number(amount || 0) * 1.05).toFixed(2)}.`}
+              </p>
             </Field>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -2451,7 +2759,9 @@ function InstallmentDialog(
                 className="bg-[#781216] text-white hover:bg-[#5f0e11]"
               >
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {action === "SEND_LINK" ? "Send payment link" : "Record payment"}
+                {action === "SEND_LINK"
+                  ? "Send payment link"
+                  : "Record payment"}
               </Button>
             </div>
           </div>
@@ -2461,17 +2771,19 @@ function InstallmentDialog(
   );
 }
 
-function CommonInclusions(
-  { commonInclusions, tripId, request }: {
-    commonInclusions: CommonInclusion[];
-    tripId: string;
-    request: (call: () => Promise<unknown>, success?: string) => Promise<void>;
-  },
-) {
+function CommonInclusions({
+  commonInclusions,
+  tripId,
+  request,
+}: {
+  commonInclusions: CommonInclusion[];
+  tripId: string;
+  request: (call: () => Promise<unknown>, success?: string) => Promise<void>;
+}) {
   const byKey = new Map(commonInclusions.map((item) => [item.key, item]));
   const patch = (payload: Record<string, unknown>) =>
     request(() =>
-      apiClient.patch(`/crm-trips/${tripId}/common-inclusions`, payload)
+      apiClient.patch(`/crm-trips/${tripId}/common-inclusions`, payload),
     );
   const count = (key: "BREAKFAST" | "DINNER") =>
     byKey.get(key)?.numberOfDays || 0;
@@ -2498,7 +2810,8 @@ function CommonInclusions(
               patch({
                 key: "TRAVEL",
                 numberOfDays: Number(event.target.value) || 0,
-              })}
+              })
+            }
           />
         </label>
         <label className="block space-y-1.5">
@@ -2512,7 +2825,8 @@ function CommonInclusions(
               patch({
                 key: "VEHICLE_TYPE",
                 vehicleType: event.target.value || null,
-              })}
+              })
+            }
           >
             <option value="">Not selected</option>
             <option value="SEDAN">Sedan</option>
@@ -2522,7 +2836,8 @@ function CommonInclusions(
           </select>
         </label>
         <div className="flex items-center gap-2 border-t pt-3 text-sm text-gray-700">
-          <Check className="h-4 w-4 text-emerald-600" />First-aid kit{" "}
+          <Check className="h-4 w-4 text-emerald-600" />
+          First-aid kit{" "}
           <span className="text-xs text-gray-400">Always included</span>
         </div>
       </div>
@@ -2562,16 +2877,16 @@ function DayCard({
 }) {
   const [expanded, setExpanded] = useState(true);
   const [activity, setActivity] = useState("");
-  const dayProperties = properties.filter((property) =>
-    property.stayLocationId === day.stayLocationId
+  const dayProperties = properties.filter(
+    (property) => property.stayLocationId === day.stayLocationId,
   );
-  const dayPlaces = places.filter((place) =>
-    place.stayLocationId === day.stayLocationId
+  const dayPlaces = places.filter(
+    (place) => place.stayLocationId === day.stayLocationId,
   );
   const selectedPlaceIds = day.visitingPlaces.map((item) => item.place.id);
   const updateDay = (payload: Record<string, any>) =>
     request(() =>
-      apiClient.patch(`/crm-trips/itinerary-days/${day.id}`, payload)
+      apiClient.patch(`/crm-trips/itinerary-days/${day.id}`, payload),
     );
   const togglePlace = (placeId: string, selected: boolean) =>
     request(() =>
@@ -2579,7 +2894,7 @@ function DayCard({
         placeIds: selected
           ? [...selectedPlaceIds, placeId]
           : selectedPlaceIds.filter((id) => id !== placeId),
-      })
+      }),
     );
   const addActivity = async () => {
     if (!activity.trim()) return;
@@ -2600,7 +2915,7 @@ function DayCard({
     request(() =>
       apiClient.put(`/crm-trips/itinerary-days/${day.id}/places`, {
         placeIds: next,
-      })
+      }),
     );
   };
   return (
@@ -2619,9 +2934,11 @@ function DayCard({
               {day.stayLocation?.name || "Plan this day"}
             </h3>
           </div>
-          {expanded
-            ? <ChevronUp className="h-5 w-5 text-gray-400" />
-            : <ChevronDown className="h-5 w-5 text-gray-400" />}
+          {expanded ? (
+            <ChevronUp className="h-5 w-5 text-gray-400" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-gray-400" />
+          )}
         </button>
         {canDelete && (
           <Button
@@ -2631,7 +2948,8 @@ function DayCard({
             className="mr-3 text-red-600 hover:bg-red-50 hover:text-red-700"
             onClick={onDelete}
           >
-            <Trash2 className="mr-1 h-3.5 w-3.5" />Remove
+            <Trash2 className="mr-1 h-3.5 w-3.5" />
+            Remove
           </Button>
         )}
       </div>
@@ -2646,11 +2964,14 @@ function DayCard({
                   updateDay({
                     stayLocationId: e.target.value || null,
                     propertyId: null,
-                  })}
+                  })
+                }
               >
                 <option value="">No stay selected</option>
                 {stays.map((stay) => (
-                  <option key={stay.id} value={stay.id}>{stay.name}</option>
+                  <option key={stay.id} value={stay.id}>
+                    {stay.name}
+                  </option>
                 ))}
               </select>
             </Field>
@@ -2660,7 +2981,8 @@ function DayCard({
                 className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm disabled:bg-gray-50"
                 value={day.propertyId || ""}
                 onChange={(e) =>
-                  updateDay({ propertyId: e.target.value || null })}
+                  updateDay({ propertyId: e.target.value || null })
+                }
               >
                 <option value="">No property selected</option>
                 {dayProperties.map((property) => (
@@ -2687,7 +3009,8 @@ function DayCard({
                     type="checkbox"
                     checked={selectedPlaceIds.includes(place.id)}
                     onChange={(event) =>
-                      togglePlace(place.id, event.target.checked)}
+                      togglePlace(place.id, event.target.checked)
+                    }
                   />
                   {place.name}
                 </label>
@@ -2740,7 +3063,8 @@ function DayCard({
           </Field>
           <div className="rounded-lg bg-gray-50 p-4">
             <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-800">
-              <Utensils className="h-4 w-4 text-[#b59410]" />Meals
+              <Utensils className="h-4 w-4 text-[#b59410]" />
+              Meals
             </p>
             <div className="flex flex-wrap gap-4">
               {(["breakfast", "lunch", "dinner"] as const).map((meal) => (
@@ -2753,8 +3077,9 @@ function DayCard({
                       apiClient.patch(
                         `/crm-trips/itinerary-days/${day.id}/meals`,
                         { [meal]: value },
-                      )
-                    )}
+                      ),
+                    )
+                  }
                 />
               ))}
             </div>
@@ -2764,23 +3089,28 @@ function DayCard({
               Day inclusions
             </p>
             <div className="flex flex-wrap gap-4">
-              {([["ILP_AND_PERMITS", "ILP and permits"], ["BBQ", "BBQ"], [
-                "BONFIRE",
-                "Bonfire",
-              ], ["TRIP_GUIDE", "Trip guide"]] as const).map(([key, label]) => (
+              {(
+                [
+                  ["ILP_AND_PERMITS", "ILP and permits"],
+                  ["BBQ", "BBQ"],
+                  ["BONFIRE", "Bonfire"],
+                  ["TRIP_GUIDE", "Trip guide"],
+                ] as const
+              ).map(([key, label]) => (
                 <Toggle
                   key={key}
                   label={label}
-                  checked={day.commonInclusions.some((item) =>
-                    item.key === key
+                  checked={day.commonInclusions.some(
+                    (item) => item.key === key,
                   )}
                   onChange={(isIncluded) =>
                     request(() =>
                       apiClient.patch(
                         `/crm-trips/itinerary-days/${day.id}/common-inclusions`,
                         { key, isIncluded },
-                      )
-                    )}
+                      ),
+                    )
+                  }
                 />
               ))}
             </div>
@@ -2802,8 +3132,9 @@ function DayCard({
                       request(() =>
                         apiClient.delete(
                           `/crm-trips/itinerary-days/${day.id}/activities/${item.id}`,
-                        )
-                      )}
+                        ),
+                      )
+                    }
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
@@ -2839,7 +3170,7 @@ function DayCard({
                         apiClient.patch(
                           `/crm-trips/itinerary-days/${day.id}/drop-off`,
                           { isDropOff: false },
-                        )
+                        ),
                       );
                     } else if (day.dropOffLocationId) {
                       request(() =>
@@ -2849,7 +3180,7 @@ function DayCard({
                             isDropOff: true,
                             dropOffLocationId: day.dropOffLocationId,
                           },
-                        )
+                        ),
                       );
                     } else toast.error("Choose a transfer location first");
                   }}
@@ -2862,8 +3193,9 @@ function DayCard({
                       apiClient.patch(
                         `/crm-trips/itinerary-days/${day.id}/drop-off`,
                         { isDropOff: true, dropOffLocationId: e.target.value },
-                      )
-                    )}
+                      ),
+                    )
+                  }
                 >
                   <option value="">Select transfer location</option>
                   {transfers.map((transfer) => (
@@ -2901,13 +3233,15 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
     </label>
   );
 }
-function Toggle(
-  { label, checked, onChange }: {
-    label: string;
-    checked: boolean;
-    onChange: (value: boolean) => void;
-  },
-) {
+function Toggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
   return (
     <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
       <input

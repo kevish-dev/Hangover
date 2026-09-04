@@ -455,6 +455,7 @@ const toPublicFestival = (festival) => {
     isPublished: festival.isPublished,
     isFeatured: festival.isFeatured,
     isListed: festival.isListed,
+    isInterestFormEnabled: Boolean(festival.isInterestFormEnabled),
     isCrmTrip: true,
     isCrmFestival: true,
   };

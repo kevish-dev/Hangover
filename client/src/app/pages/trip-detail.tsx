@@ -30,7 +30,9 @@ import {
   Link2,
   Sparkles,
   Globe,
+  HeartHandshake,
 } from "lucide-react";
+import { interestApi } from "../../lib/interestApi";
 import {
   fetchTripBySlug,
   fetchAllTrips,
@@ -2124,6 +2126,7 @@ function TripDetailContent({
   const navigate = useNavigate();
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [interestModalOpen, setInterestModalOpen] = useState(false);
 
   const safeAllImages =
     allImages.length > 0 ? allImages : [heroImage].filter(Boolean);
@@ -3280,6 +3283,37 @@ function TripDetailContent({
                   Solve your queries on WhatsApp
                 </a>
 
+                {/* Express Interest button */}
+                {(trip as any).isInterestFormEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => setInterestModalOpen(true)}
+                    style={{
+                      width: "100%",
+                      background:
+                        "linear-gradient(135deg, #781216 0%, #a21c22 100%)",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "8px",
+                      padding: "11px",
+                      fontFamily: "'Poppins', sans-serif",
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      letterSpacing: "0.03em",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      marginTop: "8px",
+                      boxShadow: "0 2px 8px rgba(120, 18, 22, 0.25)",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    Express Interest
+                  </button>
+                )}
+
                 {/* Share button */}
                 <button
                   type="button"
@@ -3626,7 +3660,425 @@ function TripDetailContent({
         onClose={() => setShareModalOpen(false)}
         title={trip.title}
       />
+      <InterestModal
+        open={interestModalOpen}
+        onClose={() => setInterestModalOpen(false)}
+        trip={trip}
+        isFestival={isFestival}
+      />
     </div>
+  );
+}
+
+function InterestModal({
+  open,
+  onClose,
+  trip,
+  isFestival,
+}: {
+  open: boolean;
+  onClose: () => void;
+  trip: ApiTrip;
+  isFestival?: boolean;
+}) {
+  const { user } = useAuth();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    if (open && user) {
+      if (user.email) setEmail(user.email);
+      const userFullName =
+        (user as any).profile?.fullName || (user as any).fullName || "";
+      if (userFullName) setName(userFullName);
+    }
+  }, [open, user]);
+
+  if (!open) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    const trimmedWhatsapp = whatsapp.trim();
+    const trimmedInstagram = instagram.trim();
+
+    if (!trimmedName) {
+      const msg = "Name is required.";
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    if (!trimmedEmail && !trimmedWhatsapp && !trimmedInstagram) {
+      const msg =
+        "Please provide at least one contact method (Email ID, WhatsApp No, or Instagram handle).";
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await interestApi.submitInterest({
+        name: trimmedName,
+        email: trimmedEmail || null,
+        whatsapp: trimmedWhatsapp || null,
+        instagram: trimmedInstagram || null,
+        crmTripId: (trip as any).isCrmTrip && !isFestival ? trip.id : null,
+        crmFestivalId:
+          (trip as any).isCrmFestival || isFestival ? trip.id : null,
+        tripId: !(trip as any).isCrmTrip && !isFestival ? trip.id : null,
+        festivalId: !(trip as any).isCrmFestival && isFestival ? trip.id : null,
+      });
+      setSubmitted(true);
+      toast.success("Interest submitted successfully!");
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to submit interest. Please try again.";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    setName("");
+    setEmail("");
+    setWhatsapp("");
+    setInstagram("");
+    setError(null);
+    setSubmitted(false);
+    onClose();
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={handleClose}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.6)",
+          backdropFilter: "blur(6px)",
+          zIndex: 9999,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "16px",
+        }}
+      >
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.95, opacity: 0, y: 20 }}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: "#ffffff",
+            borderRadius: "20px",
+            padding: "28px 24px",
+            maxWidth: "460px",
+            width: "100%",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
+            position: "relative",
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleClose}
+            style={{
+              position: "absolute",
+              top: "18px",
+              right: "18px",
+              background: "rgba(0,0,0,0.05)",
+              border: "none",
+              borderRadius: "50%",
+              width: "32px",
+              height: "32px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+            }}
+          >
+            <X size={18} color="#666" />
+          </button>
+
+          {submitted ? (
+            <div style={{ textAlign: "center", padding: "16px 0" }}>
+              <div
+                style={{
+                  width: "56px",
+                  height: "56px",
+                  borderRadius: "50%",
+                  background: "#ecfdf5",
+                  color: "#10b981",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 16px",
+                }}
+              >
+                <CheckCircle size={32} />
+              </div>
+              <h3
+                style={{
+                  fontSize: "1.25rem",
+                  fontWeight: 700,
+                  color: "#111827",
+                  marginBottom: "8px",
+                }}
+              >
+                Thank You!
+              </h3>
+              <p
+                style={{
+                  fontSize: "0.875rem",
+                  color: "#6b7280",
+                  lineHeight: 1.5,
+                  marginBottom: "24px",
+                }}
+              >
+                We've received your interest for <strong>{trip.title}</strong>.
+                Our team will get back to you shortly!
+              </p>
+              <button
+                type="button"
+                onClick={handleClose}
+                style={{
+                  width: "100%",
+                  background: "#781216",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "10px",
+                  padding: "12px",
+                  fontSize: "0.9rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Close
+              </button>
+            </div>
+          ) : (
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  marginBottom: "6px",
+                }}
+              >
+                <h3
+                  style={{
+                    fontSize: "1.2rem",
+                    fontWeight: 700,
+                    color: "#111827",
+                    margin: 0,
+                  }}
+                >
+                  Express Your Interest
+                </h3>
+              </div>
+              <p
+                style={{
+                  fontSize: "0.82rem",
+                  color: "#6b7280",
+                  marginBottom: "20px",
+                  lineHeight: 1.4,
+                }}
+              >
+                Interested in <strong>{trip.title}</strong>? Share your details
+                and we'll reach out to assist you!
+              </p>
+
+              {error && (
+                <div
+                  style={{
+                    background: "#fef2f2",
+                    border: "1px solid #fecaca",
+                    color: "#991b1b",
+                    fontSize: "0.8rem",
+                    padding: "10px 12px",
+                    borderRadius: "8px",
+                    marginBottom: "16px",
+                  }}
+                >
+                  {error}
+                </div>
+              )}
+
+              <form
+                onSubmit={handleSubmit}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "14px",
+                }}
+              >
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.78rem",
+                      fontWeight: 600,
+                      color: "#374151",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    Name <span style={{ color: "#dc2626" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter your full name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      fontSize: "0.85rem",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.78rem",
+                      fontWeight: 600,
+                      color: "#374151",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    Email ID
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="name@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      fontSize: "0.85rem",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.78rem",
+                      fontWeight: 600,
+                      color: "#374151",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    WhatsApp No
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="+91 98765 43210"
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      fontSize: "0.85rem",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.78rem",
+                      fontWeight: 600,
+                      color: "#374151",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    Instagram Handle
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="@yourhandle"
+                    value={instagram}
+                    onChange={(e) => setInstagram(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      fontSize: "0.85rem",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+
+                <p
+                  style={{
+                    fontSize: "0.72rem",
+                    color: "#6b7280",
+                    marginTop: "-4px",
+                  }}
+                >
+                  * Please provide at least one contact method (Email, WhatsApp,
+                  or Instagram).
+                </p>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    marginTop: "6px",
+                    width: "100%",
+                    background: "#781216",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "10px",
+                    padding: "12px",
+                    fontSize: "0.9rem",
+                    fontWeight: 600,
+                    cursor: loading ? "not-allowed" : "pointer",
+                    opacity: loading ? 0.7 : 1,
+                  }}
+                >
+                  {loading ? "Submitting..." : "Submit Interest"}
+                </button>
+              </form>
+            </div>
+          )}
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }
 

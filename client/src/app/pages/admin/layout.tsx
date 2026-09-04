@@ -34,6 +34,7 @@ import {
   BarChart3,
   Tent,
   Users,
+  HeartHandshake,
 } from "lucide-react";
 
 const overviewItems = [
@@ -46,6 +47,7 @@ const crmItems = [
   { title: "Master data", url: "/dashboard/crm-master-data", icon: Database },
   { title: "Itinerary trips", url: "/dashboard/crm-trips", icon: MapPin },
   { title: "Itinerary festivals", url: "/dashboard/crm-festivals", icon: Tent },
+  { title: "Interest", url: "/dashboard/interest", icon: HeartHandshake },
   { title: "Bookings", url: "/dashboard/bookings", icon: CalendarCheck },
   { title: "Operations", url: "/dashboard/operations", icon: ClipboardCheck },
   { title: "Balance sheet", url: "/dashboard/ledger", icon: BookOpen },

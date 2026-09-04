@@ -51,6 +51,7 @@ type CrmTrip = {
   isFeatured: boolean;
   isPublished: boolean;
   isListed: boolean;
+  isInterestFormEnabled?: boolean;
   _count?: { itineraryDays: number; inclusions: number; bookings?: number };
 };
 type CrmTripDetail = CrmTrip & {
@@ -607,6 +608,7 @@ function CreateTripDialog({
   const [isFeatured, setIsFeatured] = useState(false);
   const [isListed, setIsListed] = useState(true);
   const [isActive, setIsActive] = useState(true);
+  const [isInterestFormEnabled, setIsInterestFormEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pricingError, setPricingError] = useState("");
   const [uploadingAddOnIndex, setUploadingAddOnIndex] = useState<number | null>(
@@ -989,6 +991,7 @@ function CreateTripDialog({
       setIsFeatured(Boolean(draft.isFeatured));
       setIsListed(draft.isListed ?? true);
       setIsActive(draft.isActive ?? true);
+      setIsInterestFormEnabled(Boolean(draft.isInterestFormEnabled));
       setCustomInclusions(
         Array.isArray(draft.customInclusions) ? draft.customInclusions : [],
       );
@@ -1185,6 +1188,7 @@ function CreateTripDialog({
     setIsFeatured(sourceTrip.isFeatured);
     setIsListed(sourceTrip.isListed);
     setIsActive(sourceTrip.isActive);
+    setIsInterestFormEnabled(Boolean(sourceTrip.isInterestFormEnabled));
     setPricingError("");
     setCustomInclusions(
       (sourceTrip.inclusions || []).map((inc) => ({
@@ -1565,6 +1569,7 @@ function CreateTripDialog({
         isFeatured,
         isListed,
         isActive,
+        isInterestFormEnabled,
         days: itineraryDays.map((day) => ({
           ...day,
           stayLocationId: day.stayLocationId || null,
@@ -1811,6 +1816,12 @@ function CreateTripDialog({
                           detail: "Required to create new CRM bookings.",
                           checked: isActive,
                           onChange: setIsActive,
+                        },
+                        {
+                          label: "Enable Interest Form",
+                          detail: "Show Express Interest button on public trip page.",
+                          checked: isInterestFormEnabled,
+                          onChange: setIsInterestFormEnabled,
                         },
                       ].map((control) => (
                         <label

@@ -51,6 +51,7 @@ type CrmFestival = {
   isFeatured: boolean;
   isPublished: boolean;
   isListed: boolean;
+  isInterestFormEnabled?: boolean;
   _count?: { itineraryDays: number; inclusions: number; bookings?: number };
 };
 type CrmFestivalDetail = CrmFestival & {
@@ -623,6 +624,7 @@ function CreateFestivalDialog({
   const [isFeatured, setIsFeatured] = useState(false);
   const [isListed, setIsListed] = useState(true);
   const [isActive, setIsActive] = useState(true);
+  const [isInterestFormEnabled, setIsInterestFormEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pricingError, setPricingError] = useState("");
   const [uploadingAddOnIndex, setUploadingAddOnIndex] = useState<number | null>(
@@ -1006,6 +1008,7 @@ function CreateFestivalDialog({
       setIsFeatured(Boolean(draft.isFeatured));
       setIsListed(draft.isListed ?? true);
       setIsActive(draft.isActive ?? true);
+      setIsInterestFormEnabled(Boolean(draft.isInterestFormEnabled));
       setCustomInclusions(
         Array.isArray(draft.customInclusions) ? draft.customInclusions : [],
       );
@@ -1203,6 +1206,7 @@ function CreateFestivalDialog({
     setIsFeatured(sourceFestival.isFeatured);
     setIsListed(sourceFestival.isListed);
     setIsActive(sourceFestival.isActive);
+    setIsInterestFormEnabled(Boolean(sourceFestival.isInterestFormEnabled));
     setPricingError("");
     setCustomInclusions(
       (sourceFestival.inclusions || []).map((inc) => ({
@@ -1590,6 +1594,7 @@ function CreateFestivalDialog({
         isFeatured,
         isListed,
         isActive,
+        isInterestFormEnabled,
         days: itineraryDays.map((day) => ({
           ...day,
           stayLocationId: day.stayLocationId || null,
@@ -1843,6 +1848,12 @@ function CreateFestivalDialog({
                           detail: "Required to create new CRM bookings.",
                           checked: isActive,
                           onChange: setIsActive,
+                        },
+                        {
+                          label: "Enable Interest Form",
+                          detail: "Show Express Interest button on public festival page.",
+                          checked: isInterestFormEnabled,
+                          onChange: setIsInterestFormEnabled,
                         },
                       ].map((control) => (
                         <label

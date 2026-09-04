@@ -23,6 +23,7 @@ model User {
   mediaUploads      MediaAsset[]  @relation("MediaAssetUploader")
   reviews           Review[]
   profile           UserProfile?
+  interestSubmissions InterestSubmission[]
 
   @@index([email])
   @@index([role])
@@ -82,18 +83,20 @@ model Trip {
   isSignature         Boolean        @default(false)
   signatureOrder      Int            @default(0)
   destinationId       String?
-  isPublished         Boolean        @default(false)
-  isListed            Boolean        @default(true)
-  shareTokenHash      String?        @unique
+  isPublished         Boolean              @default(false)
+  isListed            Boolean              @default(true)
+  isInterestFormEnabled Boolean            @default(false)
+  shareTokenHash      String?              @unique
   shareTokenExpiresAt DateTime?
-  highlights          Json           @default("[]")
-  stayTransportImages Json           @default("[]")
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
+  highlights          Json                 @default("[]")
+  stayTransportImages Json                 @default("[]")
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
   addOns              AddOn[]
   bookings            Booking[]
   faqs                FAQ[]
   inquiries           Inquiry[]
+  interestSubmissions InterestSubmission[]
   itinerary           ItineraryDay[]
   ledgerEntries       LedgerEntry[]
   packages            Package[]
@@ -233,18 +236,20 @@ model Festival {
   stayTransportImages Json           @default("[]")
   isActive            Boolean        @default(true)
   isFeatured          Boolean        @default(false)
-  isPublished         Boolean        @default(false)
-  isListed            Boolean        @default(true)
-  shareTokenHash      String?        @unique
+  isPublished         Boolean              @default(false)
+  isListed            Boolean              @default(true)
+  isInterestFormEnabled Boolean            @default(false)
+  shareTokenHash      String?              @unique
   shareTokenExpiresAt DateTime?
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
   destinationId       String?
   addOns              AddOn[]
   bookings            Booking[]
   faqs                FAQ[]
-  destination         Destination?   @relation(fields: [destinationId], references: [id])
+  destination         Destination?         @relation(fields: [destinationId], references: [id])
   inquiries           Inquiry[]
+  interestSubmissions InterestSubmission[]
   itinerary           ItineraryDay[]
   ledgerEntries       LedgerEntry[]
   packages            Package[]
@@ -380,6 +385,7 @@ model CrmTrip {
   isFeatured                 Boolean                  @default(false)
   isPublished                Boolean                  @default(false)
   isListed                   Boolean                  @default(true)
+  isInterestFormEnabled      Boolean                  @default(false)
   operationsReminderDays     Int                      @default(3)
   exclusions                 String[]                 @default([])
   websiteOverview            String?
@@ -394,6 +400,7 @@ model CrmTrip {
   destination                CrmDestination           @relation(fields: [destinationId], references: [id])
   commonInclusions           CrmTripCommonInclusion[]
   inclusions                 CrmTripInclusion[]
+  interestSubmissions        InterestSubmission[]
   itineraryDays              CrmTripItineraryDay[]
   slots                      CrmTripSlot[]
   ledgerEntries              LedgerEntry[]
@@ -528,6 +535,7 @@ model CrmFestival {
   isFeatured                 Boolean                      @default(false)
   isPublished                Boolean                      @default(false)
   isListed                   Boolean                      @default(true)
+  isInterestFormEnabled      Boolean                      @default(false)
   operationsReminderDays     Int                          @default(3)
   exclusions                 String[]                     @default([])
   websiteOverview            String?
@@ -543,6 +551,7 @@ model CrmFestival {
   destination                CrmDestination               @relation(fields: [destinationId], references: [id])
   commonInclusions           CrmFestivalCommonInclusion[]
   inclusions                 CrmFestivalInclusion[]
+  interestSubmissions        InterestSubmission[]
   itineraryDays              CrmFestivalItineraryDay[]
   slots                      CrmFestivalSlot[]
   ledgerEntries              LedgerEntry[]
@@ -1205,6 +1214,35 @@ model CrmFestivalSlot {
 
   @@index([crmFestivalId])
   @@index([startDate])
+}
+
+model InterestSubmission {
+  id            String       @id @default(uuid())
+  name          String
+  email         String?
+  whatsapp      String?
+  instagram     String?
+  userId        String?
+  visitorToken  String?
+  crmTripId     String?
+  crmFestivalId String?
+  tripId        String?
+  festivalId    String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  user          User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  crmTrip       CrmTrip?     @relation(fields: [crmTripId], references: [id], onDelete: Cascade)
+  crmFestival   CrmFestival? @relation(fields: [crmFestivalId], references: [id], onDelete: Cascade)
+  trip          Trip?        @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  festival      Festival?    @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+
+  @@index([crmTripId])
+  @@index([crmFestivalId])
+  @@index([tripId])
+  @@index([festivalId])
+  @@index([userId])
+  @@index([visitorToken])
+  @@index([createdAt])
 }
 
 enum UserRole {

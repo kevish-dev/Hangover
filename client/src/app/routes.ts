@@ -41,6 +41,7 @@ export const router = createBrowserRouter([
       { path: "crm-festivals", lazy: lazyPage(() => import("./pages/admin/crm-festivals")) },
       { path: "crm-festivals/:festivalId/bookings/:bookingId", lazy: lazyPage(() => import("./pages/admin/crm-booking-detail")) },
       { path: "crm-festivals/:id", lazy: lazyPage(() => import("./pages/admin/crm-festival-detail")) },
+      { path: "interest", lazy: lazyPage(() => import("./pages/admin/interest")) },
       { path: "festivals", lazy: lazyPage(() => import("./pages/admin/festivals")) },
       { path: "festivals/:id", lazy: lazyPage(() => import("./pages/admin/festival-detail")) },
       { path: "bookings", lazy: lazyPage(() => import("./pages/admin/bookings")) },

@@ -30,9 +30,11 @@ import {
   Phone,
   Mail,
   Calendar,
-  Hash,
   FileText,
   PackagePlus,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
 import { showErrorToast } from "../../../lib/errors";
@@ -1129,9 +1131,105 @@ export function BalanceSheetTab({
   const summary = data?.summary;
   const entries = data?.entries || [];
 
+  const income = summary?.totalIncome || 0;
+  const expense = summary?.totalExpense || 0;
+  const netCollected = summary?.netBalance || 0;
+  const netProfitLoss = income - expense;
+  const isProfit = netProfitLoss > 0;
+  const isLoss = netProfitLoss < 0;
+
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
+    <div className="space-y-5">
+      {/* P&L Financial Summary Cards */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              Total Income
+            </p>
+            <span className="rounded-full bg-emerald-50 p-1 text-emerald-600">
+              <TrendingUp className="h-3.5 w-3.5" />
+            </span>
+          </div>
+          <p className="mt-1.5 text-xl font-bold text-emerald-700">
+            ₹{income.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              Total Expenses
+            </p>
+            <span className="rounded-full bg-red-50 p-1 text-red-600">
+              <TrendingDown className="h-3.5 w-3.5" />
+            </span>
+          </div>
+          <p className="mt-1.5 text-xl font-bold text-red-700">
+            ₹{expense.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              Net Balance
+            </p>
+            <span className="rounded-full bg-blue-50 p-1 text-blue-600">
+              <DollarSign className="h-3.5 w-3.5" />
+            </span>
+          </div>
+          <p
+            className={`mt-1.5 text-xl font-bold ${netCollected < 0 ? "text-red-700" : "text-gray-900"}`}
+          >
+            ₹
+            {netCollected.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+          </p>
+        </div>
+
+        <div
+          className={`rounded-xl border p-3.5 shadow-sm ${
+            isProfit
+              ? "border-emerald-200 bg-emerald-50/40"
+              : isLoss
+                ? "border-red-200 bg-red-50/40"
+                : "border-gray-200 bg-white"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-600">
+              Profit & Loss (P&L)
+            </p>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                isProfit
+                  ? "bg-emerald-100 text-emerald-800"
+                  : isLoss
+                    ? "bg-red-100 text-red-800"
+                    : "bg-gray-100 text-gray-700"
+              }`}
+            >
+              {isProfit ? "PROFIT" : isLoss ? "LOSS" : "EVEN"}
+            </span>
+          </div>
+          <p
+            className={`mt-1.5 text-xl font-bold ${
+              isProfit
+                ? "text-emerald-700"
+                : isLoss
+                  ? "text-red-700"
+                  : "text-gray-900"
+            }`}
+          >
+            {isProfit ? "+" : ""}₹
+            {Math.abs(netProfitLoss).toLocaleString("en-IN", {
+              maximumFractionDigits: 2,
+            })}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex justify-between items-center pt-1">
         <h3 className="text-sm font-semibold text-gray-900">Ledger Entries</h3>
         <SyncIndicator
           isMutating={

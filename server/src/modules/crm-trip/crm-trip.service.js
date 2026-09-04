@@ -467,6 +467,7 @@ const toPublicTrip = (trip) => {
     isPublished: trip.isPublished,
     isFeatured: trip.isFeatured,
     isListed: trip.isListed,
+    isInterestFormEnabled: Boolean(trip.isInterestFormEnabled),
     isCrmTrip: true,
     destinationId: trip.destinationId,
     destination: trip.destination
