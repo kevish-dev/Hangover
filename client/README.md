@@ -1,1 +1,1 @@
-# Hangover Trails. 
+# Hangover Trails
