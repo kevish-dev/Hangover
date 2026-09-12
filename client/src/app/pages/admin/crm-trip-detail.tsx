@@ -1385,17 +1385,6 @@ function CrmBookingDialog({
       setSaving(false);
     }
   };
-  const linkAmounts = booking
-    ? [
-        ...new Set(
-          [0.1, 0.25, 0.5, 0.75, 1].map((fraction) =>
-            (
-              Math.round(Number(booking.amountDue) * fraction * 100) / 100
-            ).toFixed(2),
-          ),
-        ),
-      ]
-    : [];
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
@@ -2639,6 +2628,17 @@ function InstallmentDialog({
   const [action, setAction] = useState("MANUAL");
   const [linkAmountChoice, setLinkAmountChoice] = useState("");
   const [saving, setSaving] = useState(false);
+  const linkAmounts = booking
+    ? [
+        ...new Set(
+          [0.1, 0.25, 0.5, 0.75, 1].map((fraction) =>
+            (
+              Math.round(Number(booking.amountDue) * fraction * 100) / 100
+            ).toFixed(2),
+          ),
+        ),
+      ]
+    : [];
   useEffect(() => {
     if (!booking) return setAmount("");
     const defaultAmount =
