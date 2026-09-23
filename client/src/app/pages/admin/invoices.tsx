@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
-import { format } from "date-fns";
 import {
   AlertTriangle,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   CircleAlert,
   Download,
+  FileSpreadsheet,
+  FileText,
   ExternalLink,
   Loader2,
   MapPin,
@@ -29,120 +31,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "../../components/ui/dialog";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { apiClient } from "../../../lib/axios";
-
-type InvoiceItem = { description: string; price: number };
-
-type ReceiptSync = {
-  state:
-    | "CURRENT"
-    | "REFUNDED"
-    | "REFUND_PENDING"
-    | "PARTIALLY_REFUNDED"
-    | "BOOKING_CANCELLED"
-    | "PAYMENT_NOT_SUCCESSFUL"
-    | "UNLINKED"
-    | "BOOKING_MISSING"
-    | "PAYMENT_MISSING"
-    | "PAYMENT_BOOKING_MISMATCH"
-    | "PAYMENT_AMOUNT_MISMATCH";
-  issues: string[];
-  booking: {
-    id: string;
-    bookingReference: string;
-    status: string;
-    paymentStatus: string;
-    numberOfTravelers: number;
-    totalAmount: string;
-    amountPaid: string;
-    amountDue: string;
-    balanceDueDate?: string | null;
-    customer: { name?: string | null; email?: string | null; phone?: string | null };
-    journey: {
-      kind: string;
-      title: string;
-      location?: string | null;
-      startDate?: string | null;
-      endDate?: string | null;
-      durationDays?: number | null;
-      packageName?: string | null;
-    };
-  } | null;
-  payment: {
-    id: string;
-    bookingId: string;
-    type: string;
-    status: string;
-    amount: string;
-    currency: string;
-    paymentMethod?: string | null;
-    utr?: string | null;
-    receiptNumber?: string | null;
-    razorpayOrderId?: string | null;
-    razorpayPaymentId?: string | null;
-    paidAt?: string | null;
-    createdAt: string;
-    successfulRefunded: number;
-    pendingRefunded: number;
-    netAmount: number;
-    refunds: Array<{
-      id: string;
-      amount: string;
-      status: string;
-      reason?: string | null;
-      razorpayRefundId?: string | null;
-      createdAt: string;
-      processedAt?: string | null;
-    }>;
-  } | null;
-};
-
-type Invoice = {
-  id: string;
-  customerName: string;
-  customerEmail: string;
-  customerPhone?: string;
-  title: string;
-  description?: string;
-  items: InvoiceItem[];
-  amount: string;
-  currency: string;
-  dueDate?: string;
-  status: string;
-  createdAt: string;
-  source?: "CUSTOM" | "BOOKING_RECEIPT";
-  bookingId?: string;
-  paymentId?: string;
-  sentAt?: string;
-  sync?: ReceiptSync | null;
-};
-
-const syncDisplay: Record<ReceiptSync["state"], { label: string; className: string; description: string }> = {
-  CURRENT: { label: "Current", className: "border-emerald-200 bg-emerald-50 text-emerald-700", description: "The receipt matches the current booking payment." },
-  REFUNDED: { label: "Refunded", className: "border-violet-200 bg-violet-50 text-violet-700", description: "The payment recorded by this receipt has been fully refunded." },
-  PARTIALLY_REFUNDED: { label: "Partially refunded", className: "border-violet-200 bg-violet-50 text-violet-700", description: "Part of the payment recorded by this receipt has been refunded." },
-  REFUND_PENDING: { label: "Refund pending", className: "border-amber-200 bg-amber-50 text-amber-800", description: "A refund has been initiated and is awaiting completion." },
-  BOOKING_CANCELLED: { label: "Booking cancelled", className: "border-slate-200 bg-slate-100 text-slate-700", description: "The booking has since been cancelled." },
-  PAYMENT_NOT_SUCCESSFUL: { label: "Payment needs review", className: "border-red-200 bg-red-50 text-red-700", description: "The linked transaction is no longer a successful payment." },
-  UNLINKED: { label: "Not linked", className: "border-amber-200 bg-amber-50 text-amber-800", description: "This legacy receipt cannot be matched to both a booking and payment." },
-  BOOKING_MISSING: { label: "Booking unavailable", className: "border-red-200 bg-red-50 text-red-700", description: "The booking linked to this receipt is unavailable." },
-  PAYMENT_MISSING: { label: "Payment unavailable", className: "border-red-200 bg-red-50 text-red-700", description: "The transaction linked to this receipt is unavailable." },
-  PAYMENT_BOOKING_MISMATCH: { label: "Link mismatch", className: "border-red-200 bg-red-50 text-red-700", description: "The receipt payment belongs to a different booking." },
-  PAYMENT_AMOUNT_MISMATCH: { label: "Amount mismatch", className: "border-red-200 bg-red-50 text-red-700", description: "The stored receipt amount differs from the linked payment." },
-};
-
-const formatDate = (value?: string | null, pattern = "MMM d, yyyy") => {
-  if (!value) return "Not recorded";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "Not recorded" : format(date, pattern);
-};
-
-const formatDateRange = (start?: string | null, end?: string | null) => {
-  if (!start && !end) return "Dates not recorded";
-  if (!start) return formatDate(end);
-  if (!end) return formatDate(start);
-  return `${formatDate(start)} – ${formatDate(end)}`;
-};
+import { formatDate, formatDateRange, syncDisplay, type Invoice, type InvoiceItem } from "../../components/admin/receipts";
+import { exportReceiptsCsv, exportReceiptsPdf, type ReceiptPdfMode } from "../../components/admin/receiptExport";
 
 function SyncBadge({ invoice }: { invoice: Invoice }) {
   if (!invoice.sync) {
@@ -163,6 +55,19 @@ function ReceiptDetailsModal({ invoice, onClose }: { invoice: Invoice; onClose: 
   const booking = sync?.booking;
   const payment = sync?.payment;
   const formatCurrency = (amount: number | string, currency = "INR") => new Intl.NumberFormat("en-IN", { style: "currency", currency }).format(Number(amount || 0));
+  const [downloading, setDownloading] = useState(false);
+
+  const downloadPdf = async () => {
+    setDownloading(true);
+    try {
+      await exportReceiptsPdf([invoice], "receipts");
+    } catch (error) {
+      console.error("Failed to generate receipt PDF:", error);
+      toast.error("Could not generate the receipt PDF");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div role="dialog" aria-modal="true" aria-label={`Receipt details for ${invoice.title}`} className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 p-0 backdrop-blur-sm md:items-center md:p-4" onClick={onClose}>
@@ -173,7 +78,10 @@ function ReceiptDetailsModal({ invoice, onClose }: { invoice: Invoice; onClose: 
             <h2 className="break-words text-lg font-bold text-gray-950 md:text-xl">{invoice.title}</h2>
             <p className="mt-1 text-sm text-gray-500">Issued {formatDate(invoice.sentAt || invoice.createdAt, "MMM d, yyyy · h:mm a")}</p>
           </div>
-          <button type="button" aria-label="Close receipt details" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"><X className="h-5 w-5" /></button>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button variant="outline" size="sm" onClick={downloadPdf} disabled={downloading}>{downloading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}PDF</Button>
+            <button type="button" aria-label="Close receipt details" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"><X className="h-5 w-5" /></button>
+          </div>
         </header>
 
         <div className="space-y-5 p-5 md:p-6">
@@ -308,39 +216,32 @@ export default function InvoicesPage() {
     }).format(Number(amount));
   };
 
+  const [exporting, setExporting] = useState<"csv" | ReceiptPdfMode | null>(null);
+
   const exportCsv = () => {
     if (!invoices.length) {
       toast.error("No receipt records to export");
       return;
     }
-
-    const escapeCsv = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
-    const headers = ["Sent at", "Source", "Live state", "Customer", "Email", "Phone", "Title", "Booking ID", "Payment ID", "Amount", "Currency", "Receipt status", "Line items", "Notes"];
-    const rows = invoices.map((invoice) => [
-      invoice.sentAt || invoice.createdAt,
-      invoice.source === "BOOKING_RECEIPT" ? "Booking receipt" : "Custom receipt",
-      invoice.sync?.state || "CUSTOM",
-      invoice.customerName,
-      invoice.customerEmail,
-      invoice.customerPhone,
-      invoice.title,
-      invoice.bookingId,
-      invoice.paymentId,
-      invoice.amount,
-      invoice.currency,
-      invoice.status,
-      invoice.items.map((item) => `${item.description}: ${item.price}`).join(" | "),
-      invoice.description,
-    ]);
-    const csv = [headers, ...rows].map((row) => row.map(escapeCsv).join(",")).join("\r\n");
-    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `receipt-records-${format(new Date(), "yyyy-MM-dd")}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    exportReceiptsCsv(invoices);
     toast.success("Receipt records exported");
+  };
+
+  const exportPdf = async (mode: ReceiptPdfMode) => {
+    if (!invoices.length) {
+      toast.error("No receipt records to export");
+      return;
+    }
+    setExporting(mode);
+    try {
+      await exportReceiptsPdf(invoices, mode);
+      toast.success(mode === "register" ? "Receipt register exported" : `${invoices.length} receipt${invoices.length === 1 ? "" : "s"} exported to PDF`);
+    } catch (error) {
+      console.error("Failed to generate receipts PDF:", error);
+      toast.error("Could not generate the PDF export");
+    } finally {
+      setExporting(null);
+    }
   };
 
   const bookingReceipts = invoices.filter((invoice) => invoice.source === "BOOKING_RECEIPT");
@@ -357,9 +258,30 @@ export default function InvoicesPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={exportCsv} disabled={!invoices.length}>
-            <Download className="mr-2 h-4 w-4" /> Export CSV
-          </Button>
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <Button variant="outline" disabled={!invoices.length || exporting !== null}>
+                {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Export <ChevronDown className="ml-1.5 h-4 w-4 text-gray-400" />
+              </Button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content align="end" sideOffset={6} className="z-50 w-72 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg">
+                <DropdownMenu.Label className="px-2.5 pb-1.5 pt-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">All {invoices.length} receipt records</DropdownMenu.Label>
+                <DropdownMenu.Item onSelect={exportCsv} className="flex cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2 outline-none data-[highlighted]:bg-gray-50">
+                  <FileSpreadsheet className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+                  <span><span className="block text-sm font-semibold text-gray-900">CSV spreadsheet</span><span className="block text-xs text-gray-500">Every field, including booking, payment and GST columns</span></span>
+                </DropdownMenu.Item>
+                <DropdownMenu.Item onSelect={() => exportPdf("full")} className="flex cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2 outline-none data-[highlighted]:bg-gray-50">
+                  <FileText className="mt-0.5 h-4 w-4 shrink-0 text-[#781216]" />
+                  <span><span className="block text-sm font-semibold text-gray-900">PDF with all receipts</span><span className="block text-xs text-gray-500">Summary register, then one page per receipt</span></span>
+                </DropdownMenu.Item>
+                <DropdownMenu.Item onSelect={() => exportPdf("register")} className="flex cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2 outline-none data-[highlighted]:bg-gray-50">
+                  <ReceiptText className="mt-0.5 h-4 w-4 shrink-0 text-[#781216]" />
+                  <span><span className="block text-sm font-semibold text-gray-900">PDF register only</span><span className="block text-xs text-gray-500">A single summary table with totals</span></span>
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
           <Button variant="outline" onClick={fetchInvoices} disabled={loading}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Refresh
           </Button>
