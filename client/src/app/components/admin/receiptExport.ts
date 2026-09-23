@@ -38,6 +38,19 @@ const sourceLabel = (invoice: Invoice) => (invoice.source === "BOOKING_RECEIPT" 
 const stateLabel = (invoice: Invoice) => (invoice.sync ? syncDisplay[invoice.sync.state].label : "Custom receipt");
 const humanize = (value?: string | null) => (value ? value.replaceAll("_", " ") : "Not recorded");
 const fileDate = () => format(new Date(), "yyyy-MM-dd");
+/** Batch exports carry their size so "selected" and "all" downloads don't collide. */
+const batchName = (prefix: string, invoices: Invoice[]) => `${prefix}-${invoices.length}-${fileDate()}`;
+
+/** A single receipt is named after its booking/receipt reference; batches after today's date. */
+const singleReceiptName = (invoices: Invoice[]) => {
+  if (invoices.length !== 1) return null;
+  const [invoice] = invoices;
+  const receiptNumber = invoice.sync?.payment?.receiptNumber;
+  const reference = invoice.sync?.booking?.bookingReference
+    ? `${invoice.sync.booking.bookingReference}${receiptNumber ? `-${receiptNumber}` : ""}`
+    : invoice.paymentId || invoice.id;
+  return `receipt-${reference.replace(/[^A-Za-z0-9_-]+/g, "-")}`;
+};
 
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
@@ -106,7 +119,7 @@ export const exportReceiptsCsv = (invoices: Invoice[]) => {
     ];
   });
   const csv = [headers, ...rows].map((row) => row.map(escapeCsv).join(",")).join("\r\n");
-  downloadBlob(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" }), `receipt-records-${fileDate()}.csv`);
+  downloadBlob(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" }), `${singleReceiptName(invoices) || batchName("receipt-records", invoices)}.csv`);
 };
 
 // ---------------------------------------------------------------------------
@@ -451,12 +464,9 @@ const drawReceiptPage = (autoTable: AutoTable, doc: jsPDF, invoice: Invoice) => 
 };
 
 const pdfFilename = (invoices: Invoice[], mode: ReceiptPdfMode) => {
-  if (mode === "receipts" && invoices.length === 1) {
-    const [invoice] = invoices;
-    const reference = invoice.sync?.booking?.bookingReference || invoice.paymentId || invoice.id;
-    return `receipt-${reference.replace(/[^A-Za-z0-9_-]+/g, "-")}.pdf`;
-  }
-  return mode === "register" ? `receipt-register-${fileDate()}.pdf` : `receipts-${fileDate()}.pdf`;
+  const single = mode === "receipts" ? singleReceiptName(invoices) : null;
+  if (single) return `${single}.pdf`;
+  return `${batchName(mode === "register" ? "receipt-register" : "receipts", invoices)}.pdf`;
 };
 
 export const exportReceiptsPdf = async (invoices: Invoice[], mode: ReceiptPdfMode = "full") => {

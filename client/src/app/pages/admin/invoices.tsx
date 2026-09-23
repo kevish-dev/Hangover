@@ -48,6 +48,63 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   return <div className="grid grid-cols-[minmax(100px,0.8fr)_minmax(0,1.4fr)] gap-3 border-b border-gray-100 py-2.5 text-sm last:border-0"><span className="text-gray-500">{label}</span><span className="break-words text-right font-medium text-gray-900">{value}</span></div>;
 }
 
+type ExportKind = "csv" | ReceiptPdfMode;
+
+const exportItemClass = "flex cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2 outline-none data-[highlighted]:bg-gray-50";
+
+/** Export menu for any set of receipts: one, a selection, or all of them. */
+function ExportMenu({ invoices, heading, label, variant = "outline", size = "default" }: { invoices: Invoice[]; heading: string; label: string; variant?: "outline" | "default"; size?: "default" | "sm" }) {
+  const [busy, setBusy] = useState(false);
+  const count = invoices.length;
+  const noun = `${count} receipt${count === 1 ? "" : "s"}`;
+
+  const run = async (kind: ExportKind) => {
+    if (!count) {
+      toast.error("No receipt records to export");
+      return;
+    }
+    setBusy(true);
+    try {
+      if (kind === "csv") exportReceiptsCsv(invoices);
+      else await exportReceiptsPdf(invoices, kind);
+      toast.success(kind === "register" ? `Register of ${noun} exported` : `${noun} exported to ${kind === "csv" ? "CSV" : "PDF"}`);
+    } catch (error) {
+      console.error("Failed to export receipts:", error);
+      toast.error(`Could not generate the ${kind === "csv" ? "CSV" : "PDF"} export`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <Button variant={variant} size={size} disabled={!count || busy}>
+          {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} {label} <ChevronDown className="ml-1.5 h-4 w-4 opacity-60" />
+        </Button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        {/* Above the receipt details modal (z-[70]) so it also works from there. */}
+        <DropdownMenu.Content align="end" sideOffset={6} className="z-[80] w-72 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg">
+          <DropdownMenu.Label className="px-2.5 pb-1.5 pt-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">{heading}</DropdownMenu.Label>
+          <DropdownMenu.Item onSelect={() => run(count === 1 ? "receipts" : "full")} className={exportItemClass}>
+            <FileText className="mt-0.5 h-4 w-4 shrink-0 text-[#781216]" />
+            <span><span className="block text-sm font-semibold text-gray-900">{count === 1 ? "PDF receipt" : `PDF with ${count === 2 ? "both" : `all ${count}`} receipts`}</span><span className="block text-xs text-gray-500">{count === 1 ? "Branded receipt with booking, payment and GST" : "Summary register, then one page per receipt"}</span></span>
+          </DropdownMenu.Item>
+          {count > 1 && <DropdownMenu.Item onSelect={() => run("register")} className={exportItemClass}>
+            <ReceiptText className="mt-0.5 h-4 w-4 shrink-0 text-[#781216]" />
+            <span><span className="block text-sm font-semibold text-gray-900">PDF register only</span><span className="block text-xs text-gray-500">A single summary table with totals</span></span>
+          </DropdownMenu.Item>}
+          <DropdownMenu.Item onSelect={() => run("csv")} className={exportItemClass}>
+            <FileSpreadsheet className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+            <span><span className="block text-sm font-semibold text-gray-900">CSV spreadsheet</span><span className="block text-xs text-gray-500">Every field, including booking, payment and GST columns</span></span>
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
+}
+
 function ReceiptDetailsModal({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
   const sync = invoice.sync;
   const display = sync ? syncDisplay[sync.state] : null;
@@ -55,19 +112,6 @@ function ReceiptDetailsModal({ invoice, onClose }: { invoice: Invoice; onClose: 
   const booking = sync?.booking;
   const payment = sync?.payment;
   const formatCurrency = (amount: number | string, currency = "INR") => new Intl.NumberFormat("en-IN", { style: "currency", currency }).format(Number(amount || 0));
-  const [downloading, setDownloading] = useState(false);
-
-  const downloadPdf = async () => {
-    setDownloading(true);
-    try {
-      await exportReceiptsPdf([invoice], "receipts");
-    } catch (error) {
-      console.error("Failed to generate receipt PDF:", error);
-      toast.error("Could not generate the receipt PDF");
-    } finally {
-      setDownloading(false);
-    }
-  };
 
   return (
     <div role="dialog" aria-modal="true" aria-label={`Receipt details for ${invoice.title}`} className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 p-0 backdrop-blur-sm md:items-center md:p-4" onClick={onClose}>
@@ -79,7 +123,7 @@ function ReceiptDetailsModal({ invoice, onClose }: { invoice: Invoice; onClose: 
             <p className="mt-1 text-sm text-gray-500">Issued {formatDate(invoice.sentAt || invoice.createdAt, "MMM d, yyyy · h:mm a")}</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <Button variant="outline" size="sm" onClick={downloadPdf} disabled={downloading}>{downloading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}PDF</Button>
+            <ExportMenu invoices={[invoice]} heading="This receipt" label="Export" size="sm" />
             <button type="button" aria-label="Close receipt details" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"><X className="h-5 w-5" /></button>
           </div>
         </header>
@@ -114,6 +158,7 @@ export default function InvoicesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
 
   // Form State
   const [customerName, setCustomerName] = useState("");
@@ -133,7 +178,10 @@ export default function InvoicesPage() {
       setLoading(true);
       const res = await apiClient.get("/invoices");
       if (res.data.status === "success") {
-        setInvoices(res.data.data);
+        const next: Invoice[] = res.data.data;
+        setInvoices(next);
+        // Keep the export selection for receipts that still exist after a refresh.
+        setCheckedIds((prev) => new Set(next.map((invoice) => invoice.id).filter((id) => prev.has(id))));
       }
     } catch (error) {
       toast.error("Failed to fetch invoices");
@@ -216,33 +264,19 @@ export default function InvoicesPage() {
     }).format(Number(amount));
   };
 
-  const [exporting, setExporting] = useState<"csv" | ReceiptPdfMode | null>(null);
+  const checkedInvoices = invoices.filter((invoice) => checkedIds.has(invoice.id));
+  const allChecked = invoices.length > 0 && checkedInvoices.length === invoices.length;
+  const someChecked = checkedInvoices.length > 0 && !allChecked;
 
-  const exportCsv = () => {
-    if (!invoices.length) {
-      toast.error("No receipt records to export");
-      return;
-    }
-    exportReceiptsCsv(invoices);
-    toast.success("Receipt records exported");
+  const toggleChecked = (id: string) => {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
-
-  const exportPdf = async (mode: ReceiptPdfMode) => {
-    if (!invoices.length) {
-      toast.error("No receipt records to export");
-      return;
-    }
-    setExporting(mode);
-    try {
-      await exportReceiptsPdf(invoices, mode);
-      toast.success(mode === "register" ? "Receipt register exported" : `${invoices.length} receipt${invoices.length === 1 ? "" : "s"} exported to PDF`);
-    } catch (error) {
-      console.error("Failed to generate receipts PDF:", error);
-      toast.error("Could not generate the PDF export");
-    } finally {
-      setExporting(null);
-    }
-  };
+  const toggleAll = () => setCheckedIds(allChecked ? new Set() : new Set(invoices.map((invoice) => invoice.id)));
 
   const bookingReceipts = invoices.filter((invoice) => invoice.source === "BOOKING_RECEIPT");
   const currentReceipts = bookingReceipts.filter((invoice) => invoice.sync?.state === "CURRENT");
@@ -258,30 +292,7 @@ export default function InvoicesPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger asChild>
-              <Button variant="outline" disabled={!invoices.length || exporting !== null}>
-                {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Export <ChevronDown className="ml-1.5 h-4 w-4 text-gray-400" />
-              </Button>
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Portal>
-              <DropdownMenu.Content align="end" sideOffset={6} className="z-50 w-72 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg">
-                <DropdownMenu.Label className="px-2.5 pb-1.5 pt-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">All {invoices.length} receipt records</DropdownMenu.Label>
-                <DropdownMenu.Item onSelect={exportCsv} className="flex cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2 outline-none data-[highlighted]:bg-gray-50">
-                  <FileSpreadsheet className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
-                  <span><span className="block text-sm font-semibold text-gray-900">CSV spreadsheet</span><span className="block text-xs text-gray-500">Every field, including booking, payment and GST columns</span></span>
-                </DropdownMenu.Item>
-                <DropdownMenu.Item onSelect={() => exportPdf("full")} className="flex cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2 outline-none data-[highlighted]:bg-gray-50">
-                  <FileText className="mt-0.5 h-4 w-4 shrink-0 text-[#781216]" />
-                  <span><span className="block text-sm font-semibold text-gray-900">PDF with all receipts</span><span className="block text-xs text-gray-500">Summary register, then one page per receipt</span></span>
-                </DropdownMenu.Item>
-                <DropdownMenu.Item onSelect={() => exportPdf("register")} className="flex cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2 outline-none data-[highlighted]:bg-gray-50">
-                  <ReceiptText className="mt-0.5 h-4 w-4 shrink-0 text-[#781216]" />
-                  <span><span className="block text-sm font-semibold text-gray-900">PDF register only</span><span className="block text-xs text-gray-500">A single summary table with totals</span></span>
-                </DropdownMenu.Item>
-              </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Root>
+          <ExportMenu invoices={invoices} heading={`All ${invoices.length} receipt records`} label="Export all" />
           <Button variant="outline" onClick={fetchInvoices} disabled={loading}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Refresh
           </Button>
@@ -404,19 +415,34 @@ export default function InvoicesPage() {
           </div>
         ) : (
           <>
+          <div className={`flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 md:px-5 ${checkedInvoices.length ? "border-[#e8d9b5] bg-[#fbf7ed]" : "border-gray-100 bg-gray-50/60"}`}>
+            <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-gray-700">
+              <input type="checkbox" checked={allChecked} ref={(el) => { if (el) el.indeterminate = someChecked; }} onChange={toggleAll} className="h-4 w-4 cursor-pointer rounded border-gray-300 accent-[#781216]" aria-label="Select all receipts" />
+              {checkedInvoices.length ? <span><span className="font-bold text-gray-950">{checkedInvoices.length}</span> of {invoices.length} selected</span> : <span>Select receipts to export</span>}
+            </label>
+            {checkedInvoices.length > 0 && <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setCheckedIds(new Set())}>Clear</Button>
+              <ExportMenu invoices={checkedInvoices} heading={`${checkedInvoices.length} selected receipt${checkedInvoices.length === 1 ? "" : "s"}`} label="Export selected" variant="default" size="sm" />
+            </div>}
+          </div>
           <div className="space-y-3 p-3 md:hidden">
             {invoices.map((invoice) => {
               const booking = invoice.sync?.booking;
-              return <button type="button" key={invoice.id} onClick={() => setSelectedInvoice(invoice)} className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left transition hover:border-[#c8a96e] hover:bg-[#fbf7ed]/30">
+              const checked = checkedIds.has(invoice.id);
+              return <div key={invoice.id} className={`flex items-stretch overflow-hidden rounded-xl border transition ${checked ? "border-[#c8a96e] bg-[#fbf7ed]/50" : "border-gray-200 bg-white"}`}>
+                <label className="flex cursor-pointer items-start py-4 pl-4 pr-1"><input type="checkbox" checked={checked} onChange={() => toggleChecked(invoice.id)} className="h-4 w-4 cursor-pointer rounded border-gray-300 accent-[#781216]" aria-label={`Select receipt ${invoice.title}`} /></label>
+                <button type="button" onClick={() => setSelectedInvoice(invoice)} className="min-w-0 flex-1 p-4 pl-2 text-left transition hover:bg-[#fbf7ed]/30">
                 <div className="flex items-start justify-between gap-3"><div className="min-w-0"><SyncBadge invoice={invoice} /><h3 className="mt-2 break-words text-sm font-bold text-gray-950">{invoice.title}</h3><p className="mt-1 text-xs text-gray-500">{booking?.bookingReference || invoice.customerEmail}</p></div><span className="shrink-0 text-sm font-bold text-gray-950">{formatCurrency(invoice.amount, invoice.currency)}</span></div>
                 <div className="mt-3 border-t border-gray-100 pt-3"><p className="text-sm font-semibold text-gray-900">{booking?.journey.title || invoice.customerName}</p><p className="mt-1 text-xs text-gray-500">{booking ? `${formatDateRange(booking.journey.startDate, booking.journey.endDate)} · ${booking.paymentStatus.replaceAll("_", " ")}` : formatDate(invoice.sentAt || invoice.createdAt)}</p></div>
-              </button>;
+              </button>
+              </div>;
             })}
           </div>
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[1100px] text-left text-sm">
               <thead className="border-b bg-gray-50 text-xs font-bold uppercase tracking-[0.08em] text-gray-500">
                 <tr>
+                  <th className="w-10 py-4 pl-5 pr-0"><span className="sr-only">Select</span></th>
                   <th className="px-5 py-4">Receipt</th>
                   <th className="px-5 py-4">Booking & journey</th>
                   <th className="px-5 py-4">Customer</th>
@@ -428,7 +454,8 @@ export default function InvoicesPage() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {invoices.map((inv) => (
-                  <tr key={inv.id} className="align-top hover:bg-gray-50/70">
+                  <tr key={inv.id} className={`align-top ${checkedIds.has(inv.id) ? "bg-[#fbf7ed]/60" : "hover:bg-gray-50/70"}`}>
+                    <td className="py-4 pl-5 pr-0"><input type="checkbox" checked={checkedIds.has(inv.id)} onChange={() => toggleChecked(inv.id)} className="mt-0.5 h-4 w-4 cursor-pointer rounded border-gray-300 accent-[#781216]" aria-label={`Select receipt ${inv.title}`} /></td>
                     <td className="max-w-[260px] px-5 py-4">
                       <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-gray-400">{inv.source === "BOOKING_RECEIPT" ? "Booking receipt" : "Custom receipt"}</div>
                       <div className="break-words font-semibold text-gray-950">{inv.title}</div>
