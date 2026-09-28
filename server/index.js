@@ -31,6 +31,7 @@ import invoiceRoutes from "./src/modules/invoice/invoice.routes.js";
 import analyticsRoutes from "./src/modules/analytics/analytics.routes.js";
 import siteSettingsRoutes from "./src/modules/site-settings/site-settings.routes.js";
 import interestRoutes from "./src/modules/interest/interest.routes.js";
+import notificationRoutes from "./src/modules/notification/notification.routes.js";
 import { errorHandler } from "./src/core/errors/errorHandler.js";
 import { prisma } from "./src/prisma/client.js";
 import { startOperationsWorker } from "./src/workers/operations.worker.js";
@@ -88,6 +89,7 @@ app.use("/api/v1/operations", operationsRoutes);
 app.use("/api/v1/invoices", invoiceRoutes);
 app.use("/api/v1/analytics", analyticsRoutes);
 app.use("/api/v1/interests", interestRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
 
 app.get("/openapi.json", (req, res) => {
   res.json(generateOpenApiDocument());

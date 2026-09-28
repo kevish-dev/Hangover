@@ -35,6 +35,7 @@ import {
   Tent,
   Users,
   HeartHandshake,
+  Mail,
 } from "lucide-react";
 
 const overviewItems = [
@@ -53,6 +54,7 @@ const crmItems = [
   { title: "Balance sheet", url: "/dashboard/ledger", icon: BookOpen },
   { title: "Payments", url: "/dashboard/payments", icon: CreditCard },
   { title: "Invoices", url: "/dashboard/invoices", icon: Receipt },
+  { title: "Notifications", url: "/dashboard/notifications", icon: Mail },
 ];
 
 const websiteItems = [

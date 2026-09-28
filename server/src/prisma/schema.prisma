@@ -24,9 +24,26 @@ model User {
   reviews           Review[]
   profile           UserProfile?
   interestSubmissions InterestSubmission[]
+  notificationSubscriptions NotificationRecipient[]
 
   @@index([email])
   @@index([role])
+}
+
+enum NotificationCategory {
+  OPERATIONS_REMINDER
+  NEW_INQUIRY
+}
+
+model NotificationRecipient {
+  id        String               @id @default(uuid())
+  category  NotificationCategory
+  userId    String
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime             @default(now())
+
+  @@unique([category, userId])
+  @@index([category])
 }
 
 model SiteSetting {
