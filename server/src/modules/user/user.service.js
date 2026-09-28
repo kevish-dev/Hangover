@@ -85,6 +85,27 @@ export const updateUserStatus = async (id, isActive) => {
   return userRepo.updateUserStatus(id, isActive);
 };
 
+const VALID_ROLES = new Set(["USER", "ADMIN"]);
+
+export const updateUserRole = async (id, role, requestingUserId) => {
+  if (!VALID_ROLES.has(role)) {
+    throw new ValidationError("Role must be either USER or ADMIN.");
+  }
+  if (id === requestingUserId) {
+    throw new ValidationError("You cannot change your own role.");
+  }
+  await getUserById(id);
+  return userRepo.updateUserRole(id, role);
+};
+
+export const deleteUser = async (id, requestingUserId) => {
+  if (id === requestingUserId) {
+    throw new ValidationError("You cannot delete your own account.");
+  }
+  await getUserById(id);
+  return userRepo.deleteUser(id);
+};
+
 export const uploadGovtIdImage = async (userId, govtIdType, file) => {
   const folder = `uploads/users/${userId}/govtid/${govtIdType}`;
   const uploaded = await uploadSensitiveDocument(file, {

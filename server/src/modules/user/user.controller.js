@@ -86,3 +86,27 @@ export const toggleUserStatus = async (req, res, next) => {
     next(error);
   }
 };
+
+export const updateUserRole = async (req, res, next) => {
+  try {
+    const user = await userService.updateUserRole(req.params.id, req.body.role, req.user.id);
+    res.status(200).json({ message: "User role updated", user });
+  } catch (error) {
+    if (error.message === "User not found") {
+      return res.status(404).json({ message: "User not found" });
+    }
+    next(error);
+  }
+};
+
+export const deleteUser = async (req, res, next) => {
+  try {
+    await userService.deleteUser(req.params.id, req.user.id);
+    res.status(200).json({ message: "User deleted" });
+  } catch (error) {
+    if (error.message === "User not found") {
+      return res.status(404).json({ message: "User not found" });
+    }
+    next(error);
+  }
+};

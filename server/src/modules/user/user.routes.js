@@ -24,5 +24,7 @@ router.get("/", userController.getUsers);
 router.get("/:id", userController.getUserById);
 router.put("/:id/profile", userController.updateUserProfile);
 router.patch("/:id/status", userController.toggleUserStatus);
+router.patch("/:id/role", userController.updateUserRole);
+router.delete("/:id", userController.deleteUser);
 
 export default router;

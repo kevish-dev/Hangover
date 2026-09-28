@@ -36,3 +36,14 @@ export const updateUserStatus = async (id, isActive) => {
     data: { isActive },
   });
 };
+
+export const updateUserRole = async (id, role) => {
+  return prisma.user.update({
+    where: { id },
+    data: { role },
+  });
+};
+
+export const deleteUser = async (id) => {
+  return prisma.user.delete({ where: { id } });
+};
