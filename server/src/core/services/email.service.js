@@ -293,7 +293,7 @@ const renderEmail = ({ preheader, eyebrow, title, intro, badge, bodyHtml, cta, f
   </style>
 </head>
 <body style="margin:0;padding:0;background:${BRAND.cream};-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
-  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">${escapeHtml(preheader)}&#847; &zwnj; &nbsp; &#847; &zwnj; &nbsp;</div>
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">${escapeHtml(preheader)}</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.cream}" style="width:100%;border-collapse:collapse;">
     <tr>
       <td align="center" style="padding:28px 12px;">
@@ -1054,7 +1054,7 @@ export const sendWelcomeEmail = async (options = {}) => {
       cta,
       closing: `See you out there,\nThe ${BRAND.name} Team`,
     }),
-    preheader: `Welcome to ${BRAND.name}. Your next great story starts here.`,
+    preheader: `Welcome to ${BRAND.name}. Your account is ready.`,
     eyebrow: "Welcome aboard",
     title,
     intro,
