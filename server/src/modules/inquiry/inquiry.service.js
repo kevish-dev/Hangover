@@ -7,15 +7,10 @@ export const createInquiry = async (data) => {
   const parsed = createInquirySchema.parse(data);
   const inquiry = await repo.createInquiry(parsed);
 
-  // With explicit recipients configured, email each of them; otherwise fall
-  // back to sendNewInquiryNotificationEmail's own default (env var / support inbox).
   getConfiguredRecipientEmails("NEW_INQUIRY")
-    .then((recipients) => {
-      const targets = recipients.length ? recipients : [undefined];
-      return Promise.all(
-        targets.map((to) => sendNewInquiryNotificationEmail({ ...parsed, inquiryId: inquiry.id, to })),
-      );
-    })
+    .then((recipients) => Promise.all(
+      recipients.map((to) => sendNewInquiryNotificationEmail({ ...parsed, inquiryId: inquiry.id, to })),
+    ))
     .catch((error) => console.error("[Email] Failed to send inquiry notification:", error));
 
   return inquiry;

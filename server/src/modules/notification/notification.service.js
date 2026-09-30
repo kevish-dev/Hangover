@@ -12,7 +12,7 @@ export const CATEGORIES = [
     key: "NEW_INQUIRY",
     label: "New inquiries",
     description: "Sent as soon as a visitor submits a website inquiry form.",
-    defaultNote: "No admin is selected, so these go to the support inbox only.",
+    defaultNote: "No one is selected, so these emails are not sent to anyone.",
   },
 ];
 
