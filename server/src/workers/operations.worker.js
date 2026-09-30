@@ -39,20 +39,10 @@ async function scanAndNotify() {
     },
   });
 
-  // Recipients configurable from the admin Notifications settings page —
-  // falls back to every admin when nobody has configured this category yet.
-  const { resolveRecipientEmails } = await import(
+  const { getConfiguredRecipientEmails } = await import(
     "../modules/notification/notification.service.js"
   );
-  const adminEmails = await resolveRecipientEmails("OPERATIONS_REMINDER", {
-    fallback: async () => {
-      const admins = await prisma.user.findMany({
-        where: { role: "ADMIN" },
-        select: { email: true },
-      });
-      return admins.map((a) => a.email).filter(Boolean);
-    },
-  });
+  const adminEmails = await getConfiguredRecipientEmails("OPERATIONS_REMINDER");
 
   if (adminEmails.length === 0) return;
 

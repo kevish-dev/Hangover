@@ -5,14 +5,14 @@ export const CATEGORIES = [
   {
     key: "OPERATIONS_REMINDER",
     label: "Operations reminders",
-    description: "Hourly alerts for overdue or upcoming operational tasks tied to bookings.",
-    defaultNote: "By default, sent to every admin.",
+    description: "Daily alerts for overdue or upcoming operational tasks tied to bookings.",
+    defaultNote: "No one is selected, so these emails are not sent to anyone.",
   },
   {
     key: "NEW_INQUIRY",
     label: "New inquiries",
     description: "Sent as soon as a visitor submits a website inquiry form.",
-    defaultNote: "By default, sent to the support inbox only.",
+    defaultNote: "No admin is selected, so these go to the support inbox only.",
   },
 ];
 
@@ -52,18 +52,5 @@ export const updateRecipients = async (category, userIds) => {
   return uniqueValidIds;
 };
 
-/** The explicitly configured recipient emails for a category, or [] if none set. */
+/** Emails of active recipients explicitly selected for a category. */
 export const getConfiguredRecipientEmails = (category) => notificationRepo.findRecipientEmails(category);
-
-/**
- * Resolves the recipient email list for a category. Falls back to the
- * pre-existing default behavior when nobody has explicitly configured
- * recipients yet, so unconfigured categories keep working exactly as
- * they did before this settings page existed.
- */
-export const resolveRecipientEmails = async (category, { fallback } = {}) => {
-  const configured = await getConfiguredRecipientEmails(category);
-  if (configured.length) return configured;
-  if (typeof fallback === "function") return fallback();
-  return [];
-};
