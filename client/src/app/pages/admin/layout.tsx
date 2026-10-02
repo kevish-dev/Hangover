@@ -36,6 +36,7 @@ import {
   Users,
   HeartHandshake,
   Mail,
+  MessageSquare,
 } from "lucide-react";
 
 const overviewItems = [
@@ -49,6 +50,7 @@ const crmItems = [
   { title: "Itinerary trips", url: "/dashboard/crm-trips", icon: MapPin },
   { title: "Itinerary festivals", url: "/dashboard/crm-festivals", icon: Tent },
   { title: "Interest", url: "/dashboard/interest", icon: HeartHandshake },
+  { title: "Inquiries", url: "/dashboard/inquiries", icon: MessageSquare },
   { title: "Bookings", url: "/dashboard/bookings", icon: CalendarCheck },
   { title: "Operations", url: "/dashboard/operations", icon: ClipboardCheck },
   { title: "Balance sheet", url: "/dashboard/ledger", icon: BookOpen },
