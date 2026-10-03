@@ -277,7 +277,7 @@ export function HeroCarousel() {
           <img
             src={mediaImageUrl(slide.bannerImages, { width: 1920, fit: "fit" })}
             alt={slide.title}
-            fetchpriority="high"
+            fetchPriority="high"
             decoding="async"
             className="w-full h-full object-cover"
           />
@@ -300,7 +300,7 @@ export function HeroCarousel() {
 
       {/* HERO CONTENT */}
       <div className="absolute inset-0 z-30 flex items-center pb-24 pt-24 md:py-0">
-        <div className="px-5 sm:px-6 md:px-10 lg:px-12 max-w-2xl w-full overflow-hidden">
+        <div className="px-5 sm:px-6 md:px-10 lg:px-12 max-w-4xl w-full overflow-hidden">
           <motion.div
             initial={false}
             animate={{ opacity: 1, y: 0 }}
