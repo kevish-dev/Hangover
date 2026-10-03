@@ -233,7 +233,6 @@ model FestivalTag {
   tag          String        @unique
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
-  crmFestivals CrmFestival[] @relation("CrmFestivalToFestivalTag")
   festivals    Festival[]    @relation("FestivalToFestivalTag")
 }
 
@@ -573,7 +572,7 @@ model CrmFestival {
   slots                      CrmFestivalSlot[]
   ledgerEntries              LedgerEntry[]
   packages                   Package[]
-  websiteTags                FestivalTag[]                @relation("CrmFestivalToFestivalTag")
+  websiteTags                TripTag[]                    @relation("CrmFestivalToTripTag")
 
   @@index([destinationId])
   @@index([isActive])
@@ -860,6 +859,7 @@ model TripTag {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   crmTrips  CrmTrip[] @relation("CrmTripToTripTag")
+  crmFestivals CrmFestival[] @relation("CrmFestivalToTripTag")
   trips     Trip[]    @relation("TripToTripTag")
 }
 
