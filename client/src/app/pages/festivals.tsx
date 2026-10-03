@@ -877,7 +877,7 @@ export default function FestivalsPage() {
         />
 
         <div className="absolute inset-0 z-30 flex items-center">
-          <div className="px-6 md:px-10 lg:px-12 max-w-2xl w-full">
+          <div className="px-6 md:px-10 lg:px-12 w-full">
             {loading ? (
               <>
                 <motion.div
