@@ -111,7 +111,6 @@ const startServer = async () => {
     await prisma.$connect();
     console.log("Connected to database successfully");
 
-    // Start the in-memory operations reminder worker
     startOperationsWorker();
 
     app.listen(env.PORT, () => {
