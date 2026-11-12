@@ -71,6 +71,11 @@ jobs:
           PROD_ENV: ${{ secrets.ENV }}
         run: |
           echo "$PROD_ENV" > server/.env
+          # Ensure DATABASE_URL connects via internal Docker network (postgres:5432) instead of host localhost:5433
+          sed -i -e 's|@localhost:5433/|@postgres:5432/|g' \
+                 -e 's|@127.0.0.1:5433/|@postgres:5432/|g' \
+                 -e 's|@localhost:5432/|@postgres:5432/|g' \
+                 -e 's|@127.0.0.1:5432/|@postgres:5432/|g' server/.env
 
       - name: Upload Production Docker Compose and .env
         uses: appleboy/scp-action@v0.1.7

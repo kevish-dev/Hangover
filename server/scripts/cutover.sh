@@ -31,6 +31,12 @@ if [ ! -f ".env" ]; then
   exit 1
 fi
 
+# Ensure DATABASE_URL uses internal Docker network host (postgres:5432)
+sed -i -e 's|@localhost:5433/|@postgres:5432/|g' \
+       -e 's|@127.0.0.1:5433/|@postgres:5432/|g' \
+       -e 's|@localhost:5432/|@postgres:5432/|g' \
+       -e 's|@127.0.0.1:5432/|@postgres:5432/|g' .env
+
 # Load environment configuration safely
 PORT=$(grep -E '^PORT=' .env | cut -d '=' -f2 | tr -d '\r"' || echo "8080")
 PORT=${PORT:-8080}
