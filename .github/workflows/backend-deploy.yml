@@ -77,13 +77,13 @@ jobs:
                  -e 's|@localhost:5432/|@postgres:5432/|g' \
                  -e 's|@127.0.0.1:5432/|@postgres:5432/|g' server/.env
 
-      - name: Upload Production Docker Compose and .env
+      - name: Upload Production Docker Compose, .env, and Scripts
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          source: server/docker-compose.prod.yml,server/.env
+          source: server/docker-compose.prod.yml,server/.env,server/scripts/cutover.sh
           target: "~/server"
           strip_components: 1
 
