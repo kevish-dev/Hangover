@@ -112,16 +112,6 @@ jobs:
             docker pull "$BACKEND_IMAGE"
             docker pull "$MIGRATE_IMAGE"
 
-            # Check if legacy PM2 process is running and decommission it
-            if command -v pm2 > /dev/null 2>&1; then
-              if pm2 list | grep -q "hangover-api"; then
-                echo "Decommissioning legacy PM2 process hangover-api..."
-                pm2 stop hangover-api || true
-                pm2 delete hangover-api || true
-                pm2 save || true
-              fi
-            fi
-
             # Ensure PostgreSQL container is running
             echo "Starting PostgreSQL container..."
             if docker ps -a --format '{{.Names}}' | grep -q "^hangover-postgres$"; then
@@ -146,6 +136,16 @@ jobs:
             # Run Prisma Migrations via dedicated one-shot migrate service
             echo "Running database migrations..."
             docker compose -f "$COMPOSE_FILE" run --rm migrate
+
+            # Check if legacy PM2 process is running and decommission it (only after migrations succeed)
+            if command -v pm2 > /dev/null 2>&1; then
+              if pm2 list | grep -q "hangover-api"; then
+                echo "Decommissioning legacy PM2 process hangover-api..."
+                pm2 stop hangover-api || true
+                pm2 delete hangover-api || true
+                pm2 save || true
+              fi
+            fi
 
             # Start/update backend container
             echo "Starting backend container..."
