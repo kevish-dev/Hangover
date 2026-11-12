@@ -39,6 +39,21 @@ import { optionalAuth } from "./src/core/middlewares/auth.middleware.js";
 import { blockCustomerWritesDuringMaintenance } from "./src/core/middlewares/maintenance.middleware.js";
 const app = express();
 
+// Unauthenticated health check endpoint
+app.get("/health", async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({
+      status: "healthy",
+    });
+  } catch (error) {
+    console.error("Health check failed:", error);
+    res.status(503).json({
+      status: "unhealthy",
+    });
+  }
+});
+
 // Raw body parser for Razorpay webhook (must be before express.json)
 app.use((req, res, next) => {
   if (req.path === "/api/v1/payments/webhook") {

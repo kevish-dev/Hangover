@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: hangover-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password123}
+      POSTGRES_DB: ${POSTGRES_DB:-hangover}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-hangover}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hangover-network
+
+  backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/kevish-is-learning/hangover-backend:latest}
+    container_name: hangover-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:${PORT:-8080}:${PORT:-8080}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:${PORT:-8080}/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - hangover-network
+
+  migrate:
+    image: ${MIGRATE_IMAGE:-ghcr.io/kevish-is-learning/hangover-migrate:latest}
+    container_name: hangover-migrate
+    restart: "no"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - hangover-network
+
+volumes:
+  postgres_data:
+    name: server_postgres_data
+
+networks:
+  hangover-network:
+    driver: bridge

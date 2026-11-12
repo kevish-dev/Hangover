@@ -1,4 +1,3 @@
-
 name: Backend Deploy
 
 on:
@@ -10,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 concurrency:
   group: backend-production
@@ -18,53 +18,67 @@ concurrency:
 jobs:
   deploy:
     name: Deploy Backend
-
     if: >
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_branch == 'main'
 
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: server
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: server/package-lock.json
+      - name: Set lower case repository name
+        run: |
+          echo "REPO_LOWER=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
-      - name: Install Dependencies
-        run: npm ci
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          target: runner
+          push: true
+          tags: |
+            ghcr.io/${{ env.REPO_LOWER }}-backend:${{ github.sha }}
+            ghcr.io/${{ env.REPO_LOWER }}-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Migrate image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          target: migrate
+          push: true
+          tags: |
+            ghcr.io/${{ env.REPO_LOWER }}-migrate:${{ github.sha }}
+            ghcr.io/${{ env.REPO_LOWER }}-migrate:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Generate Production .env
         env:
           PROD_ENV: ${{ secrets.ENV }}
         run: |
-          echo "$PROD_ENV" > .env
+          echo "$PROD_ENV" > server/.env
 
-      - name: Create Deployment Package
-        run: |
-          tar \
-            --exclude=node_modules \
-            --exclude=.git \
-            -czf /tmp/backend.tar.gz \
-            .
-          mv /tmp/backend.tar.gz ./backend.tar.gz
-
-      - name: Upload Deployment Package
+      - name: Upload Production Docker Compose and .env
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          source: server/backend.tar.gz
+          source: server/docker-compose.prod.yml,server/.env
           target: "~/server"
           strip_components: 1
 
@@ -74,42 +88,89 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          envs: GITHUB_SHA,REPO_LOWER
           script: |
             set -e
 
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-
-            source ~/.bash_profile || source ~/.profile || source ~/.bashrc || true
-
-            export PATH=$PATH:$HOME/.npm-global/bin:/usr/local/bin:/usr/bin
-
-            mkdir -p ~/server
+            echo "=== Hangover Production Deployment ==="
             cd ~/server
 
-            rm -rf index.js src prisma package.json package-lock.json prisma.config.js docker-compose.yml .env
+            export COMPOSE_FILE="docker-compose.prod.yml"
+            export BACKEND_IMAGE="ghcr.io/${REPO_LOWER}-backend:${GITHUB_SHA}"
+            export MIGRATE_IMAGE="ghcr.io/${REPO_LOWER}-migrate:${GITHUB_SHA}"
 
-            tar -xzf backend.tar.gz
+            # Log in to GHCR on the VPS host
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-            rm backend.tar.gz
+            # Pre-pull release images before transitioning
+            echo "Pulling release images ($BACKEND_IMAGE, $MIGRATE_IMAGE)..."
+            docker pull "$BACKEND_IMAGE"
+            docker pull "$MIGRATE_IMAGE"
 
-            npm ci --omit=dev
+            # Check if legacy PM2 process is running and decommission it
+            if command -v pm2 > /dev/null 2>&1; then
+              if pm2 list | grep -q "hangover-api"; then
+                echo "Decommissioning legacy PM2 process hangover-api..."
+                pm2 stop hangover-api || true
+                pm2 delete hangover-api || true
+                pm2 save || true
+              fi
+            fi
 
-            docker compose up -d
+            # Ensure PostgreSQL container is running
+            echo "Starting PostgreSQL container..."
+            if docker ps -a --format '{{.Names}}' | grep -q "^hangover-postgres$"; then
+              if ! docker compose -f "$COMPOSE_FILE" ps postgres --format '{{.Names}}' 2>/dev/null | grep -q "hangover-postgres"; then
+                echo "Transitioning standalone hangover-postgres to Compose (preserving server_postgres_data volume)..."
+                docker stop hangover-postgres || true
+                docker rm hangover-postgres || true
+              fi
+            fi
+            docker compose -f "$COMPOSE_FILE" up -d postgres
 
-            echo "Waiting for PostgreSQL to be ready..."
+            echo "Waiting for PostgreSQL to be healthy..."
             for i in {1..30}; do
-              if docker compose exec -T postgres pg_isready -U admin -d hangover > /dev/null 2>&1; then
-                echo "PostgreSQL is ready!"
+              if docker compose -f "$COMPOSE_FILE" ps postgres --filter "status=running" | grep -q "healthy"; then
+                echo "PostgreSQL is healthy!"
                 break
               fi
-              echo "Waiting..."
+              echo "Waiting for postgres healthcheck... ($i/30)"
               sleep 2
             done
 
-            npx prisma generate
-            npx prisma migrate deploy
+            # Run Prisma Migrations via dedicated one-shot migrate service
+            echo "Running database migrations..."
+            docker compose -f "$COMPOSE_FILE" run --rm migrate
 
-            pm2 reload hangover-api || pm2 start index.js --name hangover-api
+            # Start/update backend container
+            echo "Starting backend container..."
+            docker compose -f "$COMPOSE_FILE" up -d backend
 
-            pm2 save
+            # Verify backend health endpoint
+            PORT=$(grep -E '^PORT=' .env | cut -d '=' -f2 | tr -d '\r"' || echo "8080")
+            PORT=${PORT:-8080}
+            echo "Checking backend health at http://127.0.0.1:${PORT}/health..."
+
+            HEALTHY=0
+            for i in {1..30}; do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${PORT}/health" || true)
+              if [ "$STATUS" = "200" ]; then
+                echo "Backend is healthy (HTTP 200)!"
+                HEALTHY=1
+                break
+              fi
+              echo "Waiting for backend health check (HTTP $STATUS)... ($i/30)"
+              sleep 2
+            done
+
+            if [ "$HEALTHY" -ne 1 ]; then
+              echo "ERROR: Backend failed health check. Printing recent container logs:"
+              docker compose -f "$COMPOSE_FILE" logs --tail=50 backend
+              exit 1
+            fi
+
+            # Prune dangling images safely
+            echo "Cleaning up dangling images..."
+            docker image prune -f
+
+            echo "=== Deployment Successfully Completed ==="

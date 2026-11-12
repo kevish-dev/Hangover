@@ -5,5 +5,6 @@ backups/
 *.dump
 prod_dump.sql
 local_prod_dump.sql
+.env.prod
 
 src/prisma/generated/prisma
