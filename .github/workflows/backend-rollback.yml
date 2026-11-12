@@ -1,0 +1,94 @@
+name: Backend Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: "Commit SHA to roll back to (e.g. 9ebd216 or full SHA)"
+        required: true
+        type: string
+      run_migrations:
+        description: "Run migrations for this version"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: backend-production
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    name: Fast Rollback Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set lower case repository name
+        run: |
+          echo "REPO_LOWER=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Execute Rollback on Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: REPO_LOWER
+          script: |
+            set -e
+
+            TARGET_SHA="${{ github.event.inputs.commit_sha }}"
+            RUN_MIGRATE="${{ github.event.inputs.run_migrations }}"
+            COMPOSE_FILE="docker-compose.prod.yml"
+
+            echo "=== Initiating Fast Rollback to Commit: $TARGET_SHA ==="
+            cd ~/server
+
+            # Log in to GHCR
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+            # Pull the target immutable release image
+            export BACKEND_IMAGE="ghcr.io/${REPO_LOWER}-backend:${TARGET_SHA}"
+            echo "Pulling target image: $BACKEND_IMAGE..."
+            docker pull "$BACKEND_IMAGE"
+
+            # Optionally run migrations if requested
+            if [ "$RUN_MIGRATE" = "true" ]; then
+              export MIGRATE_IMAGE="ghcr.io/${REPO_LOWER}-migrate:${TARGET_SHA}"
+              echo "Pulling and running migration image: $MIGRATE_IMAGE..."
+              docker pull "$MIGRATE_IMAGE"
+              docker compose -f "$COMPOSE_FILE" run --rm migrate
+            fi
+
+            # Re-launch backend service with the rollback image
+            echo "Restarting backend container with $BACKEND_IMAGE..."
+            docker compose -f "$COMPOSE_FILE" up -d backend
+
+            # Verify healthcheck
+            PORT=$(grep -E '^PORT=' .env | cut -d '=' -f2 | tr -d '\r"' || echo "8080")
+            PORT=${PORT:-8080}
+            echo "Verifying health at http://127.0.0.1:${PORT}/health..."
+
+            HEALTHY=0
+            for i in {1..30}; do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${PORT}/health" || true)
+              if [ "$STATUS" = "200" ]; then
+                echo "Rollback successful! Backend is healthy (HTTP 200)."
+                HEALTHY=1
+                break
+              fi
+              echo "Waiting for health check (HTTP $STATUS)... ($i/30)"
+              sleep 1
+            done
+
+            if [ "$HEALTHY" -ne 1 ]; then
+              echo "ERROR: Rollback image failed health check. Container logs:"
+              docker compose -f "$COMPOSE_FILE" logs --tail=50 backend
+              exit 1
+            fi
+
+            echo "=== Rollback to $TARGET_SHA Completed Successfully ==="
