@@ -26,17 +26,19 @@ const createUploadMiddleware = ({ allowedTypes, fileSize, files }) =>
     },
   });
 
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+
 // Public content uses images only. Limits are intentionally per request, not just UI hints.
 export const imageUploadMiddleware = createUploadMiddleware({
   allowedTypes: IMAGE_TYPES,
-  fileSize: 12 * 1024 * 1024,
+  fileSize: MAX_FILE_SIZE_BYTES,
   files: 15,
 });
 
 // IDs may be a clear image or PDF, but are stored as authenticated assets.
 export const documentUploadMiddleware = createUploadMiddleware({
   allowedTypes: DOCUMENT_TYPES,
-  fileSize: 8 * 1024 * 1024,
+  fileSize: MAX_FILE_SIZE_BYTES,
   files: 1,
 });
 

@@ -6,10 +6,15 @@ export const errorHandler = (err, req, res, next) => {
     res.locals.errorStack = err.stack;
   }
   if (err?.name === "MulterError") {
+    const isSizeLimit = err.code === "LIMIT_FILE_SIZE";
     return res.status(400).json({
       success: false,
-      code: "INVALID_MEDIA",
-      message: err.code === "LIMIT_FILE_SIZE" ? "Uploaded file exceeds the allowed size." : "Invalid upload request.",
+      code: isSizeLimit ? "FILE_TOO_LARGE" : (err.code || "INVALID_MEDIA"),
+      message: isSizeLimit
+        ? "File size exceeds the 10 MB limit. Please select a smaller photo or compress it before uploading."
+        : (err.code === "LIMIT_FILE_COUNT"
+            ? "Too many files uploaded at once."
+            : "Invalid file upload request."),
     });
   }
   if (err instanceof AppError) {

@@ -224,7 +224,15 @@ function FilePickerField({
           accept="image/jpeg,image/png,image/webp,image/avif,application/pdf"
           required={required && !existingUrl && !file}
           style={{ display: "none" }}
-          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+          onChange={(e) => {
+            const picked = e.target.files?.[0] ?? null;
+            if (picked && picked.size > 10 * 1024 * 1024) {
+              toast.error("File size exceeds 10 MB. Please select a smaller photo or compress it.");
+              e.target.value = "";
+              return;
+            }
+            onChange(picked);
+          }}
         />
       </label>
     </Field>
@@ -279,7 +287,16 @@ function UncontrolledFilePicker({
           accept="image/jpeg,image/png,image/webp,image/avif,application/pdf"
           required={required && !file}
           style={{ display: "none" }}
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          onChange={(e) => {
+            const picked = e.target.files?.[0] ?? null;
+            if (picked && picked.size > 10 * 1024 * 1024) {
+              toast.error("File size exceeds 10 MB. Please select a smaller photo or compress it.");
+              e.target.value = "";
+              setFile(null);
+              return;
+            }
+            setFile(picked);
+          }}
         />
       </label>
     </Field>
@@ -793,8 +810,8 @@ export default function BookingPage() {
       return;
     }
 
-    if (govtIdImage && govtIdImage.size > 8 * 1024 * 1024) {
-      const msg = "Govt ID file size exceeds the 8 MB limit.";
+    if (govtIdImage && govtIdImage.size > 10 * 1024 * 1024) {
+      const msg = "Govt ID file size exceeds the 10 MB limit. Please select a smaller photo or compress it.";
       setBookingError(msg);
       toast.error(msg);
       return;
@@ -841,8 +858,8 @@ export default function BookingPage() {
         toast.error(msg);
         return;
       }
-      if (t.aadhaarFile && t.aadhaarFile.size > 8 * 1024 * 1024) {
-        const msg = `${travelerLabel}: Aadhaar file size exceeds the 8 MB limit.`;
+      if (t.aadhaarFile && t.aadhaarFile.size > 10 * 1024 * 1024) {
+        const msg = `${travelerLabel}: Aadhaar file size exceeds the 10 MB limit. Please select a smaller photo or compress it.`;
         setBookingError(msg);
         toast.error(msg);
         return;

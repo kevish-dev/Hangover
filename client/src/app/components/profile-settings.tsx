@@ -16,6 +16,7 @@ import {
   type UserProfile,
 } from "../../lib/profileApi";
 import { toast } from "sonner";
+import { getErrorMessage } from "../../lib/errors";
 
 // ── Shared styles ─────────────────────────────────────────────────
 const inputBase: React.CSSProperties = {
@@ -150,6 +151,10 @@ export function ProfileSettings() {
       toast.error("Please select an image to upload.");
       return;
     }
+    if (imageFile.size > 10 * 1024 * 1024) {
+      toast.error("File size exceeds 10 MB. Please select a smaller photo or compress it.");
+      return;
+    }
     setUploading(true);
     try {
       const updated = await uploadGovtId(govtIdType, imageFile);
@@ -162,7 +167,7 @@ export function ProfileSettings() {
       setImageFile(null);
       toast.success("Government ID uploaded successfully!");
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to upload Government ID");
+      toast.error(getErrorMessage(err, "Failed to upload Government ID"));
     } finally {
       setUploading(false);
     }
@@ -432,7 +437,13 @@ export function ProfileSettings() {
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/avif,application/pdf"
                   onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) setImageFile(e.target.files[0]);
+                    const f = e.target.files?.[0];
+                    if (f && f.size > 10 * 1024 * 1024) {
+                      toast.error("File size exceeds 10 MB. Please select a smaller photo or compress it.");
+                      e.target.value = "";
+                      return;
+                    }
+                    if (f) setImageFile(f);
                   }}
                   style={{ display: "none" }}
                 />

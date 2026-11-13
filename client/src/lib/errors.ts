@@ -46,8 +46,12 @@ export function getErrorMessage(error: unknown, fallback = "Something went wrong
     if (validationMessage) return validationMessage;
   }
 
+  if (candidate?.response?.status === 413) {
+    return "The uploaded file exceeds the 10 MB limit. Please select a smaller photo or compress it.";
+  }
+
   if (candidate?.code === "ERR_NETWORK" || candidate?.message === "Network Error") {
-    return "The server could not be reached. Check your connection and try again.";
+    return "The server could not be reached. If you were uploading a file, it may exceed 10 MB or your connection timed out.";
   }
 
   if (candidate?.response?.status === 401) return "Your session has expired. Please sign in again.";

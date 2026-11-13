@@ -256,6 +256,13 @@ export default function CustomTripOfferPage() {
       return toast.error(
         "Every additional traveler needs a name and government ID.",
       );
+    if (govtFile && govtFile.size > 10 * 1024 * 1024) {
+      return toast.error("Primary traveler ID exceeds 10 MB. Please choose a smaller file.");
+    }
+    const oversizedTraveler = travelers.find((t) => t.file && t.file.size > 10 * 1024 * 1024);
+    if (oversizedTraveler) {
+      return toast.error(`Traveler ${oversizedTraveler.fullName || "ID"} file exceeds 10 MB.`);
+    }
     setSubmitting(true);
     try {
       await apiClient.put("/users/me/profile", {
@@ -623,9 +630,15 @@ export default function CustomTripOfferPage() {
                         hidden
                         type="file"
                         accept="image/jpeg,image/png,image/webp,image/avif,application/pdf"
-                        onChange={(e) =>
-                          setGovtFile(e.target.files?.[0] || null)
-                        }
+                        onChange={(e) => {
+                          const f = e.target.files?.[0] || null;
+                          if (f && f.size > 10 * 1024 * 1024) {
+                            toast.error("File exceeds 10 MB. Please choose a smaller photo or compress it.");
+                            e.target.value = "";
+                            return;
+                          }
+                          setGovtFile(f);
+                        }}
                       />
                     </label>
                   </div>
@@ -690,13 +703,19 @@ export default function CustomTripOfferPage() {
                         required
                         type="file"
                         accept="image/jpeg,image/png,image/webp,image/avif,application/pdf"
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const f = e.target.files?.[0] || null;
+                          if (f && f.size > 10 * 1024 * 1024) {
+                            toast.error("File exceeds 10 MB. Please choose a smaller photo or compress it.");
+                            e.target.value = "";
+                            return;
+                          }
                           updateTraveler(
                             index,
                             "file",
-                            e.target.files?.[0] || null,
-                          )
-                        }
+                            f,
+                          );
+                        }}
                       />
                     </label>
                   </div>
