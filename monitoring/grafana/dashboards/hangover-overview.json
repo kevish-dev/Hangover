@@ -304,42 +304,96 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
+          "max": 100,
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "yellow", "value": 0.1 },
+              { "color": "yellow", "value": 2 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 6, "w": 4, "x": 0, "y": 18 },
+      "id": 9,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "(sum(rate(http_requests_total{status_code=~\"4..\"}[2m])) / clamp_min(sum(rate(http_requests_total[2m])), 0.001)) * 100", "refId": "A" }
+      ],
+      "title": "4xx Client Error %",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
               { "color": "red", "value": 1 }
             ]
           },
-          "unit": "reqps"
+          "unit": "percent"
         }
       },
-      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 18 },
-      "id": 9,
+      "gridPos": { "h": 6, "w": 4, "x": 4, "y": 18 },
+      "id": 25,
       "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
-        "textMode": "auto"
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
       },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "sum(rate(http_requests_total{status_code=~\"5..\"}[1m])) or vector(0)", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "(sum(rate(http_requests_total{status_code=~\"5..\"}[2m])) / clamp_min(sum(rate(http_requests_total[2m])), 0.001)) * 100", "refId": "A" }
       ],
-      "title": "5xx Server Errors (Rate/sec)",
-      "type": "stat"
+      "title": "5xx Server Error %",
+      "type": "gauge"
     },
     {
       "datasource": { "type": "prometheus", "uid": "Prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "unit": "s"
+          "custom": { "drawStyle": "line", "fillOpacity": 15, "lineInterpolation": "smooth", "lineWidth": 2 },
+          "unit": "percent"
         }
       },
-      "gridPos": { "h": 6, "w": 18, "x": 6, "y": 18 },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 18 },
+      "id": 26,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "(sum(rate(http_requests_total{status_code=~\"4..\"}[2m])) / clamp_min(sum(rate(http_requests_total[2m])), 0.001)) * 100", "legendFormat": "4xx Error %", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "(sum(rate(http_requests_total{status_code=~\"5..\"}[2m])) / clamp_min(sum(rate(http_requests_total[2m])), 0.001)) * 100", "legendFormat": "5xx Error %", "refId": "B" }
+      ],
+      "title": "Error Rate % Trends (4xx vs 5xx)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 18 },
       "id": 10,
       "options": {
         "displayMode": "gradient",
@@ -350,9 +404,9 @@
         "showUnfilled": true
       },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "topk(6, histogram_quantile(0.95, sum by (route, le) (rate(http_request_duration_seconds_bucket[5m]))))", "legendFormat": "{{route}}", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "topk(6, sum by (route, status_code) (increase(http_requests_total{status_code=~\"[45]..\"}[1h]))) > 0", "legendFormat": "{{status_code}} {{route}}", "refId": "A" }
       ],
-      "title": "Top Slowest Routes (p95 Latency)",
+      "title": "Top 4xx & 5xx Error Routes (Last 1h)",
       "type": "bargauge"
     },
     {

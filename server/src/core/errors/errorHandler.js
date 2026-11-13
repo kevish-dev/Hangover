@@ -2,6 +2,9 @@ import { AppError, ValidationError } from "./errors.js";
 import { ZodError } from "zod";
 
 export const errorHandler = (err, req, res, next) => {
+  if (err?.stack) {
+    res.locals.errorStack = err.stack;
+  }
   if (err?.name === "MulterError") {
     return res.status(400).json({
       success: false,

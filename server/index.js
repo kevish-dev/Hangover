@@ -39,6 +39,7 @@ import { optionalAuth } from "./src/core/middlewares/auth.middleware.js";
 import { blockCustomerWritesDuringMaintenance } from "./src/core/middlewares/maintenance.middleware.js";
 import { register } from "./src/core/metrics/metrics.js";
 import { metricsMiddleware } from "./src/core/middlewares/metrics.middleware.js";
+import { errorTrackerMiddleware } from "./src/core/middlewares/errorTracker.middleware.js";
 const app = express();
 
 // Unauthenticated health check endpoint
@@ -69,6 +70,9 @@ app.get("/metrics", async (req, res) => {
 
 // Record HTTP metrics for all downstream application endpoints
 app.use(metricsMiddleware);
+
+// Track all 4xx/5xx errors, sanitizing payloads and responses
+app.use(errorTrackerMiddleware);
 
 // Raw body parser for Razorpay webhook (must be before express.json)
 app.use((req, res, next) => {
