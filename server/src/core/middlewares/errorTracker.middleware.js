@@ -1,3 +1,5 @@
+import { emitPostHogLog, SeverityNumber } from "../logging/posthog.logger.js";
+
 /**
  * Middleware to track, sanitize, and log all 4xx and 5xx client and server errors,
  * including request payloads, query params, headers, and response bodies.
@@ -122,6 +124,29 @@ export const errorTrackerMiddleware = (req, res, next) => {
         `${logHeader}\n` +
         JSON.stringify(errorRecord, null, 2)
       );
+
+      // Ship structured error with user and session tags to PostHog
+      emitPostHogLog({
+        severity: isServerError ? SeverityNumber.ERROR : SeverityNumber.WARN,
+        severityText: isServerError ? "ERROR" : "WARN",
+        body: `${logHeader} | ${errorRecord.response?.message || errorRecord.response?.code || "HTTP Error"}`,
+        attributes: {
+          "$session_id": req.headers["x-posthog-session-id"] || undefined,
+          "$distinct_id": req.user?.id || req.headers["x-posthog-distinct-id"] || errorRecord.ip,
+          "user.id": req.user?.id || "anonymous",
+          "user.email": req.user?.email || undefined,
+          "user.role": req.user?.role || "GUEST",
+          "http.method": req.method,
+          "http.route": errorRecord.path,
+          "http.status_code": statusCode,
+          "client.ip": errorRecord.ip,
+          "duration_ms": durationMs,
+          "request.body": JSON.stringify(errorRecord.request.body),
+          "request.query": JSON.stringify(errorRecord.request.query),
+          "response.body": JSON.stringify(errorRecord.response),
+          "error.stack": res.locals?.errorStack || undefined,
+        },
+      });
     }
   });
 

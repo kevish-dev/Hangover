@@ -1,4 +1,5 @@
 import axios from "axios";
+import posthog from "posthog-js";
 
 export const API_URL =
   import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
@@ -9,6 +10,23 @@ export const apiClient = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+});
+
+// Correlate backend API requests with PostHog user and session replays
+apiClient.interceptors.request.use((config) => {
+  try {
+    const sessionId = posthog.get_session_id?.();
+    const distinctId = posthog.get_distinct_id?.();
+    if (sessionId) {
+      config.headers["X-PostHog-Session-Id"] = sessionId;
+    }
+    if (distinctId) {
+      config.headers["X-PostHog-Distinct-Id"] = distinctId;
+    }
+  } catch {
+    // Non-blocking fallback if posthog is not initialized
+  }
+  return config;
 });
 
 let isRefreshing = false;
