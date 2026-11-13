@@ -171,7 +171,7 @@ jobs:
             # Start or refresh monitoring stack
             if [ -f ~/server/monitoring/docker-compose.monitoring.yml ]; then
               echo "Starting/refreshing monitoring stack..."
-              docker compose -f ~/server/monitoring/docker-compose.monitoring.yml up -d || true
+              (cd ~/server/monitoring && docker compose -f docker-compose.monitoring.yml up -d) || true
             fi
 
             # Prune dangling images safely

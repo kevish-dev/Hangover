@@ -6,14 +6,16 @@ on:
       - main
     paths:
       - "server/**"
-      - ".github/workflows/backend-ci.yml"
+      - "monitoring/**"
+      - ".github/workflows/**"
 
   push:
     branches:
       - main
     paths:
       - "server/**"
-      - ".github/workflows/backend-ci.yml"
+      - "monitoring/**"
+      - ".github/workflows/**"
 
 permissions:
   contents: read
