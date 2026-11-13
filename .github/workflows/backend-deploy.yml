@@ -88,6 +88,16 @@ jobs:
           target: "~/server"
           strip_components: 1
 
+      - name: Upload Monitoring Stack
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "monitoring/**"
+          target: "~/server/monitoring"
+          strip_components: 1
+
       - name: Deploy on Server
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -156,6 +166,12 @@ jobs:
               echo "ERROR: Backend failed health check. Printing recent container logs:"
               docker compose -f "$COMPOSE_FILE" logs --tail=50 backend
               exit 1
+            fi
+
+            # Start or refresh monitoring stack
+            if [ -f ~/server/monitoring/docker-compose.monitoring.yml ]; then
+              echo "Starting/refreshing monitoring stack..."
+              docker compose -f ~/server/monitoring/docker-compose.monitoring.yml up -d || true
             fi
 
             # Prune dangling images safely

@@ -1,0 +1,55 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # 1. Hangover Backend Application Metrics (prom-client)
+  - job_name: "hangover-backend"
+    scrape_interval: 10s
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["hangover-backend:8080"]
+
+  # 2. Blackbox Internal Synthetic Uptime Probe (every 5 seconds)
+  - job_name: "blackbox-internal"
+    scrape_interval: 5s
+    metrics_path: "/probe"
+    params:
+      module: ["http_2xx"]
+    static_configs:
+      - targets: ["http://hangover-backend:8080/health"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "blackbox_exporter:9115"
+
+  # 3. Blackbox External Public Ingress Probe (via host Nginx / internet)
+  - job_name: "blackbox-external"
+    scrape_interval: 15s
+    metrics_path: "/probe"
+    params:
+      module: ["http_2xx"]
+    static_configs:
+      - targets: ["https://api.hangovertrails.com/health"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "blackbox_exporter:9115"
+
+  # 4. cAdvisor Container Metrics (tracks container CPU, Memory, OOM kills)
+  - job_name: "cadvisor"
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["cadvisor:8080"]
+
+  # 5. Node Exporter Host Metrics (tracks VPS CPU, RAM, Disk, Load)
+  - job_name: "node-exporter"
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["node_exporter:9100"]

@@ -1,4 +1,5 @@
 import { prisma } from "../../prisma/client.js";
+import { maintenanceModeGauge } from "../metrics/metrics.js";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const EXEMPT_PATHS = new Set([
@@ -28,7 +29,10 @@ export const blockCustomerWritesDuringMaintenance = async (req, res, next) => {
       select: { maintenanceMode: true },
     });
 
-    if (settings?.maintenanceMode) {
+    const isMaintenance = Boolean(settings?.maintenanceMode);
+    maintenanceModeGauge.set(isMaintenance ? 1 : 0);
+
+    if (isMaintenance) {
       return res.status(503).json({
         success: false,
         code: "MAINTENANCE_MODE",

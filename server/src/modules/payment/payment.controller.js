@@ -1,4 +1,5 @@
 import * as paymentService from "./payment.service.js";
+import { paymentsTotal, razorpayWebhooksTotal } from "../../core/metrics/metrics.js";
 
 export const initiatePayment = async (req, res, next) => {
   try {
@@ -29,8 +30,10 @@ export const verifyPayment = async (req, res, next) => {
       razorpayPaymentId,
       razorpaySignature,
     });
+    paymentsTotal.inc({ status: "SUCCESS" });
     res.status(200).json(payment);
   } catch (error) {
+    paymentsTotal.inc({ status: "FAILED" });
     next(error);
   }
 };
@@ -44,6 +47,7 @@ export const recordFailedPayment = async (req, res, next) => {
       reason,
       code,
     });
+    paymentsTotal.inc({ status: "FAILED" });
     res.status(200).json(payment);
   } catch (error) {
     next(error);
@@ -57,8 +61,10 @@ export const handleWebhook = async (req, res, next) => {
     if (!signature) return res.status(400).json({ message: "Missing webhook signature" });
 
     const result = await paymentService.handleWebhook(req.body, signature, webhookEventId);
+    razorpayWebhooksTotal.inc({ event: req.body?.event || "unknown", status: "SUCCESS" });
     res.status(200).json(result);
   } catch (error) {
+    razorpayWebhooksTotal.inc({ event: req.body?.event || "unknown", status: "FAILED" });
     next(error);
   }
 };

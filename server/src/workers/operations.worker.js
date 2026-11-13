@@ -1,5 +1,6 @@
 import PQueue from "p-queue";
 import { prisma } from "../prisma/client.js";
+import { operationsTasksTotal } from "../core/metrics/metrics.js";
 
 // One concurrent job at a time — no stampede risk
 const queue = new PQueue({ concurrency: 1 });
@@ -65,6 +66,7 @@ async function scanAndNotify() {
       if (sameDay) continue;
     }
 
+    operationsTasksTotal.inc({ category: "OPERATIONS_REMINDER", status: "QUEUED" });
     queue.add(() => _sendReminderEmails(task, daysTillDue, adminEmails));
   }
 }

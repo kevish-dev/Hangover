@@ -1,11 +1,14 @@
 import * as bookingService from "./booking.service.js";
 import { ValidationError } from "../../core/errors/errors.js";
+import { bookingsTotal } from "../../core/metrics/metrics.js";
 
 export const createBooking = async (req, res, next) => {
   try {
     const booking = await bookingService.createBooking(req.user.id, req.body);
+    bookingsTotal.inc({ status: "CONFIRMED" });
     res.status(201).json(booking);
   } catch (error) {
+    bookingsTotal.inc({ status: "FAILED" });
     next(error);
   }
 };
@@ -13,8 +16,10 @@ export const createBooking = async (req, res, next) => {
 export const adminCreateBooking = async (req, res, next) => {
   try {
     const booking = await bookingService.adminCreateBooking(req.user.id, req.body);
+    bookingsTotal.inc({ status: "CONFIRMED" });
     res.status(201).json(booking);
   } catch (error) {
+    bookingsTotal.inc({ status: "FAILED" });
     next(error);
   }
 };
