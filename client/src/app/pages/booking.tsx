@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, Link, useSearchParams, useNavigate } from "react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowLeft,
@@ -30,9 +30,7 @@ import { getMyProfile } from "../../lib/profileApi";
 import { mediaImageUrl } from "../../lib/media";
 import PaymentModal from "../components/PaymentModal";
 import { getErrorMessage } from "../../lib/errors";
-
-// Razorpay is loaded as a static <script> in index.html
-declare const Razorpay: any;
+import { siteSettingsQuery } from "../../lib/siteSettingsQuery";
 
 // ── Shared input styles ───────────────────────────────────────────
 const inputBase: React.CSSProperties = {
@@ -542,6 +540,11 @@ export default function BookingPage() {
   const shareToken = searchParams.get("share");
   const bookingRedirectPath = `/book/${slug}${searchParams.size ? `?${searchParams.toString()}` : ""}`;
   const { user, isLoading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
+  const submitInFlight = useRef(false);
+  const checkoutInFlight = useRef(false);
+  const verifyInFlight = useRef<string | null>(null);
+  const uploadedTravelerIds = useRef(new WeakMap<File, string>());
 
   const [trip, setTrip] = useState<any>(null); // polymorphic
   const [loading, setLoading] = useState(true);
@@ -567,11 +570,10 @@ export default function BookingPage() {
     queryKey: ["profile"],
     queryFn: getMyProfile,
     enabled: !!user,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
-  const maintenance = useQuery({
-    queryKey: ["site-settings"],
-    queryFn: async () => (await apiClient.get("/site-settings")).data.data as { maintenanceMode: boolean },
-  });
+  const maintenance = useQuery(siteSettingsQuery);
 
   // Pre-fill from profile once loaded
   useEffect(() => {
@@ -598,9 +600,27 @@ export default function BookingPage() {
   // Govt ID upload state
   const [govtIdImage, setGovtIdImage] = useState<File | null>(null);
 
-  const [hasBooked, setHasBooked] = useState(false);
-  const [reservedBooking, setReservedBooking] = useState<any>(null);
-  const [pendingBooking, setPendingBooking] = useState<any>(null);
+  const bookingsKey = ["checkout-bookings", user?.id];
+  const { data: existingBookings = [], isLoading: checkingBookings, isError: bookingCheckFailed } = useQuery({
+    queryKey: bookingsKey,
+    queryFn: async () => (await apiClient.get("/bookings/me", { params: { limit: 100 } })).data?.data || [],
+    enabled: Boolean(user),
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+  const belongsToCurrentItem = (booking: any) => {
+    if (!trip) return false;
+    if (isCrmTrip) return (booking.crmTripId || booking.crmTrip?.id || booking.crmTripSlot?.crmTripId) === trip.id;
+    const itemId = isFestival
+      ? booking.crmFestivalId || booking.crmFestival?.id || booking.crmFestivalSlot?.crmFestivalId || booking.festivalId || booking.festival?.id || booking.slot?.festivalId
+      : booking.tripId || booking.trip?.id || booking.slot?.tripId;
+    return itemId === trip.id;
+  };
+  const itemBookings = existingBookings.filter(belongsToCurrentItem);
+  const hasBooked = itemBookings.some((booking: any) => booking.status === "CONFIRMED");
+  const reservedBooking = itemBookings.find((booking: any) => booking.status === "RESERVED");
+  const pendingBooking = itemBookings.find((booking: any) => booking.status === "PENDING");
 
   // Payment choice
   const [paymentChoice, setPaymentChoice] = useState<"FULL" | "TOKEN">("FULL");
@@ -645,36 +665,6 @@ export default function BookingPage() {
       })
       .finally(() => setLoading(false));
   }, [slug, isFestival, shareToken]);
-
-  useEffect(() => {
-    if (user && trip) {
-      apiClient
-        .get(`/bookings/me?limit=100`)
-        .then((res) => {
-          const bookings = res.data?.data || [];
-          const belongsToCurrentItem = (booking: any) => {
-            if (isCrmTrip) return booking.crmTripId === trip.id;
-            const itemId = isFestival
-              ? booking.festivalId || booking.festival?.id || booking.slot?.festivalId
-              : booking.tripId || booking.trip?.id || booking.slot?.tripId;
-            return itemId === trip.id;
-          };
-          const confirmed = bookings.find(
-            (b: any) => belongsToCurrentItem(b) && b.status === "CONFIRMED",
-          );
-          const reserved = bookings.find(
-            (b: any) => belongsToCurrentItem(b) && b.status === "RESERVED",
-          );
-          const pending = bookings.find(
-            (b: any) => belongsToCurrentItem(b) && b.status === "PENDING",
-          );
-          setHasBooked(!!confirmed);
-          setReservedBooking(reserved || null);
-          setPendingBooking(pending || null);
-        })
-        .catch((error) => toast.error(getErrorMessage(error, "Your existing bookings could not be checked"), { id: `booking-status-${trip.id}` }));
-    }
-  }, [user, trip, isFestival, isCrmTrip]);
 
   useEffect(() => {
     if (selectedPackageId === undefined && trip) {
@@ -727,6 +717,16 @@ export default function BookingPage() {
   // ── Submit handler ────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitInFlight.current || checkoutInFlight.current || submitting || paymentModalData) return;
+    if (pendingBooking) {
+      navigate(`/bookings/${pendingBooking.id}/pay-balance`);
+      return;
+    }
+    if (checkingBookings || profileLoading) return;
+    if (bookingCheckFailed) {
+      toast.error("Your existing bookings could not be checked. Please refresh and try again.");
+      return;
+    }
     
     // Extract additional traveler data synchronously before any await
     const form = e.currentTarget as HTMLFormElement;
@@ -894,6 +894,7 @@ export default function BookingPage() {
       return;
     }
 
+    submitInFlight.current = true;
     setSubmitting(true);
     setBookingStep("paying");
 
@@ -903,33 +904,47 @@ export default function BookingPage() {
         const idForm = new FormData();
         idForm.append("govtIdType", "AADHAAR");
         idForm.append("image", govtIdImage);
-        await apiClient.post("/users/me/govt-id", idForm, {
+        const upload = await apiClient.post("/users/me/govt-id", idForm, {
           headers: { "Content-Type": "multipart/form-data" },
         });
+        queryClient.setQueryData(["profile"], upload.data.profile);
+        setGovtIdImage(null);
       }
 
       // Read profile data from controlled state — NOT from e.currentTarget (null after await)
       const profileData = {
-        fullName: `${firstName} ${lastName}`.trim(),
-        phone: primaryPhone,
-        addressLine1: address || undefined,
-        postalCode: pinCode || undefined,
+        fullName: `${firstName.trim()} ${lastName.trim()}`,
+        phone: cleanedPrimaryPhone,
+        addressLine1: address.trim() || undefined,
+        postalCode: cleanedPin || undefined,
         gender: gender || undefined,
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth).toISOString() : undefined,
       };
-      await apiClient.put("/users/me/profile", profileData);
+      const savedProfile = queryClient.getQueryData<Record<string, any>>(["profile"]);
+      const profileChanged = Object.entries(profileData).some(([key, value]) => {
+        if (value === undefined) return false;
+        if (key === "dateOfBirth") return String(savedProfile?.[key] || "").slice(0, 10) !== value.slice(0, 10);
+        return savedProfile?.[key] !== value;
+      });
+      if (profileChanged) {
+        const saved = await apiClient.put("/users/me/profile", profileData);
+        queryClient.setQueryData(["profile"], saved.data.profile);
+      }
 
       // Upload additional travelers govt IDs
       const additionalTravelers = await Promise.all(extractedTravelers.map(async (t) => {
         let aadhaarAssetId = null;
         if (t.aadhaarFile && t.aadhaarFile.size > 0 && t.aadhaarFile.name) {
-          const idForm = new FormData();
-          idForm.append("image", t.aadhaarFile, t.aadhaarFile.name);
-          const uploadRes = await apiClient.post("/bookings/traveler/govt-id", idForm, {
-            // apiClient defaults to application/json; this endpoint is parsed by Multer.
-            headers: { "Content-Type": "multipart/form-data" },
-          });
-          aadhaarAssetId = uploadRes.data.assetId;
+          aadhaarAssetId = uploadedTravelerIds.current.get(t.aadhaarFile);
+          if (!aadhaarAssetId) {
+            const idForm = new FormData();
+            idForm.append("image", t.aadhaarFile, t.aadhaarFile.name);
+            const uploadRes = await apiClient.post("/bookings/traveler/govt-id", idForm, {
+              headers: { "Content-Type": "multipart/form-data" },
+            });
+            aadhaarAssetId = uploadRes.data.assetId;
+            uploadedTravelerIds.current.set(t.aadhaarFile, aadhaarAssetId);
+          }
         } else {
           throw new Error("Please upload an Aadhaar card for every additional traveler.");
         }
@@ -970,7 +985,17 @@ export default function BookingPage() {
       } = bookingRes.data;
 
       const paymentType = initialPaymentType || "TOKEN";
-      const payAmount = paymentType === "TOKEN" ? Math.round(tokenAmountDue) : Math.round(totalAmountDue);
+      const payAmount = Number(paymentType === "TOKEN" ? bookingRes.data.tokenAmount : bookingRes.data.totalAmount);
+
+      queryClient.setQueryData(bookingsKey, (bookings: any[] = []) => [
+        bookingRes.data,
+        ...bookings.filter((booking) => booking.id !== bookingId),
+      ]);
+      // A retry from another tab may return an existing booking under review.
+      if (!["PENDING", "FAILED"].includes(bookingRes.data.paymentStatus)) {
+        navigate(`/bookings/${bookingId}/pay-balance`);
+        return;
+      }
 
       setPaymentModalData({
         bookingId,
@@ -981,30 +1006,38 @@ export default function BookingPage() {
     } catch (err: any) {
       toast.error(getErrorMessage(err, "Booking creation failed"));
     } finally {
+      submitInFlight.current = false;
       setSubmitting(false);
+      setBookingStep("form");
     }
   };
 
   const triggerRazorpayForBooking = async (
     bookingId: string,
     bookingReference: string,
-    paymentType: "TOKEN" | "FULL"
+    paymentType: "TOKEN" | "FULL" | "BALANCE"
   ) => {
+    if (checkoutInFlight.current) return;
+    checkoutInFlight.current = true;
     setSubmitting(true);
     try {
-      const initiateRes = await apiClient.post("/payments/initiate", {
+      if (!(window as any).Razorpay) {
+        throw new Error("Secure checkout did not load. Please refresh the page and try again.");
+      }
+      const initiateRes = await apiClient.post(paymentType === "BALANCE" ? "/payments/balance/initiate" : "/payments/initiate", {
         bookingId,
         type: paymentType,
       });
       const { razorpayOrderId, razorpayKeyId, amount, currency } = initiateRes.data;
 
-      await new Promise<void>((resolve, reject) => {
+      await new Promise<void>((resolve) => {
+        let completed = false;
         const options = {
           key: razorpayKeyId,
           amount,
           currency,
           name: "Hangover Trails",
-          description: `${trip!.title} — ${paymentType === "TOKEN" ? "Booking Payment" : "Full Payment"}`,
+          description: `${trip!.title} — ${paymentType === "TOKEN" ? "Booking Payment" : paymentType === "BALANCE" ? "Balance Payment" : "Full Payment"}`,
           order_id: razorpayOrderId,
           prefill: {
             email: primaryEmail,
@@ -1012,8 +1045,11 @@ export default function BookingPage() {
           },
           theme: { color: "#781216" },
           modal: {
-            ondismiss: async () => {
-              reject(new Error("Payment cancelled. You can try again."));
+            ondismiss: () => {
+              if (completed) return;
+              setBookingStep("form");
+              toast.info("Checkout closed. You can complete payment for this booking when ready.");
+              resolve();
             },
           },
           handler: (response: {
@@ -1021,6 +1057,8 @@ export default function BookingPage() {
             razorpay_payment_id: string;
             razorpay_signature: string;
           }) => {
+            if (completed) return;
+            completed = true;
             setBookingStep("verifying");
             setPendingVerify({
               razorpayOrderId: response.razorpay_order_id,
@@ -1038,8 +1076,8 @@ export default function BookingPage() {
         rzp.on("payment.failed", async function (response: any) {
           try {
             await apiClient.post("/payments/failed", {
-              razorpayOrderId: response.error.metadata.order_id,
-              razorpayPaymentId: response.error.metadata.payment_id,
+              razorpayOrderId: response.error.metadata?.order_id || razorpayOrderId,
+              razorpayPaymentId: response.error.metadata?.payment_id,
               reason: response.error.description,
               code: response.error.code,
             });
@@ -1057,6 +1095,7 @@ export default function BookingPage() {
       toast.error(msg, { id: "booking-submit-error" });
       setBookingStep("form");
     } finally {
+      checkoutInFlight.current = false;
       setSubmitting(false);
     }
   };
@@ -1064,6 +1103,9 @@ export default function BookingPage() {
   // ── Run verify in background once pendingVerify is set ──────────
   useEffect(() => {
     if (!pendingVerify || bookingStep !== "verifying") return;
+    const verificationKey = `${pendingVerify.razorpayOrderId}:${pendingVerify.razorpayPaymentId}`;
+    if (verifyInFlight.current === verificationKey) return;
+    verifyInFlight.current = verificationKey;
 
     apiClient
       .post("/payments/verify", {
@@ -1084,10 +1126,11 @@ export default function BookingPage() {
         setBookingError(message);
         toast.error(message, { id: "booking-payment-verification-error" });
         setBookingStep("failed");
-      });
+      })
+      .finally(() => { verifyInFlight.current = null; });
   }, [pendingVerify, bookingStep]);
 
-  if (loading || authLoading) {
+  if (loading || authLoading || (user && (profileLoading || checkingBookings))) {
     return (
       <div
         style={{
@@ -1640,70 +1683,11 @@ export default function BookingPage() {
           )}
           <button
             disabled={submitting}
-            onClick={async () => {
-              setSubmitting(true);
-              setBookingError(null);
-              setBookingStep("paying");
-              try {
-                const bookingIdToUse = activeReservedBooking.id;
-                const initiateRes = await apiClient.post("/payments/balance/initiate", {
-                  bookingId: bookingIdToUse,
-                });
-                const { razorpayOrderId, razorpayKeyId, amount, currency } = initiateRes.data;
-                // Fetch bookingReference
-                const bookingRef = reservedBooking?.bookingReference || "";
-
-                await new Promise<void>((resolve, reject) => {
-                  const options = {
-                    key: razorpayKeyId,
-                    amount,
-                    currency,
-                    name: "Hangover Trails",
-                    description: `${trip!.title} — Balance Payment`,
-                    order_id: razorpayOrderId,
-                    prefill: { email: user?.email, contact: primaryPhone },
-                    theme: { color: "#b8943a" },
-                    modal: {
-                      ondismiss: () => {
-                        reject(new Error("Payment cancelled. You can try again."));
-                      },
-                    },
-                    handler: (response: any) => {
-                      setBookingStep("verifying");
-                      setPendingVerify({
-                        razorpayOrderId: response.razorpay_order_id,
-                        razorpayPaymentId: response.razorpay_payment_id,
-                        razorpaySignature: response.razorpay_signature,
-                        bookingReference: bookingRef,
-                        amountPaid: amount / 100,
-                        paymentType: "BALANCE",
-                      });
-                      resolve();
-                    },
-                  };
-                  const rzp = new Razorpay(options);
-                  rzp.on("payment.failed", async (response: any) => {
-                    try {
-                      await apiClient.post("/payments/failed", {
-                        razorpayOrderId: response.error.metadata.order_id,
-                        razorpayPaymentId: response.error.metadata.payment_id,
-                        reason: response.error.description,
-                        code: response.error.code,
-                      });
-                    } catch (e) {}
-                    toast.error(`Payment failed: ${response.error.description}`);
-                  });
-                  rzp.open();
-                });
-              } catch (err: unknown) {
-                const msg = getErrorMessage(err, "Something went wrong.");
-                setBookingError(msg);
-                toast.error(msg, { id: "booking-balance-payment-error" });
-                setBookingStep("form");
-              } finally {
-                setSubmitting(false);
-              }
-            }}
+            onClick={() => triggerRazorpayForBooking(
+              activeReservedBooking.id,
+              reservedBooking?.bookingReference || "",
+              "BALANCE",
+            )}
             style={{
               background: submitting ? "rgba(184,148,58,0.5)" : "#b8943a",
               color: "#fff",
@@ -1746,7 +1730,7 @@ export default function BookingPage() {
     );
   }
 
-  if (pendingBooking) {
+  if (pendingBooking && !paymentModalData && !submitting) {
     return (
       <div
         style={{
@@ -1794,10 +1778,10 @@ export default function BookingPage() {
               margin: "0 0 28px",
             }}
           >
-            You already have a pending booking for this trip. Please complete the payment from your profile.
+            Your booking {pendingBooking.bookingReference} is saved. Continue payment using the same booking.
           </p>
           <Link
-            to={`/profile`}
+            to={`/bookings/${pendingBooking.id}/pay-balance`}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -1812,7 +1796,7 @@ export default function BookingPage() {
               paddingBottom: "3px",
             }}
           >
-            Go to Profile Dashboard →
+            Continue Payment →
           </Link>
         </motion.div>
       </div>
@@ -3558,7 +3542,10 @@ export default function BookingPage() {
       {paymentModalData && (
         <PaymentModal
           isOpen={Boolean(paymentModalData)}
-          onClose={() => setPaymentModalData(null)}
+          onClose={() => {
+            setPaymentModalData(null);
+            setBookingStep("form");
+          }}
           bookingId={paymentModalData.bookingId}
           amount={paymentModalData.amount}
           paymentType={paymentModalData.paymentType}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "motion/react";
@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { apiClient, API_URL } from "../../lib/axios";
 import { useAuth } from "../../contexts/AuthContext";
 import PaymentModal from "../components/PaymentModal";
+import { siteSettingsQuery } from "../../lib/siteSettingsQuery";
 
 type PaymentStep = "form" | "verifying" | "success" | "failed";
 
@@ -210,6 +211,8 @@ export default function PayBalancePage() {
   const [paymentStep, setPaymentStep] = useState<PaymentStep>("form");
   const [pendingVerify, setPendingVerify] = useState<PendingVerification | null>(null);
   const [paymentError, setPaymentError] = useState("");
+  const checkoutInFlight = useRef(false);
+  const verifyInFlight = useRef<string | null>(null);
 
   const { data: booking, isLoading, error, refetch } = useQuery({
     queryKey: ["booking", bookingId],
@@ -219,14 +222,15 @@ export default function PayBalancePage() {
     },
     enabled: Boolean(user && bookingId),
     retry: false,
+    refetchOnWindowFocus: false,
   });
-  const maintenance = useQuery({
-    queryKey: ["site-settings"],
-    queryFn: async () => (await apiClient.get("/site-settings")).data.data as { maintenanceMode: boolean },
-  });
+  const maintenance = useQuery(siteSettingsQuery);
 
   useEffect(() => {
     if (!pendingVerify || paymentStep !== "verifying") return;
+    const verificationKey = `${pendingVerify.razorpayOrderId}:${pendingVerify.razorpayPaymentId}`;
+    if (verifyInFlight.current === verificationKey) return;
+    verifyInFlight.current = verificationKey;
 
     apiClient
       .post("/payments/verify", pendingVerify)
@@ -246,7 +250,8 @@ export default function PayBalancePage() {
         setPaymentError(verifyError?.response?.data?.message || "Payment verification needs manual review.");
         setProcessing(false);
         setPaymentStep("failed");
-      });
+      })
+      .finally(() => { verifyInFlight.current = null; });
   }, [pendingVerify, paymentStep, refetch]);
 
   useEffect(() => {
@@ -356,7 +361,8 @@ export default function PayBalancePage() {
   const supportLink = `https://wa.me/${SUPPORT_PHONE}?text=${encodeURIComponent(`Hi, I need help with balance payment for booking ${booking.bookingReference}.`)}`;
 
   const handlePayBalance = async () => {
-    if (processing || !isEligible) return;
+    if (checkoutInFlight.current || processing || !isEligible) return;
+    checkoutInFlight.current = true;
     setProcessing(true);
     setPaymentError("");
 
@@ -373,6 +379,7 @@ export default function PayBalancePage() {
 
       const initiateResponse = await apiClient.post(endpoint, payload);
       const { razorpayOrderId, razorpayKeyId, amount, currency } = initiateResponse.data;
+      let completed = false;
 
       const options = {
         key: razorpayKeyId,
@@ -389,11 +396,16 @@ export default function PayBalancePage() {
         theme: { color: "#781216" },
         modal: {
           ondismiss: () => {
+            if (completed) return;
+            checkoutInFlight.current = false;
             setProcessing(false);
             toast.info("Checkout closed. Your booking is unchanged.");
           },
         },
         handler: (response: any) => {
+          if (completed) return;
+          completed = true;
+          checkoutInFlight.current = false;
           setPaymentStep("verifying");
           setPendingVerify({
             razorpayOrderId: response.razorpay_order_id,
@@ -417,6 +429,7 @@ export default function PayBalancePage() {
       });
       razorpay.open();
     } catch (payError: any) {
+      checkoutInFlight.current = false;
       setProcessing(false);
       const message = payError?.response?.data?.message || payError?.message || "Unable to open secure checkout.";
       setPaymentError(message);

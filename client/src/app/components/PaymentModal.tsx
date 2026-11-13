@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,7 @@ export default function PaymentModal({
   const [utr, setUtr] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [copiedUpi, setCopiedUpi] = useState(false);
+  const submitInFlight = useRef(false);
 
   const upiId = "8413872431-5@ybl";
   const payeeName = "DAWN TOURS AND TRAVELS";
@@ -51,12 +52,14 @@ export default function PaymentModal({
   };
 
   const handleUpiSubmit = async () => {
+    if (submitInFlight.current) return;
     const cleanUtr = utr.trim();
     if (!cleanUtr) {
       toast.error("Please enter or paste your payment UTR / Reference number");
       return;
     }
 
+    submitInFlight.current = true;
     setSubmitting(true);
     try {
       await apiClient.post("/payments/submit-upi-utr", {
@@ -71,6 +74,7 @@ export default function PaymentModal({
     } catch (error: any) {
       toast.error(error?.response?.data?.message || "Could not submit UTR for verification");
     } finally {
+      submitInFlight.current = false;
       setSubmitting(false);
     }
   };

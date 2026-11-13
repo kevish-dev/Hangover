@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "test:booking-checkout": "node --experimental-vm-modules --test test/booking-checkout.test.js",
     "dev": "nodemon .",
     "payments:reconcile-balances": "node src/utils/scripts/reconcilePaymentBalances.js",
     "media:prune": "node src/utils/scripts/pruneMediaAssets.js",

@@ -8,7 +8,7 @@ import {
   ValidationError,
 } from "../../core/errors/errors.js";
 import crypto from "crypto";
-import { uploadSensitiveDocument, createAuthenticatedDeliveryUrl, deleteMediaAsset } from "../../core/services/upload.service.js";
+import { uploadSensitiveDocument, createAuthenticatedDeliveryUrl } from "../../core/services/upload.service.js";
 import { getBookingJourney } from "./booking-journey.js";
 import * as operationsService from "../operations/operations.service.js";
 import {
@@ -200,73 +200,29 @@ export const createBooking = async (userId, data) => {
     throw new ValidationError("The selected departure is missing its travel dates and cannot be booked yet.");
   }
 
-  if (isCrmTrip) {
-    const siblingCrmSlots = await prisma.crmTripSlot.findMany({
-      where: { crmTripId: crmTripSlot.crmTripId },
-      select: { id: true },
+  // A closed checkout leaves its booking pending. Resume it without changing
+  // prices, travelers, or documents that an existing payment order refers to.
+  const itemWhere = isCrmTrip
+    ? { OR: [{ crmTripId: item.id }, { crmTripSlot: { crmTripId: item.id } }] }
+    : isCrmFestival
+    ? { OR: [{ crmFestivalId: item.id }, { crmFestivalSlot: { crmFestivalId: item.id } }] }
+    : isTrip
+    ? { OR: [{ tripId: item.id }, { slot: { tripId: item.id } }] }
+    : { OR: [{ festivalId: item.id }, { slot: { festivalId: item.id } }] };
+  const findExistingCheckout = async (db) => {
+    const active = await db.booking.findMany({
+      where: { userId, ...itemWhere, status: { in: ["PENDING", "RESERVED", "CONFIRMED"] } },
+      select: { id: true, status: true },
+      orderBy: { createdAt: "desc" },
     });
-    const siblingCrmSlotIds = siblingCrmSlots.map((s) => s.id);
-
-    const existingBooking = await prisma.booking.findFirst({
-      where: {
-        userId,
-        crmTripSlotId: { in: siblingCrmSlotIds },
-        status: { in: ["PENDING", "RESERVED", "CONFIRMED"] },
-      },
-    });
-
-    if (existingBooking) {
-      if (existingBooking.status === "PENDING") {
-        throw new ValidationError("You already have a pending booking for this trip. Please complete the payment or ask support to cancel it.");
-      } else {
-        throw new ValidationError("You already have an active booking for this trip. You cannot book another slot or package until your trip is completed.");
-      }
+    const itemLabel = isFestival || isCrmFestival ? "festival" : "trip";
+    if (active.some((booking) => booking.status !== "PENDING")) {
+      throw new ValidationError(`You already have an active booking for this ${itemLabel}. Please manage it from your profile.`);
     }
-  } else if (isCrmFestival) {
-    const siblingCrmSlots = await prisma.crmFestivalSlot.findMany({
-      where: { crmFestivalId: crmFestivalSlot.crmFestivalId },
-      select: { id: true },
-    });
-    const siblingCrmSlotIds = siblingCrmSlots.map((s) => s.id);
-
-    const existingBooking = await prisma.booking.findFirst({
-      where: {
-        userId,
-        crmFestivalSlotId: { in: siblingCrmSlotIds },
-        status: { in: ["PENDING", "RESERVED", "CONFIRMED"] },
-      },
-    });
-
-    if (existingBooking) {
-      if (existingBooking.status === "PENDING") {
-        throw new ValidationError("You already have a pending booking for this festival. Please complete the payment or ask support to cancel it.");
-      } else {
-        throw new ValidationError("You already have an active booking for this festival. You cannot book another slot or package until your festival is completed.");
-      }
-    }
-  } else {
-    const siblingSlots = await prisma.slot.findMany({
-      where: isTrip ? { tripId: slot.tripId } : { festivalId: slot.festivalId },
-      select: { id: true }
-    });
-    const siblingSlotIds = siblingSlots.map(s => s.id);
-
-    const existingBooking = await prisma.booking.findFirst({
-      where: {
-        userId,
-        slotId: { in: siblingSlotIds },
-        status: { in: ["PENDING", "RESERVED", "CONFIRMED"] }
-      }
-    });
-
-    if (existingBooking) {
-      if (existingBooking.status === "PENDING") {
-        throw new ValidationError("You already have a pending booking for this trip. Please complete the payment or ask support to cancel it.");
-      } else {
-        throw new ValidationError("You already have an active booking for this trip. You cannot book another slot or package until your trip is completed.");
-      }
-    }
-  }
+    return active[0] ? repo.getCheckoutBookingById(active[0].id, db) : null;
+  };
+  const existingCheckout = await findExistingCheckout(prisma);
+  if (existingCheckout) return existingCheckout;
 
   // 3. Pricing calculation (per-person)
   const numberOfTravelers = Number(data.numberOfTravelers ?? 1);
@@ -426,39 +382,6 @@ export const createBooking = async (userId, data) => {
     throw new ValidationError("Each additional traveler needs complete contact, identity, and date-of-birth details.");
   }
 
-  // Check if there is an existing PENDING booking to reuse
-  const pendingWhere = isCrmTrip
-    ? { userId, crmTripSlotId: crmTripSlot.id, status: "PENDING" }
-    : isCrmFestival
-    ? { userId, crmFestivalSlotId: crmFestivalSlot.id, status: "PENDING" }
-    : { userId, slotId: slot.id, status: "PENDING" };
-
-  const existingPending = await prisma.booking.findFirst({
-    where: pendingWhere,
-    include: { travelers: { select: { aadhaarAssetId: true } } },
-  });
-
-  if (existingPending) {
-    const replacedAssetIds = existingPending.travelers?.map((traveler) => traveler.aadhaarAssetId).filter(Boolean) || [];
-    bookingData.travelers = {
-      deleteMany: {}, // Clear any previous travelers if updating an existing pending booking
-      ...(travelersCreateData.length > 0 && { create: travelersCreateData })
-    };
-    bookingData.addOns = {
-      deleteMany: {},
-      ...(bookingAddOnsData.length > 0 && { create: bookingAddOnsData }),
-    };
-    const booking = await repo.updateBooking(existingPending.id, bookingData);
-    if (replacedAssetIds.length > 0) {
-      const replacedAssets = await prisma.mediaAsset.findMany({ where: { id: { in: replacedAssetIds } } });
-      await Promise.allSettled(replacedAssets.flatMap((asset) => [
-        deleteMediaAsset(asset),
-        prisma.mediaAsset.delete({ where: { id: asset.id } }),
-      ]));
-    }
-    return booking;
-  }
-
   // Generate booking reference and complete payload for a new booking
   const customBookingId = await generateBookingReference(prisma);
   bookingData.id = customBookingId;
@@ -490,7 +413,16 @@ export const createBooking = async (userId, data) => {
     bookingData.addOns = { create: bookingAddOnsData };
   }
 
-  const booking = await repo.createBooking(bookingData);
+  // Serialize creation across tabs and API processes. The second check must
+  // happen inside the same transaction as INSERT; an earlier read alone races.
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`booking:${userId}`}, 0))::text`;
+    const existing = await findExistingCheckout(tx);
+    if (existing) return { booking: existing, created: false };
+    return { booking: await repo.createBooking(bookingData, tx), created: true };
+  });
+  const { booking } = result;
+  if (!result.created) return booking;
 
   if (isCrmTrip) {
     operationsService.generateCrmBookingOperations(booking, crmTripSlot).catch(

@@ -34,6 +34,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     retry: false,
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const user = data?.user || null;

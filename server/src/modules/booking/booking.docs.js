@@ -5,7 +5,7 @@ registry.registerPath({
   method: "post",
   path: "/bookings",
   summary: "Create a booking",
-  description: "Creates a new booking for a trip. Requires a valid Government ID in the user profile.",
+  description: "Creates a booking for a trip or festival, or resumes the user's existing pending booking for that item without changing its details. Concurrent checkout requests are serialized. Requires a valid Government ID in the user profile.",
   tags: ["Booking"],
   security: [{ cookieAuth: [] }],
   request: {
@@ -23,7 +23,7 @@ registry.registerPath({
     },
   },
   responses: {
-    201: { description: "Booking created successfully" },
+    201: { description: "Booking created or existing pending booking resumed" },
     400: { description: "Bad Request - Profile incomplete" },
     403: { description: "Forbidden - Government ID missing" },
     404: { description: "Trip not found" }

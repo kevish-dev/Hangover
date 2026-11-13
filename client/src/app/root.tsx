@@ -3,14 +3,12 @@ import { Navbar } from "./components/navbar";
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Wrench } from "lucide-react";
-import { apiClient } from "../lib/axios";
+import { siteSettingsQuery } from "../lib/siteSettingsQuery";
 
 export default function Root() {
   const location = useLocation();
   const maintenance = useQuery({
-    queryKey: ["site-settings"],
-    queryFn: async () => (await apiClient.get("/site-settings")).data.data as { maintenanceMode: boolean },
-    staleTime: 30_000,
+    ...siteSettingsQuery,
     refetchInterval: 30_000,
   });
 

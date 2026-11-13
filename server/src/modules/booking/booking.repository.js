@@ -15,9 +15,16 @@ const bookingInclude = {
   payments: { include: { refunds: true } },
 };
 
-export const createBooking = async (data) => {
-  return prisma.booking.create({
+export const createBooking = async (data, db = prisma) => {
+  return db.booking.create({
     data,
+    include: bookingInclude,
+  });
+};
+
+export const getCheckoutBookingById = async (id, db = prisma) => {
+  return db.booking.findUnique({
+    where: { id },
     include: bookingInclude,
   });
 };
