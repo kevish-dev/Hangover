@@ -704,6 +704,39 @@
       ],
       "title": "Razorpay Webhooks Activity",
       "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 51 },
+      "id": 105,
+      "title": "📜 Live 4xx & 5xx Error Payload Inspector (Loki)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 52 },
+      "id": 22,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "Loki" },
+          "editorMode": "builder",
+          "expr": "{container=\"hangover-backend\"} |= \"ERROR\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Real-Time 4xx/5xx Error Payloads & Responses (Click any row to inspect full JSON payload)",
+      "type": "logs"
     }
   ],
   "refresh": "5s",
