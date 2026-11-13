@@ -115,8 +115,8 @@ export const errorTrackerMiddleware = (req, res, next) => {
 
       // Emit structured JSON log to stdout for Docker and log aggregators
       const logHeader = isServerError
-        ? `🔥 [5XX_SERVER_ERROR] ${req.method} ${errorRecord.path} - HTTP ${statusCode} (${durationMs}ms)`
-        : `⚠️ [4XX_CLIENT_ERROR] ${req.method} ${errorRecord.path} - HTTP ${statusCode} (${durationMs}ms)`;
+        ? `[5XX_SERVER_ERROR] ${req.method} ${errorRecord.path} - HTTP ${statusCode} (${durationMs}ms)`
+        : `[4XX_CLIENT_ERROR] ${req.method} ${errorRecord.path} - HTTP ${statusCode} (${durationMs}ms)`;
 
       console.error(
         `${logHeader}\n` +

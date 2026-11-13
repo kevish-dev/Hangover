@@ -22,7 +22,7 @@
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "id": 100,
-      "title": "🚨 Uptime & Unreachability Detective",
+      "title": "Uptime & Availability Detective",
       "type": "row"
     },
     {
@@ -240,7 +240,7 @@
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 10 },
       "id": 101,
-      "title": "📈 HTTP Traffic, Performance & Errors",
+      "title": "HTTP Traffic, Performance & Errors",
       "type": "row"
     },
     {
@@ -413,7 +413,7 @@
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
       "id": 102,
-      "title": "🧠 Node.js Runtime & Event Loop Health (Freeze Detection)",
+      "title": "Node.js Runtime & Event Loop Health",
       "type": "row"
     },
     {
@@ -528,7 +528,7 @@
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 },
       "id": 103,
-      "title": "🐳 Container & Host Resources (OOM Kill & Crash Detection)",
+      "title": "Container & Host Resources (OOM & Crash Detection)",
       "type": "row"
     },
     {
@@ -608,7 +608,7 @@
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 },
       "id": 104,
-      "title": "💼 Business & Hangover Domain Operations",
+      "title": "Business & Hangover Domain Operations",
       "type": "row"
     },
     {
@@ -709,7 +709,7 @@
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 51 },
       "id": 105,
-      "title": "📜 Live 4xx & 5xx Error Payload Inspector (Loki)",
+      "title": "Live 4xx & 5xx Error Payload Inspector (Loki)",
       "type": "row"
     },
     {
