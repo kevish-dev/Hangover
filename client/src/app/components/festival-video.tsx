@@ -1,3 +1,5 @@
+import { useQuery } from "@tanstack/react-query";
+import { canAutoplayVideo } from "../../lib/connection";
 
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
@@ -63,25 +65,12 @@ function formatFestivalDate(festival: ApiFestival) {
 
 export function FestivalVideo() {
   const navigate = useNavigate();
-  const [festivals, setFestivals] = useState<ApiFestival[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchFeaturedFestivals()
-      .then((data) => {
-        if (!cancelled) setFestivals(data.filter((festival) => festival.videoUrl || festival.bannerImages?.length > 0));
-      })
-      .catch(() => {
-        if (!cancelled) setFestivals([]);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { data, isPending: isLoading } = useQuery({
+    queryKey: ["public", "featured-festivals"],
+    queryFn: ({ signal }) => fetchFeaturedFestivals(signal),
+    staleTime: 60_000,
+  });
+  const festivals = (data ?? []).filter((festival) => festival.videoUrl || festival.bannerImages?.length);
 
   if (!isLoading && festivals.length === 0) return null;
 
@@ -286,6 +275,7 @@ function VideoLayer({
   video: VideoMeta;
   scrollYProgress: MotionValue<number>;
 }) {
+  const playVideo = Boolean(video.videoUrl) && canAutoplayVideo();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [shouldLoad, setShouldLoad] = useState(false);
 
@@ -349,7 +339,7 @@ function VideoLayer({
           position: "relative",
         }}
       >
-        <motion.video
+        {playVideo && <motion.video
           ref={videoRef}
           muted
           loop
@@ -364,12 +354,14 @@ function VideoLayer({
           }}
         >
           {shouldLoad && video.videoUrl && <source src={mediaVideoUrl(video.videoUrl)} type="video/mp4" />}
-        </motion.video>
+        </motion.video>}
 
-        {!video.videoUrl && (
+        {!playVideo && video.imageUrl && (
           <img
             src={mediaImageUrl(video.imageUrl, { width: 1920, fit: "fit" })}
             alt={video.label}
+            loading="lazy"
+            decoding="async"
             className="absolute inset-0 w-full h-full object-cover"
           />
         )}

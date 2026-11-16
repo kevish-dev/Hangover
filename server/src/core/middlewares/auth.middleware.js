@@ -3,16 +3,23 @@ import { prisma } from "../../prisma/client.js";
 
 export const requireAuth = async (req, res, next) => {
   try {
+    if (req.user) return next();
     const token = req.cookies.accessToken;
 
     if (!token) {
-      return res.status(401).json({ message: "Authentication required. Access token missing." });
+      return res.status(401).json({
+        message: "Authentication required. Access token missing.",
+        ...(!req.cookies.refreshToken && { code: "NO_SESSION" }),
+      });
     }
 
     const decoded = verifyAccessToken(token);
 
     if (!decoded) {
-      return res.status(401).json({ message: "Invalid or expired access token." });
+      return res.status(401).json({
+        message: "Invalid or expired access token.",
+        ...(!req.cookies.refreshToken && { code: "NO_SESSION" }),
+      });
     }
 
     let user;
@@ -49,6 +56,7 @@ export const requireAuth = async (req, res, next) => {
 
 export const optionalAuth = async (req, res, next) => {
   try {
+    if (req.user) return next();
     const token = req.cookies.accessToken;
     if (!token) {
       return next();

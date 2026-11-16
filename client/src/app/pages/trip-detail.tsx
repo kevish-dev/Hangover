@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, Link, useLocation, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -34,8 +34,6 @@ import {
 } from "lucide-react";
 import { interestApi } from "../../lib/interestApi";
 import {
-  fetchTripBySlug,
-  fetchAllTrips,
   formatTripType,
   formatPrice,
   formatDuration,
@@ -46,7 +44,10 @@ import {
   type ApiTrip,
   type ApiFaq,
 } from "../../lib/tripApi";
-import { fetchFestivalBySlug } from "../../lib/festivalApi";
+import { useQuery } from "@tanstack/react-query";
+import { publicTripDetailQuery, publicTripsQuery } from "../../lib/catalogQueries";
+import { canAutoplayVideo } from "../../lib/connection";
+import { checkoutBookingsQuery } from "../../lib/bookingApi";
 import { SiteFooter } from "../components/site-footer";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiClient } from "../../lib/axios";
@@ -78,22 +79,14 @@ function RelatedTrips({
   currentId: string;
   currentType: string;
 }) {
-  const [related, setRelated] = useState<ApiTrip[]>([]);
-
-  useEffect(() => {
-    if (!currentType) return;
-    fetchAllTrips()
-      .then((all) => {
-        const sameType = all.filter(
-          (t) => t.id !== currentId && t.tripType === currentType,
-        );
-        const others = all.filter(
-          (t) => t.id !== currentId && t.tripType !== currentType,
-        );
-        setRelated([...sameType, ...others].slice(0, 6));
-      })
-      .catch(() => {});
-  }, [currentId, currentType]);
+  const { data } = useQuery({ ...publicTripsQuery, enabled: Boolean(currentType) });
+  const related = useMemo(() => {
+    const others = (data ?? []).filter((trip) => trip.id !== currentId);
+    return [
+      ...others.filter((trip) => trip.tripType === currentType),
+      ...others.filter((trip) => trip.tripType !== currentType),
+    ].slice(0, 6);
+  }, [data, currentId, currentType]);
 
   if (related.length === 0) return null;
 
@@ -1178,40 +1171,25 @@ export default function TripDetail() {
   const location = useLocation();
   const isFestival = location.pathname.startsWith("/festivals");
   const shareToken = new URLSearchParams(location.search).get("share");
-  const { user } = useAuth();
-  const [trip, setTrip] = useState<any>(null); // polymorphic: ApiTrip | ApiFestival
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [hasBooked, setHasBooked] = useState(false);
-  const [reservedBookingId, setReservedBookingId] = useState<string | null>(
-    null,
-  );
+  const { user, isLoading: authLoading } = useAuth();
+  const detailQuery = useQuery(publicTripDetailQuery(slug, isFestival, shareToken, {
+    userId: user?.id,
+    isLoading: authLoading,
+  }));
+  const trip: any = detailQuery.data; // ApiTrip or ApiFestival
+  const { data: bookings = [] } = useQuery(checkoutBookingsQuery(user?.id));
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
-
-  const loadTrip = useCallback(async () => {
-    if (!slug) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await (isFestival
-        ? fetchFestivalBySlug(slug)
-        : fetchTripBySlug(slug, shareToken));
-      setTrip(data);
-    } catch (error) {
-      const message = getErrorMessage(
-        error,
-        isFestival ? "Festival not found" : "Trip not found",
-      );
-      setError(message);
-      toast.error(message, { id: `trip-detail-load-${slug}` });
-    } finally {
-      setLoading(false);
+  const belongsToCurrentItem = (booking: any) => {
+    if (!trip) return false;
+    if (isFestival) {
+      return (booking.crmFestivalId || booking.crmFestival?.id || booking.crmFestivalSlot?.crmFestivalId ||
+        booking.festivalId || booking.festival?.id || booking.slot?.festivalId) === trip.id;
     }
-  }, [isFestival, shareToken, slug]);
-
-  useEffect(() => {
-    loadTrip();
-  }, [loadTrip]);
+    if (trip.isCrmTrip) return (booking.crmTripId || booking.crmTrip?.id || booking.crmTripSlot?.crmTripId) === trip.id;
+    return (booking.tripId || booking.trip?.id || booking.slot?.tripId) === trip.id;
+  };
+  const hasBooked = bookings.some((booking) => booking.status === "CONFIRMED" && belongsToCurrentItem(booking));
+  const reservedBookingId = bookings.find((booking) => booking.status === "RESERVED" && belongsToCurrentItem(booking))?.id;
 
   useEffect(() => {
     const slots = trip?.slots || [];
@@ -1228,44 +1206,10 @@ export default function TripDetail() {
     setSelectedSlotId(firstAvailable?.id || null);
   }, [trip, selectedSlotId]);
 
-  useEffect(() => {
-    if (user && trip) {
-      apiClient
-        .get(`/bookings/me?limit=100`)
-        .then((res) => {
-          const bookings = res.data?.data || [];
-          const belongsToCurrentItem = (booking: any) => {
-            if (!isFestival && (trip as any).isCrmTrip) {
-              return booking.crmTripId === trip.id;
-            }
-            const itemId = isFestival
-              ? booking.festivalId ||
-                booking.festival?.id ||
-                booking.slot?.festivalId
-              : booking.tripId || booking.trip?.id || booking.slot?.tripId;
-            return itemId === trip.id;
-          };
-          const confirmed = bookings.find(
-            (b: any) => belongsToCurrentItem(b) && b.status === "CONFIRMED",
-          );
-          const reserved = bookings.find(
-            (b: any) => belongsToCurrentItem(b) && b.status === "RESERVED",
-          );
-          setHasBooked(!!confirmed);
-          setReservedBookingId(reserved?.id || null);
-        })
-        .catch((error) =>
-          toast.error(
-            getErrorMessage(error, "Your booking status could not be checked"),
-            { id: `trip-booking-status-${trip.id}` },
-          ),
-        );
-    }
-  }, [user, trip, isFestival]);
+  if (slug && detailQuery.isPending) return <DetailLoadingSkeleton />;
 
-  if (loading) return <DetailLoadingSkeleton />;
-
-  if (error || !trip) {
+  if (!trip) {
+    const error = getErrorMessage(detailQuery.error, isFestival ? "Festival could not be loaded" : "Trip could not be loaded");
     return (
       <div
         style={{
@@ -1296,7 +1240,7 @@ export default function TripDetail() {
           </p>
           <button
             type="button"
-            onClick={loadTrip}
+            onClick={() => void detailQuery.refetch()}
             style={{
               color: "#781216",
               fontSize: "0.82rem",
@@ -1364,6 +1308,7 @@ export default function TripDetail() {
 
   return (
     <TripDetailContent
+      key={trip.id}
       trip={trip}
       heroImage={heroImage}
       allImages={allImages}
@@ -2133,7 +2078,7 @@ function TripDetailContent({
   const festivalVideoUrl = isFestival
     ? ((trip as any).videoUrl as string | null | undefined)
     : null;
-  const showHeroVideo = Boolean(festivalVideoUrl);
+  const showHeroVideo = Boolean(festivalVideoUrl) && canAutoplayVideo();
   const bookingParams = new URLSearchParams();
   if (isFestival) bookingParams.set("type", "festival");
   if (selectedSlotId) bookingParams.set("slotId", selectedSlotId);
@@ -2374,6 +2319,7 @@ function TripDetailContent({
           <motion.video
             key={festivalVideoUrl}
             src={mediaVideoUrl(festivalVideoUrl!)}
+            poster={mediaImageUrl(heroImage, { width: 1280, fit: "fit" }) || undefined}
             autoPlay
             muted
             loop

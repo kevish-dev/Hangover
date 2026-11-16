@@ -1,3 +1,5 @@
+import { SessionUnavailable } from "../components/SessionUnavailable";
+import { loadRazorpay } from "../../lib/razorpay";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -143,10 +145,10 @@ function ResultPage({
   onBack: () => void;
   errorMessage?: string;
 }) {
-  const item = booking?.crmTrip || booking?.customTrip || booking?.trip || booking?.festival || booking?.slot?.trip || booking?.slot?.festival;
+  const item = booking?.crmTrip || booking?.crmFestival || booking?.crmFestivalSlot?.crmFestival || booking?.customTrip || booking?.trip || booking?.festival || booking?.slot?.trip || booking?.slot?.festival;
   const itemTitle = item?.title || item?.name || "the trip";
   const itemPath = booking?.customTrip ? "/profile" : item?.id
-    ? (booking?.festival || booking?.slot?.festival ? `/festivals/${item.id}` : `/trips/${item.id}`)
+    ? (booking?.crmFestival || booking?.crmFestivalSlot || booking?.festival || booking?.slot?.festival ? `/festivals/${item.id}` : `/trips/${item.id}`)
     : "/trips";
   const isVerifying = type === "verifying";
   const isSuccess = type === "success";
@@ -206,7 +208,11 @@ function ResultPage({
 
 export default function PayBalancePage() {
   const { bookingId } = useParams();
-  const { user, isLoading: authLoading } = useAuth();
+  return <PayBalance key={bookingId} bookingId={bookingId} />;
+}
+
+function PayBalance({ bookingId }: { bookingId?: string }) {
+  const { user, isLoading: authLoading, sessionError, retrySession } = useAuth();
   const [processing, setProcessing] = useState(false);
   const [paymentStep, setPaymentStep] = useState<PaymentStep>("form");
   const [pendingVerify, setPendingVerify] = useState<PendingVerification | null>(null);
@@ -214,10 +220,10 @@ export default function PayBalancePage() {
   const checkoutInFlight = useRef(false);
   const verifyInFlight = useRef<string | null>(null);
 
-  const { data: booking, isLoading, error, refetch } = useQuery({
-    queryKey: ["booking", bookingId],
-    queryFn: async () => {
-      const response = await apiClient.get(`/bookings/${bookingId}`);
+  const { data: booking, isPending, error, refetch } = useQuery({
+    queryKey: ["booking", bookingId, user?.id],
+    queryFn: async ({ signal }) => {
+      const response = await apiClient.get(`/bookings/${bookingId}`, { signal });
       return response.data;
     },
     enabled: Boolean(user && bookingId),
@@ -261,16 +267,16 @@ export default function PayBalancePage() {
   }, [paymentStep]);
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const item = booking?.crmTrip || booking?.customTrip || booking?.trip || booking?.festival || booking?.slot?.trip || booking?.slot?.festival || booking?.crmTripSlot?.crmTrip;
+  const item = booking?.crmTrip || booking?.crmFestival || booking?.crmFestivalSlot?.crmFestival || booking?.customTrip || booking?.trip || booking?.festival || booking?.slot?.trip || booking?.slot?.festival || booking?.crmTripSlot?.crmTrip;
   const isCrm = Boolean(booking?.crmTrip || booking?.crmTripSlot);
   const isCustom = booking?.source === "CUSTOM" || Boolean(booking?.customTrip);
-  const isFestival = Boolean(booking?.festival || booking?.slot?.festival);
+  const isFestival = Boolean(booking?.crmFestival || booking?.crmFestivalSlot || booking?.festival || booking?.slot?.festival);
   const itemPath = isCustom ? "/profile" : item?.id ? (isFestival ? `/festivals/${item.id}` : `/trips/${item.id}`) : "/trips";
   const itemTitle = item?.title || item?.name || "Upcoming Journey";
   const itemLocation = isCustom ? "Private custom itinerary" : (item?.location || item?.destination?.name || "Location to be announced");
   const heroBanner = item?.bannerImages?.[0] || item?.websiteBannerImages?.[0] || booking?.crmTrip?.websiteBannerImages?.[0] || "";
-  const tripStartDate = booking?.crmTripSlot?.startDate || booking?.customTrip?.startDate || booking?.slot?.startDate;
-  const tripEndDate = booking?.crmTripSlot?.endDate || booking?.customTrip?.endDate || booking?.slot?.endDate;
+  const tripStartDate = booking?.crmTripSlot?.startDate || booking?.crmFestivalSlot?.startDate || booking?.customTrip?.startDate || booking?.slot?.startDate;
+  const tripEndDate = booking?.crmTripSlot?.endDate || booking?.crmFestivalSlot?.endDate || booking?.customTrip?.endDate || booking?.slot?.endDate;
   const durationDays = item?.numberOfNights ? item.numberOfNights + 1 : (item?.duration || item?.durationDays);
   const totalAmount = Number(booking?.totalAmount || 0);
   const amountPaid = Number(booking?.amountPaid || 0);
@@ -337,8 +343,9 @@ export default function PayBalancePage() {
   }, [booking?.travelers, booking?.user?.profile?.fullName]);
 
   if (authLoading) return <LoadingPage />;
+  if (sessionError) return <SessionUnavailable onRetry={retrySession} />;
   if (!user) return <SignedOutPage bookingId={bookingId} />;
-  if (isLoading) return <LoadingPage />;
+  if (bookingId && isPending) return <LoadingPage />;
 
   if (error || !booking) {
     const status = (error as any)?.response?.status;
@@ -347,7 +354,12 @@ export default function PayBalancePage() {
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} style={{ width: "100%", maxWidth: 560, background: "#fff", borderRadius: 18, padding: "42px 34px", textAlign: "center", border: "1px solid rgba(30,26,20,0.08)", boxShadow: "0 20px 60px rgba(30,26,20,0.09)" }}>
           <AlertCircle size={40} color="#781216" strokeWidth={1.3} style={{ margin: "0 auto 18px" }} />
           <h1 style={{ margin: "0 0 10px", color: "#1e1a14", fontWeight: 300, fontSize: "1.8rem" }}>{status === 403 ? "This booking belongs to another account" : status === 404 ? "Booking not found" : "We could not load this booking"}</h1>
-          <p style={{ color: "rgba(30,26,20,0.55)", fontSize: "0.82rem", lineHeight: 1.75, margin: "0 0 25px" }}>{status === 403 ? "Please sign in with the account used to make this booking." : "Return to your profile and try opening the booking again."}</p>
+          <p style={{ color: "rgba(30,26,20,0.55)", fontSize: "0.82rem", lineHeight: 1.75, margin: "0 0 25px" }}>{status === 403 ? "Please sign in with the account used to make this booking." : "Check your connection and try again."}</p>
+          {status !== 403 && status !== 404 && (
+            <button type="button" className="mr-3 rounded-lg border border-[#781216] px-4 py-3 text-sm font-semibold text-[#781216]" onClick={() => void refetch()}>
+              Try again
+            </button>
+          )}
           <Link to="/profile" style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#781216", color: "#fff", padding: "12px 20px", borderRadius: 8, textDecoration: "none", fontSize: "0.76rem", fontWeight: 600 }}><ArrowLeft size={14} /> Back to My Bookings</Link>
         </motion.div>
       </div>
@@ -367,9 +379,7 @@ export default function PayBalancePage() {
     setPaymentError("");
 
     try {
-      if (!(window as any).Razorpay) {
-        throw new Error("Secure checkout did not load. Please refresh the page and try again.");
-      }
+      const Razorpay = await loadRazorpay();
 
       const isInitial = booking.status === "PENDING";
       const endpoint = isInitial ? "/payments/initiate" : "/payments/balance/initiate";
@@ -415,7 +425,7 @@ export default function PayBalancePage() {
         },
       };
 
-      const razorpay = new (window as any).Razorpay(options);
+      const razorpay = new Razorpay(options);
       razorpay.on("payment.failed", async (response: any) => {
         const failure = response?.error || {};
         await apiClient.post("/payments/failed", {

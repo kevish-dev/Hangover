@@ -149,55 +149,63 @@ export default function CrmFestivalDetailPage() {
   >("stays");
   const tripQuery = useQuery({
     queryKey: ["crm-festival", id],
-    queryFn: async () => (await apiClient.get(`/crm-festivals/${id}`)).data as Festival,
+    queryFn: async ({ signal }) => (await apiClient.get(`/crm-festivals/${id}`, { signal })).data as Festival,
     enabled: Boolean(id),
   });
   const festival = tripQuery.data;
   const bookingsQuery = useQuery({
     queryKey: ["crm-festival-bookings", id],
-    queryFn: async () =>
-      (await apiClient.get(`/crm-festivals/${id}/bookings`)).data as Booking[],
-    enabled: Boolean(id),
+    queryFn: async ({ signal }) =>
+      (await apiClient.get(`/crm-festivals/${id}/bookings`, { signal })).data as Booking[],
+    enabled: Boolean(id) && activeTab === "bookings",
   });
   const placesQuery = useQuery({
     queryKey: ["crm", "places"],
-    queryFn: async () =>
+    queryFn: async ({ signal }) =>
       (await apiClient.get("/places", {
-        params: { activeOnly: true, limit: 500 },
+        signal,
+          params: { activeOnly: true, limit: 500 },
       })).data.data as Master[],
-    enabled: Boolean(festival),
+    enabled: Boolean(festival) && activeTab === "stays",
+    staleTime: 60_000,
   });
   const staysQuery = useQuery({
     queryKey: ["crm", "stays", festival?.destination.id],
-    queryFn: async () =>
+    queryFn: async ({ signal }) =>
       (await apiClient.get("/stay-locations", {
-        params: {
+        signal,
+          params: {
           destinationId: festival!.destination.id,
           activeOnly: true,
           limit: 200,
         },
       })).data.data as Master[],
-    enabled: Boolean(festival),
+    enabled: Boolean(festival) && activeTab === "stays",
+    staleTime: 60_000,
   });
   const propertiesQuery = useQuery({
     queryKey: ["crm", "properties"],
-    queryFn: async () =>
+    queryFn: async ({ signal }) =>
       (await apiClient.get("/properties", {
-        params: { activeOnly: true, limit: 500 },
+        signal,
+          params: { activeOnly: true, limit: 500 },
       })).data.data as Master[],
-    enabled: Boolean(festival),
+    enabled: Boolean(festival) && activeTab === "stays",
+    staleTime: 60_000,
   });
   const transfersQuery = useQuery({
     queryKey: ["crm", "transfers", festival?.destination.id],
-    queryFn: async () =>
+    queryFn: async ({ signal }) =>
       (await apiClient.get("/transfer-locations", {
-        params: {
+        signal,
+          params: {
           destinationId: festival!.destination.id,
           activeOnly: true,
           limit: 200,
         },
       })).data.data as Master[],
-    enabled: Boolean(festival),
+    enabled: Boolean(festival) && activeTab === "stays",
+    staleTime: 60_000,
   });
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: ["crm-festival", id] });
@@ -213,7 +221,7 @@ export default function CrmFestivalDetailPage() {
     }
   };
 
-  if (tripQuery.isLoading) {
+  if (tripQuery.isPending && id) {
     return (
       <div className="py-20 text-center text-gray-500">
         <Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />Loading
@@ -224,7 +232,8 @@ export default function CrmFestivalDetailPage() {
   if (!festival) {
     return (
       <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-800">
-        This CRM festival could not be found.
+        {message(tripQuery.error, "This CRM festival could not be loaded.")}{" "}
+        <button type="button" className="underline" onClick={() => void tripQuery.refetch()}>Retry</button>
       </div>
     );
   }
@@ -398,14 +407,21 @@ export default function CrmFestivalDetailPage() {
         )
         : activeTab === "bookings"
         ? (
-          <BookingPanel
-            bookings={bookingsQuery.data || []}
-            loading={bookingsQuery.isLoading}
-            onCreate={() => setCreateBookingOpen(true)}
-            onInstallment={setInstallmentBooking}
-            onOpen={(booking) =>
-              navigate(`/dashboard/crm-festivals/${id}/bookings/${booking.id}`)}
-          />
+          bookingsQuery.isError && !bookingsQuery.data ? (
+            <div role="alert" className="rounded-lg bg-red-50 p-4 text-sm text-red-800">
+              {message(bookingsQuery.error, "Bookings could not be loaded.")}{" "}
+              <button type="button" className="underline" onClick={() => void bookingsQuery.refetch()}>Retry</button>
+            </div>
+          ) : (
+            <BookingPanel
+              bookings={bookingsQuery.data || []}
+              loading={bookingsQuery.isPending}
+              onCreate={() => setCreateBookingOpen(true)}
+              onInstallment={setInstallmentBooking}
+              onOpen={(booking) =>
+                navigate(`/dashboard/crm-festivals/${id}/bookings/${booking.id}`)}
+            />
+          )
         )
         : activeTab === "operations"
         ? <CrmOperationsCalendar festivalId={id} />

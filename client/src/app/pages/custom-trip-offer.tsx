@@ -1,3 +1,4 @@
+import { loadRazorpay } from "../../lib/razorpay";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import {
@@ -20,7 +21,6 @@ import { customTripApi, type CustomTrip } from "../../lib/customTripApi";
 import { getMyProfile, type UserProfile } from "../../lib/profileApi";
 import { SiteFooter } from "../components/site-footer";
 
-declare const Razorpay: any;
 
 const input =
   "w-full rounded-lg border border-[#d9d2c7] bg-white px-3.5 py-3 text-sm text-[#1e1a14] outline-none focus:border-[#781216] focus:ring-2 focus:ring-[#781216]/10";
@@ -150,6 +150,7 @@ export default function CustomTripOfferPage() {
       })
     ).data;
     await new Promise<void>((resolve, reject) => {
+      const Razorpay = await loadRazorpay();
       const razorpay = new Razorpay({
         key: initiated.razorpayKeyId,
         amount: initiated.amount,

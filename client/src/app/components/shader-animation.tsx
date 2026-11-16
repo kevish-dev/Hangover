@@ -56,7 +56,7 @@ export function ShaderAnimation({ opacity = 0.18, className = "" }: ShaderAnimat
     scene.add(new THREE.Mesh(geometry, material));
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     container.appendChild(renderer.domElement);
 
     const onResize = () => {
@@ -82,18 +82,22 @@ export function ShaderAnimation({ opacity = 0.18, className = "" }: ShaderAnimat
     // Play once: hold for 2.8s then fade out
     const holdTimer = setTimeout(() => setVisible(false), 2800);
 
-    return () => {
-      clearTimeout(holdTimer);
+    const stop = () => {
       window.removeEventListener("resize", onResize);
-      if (sceneRef.current) {
-        cancelAnimationFrame(sceneRef.current.animationId);
-        if (container.contains(sceneRef.current.renderer.domElement)) {
-          container.removeChild(sceneRef.current.renderer.domElement);
-        }
-        sceneRef.current.renderer.dispose();
-      }
+      if (!sceneRef.current) return;
+      cancelAnimationFrame(sceneRef.current.animationId);
+      renderer.domElement.remove();
+      renderer.dispose();
       geometry.dispose();
       material.dispose();
+      sceneRef.current = null;
+    };
+    const stopTimer = setTimeout(stop, 4200);
+
+    return () => {
+      clearTimeout(holdTimer);
+      clearTimeout(stopTimer);
+      stop();
     };
     } catch (e) {
       // WebGL unavailable — shader silently skipped

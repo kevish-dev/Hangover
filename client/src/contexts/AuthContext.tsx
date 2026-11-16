@@ -1,5 +1,6 @@
 import { createContext, useContext, ReactNode, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 import { apiClient } from "../lib/axios";
 
 export interface User {
@@ -16,6 +17,8 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   logout: () => void;
+  sessionError: boolean;
+  retrySession: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,14 +26,17 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isPending, isError, refetch } = useQuery({
     queryKey: ["auth", "me"],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       try {
-        const response = await apiClient.get<{ user: User }>("/auth/me");
+        const response = await apiClient.get<{ user: User }>("/auth/me", { signal });
         return response.data;
       } catch (error) {
-        return { user: null };
+        if (isAxiosError(error) && [401, 403].includes(error.response?.status ?? 0)) {
+          return { user: null };
+        }
+        throw error;
       }
     },
     retry: false,
@@ -61,7 +67,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, logout }}>
+    <AuthContext.Provider value={{
+      user, isLoading: isPending, logout,
+      sessionError: isError && !data,
+      retrySession: () => void refetch(),
+    }}>
       {children}
     </AuthContext.Provider>
   );

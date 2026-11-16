@@ -1,5 +1,6 @@
 import { prisma } from "../../prisma/client.js";
 import { NotFoundError, ValidationError } from "../../core/errors/errors.js";
+import { legacyTripShareFilter } from "../../utils/trip-share-token.js";
 import * as repository from "./crm-trip.repository.js";
 
 const COMMON_INCLUSION_DEFAULTS = (numberOfNights) => [
@@ -529,7 +530,25 @@ export const getFeaturedPublicTrips = async () => ({
   data: (await repository.findFeaturedPublic()).map(toPublicTrip),
 });
 
-export const getPublicTrip = async (id, user = null) => {
+const UUID_PATTERN = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
+
+const findLegacyTrip = (identifier, user, shareToken) => {
+  const key = UUID_PATTERN.test(identifier) ? "id" : "slug";
+  const where = { [key]: identifier };
+  if (user?.role === "ADMIN") return repository.findLegacyTripForWebsite(where);
+
+  const access = [{ isPublished: true }];
+  if (shareToken) {
+    access.push(legacyTripShareFilter(shareToken));
+  }
+  if (user?.id) {
+    access.push({ bookings: { some: { userId: user.id } } });
+    access.push({ slots: { some: { bookings: { some: { userId: user.id } } } } });
+  }
+  return repository.findLegacyTripForWebsite({ ...where, OR: access });
+};
+
+export const getPublicTrip = async (id, user = null, shareToken = null) => {
   let trip = await repository.findPublicById(id);
 
   if (!trip && user) {
@@ -549,8 +568,11 @@ export const getPublicTrip = async (id, user = null) => {
     }
   }
 
-  if (!trip) throw new NotFoundError("Trip not found");
-  return toPublicTrip(trip);
+  if (trip) return toPublicTrip(trip);
+
+  const legacyTrip = await findLegacyTrip(id, user, shareToken);
+  if (!legacyTrip) throw new NotFoundError("Trip not found");
+  return { ...legacyTrip, isCrmTrip: false };
 };
 
 export const getTrip = async (id) => {

@@ -1,3 +1,4 @@
+import { SessionUnavailable } from "../../components/SessionUnavailable";
 import { Outlet, Link, useLocation, Navigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -67,7 +68,7 @@ const websiteItems = [
 ];
 
 export default function AdminLayout() {
-  const { user, isLoading, logout } = useAuth();
+  const { user, isLoading, logout, sessionError, retrySession } = useAuth();
   const location = useLocation();
 
   const { data: pendingPaymentsData } = useQuery({
@@ -85,6 +86,8 @@ export default function AdminLayout() {
       </div>
     );
   }
+
+  if (sessionError) return <SessionUnavailable onRetry={retrySession} />;
 
   // If not logged in or not admin, redirect
   if (!user || user.role !== "ADMIN") {

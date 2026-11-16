@@ -1,3 +1,4 @@
+import { isAxiosError } from "axios";
 import { apiClient } from "./axios";
 
 // ── Backend response types ────────────────────────────────────────
@@ -117,31 +118,37 @@ export interface ApiFeaturedFestivalsResponse {
 
 // ── Fetch functions ───────────────────────────────────────────────
 
-export async function fetchAllFestivals(): Promise<ApiFestival[]> {
-  const [festivalsResult, crmFestivalsResult] = await Promise.allSettled([
-    apiClient.get<ApiFestivalsResponse>("/festivals", { params: { page: 1, limit: 200 } }),
-    apiClient.get<{ data: ApiFestival[] }>("/crm-festivals/public"),
-  ]);
-  const festivals = festivalsResult.status === "fulfilled" ? (festivalsResult.value.data?.data || []) : [];
-  const crmFestivals = crmFestivalsResult.status === "fulfilled" ? (crmFestivalsResult.value.data?.data || []) : [];
-  return [...festivals, ...crmFestivals];
+export async function fetchLegacyFestivals(signal?: AbortSignal): Promise<ApiFestival[]> {
+  const response = await apiClient.get<ApiFestivalsResponse>("/festivals", {
+    params: { page: 1, limit: 200 },
+    signal,
+  });
+  return response.data.data ?? [];
 }
 
-export async function fetchFestivalBySlug(slug: string): Promise<ApiFestival> {
+export async function fetchCrmFestivals(signal?: AbortSignal): Promise<ApiFestival[]> {
+  const response = await apiClient.get<{ data: ApiFestival[] }>("/crm-festivals/public", { signal });
+  return response.data.data;
+}
+
+export async function fetchFestivalBySlug(slug: string, signal?: AbortSignal): Promise<ApiFestival> {
+  const id = encodeURIComponent(slug);
   try {
-    const res = await apiClient.get<ApiFestival>(`/festivals/${slug}`);
-    return res.data;
+    return (await apiClient.get<ApiFestival>(`/crm-festivals/public/${id}`, { signal })).data;
   } catch (error) {
-    const res = await apiClient.get<ApiFestival>(`/crm-festivals/public/${slug}`);
-    return res.data;
+    if (!isAxiosError(error) || error.response?.status !== 404) throw error;
+    return (await apiClient.get<ApiFestival>(`/festivals/${id}`, { signal })).data;
   }
 }
 
-export async function fetchFeaturedFestivals(): Promise<ApiFestival[]> {
+export async function fetchFeaturedFestivals(signal?: AbortSignal): Promise<ApiFestival[]> {
   const [featuredResult, crmFeaturedResult] = await Promise.allSettled([
-    apiClient.get<ApiFeaturedFestivalsResponse>("/festivals/featured"),
-    apiClient.get<{ data: ApiFestival[] }>("/crm-festivals/public/featured"),
+    apiClient.get<ApiFeaturedFestivalsResponse & { data?: ApiFestival[] }>("/festivals/featured", { signal }),
+    apiClient.get<{ data: ApiFestival[] }>("/crm-festivals/public/featured", { signal }),
   ]);
+  if (featuredResult.status === "rejected" && crmFeaturedResult.status === "rejected") {
+    throw crmFeaturedResult.reason;
+  }
   const featured = featuredResult.status === "fulfilled" ? (featuredResult.value.data?.result || featuredResult.value.data?.data || []) : [];
   const crmFeatured = crmFeaturedResult.status === "fulfilled" ? (crmFeaturedResult.value.data?.data || []) : [];
   return [...featured, ...crmFeatured];

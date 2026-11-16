@@ -1,3 +1,4 @@
+import { SessionUnavailable } from "../components/SessionUnavailable";
 import { useCallback, useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
@@ -580,7 +581,7 @@ type Tab = "bookings" | "settings";
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { user, isLoading: authLoading, logout } = useAuth();
+  const { user, isLoading: authLoading, logout, sessionError, retrySession } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("bookings");
   const [bookings, setBookings] = useState<ApiBooking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -588,10 +589,10 @@ export default function ProfilePage() {
 
   // Redirect if not logged in
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!authLoading && !sessionError && !user) {
       navigate("/", { replace: true });
     }
-  }, [authLoading, user, navigate]);
+  }, [authLoading, sessionError, user, navigate]);
 
   const loadBookings = useCallback(async () => {
     if (!user) return;
@@ -635,6 +636,7 @@ export default function ProfilePage() {
     );
   }
 
+  if (sessionError) return <SessionUnavailable onRetry={retrySession} />;
   if (!user) return null;
 
   const upcoming = bookings.filter(isUpcomingBooking);

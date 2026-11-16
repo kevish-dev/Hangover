@@ -1,6 +1,7 @@
 import * as repo from "./booking.repository.js";
 import { prisma } from "../../prisma/client.js";
 import { addGst } from "../../utils/gst.js";
+import { legacyTripShareFilter } from "../../utils/trip-share-token.js";
 import {
   AppError,
   NotFoundError,
@@ -107,7 +108,7 @@ const generateBookingReference = async (prismaClient) => {
   }
 };
 
-export const createBooking = async (userId, data) => {
+export const createBooking = async (userId, data, shareToken = null) => {
   // 1. Verify user has a Government ID
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -223,6 +224,13 @@ export const createBooking = async (userId, data) => {
   };
   const existingCheckout = await findExistingCheckout(prisma);
   if (existingCheckout) return existingCheckout;
+
+  if (isTrip && !item.isPublished) {
+    const canBookSharedTrip = shareToken && await prisma.trip.count({
+      where: { id: item.id, ...legacyTripShareFilter(shareToken) },
+    });
+    if (!canBookSharedTrip) throw new NotFoundError("Trip not found");
+  }
 
   // 3. Pricing calculation (per-person)
   const numberOfTravelers = Number(data.numberOfTravelers ?? 1);
@@ -922,6 +930,46 @@ export const getUserBookings = async (userId, page = 1, limit = 10) => {
       limit: take,
       totalPages: Math.ceil(total / take),
     },
+  };
+};
+
+export const getBookingSummaries = async (query) => {
+  const page = Math.max(1, Math.min(Number.parseInt(query.page, 10) || 1, 1_000_000));
+  const limit = 30;
+  const search = typeof query.search === "string" ? query.search.trim().slice(0, 120) : "";
+  const where = {};
+  if (["CONFIRMED", "PENDING", "CANCELLED"].includes(query.status)) where.status = query.status;
+  if (query.status === "PARTIALLY_PAID") where.paymentStatus = query.status;
+  if (search) {
+    const contains = { contains: search, mode: "insensitive" };
+    where.OR = [
+      { bookingReference: contains },
+      { user: { email: contains } },
+      { user: { profile: { fullName: contains } } },
+      { trip: { title: contains } },
+      { festival: { title: contains } },
+      { slot: { trip: { title: contains } } },
+      { slot: { festival: { title: contains } } },
+      { crmTrip: { name: contains } },
+      { crmFestival: { name: contains } },
+    ];
+  }
+
+  const orderBy = query.sort === "date_asc" ? { createdAt: "asc" }
+    : query.sort === "amount_desc" ? { totalAmount: "desc" }
+    : query.sort === "amount_asc" ? { totalAmount: "asc" }
+    : { createdAt: "desc" };
+  const { bookings, total } = await repo.findBookingSummaries({
+    where, orderBy, skip: (page - 1) * limit, take: limit,
+  });
+
+  return {
+    data: bookings.map(({ trip, festival, slot, crmTrip, crmFestival, ...booking }) => ({
+      ...booking,
+      itemTitle: crmTrip?.name || crmFestival?.name || trip?.title || festival?.title ||
+        slot?.trip?.title || slot?.festival?.title || "",
+    })),
+    meta: { page, total, totalPages: Math.ceil(total / limit) },
   };
 };
 

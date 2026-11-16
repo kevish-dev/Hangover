@@ -1,26 +1,15 @@
-import { Outlet, useLocation } from "react-router";
+import { Outlet } from "react-router";
 import { Navbar } from "./components/navbar";
-import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Wrench } from "lucide-react";
 import { siteSettingsQuery } from "../lib/siteSettingsQuery";
 
 export default function Root() {
-  const location = useLocation();
   const maintenance = useQuery({
     ...siteSettingsQuery,
     refetchInterval: 30_000,
   });
 
-  useEffect(() => {
-    if ("scrollRestoration" in window.history) {
-      window.history.scrollRestoration = "manual";
-    }
-    const timeout = setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }, 50);
-    return () => clearTimeout(timeout);
-  }, [location.pathname]);
 
   return (
     <>

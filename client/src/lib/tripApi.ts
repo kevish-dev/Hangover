@@ -1,5 +1,7 @@
 import { apiClient } from "./axios";
 
+export const TRIP_SHARE_TOKEN_HEADER = "X-Trip-Share-Token";
+
 // ── Backend response types ────────────────────────────────────────
 
 export interface ApiDestination {
@@ -110,26 +112,22 @@ export interface ApiTripsResponse {
 
 // ── Fetch functions ───────────────────────────────────────────────
 
-export async function fetchAllTrips(): Promise<ApiTrip[]> {
-  const [tripsResult, itineraryTripsResult] = await Promise.allSettled([
-    apiClient.get<ApiTripsResponse>("/trips", { params: { page: 1, limit: 200 } }),
-    apiClient.get<{ data: ApiTrip[] }>("/crm-trips/public"),
-  ]);
-  const trips = tripsResult.status === "fulfilled" ? tripsResult.value.data.data : [];
-  const itineraryTrips = itineraryTripsResult.status === "fulfilled" ? itineraryTripsResult.value.data.data : [];
-  return [...trips, ...itineraryTrips];
+export async function fetchAllTrips(signal?: AbortSignal): Promise<ApiTrip[]> {
+  const response = await apiClient.get<{ data: ApiTrip[] }>("/crm-trips/public", { signal });
+  return response.data.data;
 }
 
-export async function fetchTripBySlug(slug: string, shareToken?: string | null): Promise<ApiTrip> {
-  try {
-    const res = await apiClient.get<ApiTrip>(`/trips/${slug}`, {
-      params: shareToken ? { shareToken } : undefined,
-    });
-    return res.data;
-  } catch (error) {
-    const res = await apiClient.get<ApiTrip>(`/crm-trips/public/${slug}`);
-    return res.data;
-  }
+export async function fetchFeaturedTrips(signal?: AbortSignal): Promise<ApiTrip[]> {
+  const response = await apiClient.get<{ data: ApiTrip[] }>("/crm-trips/public/featured", { signal });
+  return response.data.data;
+}
+
+export async function fetchTripBySlug(slug: string, shareToken?: string | null, signal?: AbortSignal): Promise<ApiTrip> {
+  const response = await apiClient.get<ApiTrip>(`/crm-trips/public/${encodeURIComponent(slug)}`, {
+    signal,
+    headers: shareToken ? { [TRIP_SHARE_TOKEN_HEADER]: shareToken } : undefined,
+  });
+  return response.data;
 }
 
 // ── Trip Type labels ──────────────────────────────────────────────

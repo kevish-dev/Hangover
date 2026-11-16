@@ -1,9 +1,10 @@
-import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { AlertTriangle, ArrowRight, BookOpen, CalendarCheck, CheckCircle2, ClipboardCheck, Loader2, Map, MapPin, RefreshCcw, Wrench } from "lucide-react";
 import { apiClient } from "../../../lib/axios";
 import { toast } from "sonner";
+import { siteSettingsQuery } from "../../../lib/siteSettingsQuery";
 import { getErrorMessage } from "../../../lib/errors";
 
 const steps = [
@@ -14,19 +15,27 @@ const steps = [
 ];
 
 export default function AdminDashboard() {
-  const crmTrips = useQuery({ queryKey: ["admin", "crm-trips", "overview"], queryFn: async () => (await apiClient.get("/crm-trips", { params: { limit: 200 } })).data });
-  const bookings = useQuery({ queryKey: ["admin", "bookings", "overview"], queryFn: async () => (await apiClient.get("/bookings", { params: { limit: 1000 } })).data.data });
-  const tasks = useQuery({ queryKey: ["admin", "operational-tasks", "overview"], queryFn: async () => (await apiClient.get("/operations", { params: { limit: 500 } })).data });
-  const maintenance = useQuery({ queryKey: ["site-settings"], queryFn: async () => (await apiClient.get("/site-settings")).data.data as { maintenanceMode: boolean } });
-  
-  const loading = crmTrips.isLoading || bookings.isLoading || tasks.isLoading;
-  const failedQueries = [crmTrips, bookings, tasks].filter((query) => query.isError);
+  const queryClient = useQueryClient();
+  const overview = useQuery({
+    queryKey: ["admin", "overview"],
+    queryFn: async ({ signal }) => (await apiClient.get<{
+      tripCount: number;
+      activeBookingCount: number;
+      openTaskCount: number;
+    }>("/analytics/overview", { signal })).data,
+  });
+  const maintenance = useQuery(siteSettingsQuery);
+  const [savingMaintenance, setSavingMaintenance] = useState(false);
 
   const toggleMaintenance = async () => {
-    const enabled = !maintenance.data?.maintenanceMode;
+    if (!maintenance.data || savingMaintenance) return;
+    const enabled = !maintenance.data.maintenanceMode;
+    setSavingMaintenance(true);
     try {
-      await apiClient.put("/site-settings/maintenance", { maintenanceMode: enabled });
-      await maintenance.refetch();
+      const { data } = await apiClient.put<{ data: { maintenanceMode: boolean } }>(
+        "/site-settings/maintenance", { maintenanceMode: enabled },
+      );
+      queryClient.setQueryData(siteSettingsQuery.queryKey, data.data);
       toast.success(enabled ? "Maintenance mode is on" : "Maintenance mode is off", {
         description: enabled ? "Customer actions are paused; admins can continue working." : "Customer actions are available again.",
       });
@@ -34,26 +43,15 @@ export default function AdminDashboard() {
       toast.error("Could not update maintenance mode", {
         description: getErrorMessage(error, "Please try again."),
       });
+    } finally {
+      setSavingMaintenance(false);
     }
   };
   
-  useEffect(() => {
-    if (failedQueries.length > 0) {
-      toast.error("Dashboard data could not be loaded", {
-        id: "admin-dashboard-load-error",
-        description: getErrorMessage(failedQueries[0].error, "Check the server connection and try again."),
-      });
-    }
-  }, [failedQueries.length]);
-
-  const crmTripData = Array.isArray(crmTrips.data) ? crmTrips.data : crmTrips.data?.data || [];
-  const bookingData = bookings.data || [];
-  const taskData = tasks.data || [];
-
   const stats = [
-    { label: "Itinerary trips", value: crmTripData.length, icon: MapPin },
-    { label: "Active bookings", value: bookingData.filter((booking: any) => ["PENDING", "RESERVED", "CONFIRMED"].includes(booking.status)).length, icon: CheckCircle2 },
-    { label: "Open operations", value: taskData.filter((task: any) => !["DONE", "CANCELLED"].includes(task.status)).length, icon: ClipboardCheck },
+    { label: "Itinerary trips", value: overview.data?.tripCount, icon: MapPin },
+    { label: "Active bookings", value: overview.data?.activeBookingCount, icon: CheckCircle2 },
+    { label: "Open operations", value: overview.data?.openTaskCount, icon: ClipboardCheck },
   ];
 
   return (
@@ -66,9 +64,6 @@ export default function AdminDashboard() {
           <h1 className="text-3xl font-medium tracking-tight text-gray-900">
             Overview
           </h1>
-          <div className="text-sm text-gray-500">
-            Last updated: Just now
-          </div>
         </div>
       </header>
 
@@ -92,7 +87,7 @@ export default function AdminDashboard() {
             role="switch"
             aria-checked={maintenance.data?.maintenanceMode ?? false}
             aria-label="Toggle maintenance mode"
-            disabled={maintenance.isLoading || maintenance.isFetching}
+            disabled={!maintenance.data || maintenance.isFetching || savingMaintenance}
             onClick={toggleMaintenance}
             className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${maintenance.data?.maintenanceMode ? "bg-amber-600" : "bg-gray-300"}`}
           >
@@ -101,20 +96,20 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      {loading ? (
+      {overview.isPending ? (
         <div className="flex min-h-32 items-center justify-center">
           <Loader2 className="h-7 w-7 animate-spin text-[#b59410]" />
         </div>
-      ) : failedQueries.length > 0 ? (
+      ) : !overview.data ? (
         <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-900">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
             <div>
               <h2 className="font-bold">Dashboard data is unavailable</h2>
-              <p className="mt-1 text-sm text-red-700">Totals are hidden so failed requests are never mistaken for real zero values.</p>
+              <p className="mt-1 text-sm text-red-700">{getErrorMessage(overview.error, "Check the connection and try again.")}</p>
               <button 
                 type="button" 
-                onClick={() => Promise.all([crmTrips.refetch(), bookings.refetch(), tasks.refetch()])} 
+                onClick={() => void overview.refetch()}
                 className="mt-4 inline-flex items-center gap-2 rounded border border-red-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
               >
                 <RefreshCcw className="h-4 w-4" />

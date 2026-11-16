@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Link } from "react-router";
 import {
@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { SiteFooter } from "../components/site-footer";
 import {
-  fetchAllTrips,
   formatTripType,
   formatPrice,
   priceToNumber,
@@ -25,9 +24,9 @@ import {
   isNotAvailable,
   type ApiTrip,
 } from "../../lib/tripApi";
-import { fetchAllFestivals } from "../../lib/festivalApi";
+import { publicTripsQuery, usePublicFestivals } from "../../lib/catalogQueries";
+import { useQuery } from "@tanstack/react-query";
 import { mediaImageUrl } from "../../lib/media";
-import { toast } from "sonner";
 import { getErrorMessage } from "../../lib/errors";
 
 export type ExtendedTrip = ApiTrip & { isFestival?: boolean };
@@ -1520,42 +1519,36 @@ function ErrorState({
 
 // ── Main page ─────────────────────────────────────────────────────
 export default function TripsPage() {
-  const [trips, setTrips] = useState<ExtendedTrip[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const tripQuery = useQuery(publicTripsQuery);
+  const { legacy, crm } = usePublicFestivals();
+  const sources = [tripQuery, legacy, crm];
+  const hasResults = sources.some((source) => source.data !== undefined);
+  const pending = sources.some((source) => source.isPending);
+  const loading = !hasResults && pending;
+  const failed = sources.filter((source) => source.isError);
+  const error = !hasResults && failed.length > 0
+    ? getErrorMessage(failed[0].error, "Trips could not be loaded")
+    : null;
+  const loadTrips = () => void Promise.all(failed.map((source) => source.refetch()));
+
+  const trips = useMemo<ExtendedTrip[]>(() => [
+    ...(tripQuery.data ?? []),
+    ...[...(legacy.data ?? []), ...(crm.data ?? [])].map((festival) => ({
+      ...festival,
+      isFestival: true,
+      tripType: festival.tags?.[0]?.tag || "FESTIVAL",
+      tripTags: festival.tags ?? [],
+      capacity: festival.slots?.[0]?.capacity ?? 0,
+      filledSpots: festival.slots?.[0]?.filledSpots ?? 0,
+      startDate: festival.slots?.[0]?.startDate ?? "",
+      endDate: festival.slots?.[0]?.endDate ?? "",
+    })),
+  ], [tripQuery.data, legacy.data, crm.data]);
 
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("destination");
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-
-  const loadTrips = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [tripsData, festivalsData] = await Promise.all([
-        fetchAllTrips(),
-        fetchAllFestivals(),
-      ]);
-      const festivalsAsTrips = festivalsData.map((f: any) => ({
-        ...f,
-        isFestival: true,
-        tripType: f.tags && f.tags.length > 0 ? f.tags[0].tag : "FESTIVAL",
-        tripTags: f.tags ? f.tags.map((t: any) => ({ tag: t.tag })) : [],
-      }));
-      setTrips([...tripsData, ...festivalsAsTrips]);
-    } catch (err: unknown) {
-      const message = getErrorMessage(err, "Trips could not be loaded");
-      setError(message);
-      toast.error(message, { id: "public-trips-load-error" });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadTrips();
-  }, []);
 
   // Derive available filter options from actual data
   const availableDestinations = useMemo(() => {
@@ -2134,6 +2127,13 @@ export default function TripsPage() {
 
           {/* Destination sections */}
           <div style={{ flex: 1, minWidth: 0 }}>
+            {hasResults && pending && <p role="status" className="mb-4 text-sm">Loading more results…</p>}
+            {hasResults && failed.length > 0 && (
+              <p role="status" className="mb-4 rounded-md bg-amber-50 p-3 text-sm text-amber-950">
+                Some results could not be refreshed.{" "}
+                <button type="button" onClick={loadTrips} className="underline">Retry</button>
+              </p>
+            )}
             {loading ? (
               <LoadingSkeleton />
             ) : error ? (
@@ -2148,7 +2148,7 @@ export default function TripsPage() {
                     marginBottom: "16px",
                   }}
                 >
-                  No trips match your filters.
+                  {pending ? "Checking for more trips…" : "No trips match your filters."}
                 </p>
                 <button
                   onClick={() => {

@@ -31,6 +31,7 @@ import {
   Mail,
   Calendar,
   FileText,
+  Hash,
   PackagePlus,
   TrendingUp,
   TrendingDown,

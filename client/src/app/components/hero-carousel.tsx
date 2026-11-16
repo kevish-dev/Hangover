@@ -1,10 +1,15 @@
-import { useEffect, useRef, useState } from "react";
-import { ShaderAnimation } from "./shader-animation";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { isConnectionConstrained } from "../../lib/connection";
 import { ArrowRight, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useNavigate } from "react-router";
-import axios from "axios";
 import { mediaImageUrl } from "../../lib/media";
+import { fetchFeaturedTrips } from "../../lib/tripApi";
+
+const ShaderAnimation = lazy(() => import("./shader-animation")
+  .then((module) => ({ default: module.ShaderAnimation }))
+  .catch(() => ({ default: () => null })));
 
 interface FeaturedTrip {
   id: string;
@@ -17,8 +22,6 @@ interface FeaturedTrip {
   packages?: Array<{ price: string | number }>;
   bannerImages: string; // first banner image URL
 }
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 
 // Hardcoded fallback in case no featured trips exist
 const FALLBACK_TRIPS: FeaturedTrip[] = [
@@ -51,41 +54,19 @@ function withStartingPrice(trip: FeaturedTrip): FeaturedTrip {
 }
 
 export function HeroCarousel() {
-  const [trips, setTrips] = useState<FeaturedTrip[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const featured = useQuery({
+    queryKey: ["public", "featured-trips"],
+    queryFn: ({ signal }) => fetchFeaturedTrips(signal),
+    staleTime: 60_000,
+  });
+  const trips = useMemo(() => {
+    if (!featured.data?.length) return FALLBACK_TRIPS;
+    return featured.data.map((trip) => withStartingPrice({ ...trip, bannerImages: trip.bannerImages?.[0] }));
+  }, [featured.data]);
   const [current, setCurrent] = useState(0);
+  const [showShader, setShowShader] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const navigate = useNavigate();
-
-  // Fetch featured trips from v2 API
-  useEffect(() => {
-    let cancelled = false;
-    const fetchFeatured = async () => {
-      try {
-        const [standardResult, itineraryResult] = await Promise.allSettled([
-          axios.get(`${API_URL}/trips/featured`, { withCredentials: true }),
-          axios.get(`${API_URL}/crm-trips/public/featured`, { withCredentials: true }),
-        ]);
-        const standardTrips = standardResult.status === "fulfilled" ? standardResult.value.data?.result?.data : [];
-        const itineraryTrips = itineraryResult.status === "fulfilled" ? itineraryResult.value.data?.data : [];
-        const data = [...(Array.isArray(standardTrips) ? standardTrips : []), ...(Array.isArray(itineraryTrips) ? itineraryTrips : [])]
-          .map((trip) => ({ ...trip, bannerImages: Array.isArray(trip.bannerImages) ? trip.bannerImages[0] : trip.bannerImages }));
-        if (!cancelled && data.length > 0) {
-          setTrips(data.map(withStartingPrice));
-        } else if (!cancelled) {
-          setTrips(FALLBACK_TRIPS);
-        }
-      } catch {
-        if (!cancelled) setTrips(FALLBACK_TRIPS);
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-    fetchFeatured();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const go = (next: number) => {
     if (trips.length === 0) return;
@@ -94,7 +75,7 @@ export function HeroCarousel() {
 
   const resetInterval = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    if (trips.length <= 1) return;
+    if (trips.length <= 1 || isConnectionConstrained() || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     intervalRef.current = setInterval(() => {
       setCurrent((c) => (c + 1) % trips.length);
     }, 6000);
@@ -123,7 +104,7 @@ export function HeroCarousel() {
   };
 
   // ──── LOADING STATE ────
-  if (isLoading) {
+  if (featured.isPending) {
     return (
       <section className="relative w-full min-h-[100svh] overflow-hidden bg-[#0b0b0b]">
         {/* Animated solid color pulse */}
@@ -145,11 +126,6 @@ export function HeroCarousel() {
               "linear-gradient(to right, rgba(11,11,11,0.92) 0%, rgba(11,11,11,0.60) 50%, rgba(11,11,11,0.20) 100%), linear-gradient(to top, rgba(11,11,11,0.70) 0%, transparent 45%)",
           }}
         />
-
-        {/* Shader texture overlay */}
-        <div className="absolute inset-0 z-20">
-          <ShaderAnimation opacity={0.12} />
-        </div>
 
         {/* Skeleton content */}
         <div className="absolute inset-0 z-30 flex items-center">
@@ -240,18 +216,13 @@ export function HeroCarousel() {
               />
             </div>
 
-            {/* Button skeleton */}
-            <motion.div
-              className="h-11 w-36 rounded"
-              style={{ background: "rgba(200,169,110,0.12)" }}
-              animate={{ opacity: [0.3, 0.6, 0.3] }}
-              transition={{
-                duration: 1.8,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: 0.5,
-              }}
-            />
+            <button
+              type="button"
+              onClick={() => navigate("/trips")}
+              className="rounded-lg bg-[#781216] px-5 py-3 text-sm font-semibold text-white"
+            >
+              Browse trips
+            </button>
           </div>
         </div>
       </section>
@@ -259,7 +230,7 @@ export function HeroCarousel() {
   }
 
   // ──── LOADED STATE ────
-  const slide = trips[current];
+  const slide = trips[current % trips.length];
   if (!slide) return null;
 
   return (
@@ -276,7 +247,16 @@ export function HeroCarousel() {
         >
           <img
             src={mediaImageUrl(slide.bannerImages, { width: 1920, fit: "fit" })}
+            srcSet={slide.bannerImages?.includes("res.cloudinary.com") ? [640, 960, 1440, 1920].map(
+              (width) => `${mediaImageUrl(slide.bannerImages, { width, fit: "fit" })} ${width}w`,
+            ).join(", ") : undefined}
+            sizes="100vw"
             alt={slide.title}
+            onLoad={() => {
+              if (!isConnectionConstrained() && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+                setShowShader(true);
+              }
+            }}
             fetchPriority="high"
             decoding="async"
             className="w-full h-full object-cover"
@@ -294,9 +274,11 @@ export function HeroCarousel() {
       />
 
       {/* Shader animation texture */}
-      <div className="absolute inset-0 z-20">
-        <ShaderAnimation opacity={0.12} />
-      </div>
+      {showShader && (
+        <div className="absolute inset-0 z-20">
+          <Suspense fallback={null}><ShaderAnimation opacity={0.12} /></Suspense>
+        </div>
+      )}
 
       {/* HERO CONTENT */}
       <div className="absolute inset-0 z-30 flex items-center pb-24 pt-24 md:py-0">

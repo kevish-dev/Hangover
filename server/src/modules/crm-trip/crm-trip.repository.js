@@ -59,6 +59,20 @@ export const findPublicById = (id) => prisma.crmTrip.findFirst({
   include: CRM_TRIP_INCLUDE,
 });
 
+export const findLegacyTripForWebsite = (where) => prisma.trip.findFirst({
+  where,
+  omit: { shareTokenHash: true, shareTokenExpiresAt: true },
+  include: {
+    destination: { select: { id: true, name: true, state: true, subheading: true } },
+    tripTags: { select: { id: true, tag: true } },
+    packages: { orderBy: { createdAt: "asc" } },
+    addOns: { where: { isActive: true }, orderBy: { createdAt: "asc" } },
+    faqs: { orderBy: { order: "asc" } },
+    itinerary: { orderBy: { dayNumber: "asc" } },
+    slots: { orderBy: [{ priority: "desc" }, { startDate: "asc" }] },
+  },
+});
+
 export const findById = (id, client = prisma) => client.crmTrip.findUnique({ where: { id }, include: CRM_TRIP_INCLUDE });
 export const findDayById = (id, client = prisma) => client.crmTripItineraryDay.findUnique({
   where: { id },

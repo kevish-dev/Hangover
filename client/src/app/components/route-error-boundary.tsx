@@ -1,12 +1,38 @@
 import { useEffect } from "react";
 import { AlertTriangle, RefreshCcw } from "lucide-react";
-import { useRouteError } from "react-router";
+import { Link, useRouteError } from "react-router";
 import { toast } from "sonner";
 import { getErrorMessage } from "../../lib/errors";
 
+async function reloadUpdatedApp(signal: AbortSignal) {
+  try {
+    const entry = document.querySelector<HTMLScriptElement>('script[type="module"][src*="/assets/"]')?.src;
+    if (!entry || !navigator.onLine || sessionStorage.getItem("reload-for-build") === entry) return;
+
+    const response = await fetch(window.location.href, { cache: "no-store", signal });
+    if (!response.ok) return;
+    const html = new DOMParser().parseFromString(await response.text(), "text/html");
+    const nextEntry = html.querySelector('script[type="module"][src*="/assets/"]')?.getAttribute("src");
+    if (signal.aborted || !nextEntry || new URL(nextEntry, response.url).href === entry) return;
+
+    sessionStorage.setItem("reload-for-build", entry);
+    window.location.reload();
+  } catch {
+    // The retry button remains available if the connection is unavailable.
+  }
+}
+
 export function RouteErrorBoundary() {
   const error = useRouteError();
-  const message = getErrorMessage(error, "This page could not be loaded.");
+  const rawMessage = getErrorMessage(error, "This page could not be loaded.");
+  const chunkFailed = /dynamically imported module|importing a module script|loading chunk|unable to preload css/i.test(rawMessage);
+  const message = chunkFailed ? "Check your connection and retry this page." : rawMessage;
+  useEffect(() => {
+    if (!chunkFailed) return;
+    const controller = new AbortController();
+    void reloadUpdatedApp(controller.signal);
+    return () => controller.abort();
+  }, [chunkFailed]);
 
   useEffect(() => {
     toast.error("Page unavailable", { id: "route-error", description: message });
@@ -22,9 +48,9 @@ export function RouteErrorBoundary() {
           <button type="button" onClick={() => window.location.reload()} className="inline-flex items-center gap-2 rounded-lg bg-[#781216] px-4 py-2.5 text-sm font-semibold text-white">
             <RefreshCcw className="h-4 w-4" /> Retry page
           </button>
-          <button type="button" onClick={() => window.location.assign("/")} className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700">
+          <Link to="/" className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700">
             Go home
-          </button>
+          </Link>
         </div>
       </div>
     </main>

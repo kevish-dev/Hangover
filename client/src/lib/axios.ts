@@ -1,5 +1,6 @@
 import axios from "axios";
-import posthog from "posthog-js";
+import type { InternalAxiosRequestConfig } from "axios";
+import { getTelemetryIds } from "./telemetry";
 
 export const API_URL =
   import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
@@ -7,91 +8,57 @@ export const API_URL =
 export const apiClient = axios.create({
   baseURL: API_URL,
   withCredentials: true,
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
-// Correlate backend API requests with PostHog user and session replays
-apiClient.interceptors.request.use((config) => {
+type SessionRequest = InternalAxiosRequestConfig & {
+  sessionVersion?: number;
+  retriedAfterRefresh?: boolean;
+};
+
+let sessionVersion = 0;
+let refreshRequest: Promise<void> | undefined;
+
+apiClient.interceptors.request.use((config: SessionRequest) => {
+  config.sessionVersion = sessionVersion;
+  const isRead = config.method === "get" || config.method === "head";
+  if (isRead) {
+    config.timeout ||= 15_000;
+    return config;
+  }
+
+  // Keep correlation for writes. Adding custom headers to reads makes the
+  // browser wait for a CORS preflight before it can fetch page data.
   try {
-    const sessionId = posthog.get_session_id?.();
-    const distinctId = posthog.get_distinct_id?.();
-    if (sessionId) {
-      config.headers["X-PostHog-Session-Id"] = sessionId;
-    }
-    if (distinctId) {
-      config.headers["X-PostHog-Distinct-Id"] = distinctId;
-    }
+    const { sessionId, distinctId } = getTelemetryIds();
+    if (sessionId) config.headers.set("X-PostHog-Session-Id", sessionId);
+    if (distinctId) config.headers.set("X-PostHog-Distinct-Id", distinctId);
   } catch {
-    // Non-blocking fallback if posthog is not initialized
+    // The request can proceed without telemetry.
   }
   return config;
 });
 
-let isRefreshing = false;
-let failedQueue: {
-  resolve: (value?: unknown) => void;
-  reject: (reason?: any) => void;
-}[] = [];
+apiClient.interceptors.response.use(undefined, async (error) => {
+  const request: SessionRequest | undefined = error.config;
+  if (
+    error.response?.status !== 401 || !request || request.signal?.aborted ||
+    request.retriedAfterRefresh || error.response.data?.code === "NO_SESSION"
+  ) {
+    throw error;
+  }
 
-const processQueue = (error: any) => {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve();
-    }
-  });
-  failedQueue = [];
-};
+  request.retriedAfterRefresh = true;
+  if (request.sessionVersion === sessionVersion) {
+    refreshRequest ??= axios.post(
+      `${API_URL}/auth/refresh`, {},
+      { withCredentials: true, timeout: 12_000 },
+    ).then(() => {
+      sessionVersion += 1;
+    }).finally(() => {
+      refreshRequest = undefined;
+    });
+    await refreshRequest;
+  }
 
-apiClient.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-
-    // Check if the error is 401 and we haven't already retried this specific request
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      if (isRefreshing) {
-        // If already refreshing, queue the request until refresh finishes
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then(() => {
-            return apiClient(originalRequest);
-          })
-          .catch((err) => {
-            return Promise.reject(err);
-          });
-      }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        // Call the refresh endpoint (this will automatically send and receive httpOnly cookies)
-        await axios.post(
-          `${API_URL}/auth/refresh`,
-          {},
-          { withCredentials: true },
-        );
-
-        processQueue(null);
-
-        // Retry the original request now that the token is refreshed
-        return apiClient(originalRequest);
-      } catch (err) {
-        processQueue(err);
-        // If refresh fails, the user is truly unauthenticated.
-        // You might want to handle a global logout here, but rejecting the promise
-        // will let the caller (like AuthContext) handle it.
-        return Promise.reject(err);
-      } finally {
-        isRefreshing = false;
-      }
-    }
-
-    return Promise.reject(error);
-  },
-);
+  return apiClient(request);
+});

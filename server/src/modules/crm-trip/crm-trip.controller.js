@@ -22,8 +22,9 @@ export const getFeaturedPublicTrips = async (_req, res, next) => {
   }
 };
 export const getPublicTrip = async (req, res, next) => {
+  res.set("Cache-Control", "private, no-store");
   try {
-    res.json(await service.getPublicTrip(req.params.id, req.user));
+    res.json(await service.getPublicTrip(req.params.id, req.user, req.get("X-Trip-Share-Token")));
   } catch (error) {
     next(error);
   }

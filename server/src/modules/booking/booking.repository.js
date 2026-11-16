@@ -68,6 +68,35 @@ export const getUserBookings = async (userId, skip, take) => {
   return { bookings, total };
 };
 
+export const findBookingSummaries = async ({ where, orderBy, skip, take }) => {
+  const [bookings, total] = await Promise.all([
+    prisma.booking.findMany({
+      where,
+      orderBy: [orderBy, { id: "asc" }],
+      skip,
+      take,
+      select: {
+        id: true,
+        bookingReference: true,
+        numberOfTravelers: true,
+        status: true,
+        paymentStatus: true,
+        totalAmount: true,
+        amountPaid: true,
+        createdAt: true,
+        user: { select: { email: true, profile: { select: { fullName: true } } } },
+        trip: { select: { title: true } },
+        festival: { select: { title: true } },
+        slot: { select: { trip: { select: { title: true } }, festival: { select: { title: true } } } },
+        crmTrip: { select: { name: true } },
+        crmFestival: { select: { name: true } },
+      },
+    }),
+    prisma.booking.count({ where }),
+  ]);
+  return { bookings, total };
+};
+
 export const getAllBookings = async (skip, take) => {
   const [bookings, total] = await Promise.all([
     prisma.booking.findMany({

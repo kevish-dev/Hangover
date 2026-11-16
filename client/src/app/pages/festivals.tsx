@@ -1,10 +1,12 @@
 // @ts-ignore
 import logoSrc from "/images/final-logo_png_transparent.png";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
+import { usePublicFestivals } from "../../lib/catalogQueries";
+import { canAutoplayVideo } from "../../lib/connection";
+import { getErrorMessage } from "../../lib/errors";
 import { Link } from "react-router";
 import {
-  fetchAllFestivals,
   formatPrice,
   priceToNumber,
   ApiFestival,
@@ -686,35 +688,27 @@ function CardSkeleton() {
 
 // ── Page ──────────────────────────────────────────────────────────
 export default function FestivalsPage() {
-  const [allFestivals, setAllFestivals] = useState<ApiFestival[]>([]);
-  const [featuredFestival, setFeaturedFestival] = useState<ApiFestival | null>(
-    null,
+  const { legacy, crm } = usePublicFestivals();
+  const hasResults = legacy.data !== undefined || crm.data !== undefined;
+  const pending = legacy.isPending || crm.isPending;
+  const loading = !hasResults && pending;
+  const failed = [legacy, crm].filter((query) => query.isError);
+  const error = !hasResults && failed.length > 0
+    ? getErrorMessage(failed[0].error, "Festivals could not be loaded")
+    : null;
+  const load = () => void Promise.all(failed.map((query) => query.refetch()));
+  const allFestivals = useMemo(
+    () => [...(legacy.data ?? []), ...(crm.data ?? [])].filter(
+      (festival) => (festival.isActive ?? true) && (festival.isPublished ?? true),
+    ),
+    [legacy.data, crm.data],
   );
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const featuredFestival = allFestivals.find((festival) => festival.isFeatured);
 
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("popular");
   const [filters, setFilters] = useState<FestFilters>(EMPTY_FILTERS);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-
-  const load = () => {
-    setLoading(true);
-    setError(null);
-    fetchAllFestivals()
-      .then((all) => {
-        const active = all.filter((f) => (f.isActive ?? true) && (f.isPublished ?? true));
-        const hero = active.find((f) => f.isFeatured) ?? null;
-        setFeaturedFestival(hero);
-        setAllFestivals(active);
-      })
-      .catch((err) => setError(err?.message || "Something went wrong"))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
 
   // Hero derived values
   const heroSlot = featuredFestival?.slots?.[0];
@@ -743,6 +737,9 @@ export default function FestivalsPage() {
         tripSlug: featuredFestival.id,
       }
     : null;
+
+  const featuredImage = featured?.image || mediaVideoPosterUrl(featured?.videoUrl);
+  const heroVideoUrl = canAutoplayVideo() ? featured?.videoUrl : null;
 
   // Available filter options
   const availableLocations = useMemo(() => {
@@ -825,26 +822,26 @@ export default function FestivalsPage() {
 
       {/* ════════════════ FEATURED HERO ════════════════ */}
       <section className="relative w-full h-screen overflow-hidden bg-[#0b0b0b]">
-        {featured?.videoUrl ? (
+        {heroVideoUrl ? (
           <motion.video
-            key={featured.videoUrl}
-            src={mediaVideoUrl(featured.videoUrl)}
+            key={heroVideoUrl}
+            src={mediaVideoUrl(heroVideoUrl)}
             autoPlay
             muted
             loop
             playsInline
             preload="metadata"
-            poster={mediaVideoPosterUrl(featured.videoUrl)}
+            poster={featuredImage}
             initial={{ opacity: 0, scale: 1.04 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1.1, ease: [0.25, 0.1, 0.25, 1] }}
             className="absolute inset-0 w-full h-full object-cover"
           />
-        ) : featured?.image ? (
+        ) : featuredImage ? (
           <motion.img
-            key={featured.image}
-            src={mediaImageUrl(featured.image, { width: 1920, fit: "fit" })}
-            alt={featured.name}
+            key={featuredImage}
+            src={mediaImageUrl(featuredImage, { width: 1280, fit: "fit" })}
+            alt={featured?.name ?? ""}
             fetchPriority="high"
             decoding="async"
             initial={{ opacity: 0, scale: 1.04 }}
@@ -1672,6 +1669,13 @@ export default function FestivalsPage() {
 
           {/* Festival grid */}
           <div style={{ flex: 1, minWidth: 0 }}>
+            {hasResults && pending && <p role="status" className="mb-4 text-sm">Loading more festivals…</p>}
+            {hasResults && failed.length > 0 && (
+              <p role="status" className="mb-4 rounded-md bg-amber-50 p-3 text-sm text-amber-950">
+                Some festivals could not be refreshed.{" "}
+                <button type="button" onClick={load} className="underline">Retry</button>
+              </p>
+            )}
             {loading ? (
               <div
                 style={{ display: "grid", gap: "20px" }}

@@ -1,3 +1,4 @@
+import { loadRazorpay } from "../../lib/razorpay";
 import { useState, useEffect, useRef } from "react";
 import { useParams, Link, useSearchParams, useNavigate } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -16,12 +17,13 @@ import {
   Loader2,
 } from "lucide-react";
 import {
-  fetchTripBySlug,
   formatPrice,
   formatDuration,
+  TRIP_SHARE_TOKEN_HEADER,
   type ApiTrip,
 } from "../../lib/tripApi";
-import { fetchFestivalBySlug } from "../../lib/festivalApi";
+import { publicTripDetailQuery } from "../../lib/catalogQueries";
+import { checkoutBookingsQuery } from "../../lib/bookingApi";
 import { apiClient, API_URL } from "../../lib/axios";
 import { useAuth } from "../../contexts/AuthContext";
 import { SiteFooter } from "../components/site-footer";
@@ -532,6 +534,10 @@ function TravelerForm({
 // ── Page ──────────────────────────────────────────────────────────
 export default function BookingPage() {
   const { slug } = useParams();
+  return <BookingForm key={slug} slug={slug} />;
+}
+
+function BookingForm({ slug }: { slug?: string }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const resumeBookingId = searchParams.get("resume"); // set when coming from "Complete Payment" CTA
@@ -539,15 +545,19 @@ export default function BookingPage() {
   const urlSlotId = searchParams.get("slotId");
   const shareToken = searchParams.get("share");
   const bookingRedirectPath = `/book/${slug}${searchParams.size ? `?${searchParams.toString()}` : ""}`;
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, sessionError, retrySession } = useAuth();
   const queryClient = useQueryClient();
   const submitInFlight = useRef(false);
   const checkoutInFlight = useRef(false);
   const verifyInFlight = useRef<string | null>(null);
   const uploadedTravelerIds = useRef(new WeakMap<File, string>());
 
-  const [trip, setTrip] = useState<any>(null); // polymorphic
-  const [loading, setLoading] = useState(true);
+  const tripQuery = useQuery(publicTripDetailQuery(slug, isFestival, shareToken, {
+    userId: user?.id,
+    isLoading: authLoading,
+  }));
+  const trip: any = tripQuery.data; // ApiTrip or ApiFestival
+  const loading = Boolean(slug) && tripQuery.isPending;
   const [selectedSlotId, setSelectedSlotId] = useState<string>(urlSlotId || "");
   const isCrmTrip = !isFestival && Boolean(trip?.isCrmTrip);
 
@@ -566,7 +576,7 @@ export default function BookingPage() {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [gender, setGender] = useState("");
 
-  const { data: profile, isLoading: profileLoading } = useQuery({
+  const { data: profile, isPending: profilePending } = useQuery({
     queryKey: ["profile"],
     queryFn: getMyProfile,
     enabled: !!user,
@@ -600,15 +610,10 @@ export default function BookingPage() {
   // Govt ID upload state
   const [govtIdImage, setGovtIdImage] = useState<File | null>(null);
 
-  const bookingsKey = ["checkout-bookings", user?.id];
-  const { data: existingBookings = [], isLoading: checkingBookings, isError: bookingCheckFailed } = useQuery({
-    queryKey: bookingsKey,
-    queryFn: async () => (await apiClient.get("/bookings/me", { params: { limit: 100 } })).data?.data || [],
-    enabled: Boolean(user),
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
-    retry: false,
-  });
+  const bookingsOptions = checkoutBookingsQuery(user?.id);
+  const bookingsKey = bookingsOptions.queryKey;
+  const { data: existingBookings = [], isPending: checkingBookings, isError: bookingCheckFailed, refetch: retryBookingCheck } =
+    useQuery(bookingsOptions);
   const belongsToCurrentItem = (booking: any) => {
     if (!trip) return false;
     if (isCrmTrip) return (booking.crmTripId || booking.crmTrip?.id || booking.crmTripSlot?.crmTripId) === trip.id;
@@ -654,19 +659,6 @@ export default function BookingPage() {
   } | null>(null);
 
   useEffect(() => {
-    if (!slug) return;
-    setLoading(true);
-    const request = isFestival ? fetchFestivalBySlug(slug) : fetchTripBySlug(slug, shareToken);
-    request
-      .then((data) => setTrip(data))
-      .catch((error) => {
-        setTrip(null);
-        toast.error(getErrorMessage(error, isFestival ? "Festival could not be loaded" : "Trip could not be loaded"), { id: `booking-trip-load-${slug}` });
-      })
-      .finally(() => setLoading(false));
-  }, [slug, isFestival, shareToken]);
-
-  useEffect(() => {
     if (selectedPackageId === undefined && trip) {
       if (trip.packages?.length > 0) {
         setSelectedPackageId(trip.packages[0].id);
@@ -692,7 +684,7 @@ export default function BookingPage() {
 
   // Prevent scrolling when forced login is active
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (trip && !authLoading && !sessionError && !user) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -700,7 +692,7 @@ export default function BookingPage() {
     return () => {
       document.body.style.overflow = "";
     };
-  }, [user, authLoading]);
+  }, [user, authLoading, sessionError, trip]);
 
   const selectedSlot = trip?.slots?.find((s: any) => s.id === selectedSlotId);
   const spotsLeft = selectedSlot ? selectedSlot.capacity - (selectedSlot.filledSpots || 0) : 0;
@@ -722,11 +714,8 @@ export default function BookingPage() {
       navigate(`/bookings/${pendingBooking.id}/pay-balance`);
       return;
     }
-    if (checkingBookings || profileLoading) return;
-    if (bookingCheckFailed) {
-      toast.error("Your existing bookings could not be checked. Please refresh and try again.");
-      return;
-    }
+    if (sessionError || (user && (checkingBookings || profilePending))) return;
+    if (bookingCheckFailed) return;
     
     // Extract additional traveler data synchronously before any await
     const form = e.currentTarget as HTMLFormElement;
@@ -977,7 +966,9 @@ export default function BookingPage() {
         .filter(([addOnId, quantity]) => quantity > 0 && availableAddOns.some((addOn: any) => addOn.id === addOnId))
         .map(([addOnId, quantity]) => ({ addOnId, quantity }));
       
-      const bookingRes = await apiClient.post("/bookings", payload);
+      const bookingRes = await apiClient.post("/bookings", payload, {
+        headers: !isFestival && shareToken ? { [TRIP_SHARE_TOKEN_HEADER]: shareToken } : undefined,
+      });
       const {
         id: bookingId,
         bookingReference,
@@ -1021,9 +1012,7 @@ export default function BookingPage() {
     checkoutInFlight.current = true;
     setSubmitting(true);
     try {
-      if (!(window as any).Razorpay) {
-        throw new Error("Secure checkout did not load. Please refresh the page and try again.");
-      }
+      const Razorpay = await loadRazorpay();
       const initiateRes = await apiClient.post(paymentType === "BALANCE" ? "/payments/balance/initiate" : "/payments/initiate", {
         bookingId,
         type: paymentType,
@@ -1072,7 +1061,7 @@ export default function BookingPage() {
           },
         };
 
-        const rzp = new (window as any).Razorpay(options);
+        const rzp = new Razorpay(options);
         rzp.on("payment.failed", async function (response: any) {
           try {
             await apiClient.post("/payments/failed", {
@@ -1130,7 +1119,7 @@ export default function BookingPage() {
       .finally(() => { verifyInFlight.current = null; });
   }, [pendingVerify, bookingStep]);
 
-  if (loading || authLoading || (user && (profileLoading || checkingBookings))) {
+  if (loading || authLoading) {
     return (
       <div
         style={{
@@ -1284,8 +1273,11 @@ export default function BookingPage() {
               marginBottom: "16px",
             }}
           >
-            Trip not found.
+            {getErrorMessage(tripQuery.error, "Trip could not be loaded.")}
           </p>
+          <button type="button" onClick={() => void tripQuery.refetch()} className="mr-3 rounded-md bg-[#781216] px-4 py-2 text-sm text-white">
+            Try again
+          </button>
           <button
             type="button"
             onClick={() => navigate(-1)}
@@ -3009,9 +3001,15 @@ export default function BookingPage() {
 
             {/* ── Submit ── */}
             <div>
+              {bookingCheckFailed && (
+                <p role="alert" className="mb-3 text-sm text-red-800">
+                  Your existing bookings could not be checked.{" "}
+                  <button type="button" className="font-semibold underline" onClick={() => void retryBookingCheck()}>Retry</button>
+                </p>
+              )}
               <button
                 type="submit"
-                disabled={submitting || !selectedSlot}
+                disabled={submitting || !selectedSlot || Boolean(user && (checkingBookings || profilePending || bookingCheckFailed)) || sessionError}
                 style={{
                   width: "100%",
                   background: submitting || !selectedSlot ? "rgba(120,18,22,0.45)" : "#781216",
@@ -3048,6 +3046,8 @@ export default function BookingPage() {
                     />
                     Processing…
                   </>
+                ) : user && (checkingBookings || profilePending) ? (
+                  "Checking booking details…"
                 ) : user ? (
                   "Confirm & Pay Now"
                 ) : (
@@ -3357,7 +3357,13 @@ export default function BookingPage() {
         </div>
       </div>
       {/* Forced Login Overlay if not logged in */}
-      {!authLoading && !user && (
+      {sessionError && (
+        <div role="alert" className="fixed inset-x-4 bottom-4 z-[110] mx-auto max-w-lg rounded-lg bg-white p-4 shadow-lg">
+          Your session could not be checked.{" "}
+          <button type="button" onClick={retrySession} className="font-medium text-[#781216] underline">Retry</button>
+        </div>
+      )}
+      {!authLoading && !sessionError && !user && (
         <div
           className="booking-login-overlay"
           style={{

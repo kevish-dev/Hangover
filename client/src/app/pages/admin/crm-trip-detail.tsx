@@ -152,31 +152,34 @@ export default function CrmTripDetailPage() {
   >("stays");
   const tripQuery = useQuery({
     queryKey: ["crm-trip", id],
-    queryFn: async () => (await apiClient.get(`/crm-trips/${id}`)).data as Trip,
+    queryFn: async ({ signal }) => (await apiClient.get(`/crm-trips/${id}`, { signal })).data as Trip,
     enabled: Boolean(id),
   });
   const trip = tripQuery.data;
   const bookingsQuery = useQuery({
     queryKey: ["crm-trip-bookings", id],
-    queryFn: async () =>
-      (await apiClient.get(`/crm-trips/${id}/bookings`)).data as Booking[],
-    enabled: Boolean(id),
+    queryFn: async ({ signal }) =>
+      (await apiClient.get(`/crm-trips/${id}/bookings`, { signal })).data as Booking[],
+    enabled: Boolean(id) && activeTab === "bookings",
   });
   const placesQuery = useQuery({
     queryKey: ["crm", "places"],
-    queryFn: async () =>
+    queryFn: async ({ signal }) =>
       (
         await apiClient.get("/places", {
+          signal,
           params: { activeOnly: true, limit: 500 },
         })
       ).data.data as Master[],
-    enabled: Boolean(trip),
+    enabled: Boolean(trip) && activeTab === "stays",
+    staleTime: 60_000,
   });
   const staysQuery = useQuery({
     queryKey: ["crm", "stays", trip?.destination.id],
-    queryFn: async () =>
+    queryFn: async ({ signal }) =>
       (
         await apiClient.get("/stay-locations", {
+          signal,
           params: {
             destinationId: trip!.destination.id,
             activeOnly: true,
@@ -184,23 +187,27 @@ export default function CrmTripDetailPage() {
           },
         })
       ).data.data as Master[],
-    enabled: Boolean(trip),
+    enabled: Boolean(trip) && activeTab === "stays",
+    staleTime: 60_000,
   });
   const propertiesQuery = useQuery({
     queryKey: ["crm", "properties"],
-    queryFn: async () =>
+    queryFn: async ({ signal }) =>
       (
         await apiClient.get("/properties", {
+          signal,
           params: { activeOnly: true, limit: 500 },
         })
       ).data.data as Master[],
-    enabled: Boolean(trip),
+    enabled: Boolean(trip) && activeTab === "stays",
+    staleTime: 60_000,
   });
   const transfersQuery = useQuery({
     queryKey: ["crm", "transfers", trip?.destination.id],
-    queryFn: async () =>
+    queryFn: async ({ signal }) =>
       (
         await apiClient.get("/transfer-locations", {
+          signal,
           params: {
             destinationId: trip!.destination.id,
             activeOnly: true,
@@ -208,7 +215,8 @@ export default function CrmTripDetailPage() {
           },
         })
       ).data.data as Master[],
-    enabled: Boolean(trip),
+    enabled: Boolean(trip) && activeTab === "stays",
+    staleTime: 60_000,
   });
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: ["crm-trip", id] });
@@ -224,7 +232,7 @@ export default function CrmTripDetailPage() {
     }
   };
 
-  if (tripQuery.isLoading) {
+  if (tripQuery.isPending && id) {
     return (
       <div className="py-20 text-center text-gray-500">
         <Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />
@@ -235,7 +243,8 @@ export default function CrmTripDetailPage() {
   if (!trip) {
     return (
       <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-800">
-        This CRM trip could not be found.
+        {message(tripQuery.error, "This CRM trip could not be loaded.")}{" "}
+        <button type="button" className="underline" onClick={() => void tripQuery.refetch()}>Retry</button>
       </div>
     );
   }
@@ -410,15 +419,22 @@ export default function CrmTripDetailPage() {
           </aside>
         </div>
       ) : activeTab === "bookings" ? (
-        <BookingPanel
-          bookings={bookingsQuery.data || []}
-          loading={bookingsQuery.isLoading}
-          onCreate={() => setCreateBookingOpen(true)}
-          onInstallment={setInstallmentBooking}
-          onOpen={(booking) =>
-            navigate(`/dashboard/crm-trips/${id}/bookings/${booking.id}`)
-          }
-        />
+        bookingsQuery.isError && !bookingsQuery.data ? (
+          <div role="alert" className="rounded-lg bg-red-50 p-4 text-sm text-red-800">
+            {message(bookingsQuery.error, "Bookings could not be loaded.")}{" "}
+            <button type="button" className="underline" onClick={() => void bookingsQuery.refetch()}>Retry</button>
+          </div>
+        ) : (
+          <BookingPanel
+            bookings={bookingsQuery.data || []}
+            loading={bookingsQuery.isPending}
+            onCreate={() => setCreateBookingOpen(true)}
+            onInstallment={setInstallmentBooking}
+            onOpen={(booking) =>
+              navigate(`/dashboard/crm-trips/${id}/bookings/${booking.id}`)
+            }
+          />
+        )
       ) : activeTab === "operations" ? (
         <CrmOperationsCalendar tripId={id} />
       ) : (

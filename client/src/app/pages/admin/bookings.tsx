@@ -1,13 +1,14 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../lib/axios";
 import { CalendarCheck, IndianRupee, Loader2, Bell, X, User, MapPin, Mail, Phone, Image as ImageIcon, MoreVertical, Search, ArrowUpDown, Filter, AlertCircle, Plus } from "lucide-react";
 import { format } from "date-fns";
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { finalizeBooking } from "../../../lib/bookingApi";
 import { useMutation } from "@tanstack/react-query";
 import CreateBookingModal from "../../components/admin/CreateBookingModal";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
+import { getErrorMessage } from "../../../lib/errors";
 
 function BookingStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -53,13 +54,12 @@ function ActionMenu({ booking, onRemind, onCancelAndRefund, onFinalize }: { book
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  const hasSuccessfulPayments = booking.payments?.some((p: any) => p.status === "SUCCESS");
   const isCancellable = booking.status !== "CANCELLED" && booking.status !== "COMPLETED";
   const totalPaid = Number(booking.amountPaid) || 0;
 
   const isFinalizable = booking.status === "CONFIRMED";
 
-  if (booking.status === "PENDING" || (booking.paymentStatus !== "PARTIALLY_PAID" && !hasSuccessfulPayments && !isCancellable && !isFinalizable)) {
+  if (booking.status === "PENDING" || (booking.paymentStatus !== "PARTIALLY_PAID" && !isCancellable && !isFinalizable)) {
     return <div className="text-gray-400 text-xs italic">No actions</div>;
   }
 
@@ -196,11 +196,22 @@ export default function AdminBookingsPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [bookingToCancel, setBookingToCancel] = useState<{ id: string; amountPaid: string | number } | null>(null);
+  const cancellationInFlight = useRef(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (search === searchQuery.trim()) return;
+      setSearch(searchQuery.trim());
+      setPage(1);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery, search]);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [sortBy, setSortBy] = useState<"date_desc" | "date_asc" | "amount_desc" | "amount_asc">("date_desc");
 
@@ -217,13 +228,22 @@ export default function AdminBookingsPage() {
     }
   });
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["admin", "bookings"],
-    queryFn: async () => {
-      const res = await apiClient.get("/bookings?limit=1000");
-      return res.data;
+  const { data, isPending, isError, error, isFetching, isPlaceholderData, refetch } = useQuery({
+    queryKey: ["admin", "bookings", "summary", { page, search, status: statusFilter, sort: sortBy }],
+    queryFn: async ({ signal }) => {
+      const response = await apiClient.get<{
+        data: any[];
+        meta: { page: number; totalPages: number; total: number };
+      }>("/bookings/summary", { params: { page, search, status: statusFilter, sort: sortBy }, signal });
+      return response.data;
     },
+    placeholderData: keepPreviousData,
+    staleTime: 15_000,
   });
+  const totalPages = Math.max(1, data?.meta.totalPages ?? 1);
+  useEffect(() => {
+    if (data && !isPlaceholderData && page > totalPages) setPage(totalPages);
+  }, [data, isPlaceholderData, page, totalPages]);
 
   const handleRemind = async (bookingId: string) => {
     const toastId = toast.loading("Sending reminder email...");
@@ -236,6 +256,8 @@ export default function AdminBookingsPage() {
   };
 
   const handleCancelAndRefund = async (bookingId: string, refundAmount?: number) => {
+    if (cancellationInFlight.current) return;
+    cancellationInFlight.current = true;
     const toastId = toast.loading("Processing cancellation...");
     try {
       await apiClient.post(`/bookings/${bookingId}/cancel-and-refund`, { 
@@ -243,10 +265,12 @@ export default function AdminBookingsPage() {
         ...(refundAmount !== undefined && { refundAmount })
       });
       toast.success("Booking cancelled successfully!", { id: toastId });
-      setConfirmCancelId(null);
+      setBookingToCancel(null);
       refetch();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to cancel booking.", { id: toastId });
+    } finally {
+      cancellationInFlight.current = false;
     }
   };
 
@@ -260,50 +284,7 @@ export default function AdminBookingsPage() {
     });
   };
 
-  const allBookings = data?.data || [];
-
-  // Filter and Sort Logic
-  const processedBookings = useMemo(() => {
-    let filtered = [...allBookings];
-
-    // Status Filter
-    if (statusFilter !== "ALL") {
-      filtered = filtered.filter(b => b.status === statusFilter || b.paymentStatus === statusFilter);
-    }
-
-    // Search Filter
-    if (searchQuery.trim() !== "") {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(b => 
-        b.bookingReference?.toLowerCase().includes(q) ||
-        b.user?.profile?.fullName?.toLowerCase().includes(q) ||
-        b.user?.email?.toLowerCase().includes(q) ||
-        b.trip?.title?.toLowerCase().includes(q) ||
-        b.festival?.title?.toLowerCase().includes(q) ||
-        b.customTrip?.title?.toLowerCase().includes(q) ||
-        b.customTrip?.reference?.toLowerCase().includes(q)
-      );
-    }
-
-    // Sorting
-    filtered.sort((a, b) => {
-      if (sortBy === "date_desc") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      if (sortBy === "date_asc") return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      if (sortBy === "amount_desc") return Number(b.totalAmount) - Number(a.totalAmount);
-      if (sortBy === "amount_asc") return Number(a.totalAmount) - Number(b.totalAmount);
-      return 0;
-    });
-
-    return filtered;
-  }, [allBookings, searchQuery, statusFilter, sortBy]);
-
-  if (isLoading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#c8a96e]" />
-      </div>
-    );
-  }
+  const bookings = data?.data ?? [];
 
   return (
     <div className="max-w-7xl mx-auto pb-12">
@@ -341,7 +322,7 @@ export default function AdminBookingsPage() {
           <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-2 w-full md:flex md:items-center md:w-auto">
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
               className="px-3 py-2 bg-white border border-gray-200/60 rounded-full text-base md:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/50 focus:border-[#c8a96e] w-full md:w-auto transition-all shadow-sm"
             >
               <option value="ALL">All Status</option>
@@ -353,7 +334,7 @@ export default function AdminBookingsPage() {
 
             <select
               value={sortBy}
-              onChange={(e: any) => setSortBy(e.target.value)}
+              onChange={(e) => { setSortBy(e.target.value as typeof sortBy); setPage(1); }}
               className="px-3 py-2 bg-white border border-gray-200/60 rounded-full text-base md:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#c8a96e]/50 focus:border-[#c8a96e] w-full md:w-auto transition-all shadow-sm"
             >
               <option value="date_desc">Newest First</option>
@@ -365,155 +346,177 @@ export default function AdminBookingsPage() {
         </div>
       </div>
 
-      <div className="md:hidden space-y-3">
-        {processedBookings.length === 0 ? (
-          <div className="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-500">
-            No bookings found matching your criteria.
-          </div>
-        ) : (
-          processedBookings.map((b: any) => (
-            <article
-              key={b.id}
-              onClick={() => navigate(`/dashboard/bookings/${b.id}`)}
-              className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-mono text-xs font-semibold text-[#781216]">{b.bookingReference}</p>
-                  <h2 className="mt-1 break-words text-sm font-semibold text-gray-900">{b.customTrip?.title || b.trip?.title || b.festival?.title}</h2>
-                </div>
-                <div onClick={(event) => event.stopPropagation()} className="shrink-0">
-                  <ActionMenu
-                    booking={b}
-                    onRemind={() => handleRemind(b.id)}
-                    onCancelAndRefund={() => setConfirmCancelId(b.id)}
-                    onFinalize={() => handleFinalize(b.id)}
-                  />
-                </div>
+      {isError && (
+        <div role="alert" className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-800">
+          {getErrorMessage(error, "Bookings could not be loaded.")}{" "}
+          <button type="button" className="underline" onClick={() => void refetch()}>Retry</button>
+        </div>
+      )}
+      {isFetching && (
+        <p role="status" className="mb-3 flex items-center gap-2 text-sm text-gray-600">
+          <Loader2 className="h-4 w-4 motion-safe:animate-spin" />
+          {data ? "Updating bookings…" : "Loading bookings…"}
+        </p>
+      )}
+      {!isPending && data && (
+        <div aria-busy={isFetching}>
+          <div className="md:hidden space-y-3">
+            {bookings.length === 0 ? (
+              <div className="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-500">
+                No bookings found matching your criteria.
               </div>
-
-              <div className="mt-3 rounded-lg bg-gray-50 p-3">
-                <p className="break-words text-sm font-medium text-gray-900">{b.user?.profile?.fullName || "N/A"}</p>
-                <p className="break-all text-xs text-gray-500">{b.user?.email}</p>
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                <BookingStatusBadge status={b.status} />
-                <PaymentStatusBadge status={b.paymentStatus} />
-              </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-3 border-t border-gray-100 pt-3 text-xs">
-                <div>
-                  <p className="text-gray-400">Travelers</p>
-                  <p className="mt-0.5 font-semibold text-gray-900">{b.numberOfTravelers}</p>
-                </div>
-                <div>
-                  <p className="text-gray-400">Booked</p>
-                  <p className="mt-0.5 font-medium text-gray-700">{format(new Date(b.createdAt), "MMM d, yyyy")}</p>
-                </div>
-                <div>
-                  <p className="text-gray-400">Total</p>
-                  <p className="mt-0.5 font-semibold text-gray-900">₹{Number(b.totalAmount).toLocaleString("en-IN")}</p>
-                </div>
-                <div>
-                  <p className="text-gray-400">Received</p>
-                  <p className="mt-0.5 font-semibold text-green-600">₹{Number(b.amountPaid || 0).toLocaleString("en-IN")}</p>
-                </div>
-              </div>
-              <p className="mt-3 text-right text-xs font-medium text-[#781216]">Tap to view details</p>
-            </article>
-          ))
-        )}
-      </div>
-
-      <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="w-full min-h-[400px]">
-          <table className="w-full text-sm text-left">
-            <thead className="border-b border-gray-100 text-gray-500 font-medium text-xs tracking-wider uppercase">
-              <tr>
-                <th className="px-4 py-4">Ref</th>
-                <th className="px-4 py-4">Item</th>
-                <th className="px-4 py-4">User</th>
-                <th className="px-4 py-4 text-center">Pax</th>
-                <th className="px-4 py-4">Status</th>
-                <th className="px-4 py-4">Financials</th>
-                <th className="px-4 py-4">Date</th>
-                <th className="px-4 py-4 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {processedBookings.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
-                    No bookings found matching your criteria.
-                  </td>
-                </tr>
-              ) : (
-                processedBookings.map((b: any) => (
-                  <tr 
-                    key={b.id} 
-                    className="hover:bg-[#fbf7ed]/50 transition-colors cursor-pointer"
-                    onClick={() => navigate(`/dashboard/bookings/${b.id}`)}
-                  >
-                    <td className="px-4 py-4 font-mono font-medium text-gray-900 text-xs">
-                      {b.bookingReference}
-                    </td>
-                    <td className="px-4 py-4 text-gray-700 max-w-[150px] truncate text-sm">
-                      {b.customTrip?.title || b.trip?.title || b.festival?.title}
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="text-gray-900 font-medium truncate max-w-[140px] text-sm">{b.user?.profile?.fullName || "N/A"}</div>
-                      <div className="text-gray-500 text-xs truncate max-w-[140px]">{b.user?.email}</div>
-                    </td>
-                    <td className="px-4 py-4 text-center text-gray-900 text-sm">
-                      {b.numberOfTravelers}
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex flex-col gap-1.5 items-start">
-                        <BookingStatusBadge status={b.status} />
-                        <PaymentStatusBadge status={b.paymentStatus} />
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex flex-col gap-1">
-                        <div className="font-medium text-gray-900 flex items-center gap-1 text-sm">
-                          <IndianRupee className="w-3.5 h-3.5 text-gray-500" />
-                          {Number(b.totalAmount).toLocaleString("en-IN")}
-                        </div>
-                        <div className="font-medium text-green-600 flex items-center gap-0.5 text-xs">
-                          Paid: <IndianRupee className="w-3 h-3 text-green-500" />
-                          {Number(b.amountPaid || 0).toLocaleString("en-IN")}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-gray-500 text-xs whitespace-nowrap">
-                      {format(new Date(b.createdAt), "MMM d, yyyy")}
-                    </td>
-                    <td className="px-4 py-4 text-center" onClick={(e) => e.stopPropagation()}>
-                      <ActionMenu 
-                        booking={b} 
-                        onRemind={() => handleRemind(b.id)} 
-                        onCancelAndRefund={() => setConfirmCancelId(b.id)}
+            ) : (
+              bookings.map((b: any) => (
+                <article
+                  key={b.id}
+                  onClick={() => navigate(`/dashboard/bookings/${b.id}`)}
+                  className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-mono text-xs font-semibold text-[#781216]"><Link to={`/dashboard/bookings/${b.id}`} onClick={(event) => event.stopPropagation()}>{b.bookingReference}</Link></p>
+                      <h2 className="mt-1 break-words text-sm font-semibold text-gray-900">{b.itemTitle}</h2>
+                    </div>
+                    <div onClick={(event) => event.stopPropagation()} className="shrink-0">
+                      <ActionMenu
+                        booking={b}
+                        onRemind={() => handleRemind(b.id)}
+                        onCancelAndRefund={() => setBookingToCancel(b)}
                         onFinalize={() => handleFinalize(b.id)}
                       />
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                    </div>
+                  </div>
 
-      {confirmCancelId && (
-        <ConfirmCancelModal 
-          booking={allBookings.find((b: any) => b.id === confirmCancelId)}
-          onConfirm={(refundAmount) => handleCancelAndRefund(confirmCancelId, refundAmount)} 
-          onClose={() => setConfirmCancelId(null)} 
-        />
+                  <div className="mt-3 rounded-lg bg-gray-50 p-3">
+                    <p className="break-words text-sm font-medium text-gray-900">{b.user?.profile?.fullName || "N/A"}</p>
+                    <p className="break-all text-xs text-gray-500">{b.user?.email}</p>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <BookingStatusBadge status={b.status} />
+                    <PaymentStatusBadge status={b.paymentStatus} />
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-3 border-t border-gray-100 pt-3 text-xs">
+                    <div>
+                      <p className="text-gray-400">Travelers</p>
+                      <p className="mt-0.5 font-semibold text-gray-900">{b.numberOfTravelers}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400">Booked</p>
+                      <p className="mt-0.5 font-medium text-gray-700">{format(new Date(b.createdAt), "MMM d, yyyy")}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400">Total</p>
+                      <p className="mt-0.5 font-semibold text-gray-900">₹{Number(b.totalAmount).toLocaleString("en-IN")}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400">Received</p>
+                      <p className="mt-0.5 font-semibold text-green-600">₹{Number(b.amountPaid || 0).toLocaleString("en-IN")}</p>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-right text-xs font-medium text-[#781216]">Tap to view details</p>
+                </article>
+              ))
+            )}
+          </div>
+
+          <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200">
+            <div className="w-full min-h-[400px]">
+              <table className="w-full text-sm text-left">
+                <thead className="border-b border-gray-100 text-gray-500 font-medium text-xs tracking-wider uppercase">
+                  <tr>
+                    <th className="px-4 py-4">Ref</th>
+                    <th className="px-4 py-4">Item</th>
+                    <th className="px-4 py-4">User</th>
+                    <th className="px-4 py-4 text-center">Pax</th>
+                    <th className="px-4 py-4">Status</th>
+                    <th className="px-4 py-4">Financials</th>
+                    <th className="px-4 py-4">Date</th>
+                    <th className="px-4 py-4 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {bookings.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                        No bookings found matching your criteria.
+                      </td>
+                    </tr>
+                  ) : (
+                    bookings.map((b: any) => (
+                      <tr
+                        key={b.id}
+                        className="hover:bg-[#fbf7ed]/50 transition-colors cursor-pointer"
+                        onClick={() => navigate(`/dashboard/bookings/${b.id}`)}
+                      >
+                        <td className="px-4 py-4 font-mono font-medium text-gray-900 text-xs">
+                          <Link to={`/dashboard/bookings/${b.id}`} onClick={(event) => event.stopPropagation()}>{b.bookingReference}</Link>
+                        </td>
+                        <td className="px-4 py-4 text-gray-700 max-w-[150px] truncate text-sm">
+                          {b.itemTitle}
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="text-gray-900 font-medium truncate max-w-[140px] text-sm">{b.user?.profile?.fullName || "N/A"}</div>
+                          <div className="text-gray-500 text-xs truncate max-w-[140px]">{b.user?.email}</div>
+                        </td>
+                        <td className="px-4 py-4 text-center text-gray-900 text-sm">
+                          {b.numberOfTravelers}
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex flex-col gap-1.5 items-start">
+                            <BookingStatusBadge status={b.status} />
+                            <PaymentStatusBadge status={b.paymentStatus} />
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex flex-col gap-1">
+                            <div className="font-medium text-gray-900 flex items-center gap-1 text-sm">
+                              <IndianRupee className="w-3.5 h-3.5 text-gray-500" />
+                              {Number(b.totalAmount).toLocaleString("en-IN")}
+                            </div>
+                            <div className="font-medium text-green-600 flex items-center gap-0.5 text-xs">
+                              Paid: <IndianRupee className="w-3 h-3 text-green-500" />
+                              {Number(b.amountPaid || 0).toLocaleString("en-IN")}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 text-gray-500 text-xs whitespace-nowrap">
+                          {format(new Date(b.createdAt), "MMM d, yyyy")}
+                        </td>
+                        <td className="px-4 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                          <ActionMenu
+                            booking={b}
+                            onRemind={() => handleRemind(b.id)}
+                            onCancelAndRefund={() => setBookingToCancel(b)}
+                            onFinalize={() => handleFinalize(b.id)}
+                          />
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <nav aria-label="Booking pages" className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+            <p>{data.meta.total.toLocaleString("en-IN")} bookings · Page {data.meta.page} of {totalPages}</p>
+            <div className="flex gap-2">
+              <button type="button" disabled={page <= 1 || isPlaceholderData} onClick={() => setPage(page - 1)} className="rounded border px-3 py-2 disabled:opacity-40">Previous</button>
+              <button type="button" disabled={page >= totalPages || isPlaceholderData} onClick={() => setPage(page + 1)} className="rounded border px-3 py-2 disabled:opacity-40">Next</button>
+            </div>
+          </nav>
+        </div>
       )}
 
-
+      {bookingToCancel && (
+        <ConfirmCancelModal
+          booking={bookingToCancel}
+          onConfirm={(refundAmount) => handleCancelAndRefund(bookingToCancel.id, refundAmount)}
+          onClose={() => setBookingToCancel(null)}
+        />
+      )}
 
       {showCreateModal && (
         <CreateBookingModal 

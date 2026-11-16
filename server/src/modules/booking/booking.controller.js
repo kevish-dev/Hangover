@@ -4,7 +4,7 @@ import { bookingsTotal } from "../../core/metrics/metrics.js";
 
 export const createBooking = async (req, res, next) => {
   try {
-    const booking = await bookingService.createBooking(req.user.id, req.body);
+    const booking = await bookingService.createBooking(req.user.id, req.body, req.get("X-Trip-Share-Token"));
     bookingsTotal.inc({ status: "CONFIRMED" });
     res.status(201).json(booking);
   } catch (error) {
@@ -29,6 +29,14 @@ export const getMyBookings = async (req, res, next) => {
     const { page, limit } = req.query;
     const bookings = await bookingService.getUserBookings(req.user.id, page, limit);
     res.status(200).json(bookings);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getBookingSummaries = async (req, res, next) => {
+  try {
+    res.json(await bookingService.getBookingSummaries(req.query));
   } catch (error) {
     next(error);
   }

@@ -5,16 +5,17 @@ import { SourceTextModule, SyntheticModule } from "node:vm";
 import crypto from "node:crypto";
 import * as errors from "../src/core/errors/errors.js";
 import { addGst } from "../src/utils/gst.js";
+import { legacyTripShareFilter } from "../src/utils/trip-share-token.js";
 
 const source = await readFile(new URL("../src/modules/booking/booking.service.js", import.meta.url), "utf8");
 
 // Run the real service with isolated database/media boundaries. These tests
 // never load .env, connect to a database, or call Razorpay/Cloudinary/SMTP.
-async function checkoutFixture(kind, initialBookings = []) {
+async function checkoutFixture(kind, initialBookings = [], privateTrip = null) {
   const rows = structuredClone(initialBookings);
   const stats = { creates: 0, operations: 0, transactions: 0, locks: [] };
   const item = {
-    id: "item-1", isActive: true, isPublished: true, isListed: true,
+    id: "item-1", isActive: true, isPublished: !privateTrip, isListed: true,
     packages: [{ id: "package-1", price: 1000, tokenAmount: 200 }], addOns: [],
   };
   const slot = { id: "slot-1", capacity: 10, filledSpots: 0, startDate: new Date("2099-01-01"), endDate: new Date("2099-01-03") };
@@ -42,6 +43,13 @@ async function checkoutFixture(kind, initialBookings = []) {
     crmTripSlot: { findUnique: async () => kind === "crmTrip" ? { ...slot, crmTripId: item.id, crmTrip: item } : null },
     crmFestivalSlot: { findUnique: async () => kind === "crmFestival" ? { ...slot, crmFestivalId: item.id, crmFestival: item } : null },
     booking: bookingDb,
+    trip: {
+      count: async ({ where }) => {
+        assert.equal(where.id, item.id);
+        const matchesToken = where.shareTokenHash === crypto.createHash("sha256").update(privateTrip.token).digest("hex");
+        return Number(matchesToken && privateTrip.expiresAt > where.OR[1].shareTokenExpiresAt.gt);
+      },
+    },
     $queryRaw: async () => [{ sequence: ++sequence }],
     $transaction: async (callback) => {
       stats.transactions++;
@@ -72,6 +80,7 @@ async function checkoutFixture(kind, initialBookings = []) {
     },
     "../../prisma/client.js": { prisma: db },
     "../../utils/gst.js": { addGst },
+    "../../utils/trip-share-token.js": { legacyTripShareFilter },
     "../../core/errors/errors.js": { ...errors },
     "crypto": { default: crypto },
     "../../core/services/upload.service.js": Object.fromEntries(["uploadSensitiveDocument", "createAuthenticatedDeliveryUrl", "deleteMediaAsset"].map((name) => [name, () => { throw new Error(`Unexpected media call: ${name}`); }])),
@@ -93,8 +102,25 @@ async function checkoutFixture(kind, initialBookings = []) {
   });
   await service.evaluate();
   const request = { slotId: slot.id, packageId: "package-1", numberOfTravelers: 1, initialPaymentType: "FULL" };
-  return { create: (data = request, userId = "user-1") => service.namespace.createBooking(userId, data), request, rows, stats, itemField };
+  return { create: (data = request, userId = "user-1", shareToken) => service.namespace.createBooking(userId, data, shareToken), request, rows, stats, itemField };
 }
+
+test("a new unpublished legacy trip booking requires its current share token", async () => {
+  const fixture = await checkoutFixture("trip", [], { token: "share", expiresAt: new Date("2099-01-01") });
+  await assert.rejects(fixture.create(), errors.NotFoundError);
+  await assert.rejects(fixture.create(undefined, undefined, "wrong"), errors.NotFoundError);
+  assert.equal(fixture.stats.creates, 0);
+
+  const first = await fixture.create(undefined, undefined, "share");
+  assert.equal((await fixture.create()).id, first.id);
+  assert.equal(fixture.stats.creates, 1);
+});
+
+test("an expired share token cannot create a new legacy trip booking", async () => {
+  const fixture = await checkoutFixture("trip", [], { token: "share", expiresAt: new Date("2000-01-01") });
+  await assert.rejects(fixture.create(undefined, undefined, "share"), errors.NotFoundError);
+  assert.equal(fixture.stats.creates, 0);
+});
 
 for (const kind of ["trip", "festival", "crmTrip", "crmFestival"]) {
   test(`${kind}: simultaneous submissions create one booking and one set of operations`, async () => {

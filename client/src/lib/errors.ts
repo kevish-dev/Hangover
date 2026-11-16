@@ -50,6 +50,10 @@ export function getErrorMessage(error: unknown, fallback = "Something went wrong
     return "The uploaded file exceeds the 10 MB limit. Please select a smaller photo or compress it.";
   }
 
+  if (candidate?.code === "ECONNABORTED" || candidate?.code === "ETIMEDOUT") {
+    return "The request timed out. Check your connection and try again.";
+  }
+
   if (candidate?.code === "ERR_NETWORK" || candidate?.message === "Network Error") {
     return "The server could not be reached. If you were uploading a file, it may exceed 10 MB or your connection timed out.";
   }

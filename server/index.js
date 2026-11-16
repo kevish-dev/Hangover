@@ -89,6 +89,7 @@ app.use(
     origin: env.ORIGIN,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     credentials: true,
+    maxAge: 600,
   }),
 );
 
