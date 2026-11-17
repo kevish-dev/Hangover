@@ -10,4 +10,8 @@ Grafana provisions [Hangover Production Observability & Availability](grafana/da
 - **Resources** shows host CPU, RAM, and root disk use plus backend and Postgres container metrics. The container-label panel should show **2**. If cAdvisor is Up but coverage is lower, inspect the cAdvisor logs for Docker discovery errors and check the container names and Compose project labels.
 - **Checkout** shows booking, payment verification, and webhook response counts. Use these for errors and traffic trends. Retries and duplicate webhook deliveries can appear in these counts.
 
+The 4xx and 5xx gauges display **No requests** when the backend scrape is healthy and the last 15 minutes contain no API requests. Checkout charts show an idle zero line when no matching requests have been recorded. An unavailable backend scrape leaves these panels without a value. Latency percentiles still require the response counts described in each panel.
+
+CI validates dashboard threshold types, panel layout, scrape configuration, and every Prometheus expression. Query regression checks cover uptime, idle endpoints, active checkout routes, errors, and unavailable exporters. Run `python3 monitoring/check_dashboard.py --output-dir /tmp/hangover-dashboard-check` to generate the Prometheus rule and test files for local verification with `promtool check rules` and `promtool test rules`.
+
 The dashboard measures backend and probe timing. Browser rendering and responsiveness are measured by the frontend's existing Speed Insights integration.

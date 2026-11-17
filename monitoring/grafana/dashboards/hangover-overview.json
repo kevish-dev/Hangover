@@ -41,12 +41,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": null,
-                "value": "red"
+                "color": "red",
+                "value": null
               },
               {
-                "color": 1,
-                "value": "green"
+                "color": "green",
+                "value": 1
               }
             ]
           },
@@ -67,7 +67,7 @@
         "reduceOptions": {"calcs": ["lastNotNull"], "values": false}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "probe_success{job=\"blackbox-internal\"}", "legendFormat": "Internal", "instant": true, "range": false}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "probe_success{job=\"blackbox-internal\"}", "legendFormat": "Internal", "instant": true, "range": false, "format": "time_series"}
       ]
     },
     {
@@ -86,12 +86,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": null,
-                "value": "red"
+                "color": "red",
+                "value": null
               },
               {
-                "color": 1,
-                "value": "green"
+                "color": "green",
+                "value": 1
               }
             ]
           },
@@ -112,7 +112,7 @@
         "reduceOptions": {"calcs": ["lastNotNull"], "values": false}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "probe_success{job=\"blackbox-external\"}", "legendFormat": "Public", "instant": true, "range": false}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "probe_success{job=\"blackbox-external\"}", "legendFormat": "Public", "instant": true, "range": false, "format": "time_series"}
       ]
     },
     {
@@ -131,16 +131,16 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": null,
-                "value": "red"
+                "color": "red",
+                "value": null
               },
               {
-                "color": 99,
-                "value": "orange"
+                "color": "orange",
+                "value": 99
               },
               {
-                "color": 99.9,
-                "value": "green"
+                "color": "green",
+                "value": 99.9
               }
             ]
           },
@@ -151,7 +151,7 @@
       },
       "options": {"reduceOptions": {"calcs": ["lastNotNull"], "values": false}, "showThresholdLabels": false, "showThresholdMarkers": true},
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "100 * avg_over_time(probe_success{job=\"blackbox-external\"}[24h])", "legendFormat": "Public API", "instant": true, "range": false}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "100 * avg_over_time(probe_success{job=\"blackbox-external\"}[24h])", "legendFormat": "Public API", "instant": true, "range": false, "format": "time_series"}
       ],
       "description": "Share of recorded public health probes that passed. Use scrape health to check for missing samples."
     },
@@ -171,12 +171,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": null,
-                "value": "red"
+                "color": "red",
+                "value": null
               },
               {
-                "color": 1,
-                "value": "green"
+                "color": "green",
+                "value": 1
               }
             ]
           },
@@ -197,7 +197,7 @@
         "reduceOptions": {"calcs": ["lastNotNull"], "values": false}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "up{job=\"hangover-backend\"}", "legendFormat": "Backend", "instant": true, "range": false}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "up{job=\"hangover-backend\"}", "legendFormat": "Backend", "instant": true, "range": false, "format": "time_series"}
       ]
     },
     {
@@ -240,7 +240,7 @@
       },
       "pluginVersion": "11.2.0",
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "probe_success{job=~\"blackbox-internal|blackbox-external|blackbox-catalog\"}", "legendFormat": "{{job}} {{check}}", "refId": "A"}
+        {"datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "probe_success{job=~\"blackbox-internal|blackbox-external|blackbox-catalog\"}", "legendFormat": "{{job}} {{check}}", "refId": "A", "format": "time_series"}
       ],
       "title": "Probe history",
       "type": "state-timeline"
@@ -262,8 +262,8 @@
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "probe_duration_seconds{job=~\"blackbox-internal|blackbox-external\"}", "legendFormat": "{{job}}", "instant": false, "range": true},
-        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "probe_duration_seconds{job=\"blackbox-catalog\"}", "legendFormat": "{{check}}", "instant": false, "range": true}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "probe_duration_seconds{job=~\"blackbox-internal|blackbox-external\"}", "legendFormat": "{{job}}", "instant": false, "range": true, "format": "time_series"},
+        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "probe_duration_seconds{job=\"blackbox-catalog\"}", "legendFormat": "{{check}}", "instant": false, "range": true, "format": "time_series"}
       ]
     },
     {
@@ -282,12 +282,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": null,
-                "value": "red"
+                "color": "red",
+                "value": null
               },
               {
-                "color": 1,
-                "value": "green"
+                "color": "green",
+                "value": 1
               }
             ]
           },
@@ -308,7 +308,7 @@
         "reduceOptions": {"calcs": ["lastNotNull"], "values": false}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "probe_success{job=\"blackbox-catalog\"}", "legendFormat": "{{check}}", "instant": true, "range": false}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "probe_success{job=\"blackbox-catalog\"}", "legendFormat": "{{check}}", "instant": true, "range": false, "format": "time_series"}
       ],
       "description": "HTTPS HEAD requests to the public CRM catalog and featured routes. Both must return HTTP 200 with a JSON content type."
     },
@@ -328,12 +328,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": null,
-                "value": "red"
+                "color": "red",
+                "value": null
               },
               {
-                "color": 1,
-                "value": "green"
+                "color": "green",
+                "value": 1
               }
             ]
           },
@@ -354,7 +354,7 @@
         "reduceOptions": {"calcs": ["lastNotNull"], "values": false}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "up{job=~\"cadvisor|node-exporter|blackbox-catalog\"}", "legendFormat": "{{job}} {{check}}", "instant": true, "range": false}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "up{job=~\"cadvisor|node-exporter|blackbox-catalog\"}", "legendFormat": "{{job}} {{check}}", "instant": true, "range": false, "format": "time_series"}
       ]
     },
     {
@@ -381,7 +381,7 @@
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "sum by (status_code) (rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[$__rate_interval]))", "legendFormat": "HTTP {{status_code}}", "instant": false, "range": true}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "sum by (status_code) (rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[$__rate_interval]))", "legendFormat": "HTTP {{status_code}}", "instant": false, "range": true, "format": "time_series"}
       ],
       "description": "Application requests per second. Browser preflights and HEAD probes are excluded."
     },
@@ -402,9 +402,9 @@
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "histogram_quantile(0.5, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"2..|304\"}[15m]))) and on () (sum(increase(http_request_duration_seconds_count{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"2..|304\"}[15m])) >= 5) and on () (max(up{job=\"hangover-backend\"}) == 1)", "legendFormat": "p50", "instant": false, "range": true},
-        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"2..|304\"}[15m]))) and on () (sum(increase(http_request_duration_seconds_count{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"2..|304\"}[15m])) >= 20) and on () (max(up{job=\"hangover-backend\"}) == 1)", "legendFormat": "p95", "instant": false, "range": true},
-        {"refId": "C", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"2..|304\"}[15m]))) and on () (sum(increase(http_request_duration_seconds_count{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"2..|304\"}[15m])) >= 100) and on () (max(up{job=\"hangover-backend\"}) == 1)", "legendFormat": "p99", "instant": false, "range": true}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "histogram_quantile(0.5, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"2..|304\"}[15m]))) and on () (sum(increase(http_request_duration_seconds_count{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"2..|304\"}[15m])) >= 5) and on () (max(up{job=\"hangover-backend\"}) == 1)", "legendFormat": "p50", "instant": false, "range": true, "format": "time_series"},
+        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"2..|304\"}[15m]))) and on () (sum(increase(http_request_duration_seconds_count{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"2..|304\"}[15m])) >= 20) and on () (max(up{job=\"hangover-backend\"}) == 1)", "legendFormat": "p95", "instant": false, "range": true, "format": "time_series"},
+        {"refId": "C", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"2..|304\"}[15m]))) and on () (sum(increase(http_request_duration_seconds_count{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"2..|304\"}[15m])) >= 100) and on () (max(up{job=\"hangover-backend\"}) == 1)", "legendFormat": "p99", "instant": false, "range": true, "format": "time_series"}
       ],
       "description": "Rolling 15-minute latency for 2xx and 304 responses. p50, p95 and p99 appear with at least 5, 20 and 100 responses respectively."
     },
@@ -428,7 +428,7 @@
         "reduceOptions": {"calcs": ["lastNotNull"], "values": false}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "round(sum(increase(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[15m])) or (0 * (max(up{job=\"hangover-backend\"}) == 1))) and on () (max(up{job=\"hangover-backend\"}) == 1)", "legendFormat": "Requests", "instant": true, "range": false}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "round(sum(increase(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[15m])) or (0 * (max(up{job=\"hangover-backend\"}) == 1))) and on () (max(up{job=\"hangover-backend\"}) == 1)", "legendFormat": "Requests", "instant": true, "range": false, "format": "time_series"}
       ]
     },
     {
@@ -447,30 +447,40 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": null,
-                "value": "green"
+                "color": "gray",
+                "value": null
               },
               {
-                "color": 5,
-                "value": "orange"
+                "color": "green",
+                "value": 0
               },
               {
-                "color": 15,
-                "value": "red"
+                "color": "orange",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 15
               }
             ]
           },
-          "noValue": "No traffic or scrape",
+          "noValue": "Scrape unavailable",
           "min": 0,
-          "max": 100
+          "max": 100,
+          "mappings": [
+            {
+              "type": "value",
+              "options": {"-1": {"text": "No requests", "color": "gray"}}
+            }
+          ]
         },
         "overrides": []
       },
       "options": {"reduceOptions": {"calcs": ["lastNotNull"], "values": false}, "showThresholdLabels": false, "showThresholdMarkers": true},
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "100 * ((sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"4..\"}[15m])) or (0 * sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[15m])))) / (sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[15m])) > 0)) and on () (max(up{job=\"hangover-backend\"}) == 1)", "legendFormat": "4xx", "instant": true, "range": false}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "(100 * ((sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"4..\"}[15m])) or (0 * sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[15m])))) / (sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[15m])) > 0)) and on () (max(up{job=\"hangover-backend\"}) == 1)) or (-1 * (max(up{job=\"hangover-backend\"}) == 1))", "legendFormat": "4xx", "instant": true, "range": false, "format": "time_series"}
       ],
-      "description": "Includes expected client responses such as unauthenticated 401s. Check request volume and the error-route panel."
+      "description": "Includes expected client responses such as unauthenticated 401s. Check request volume and the error-route panel. No requests is shown when the backend is reachable but there are no API requests in the last 15 minutes. Scrape failures stay unavailable."
     },
     {
       "id": 25,
@@ -488,30 +498,40 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": null,
-                "value": "green"
+                "color": "gray",
+                "value": null
               },
               {
-                "color": 1,
-                "value": "orange"
+                "color": "green",
+                "value": 0
               },
               {
-                "color": 5,
-                "value": "red"
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
               }
             ]
           },
-          "noValue": "No traffic or scrape",
+          "noValue": "Scrape unavailable",
           "min": 0,
-          "max": 100
+          "max": 100,
+          "mappings": [
+            {
+              "type": "value",
+              "options": {"-1": {"text": "No requests", "color": "gray"}}
+            }
+          ]
         },
         "overrides": []
       },
       "options": {"reduceOptions": {"calcs": ["lastNotNull"], "values": false}, "showThresholdLabels": false, "showThresholdMarkers": true},
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "100 * ((sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"5..\"}[15m])) or (0 * sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[15m])))) / (sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[15m])) > 0)) and on () (max(up{job=\"hangover-backend\"}) == 1)", "legendFormat": "5xx", "instant": true, "range": false}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "(100 * ((sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"5..\"}[15m])) or (0 * sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[15m])))) / (sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[15m])) > 0)) and on () (max(up{job=\"hangover-backend\"}) == 1)) or (-1 * (max(up{job=\"hangover-backend\"}) == 1))", "legendFormat": "5xx", "instant": true, "range": false, "format": "time_series"}
       ],
-      "description": "A measured zero requires recorded traffic and a healthy scrape. Ingress failures may be visible in the probe panels."
+      "description": "A measured zero requires recorded traffic and a healthy scrape. Ingress failures may be visible in the probe panels. No requests is shown when the backend is reachable but there are no API requests in the last 15 minutes. Scrape failures stay unavailable."
     },
     {
       "id": 26,
@@ -530,8 +550,8 @@
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "100 * ((sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"4..\"}[15m])) or (0 * sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[15m])))) / (sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[15m])) > 0)) and on () (max(up{job=\"hangover-backend\"}) == 1)", "legendFormat": "4xx", "instant": false, "range": true},
-        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "100 * ((sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"5..\"}[15m])) or (0 * sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[15m])))) / (sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[15m])) > 0)) and on () (max(up{job=\"hangover-backend\"}) == 1)", "legendFormat": "5xx", "instant": false, "range": true}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "100 * ((sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"4..\"}[15m])) or (0 * sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[15m])))) / (sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[15m])) > 0)) and on () (max(up{job=\"hangover-backend\"}) == 1)", "legendFormat": "4xx", "instant": false, "range": true, "format": "time_series"},
+        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "100 * ((sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"5..\"}[15m])) or (0 * sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[15m])))) / (sum(rate(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[15m])) > 0)) and on () (max(up{job=\"hangover-backend\"}) == 1)", "legendFormat": "5xx", "instant": false, "range": true, "format": "time_series"}
       ]
     },
     {
@@ -550,8 +570,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": null,
-                "value": "red"
+                "color": "red",
+                "value": null
               }
             ]
           },
@@ -566,7 +586,7 @@
         "showUnfilled": true
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "topk(8, round(sum by (method, route, status_code) (increase(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"[45]..\"}[$__range]))) > 0)", "legendFormat": "{{status_code}} {{method}} {{route}}", "instant": true, "range": false}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "topk(8, round(sum by (method, route, status_code) (increase(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"[45]..\"}[$__range]))) > 0)", "legendFormat": "{{status_code}} {{method}} {{route}}", "instant": true, "range": false, "format": "time_series"}
       ],
       "description": "Estimated error counts in the selected dashboard range."
     },
@@ -586,8 +606,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": null,
-                "value": "blue"
+                "color": "blue",
+                "value": null
               }
             ]
           },
@@ -602,7 +622,7 @@
         "showUnfilled": true
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "topk(8, round(sum by (method, route) (increase(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[$__range]))) > 0)", "legendFormat": "{{method}} {{route}}", "instant": true, "range": false}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "topk(8, round(sum by (method, route) (increase(http_requests_total{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\"}[$__range]))) > 0)", "legendFormat": "{{method}} {{route}}", "instant": true, "range": false, "format": "time_series"}
       ],
       "description": "Estimated request counts in the selected dashboard range."
     },
@@ -622,8 +642,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": null,
-                "value": "blue"
+                "color": "blue",
+                "value": null
               }
             ]
           },
@@ -638,7 +658,7 @@
         "showUnfilled": true
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "topk(8, histogram_quantile(0.95, sum by (method, route, le) (increase(http_request_duration_seconds_bucket{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"2..|304\"}[$__range]))) and on (method, route) (sum by (method, route) (increase(http_request_duration_seconds_count{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"2..|304\"}[$__range])) >= 20))", "legendFormat": "{{method}} {{route}}", "instant": true, "range": false}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "topk(8, histogram_quantile(0.95, sum by (method, route, le) (increase(http_request_duration_seconds_bucket{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"2..|304\"}[$__range]))) and on (method, route) (sum by (method, route) (increase(http_request_duration_seconds_count{job=\"hangover-backend\",route=~\"/api/v1(/.*)?\",method!~\"OPTIONS|HEAD\",status_code=~\"2..|304\"}[$__range])) >= 20))", "legendFormat": "{{method}} {{route}}", "instant": true, "range": false, "format": "time_series"}
       ],
       "description": "Ranks routes with at least 20 successful responses in the selected dashboard range. Use a longer range when traffic is low."
     },
@@ -666,8 +686,8 @@
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "histogram_quantile(0.5, sum by (le) (rate(hangover_postgres_query_duration_seconds_bucket[15m]))) and on () (sum(increase(hangover_postgres_query_duration_seconds_count[15m])) >= 5)", "legendFormat": "p50", "instant": false, "range": true},
-        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "histogram_quantile(0.95, sum by (le) (rate(hangover_postgres_query_duration_seconds_bucket[15m]))) and on () (sum(increase(hangover_postgres_query_duration_seconds_count[15m])) >= 20)", "legendFormat": "p95", "instant": false, "range": true}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "histogram_quantile(0.5, sum by (le) (rate(hangover_postgres_query_duration_seconds_bucket[15m]))) and on () (sum(increase(hangover_postgres_query_duration_seconds_count[15m])) >= 5)", "legendFormat": "p50", "instant": false, "range": true, "format": "time_series"},
+        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "histogram_quantile(0.95, sum by (le) (rate(hangover_postgres_query_duration_seconds_bucket[15m]))) and on () (sum(increase(hangover_postgres_query_duration_seconds_count[15m])) >= 20)", "legendFormat": "p95", "instant": false, "range": true, "format": "time_series"}
       ],
       "description": "Query durations observed by Prisma over 15 minutes, excluding SELECT 1 health checks. p50 and p95 require 5 and 20 queries."
     },
@@ -688,7 +708,7 @@
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "sum by (state) (hangover_postgres_pool_connections)", "legendFormat": "{{state}}", "instant": false, "range": true}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "sum by (state) (hangover_postgres_pool_connections)", "legendFormat": "{{state}}", "instant": false, "range": true, "format": "time_series"}
       ],
       "description": "Compare in-use connections with the application pool limit. Idle connections can be reused."
     },
@@ -709,8 +729,8 @@
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "sum(hangover_postgres_pool_waiting_requests)", "legendFormat": "Waiting for a DB connection", "instant": false, "range": true},
-        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "sum(http_requests_in_flight)", "legendFormat": "HTTP requests in flight", "instant": false, "range": true}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "sum(hangover_postgres_pool_waiting_requests)", "legendFormat": "Waiting for a DB connection", "instant": false, "range": true, "format": "time_series"},
+        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "sum(http_requests_in_flight)", "legendFormat": "HTTP requests in flight", "instant": false, "range": true, "format": "time_series"}
       ],
       "description": "Rising waiters alongside higher HTTP concurrency can indicate application pool contention."
     },
@@ -738,9 +758,9 @@
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
       "targets": [
-        {"refId": "C", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "nodejs_nodejs_eventloop_lag_p50_seconds", "legendFormat": "p50", "instant": false, "range": true},
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "nodejs_nodejs_eventloop_lag_p99_seconds", "legendFormat": "p99", "instant": false, "range": true},
-        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "nodejs_nodejs_eventloop_lag_max_seconds", "legendFormat": "Maximum", "instant": false, "range": true}
+        {"refId": "C", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "nodejs_nodejs_eventloop_lag_p50_seconds", "legendFormat": "p50", "instant": false, "range": true, "format": "time_series"},
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "nodejs_nodejs_eventloop_lag_p99_seconds", "legendFormat": "p99", "instant": false, "range": true, "format": "time_series"},
+        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "nodejs_nodejs_eventloop_lag_max_seconds", "legendFormat": "Maximum", "instant": false, "range": true, "format": "time_series"}
       ]
     },
     {
@@ -760,9 +780,9 @@
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "nodejs_nodejs_heap_size_used_bytes", "legendFormat": "Heap used", "instant": false, "range": true},
-        {"refId": "C", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "nodejs_nodejs_heap_size_total_bytes", "legendFormat": "Heap allocated", "instant": false, "range": true},
-        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "nodejs_process_resident_memory_bytes", "legendFormat": "Resident memory (RSS)", "instant": false, "range": true}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "nodejs_nodejs_heap_size_used_bytes", "legendFormat": "Heap used", "instant": false, "range": true, "format": "time_series"},
+        {"refId": "C", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "nodejs_nodejs_heap_size_total_bytes", "legendFormat": "Heap allocated", "instant": false, "range": true, "format": "time_series"},
+        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "nodejs_process_resident_memory_bytes", "legendFormat": "Resident memory (RSS)", "instant": false, "range": true, "format": "time_series"}
       ]
     },
     {
@@ -782,8 +802,8 @@
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "100 * rate(nodejs_process_cpu_user_seconds_total[$__rate_interval])", "legendFormat": "User", "instant": false, "range": true},
-        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "100 * rate(nodejs_process_cpu_system_seconds_total[$__rate_interval])", "legendFormat": "System", "instant": false, "range": true}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "100 * rate(nodejs_process_cpu_user_seconds_total[$__rate_interval])", "legendFormat": "User", "instant": false, "range": true, "format": "time_series"},
+        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "100 * rate(nodejs_process_cpu_system_seconds_total[$__rate_interval])", "legendFormat": "System", "instant": false, "range": true, "format": "time_series"}
       ],
       "description": "100% equals one CPU core."
     },
@@ -804,8 +824,8 @@
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "nodejs_nodejs_active_handles_total", "legendFormat": "Handles", "instant": false, "range": true},
-        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "nodejs_nodejs_active_requests_total", "legendFormat": "Async requests", "instant": false, "range": true}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "nodejs_nodejs_active_handles_total", "legendFormat": "Handles", "instant": false, "range": true, "format": "time_series"},
+        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "nodejs_nodejs_active_requests_total", "legendFormat": "Async requests", "instant": false, "range": true, "format": "time_series"}
       ],
       "description": "Active handles and asynchronous requests in the Node.js process."
     },
@@ -832,16 +852,16 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": null,
-                "value": "red"
+                "color": "red",
+                "value": null
               },
               {
-                "color": 1,
-                "value": "orange"
+                "color": "orange",
+                "value": 1
               },
               {
-                "color": 2,
-                "value": "green"
+                "color": "green",
+                "value": 2
               }
             ]
           },
@@ -856,7 +876,7 @@
         "reduceOptions": {"calcs": ["lastNotNull"], "values": false}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "count(count by (service) (container_memory_working_set_bytes{job=\"cadvisor\",service=~\"backend|postgres\"})) or (0 * (max(up{job=\"cadvisor\"}) == 1))", "legendFormat": "Expected: 2", "instant": true, "range": false}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "count(count by (service) (container_memory_working_set_bytes{job=\"cadvisor\",service=~\"backend|postgres\"})) or (0 * (max(up{job=\"cadvisor\"}) == 1))", "legendFormat": "Expected: 2", "instant": true, "range": false, "format": "time_series"}
       ],
       "description": "Two services are expected. A low value with an up scrape indicates missing Docker metadata or a missing service."
     },
@@ -876,12 +896,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": null,
-                "value": "green"
+                "color": "green",
+                "value": null
               },
               {
-                "color": 1,
-                "value": "red"
+                "color": "red",
+                "value": 1
               }
             ]
           },
@@ -896,7 +916,7 @@
         "reduceOptions": {"calcs": ["lastNotNull"], "values": false}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "round(sum by (service) (increase(container_oom_events_total{job=\"cadvisor\",service=~\"backend|postgres\"}[$__range])))", "legendFormat": "{{service}}", "instant": true, "range": false}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "round(sum by (service) (increase(container_oom_events_total{job=\"cadvisor\",service=~\"backend|postgres\"}[$__range])))", "legendFormat": "{{service}}", "instant": true, "range": false, "format": "time_series"}
       ],
       "description": "Events in the selected dashboard range. Compare with container-label coverage before interpreting a missing series."
     },
@@ -919,9 +939,9 @@
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "100 * (1 - avg(rate(node_cpu_seconds_total{job=\"node-exporter\",mode=\"idle\"}[$__rate_interval])))", "legendFormat": "CPU", "instant": false, "range": true},
-        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "100 * (1 - node_memory_MemAvailable_bytes{job=\"node-exporter\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"})", "legendFormat": "RAM", "instant": false, "range": true},
-        {"refId": "C", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "100 * (1 - node_filesystem_avail_bytes{job=\"node-exporter\",mountpoint=\"/\",fstype!~\"tmpfs|overlay|rootfs\"} / node_filesystem_size_bytes{job=\"node-exporter\",mountpoint=\"/\",fstype!~\"tmpfs|overlay|rootfs\"})", "legendFormat": "Root disk", "instant": false, "range": true}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "100 * (1 - avg(rate(node_cpu_seconds_total{job=\"node-exporter\",mode=\"idle\"}[$__rate_interval])))", "legendFormat": "CPU", "instant": false, "range": true, "format": "time_series"},
+        {"refId": "B", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "100 * (1 - node_memory_MemAvailable_bytes{job=\"node-exporter\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"})", "legendFormat": "RAM", "instant": false, "range": true, "format": "time_series"},
+        {"refId": "C", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "100 * (1 - node_filesystem_avail_bytes{job=\"node-exporter\",mountpoint=\"/\",fstype!~\"tmpfs|overlay|rootfs\"} / node_filesystem_size_bytes{job=\"node-exporter\",mountpoint=\"/\",fstype!~\"tmpfs|overlay|rootfs\"})", "legendFormat": "Root disk", "instant": false, "range": true, "format": "time_series"}
       ]
     },
     {
@@ -941,7 +961,7 @@
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "max by (service) (container_memory_working_set_bytes{job=\"cadvisor\",service=~\"backend|postgres\"})", "legendFormat": "{{service}}", "instant": false, "range": true}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "max by (service) (container_memory_working_set_bytes{job=\"cadvisor\",service=~\"backend|postgres\"})", "legendFormat": "{{service}}", "instant": false, "range": true, "format": "time_series"}
       ],
       "description": "Latest working set for each named container."
     },
@@ -962,7 +982,7 @@
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "sum by (service) (rate(container_cpu_usage_seconds_total{job=\"cadvisor\",service=~\"backend|postgres\"}[$__rate_interval]))", "legendFormat": "{{service}}", "instant": false, "range": true}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "sum by (service) (rate(container_cpu_usage_seconds_total{job=\"cadvisor\",service=~\"backend|postgres\"}[$__rate_interval]))", "legendFormat": "{{service}}", "instant": false, "range": true, "format": "time_series"}
       ],
       "description": "CPU cores used. A value of 1 equals one full core."
     },
@@ -1012,7 +1032,7 @@
         "textMode": "auto"
       },
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "max(hangover_maintenance_mode_active{job=\"hangover-backend\"})", "refId": "A", "instant": true, "range": false}
+        {"datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "max(hangover_maintenance_mode_active{job=\"hangover-backend\"})", "refId": "A", "instant": true, "range": false, "format": "time_series"}
       ],
       "title": "Maintenance Mode State",
       "type": "stat"
@@ -1025,7 +1045,8 @@
       "datasource": {"type": "prometheus", "uid": "Prometheus"},
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "noValue": "Scrape unavailable"
         },
         "overrides": []
       },
@@ -1034,9 +1055,9 @@
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "sum by (status_code) (increase(http_requests_total{job=\"hangover-backend\",method=\"POST\",route=~\"/api/v1/(bookings|crm-(trips|festivals)/public/[^/]+/bookings)\"}[15m]))", "legendFormat": "HTTP {{status_code}}", "instant": false, "range": true}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "(sum by (status_code) (increase(http_requests_total{job=\"hangover-backend\",method=\"POST\",route=~\"/api/v1/(bookings|crm-(trips|festivals)/public/[^/]+/bookings)\"}[15m])) or on () label_replace(0 * (max(up{job=\"hangover-backend\"}) == 1), \"status_code\", \"No requests\", \"\", \"\")) and on () (max(up{job=\"hangover-backend\"}) == 1)", "legendFormat": "{{status_code}}", "instant": false, "range": true, "format": "time_series"}
       ],
-      "description": "Customer booking endpoint responses, including CRM and checkout retries. This is request activity."
+      "description": "Customer booking endpoint responses, including CRM and checkout retries. This is request activity. An idle endpoint shows a zero line labeled No requests. Scrape failures stay unavailable."
     },
     {
       "id": 20,
@@ -1046,7 +1067,8 @@
       "datasource": {"type": "prometheus", "uid": "Prometheus"},
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "noValue": "Scrape unavailable"
         },
         "overrides": []
       },
@@ -1055,9 +1077,9 @@
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "sum by (status_code) (increase(http_requests_total{job=\"hangover-backend\",method=\"POST\",route=~\"/api/v1/payments/verify\"}[15m]))", "legendFormat": "HTTP {{status_code}}", "instant": false, "range": true}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "(sum by (status_code) (increase(http_requests_total{job=\"hangover-backend\",method=\"POST\",route=~\"/api/v1/payments/verify\"}[15m])) or on () label_replace(0 * (max(up{job=\"hangover-backend\"}) == 1), \"status_code\", \"No requests\", \"\", \"\")) and on () (max(up{job=\"hangover-backend\"}) == 1)", "legendFormat": "{{status_code}}", "instant": false, "range": true, "format": "time_series"}
       ],
-      "description": "Client verification requests by HTTP status. Includes verification retries."
+      "description": "Client verification requests by HTTP status. Includes verification retries. An idle endpoint shows a zero line labeled No requests. Scrape failures stay unavailable."
     },
     {
       "id": 21,
@@ -1067,7 +1089,8 @@
       "datasource": {"type": "prometheus", "uid": "Prometheus"},
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "noValue": "Scrape unavailable"
         },
         "overrides": []
       },
@@ -1076,9 +1099,9 @@
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "sum by (status_code) (increase(http_requests_total{job=\"hangover-backend\",method=\"POST\",route=~\"/api/v1/payments/webhook\"}[15m]))", "legendFormat": "HTTP {{status_code}}", "instant": false, "range": true}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "Prometheus"}, "expr": "(sum by (status_code) (increase(http_requests_total{job=\"hangover-backend\",method=\"POST\",route=~\"/api/v1/payments/webhook\"}[15m])) or on () label_replace(0 * (max(up{job=\"hangover-backend\"}) == 1), \"status_code\", \"No requests\", \"\", \"\")) and on () (max(up{job=\"hangover-backend\"}) == 1)", "legendFormat": "{{status_code}}", "instant": false, "range": true, "format": "time_series"}
       ],
-      "description": "Webhook HTTP responses, including duplicate deliveries. Check error logs for failed processing."
+      "description": "Webhook HTTP responses, including duplicate deliveries. Check error logs for failed processing. An idle endpoint shows a zero line labeled No requests. Scrape failures stay unavailable."
     },
     {
       "id": 105,
@@ -1124,5 +1147,5 @@
   "timezone": "browser",
   "title": "Hangover Production Observability & Availability",
   "uid": "hangover-prod-overview",
-  "version": 2
+  "version": 3
 }

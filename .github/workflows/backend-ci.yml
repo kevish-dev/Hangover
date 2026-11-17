@@ -21,6 +21,23 @@ permissions:
   contents: read
 
 jobs:
+  monitoring:
+    name: Validate Grafana and Prometheus
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Validate dashboard settings and generate query checks
+        run: python3 monitoring/check_dashboard.py --output-dir "$RUNNER_TEMP/grafana-validation"
+
+      - name: Check scrape configuration and dashboard queries
+        run: |
+          docker run --rm -v "$PWD/monitoring:/monitoring:ro" --entrypoint /bin/promtool prom/prometheus:v2.54.1 check config /monitoring/prometheus/prometheus.yml
+          docker run --rm -v "$RUNNER_TEMP/grafana-validation:/validation:ro" --entrypoint /bin/promtool prom/prometheus:v2.54.1 check rules /validation/rules.json
+          docker run --rm -v "$RUNNER_TEMP/grafana-validation:/validation:ro" --entrypoint /bin/promtool prom/prometheus:v2.54.1 test rules /validation/tests.json
+          docker run --rm -v "$PWD/monitoring/prometheus:/config:ro" prom/blackbox-exporter:v0.25.0 --config.check --config.file=/config/blackbox.yml
+
   test:
     name: Test Backend
     runs-on: ubuntu-latest
