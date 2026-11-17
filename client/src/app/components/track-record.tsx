@@ -1,9 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "../../lib/axios";
+import { trackRecordStatistics } from "../../seo/track-record.mjs";
 
 interface TrackRecordData {
   departures: number;
   travelerPlaces: number;
+  travelerBookings?: number;
+  returningBookers?: number;
+  destinations?: number;
+  festivalPackages?: number;
   averageRating: number | null;
   reviewCount: number;
 }
@@ -14,25 +19,19 @@ export function TrackRecord() {
     queryFn: async ({ signal }) => (await apiClient.get<TrackRecordData>("/landing-content/track-record", { signal })).data,
     staleTime: 60_000,
   });
-  if (!data || !(data.departures || data.travelerPlaces || data.reviewCount)) return null;
+  const statistics = trackRecordStatistics(data);
+  if (statistics.length === 0) return null;
 
-  const statistics = [
-    data.departures > 0 && { value: data.departures.toLocaleString("en-IN"), label: "Departures with completed bookings" },
-    data.travelerPlaces > 0 && { value: data.travelerPlaces.toLocaleString("en-IN"), label: "Traveler places on completed bookings" },
-    data.reviewCount > 0 && data.averageRating !== null && {
-      value: `${data.averageRating.toFixed(1)}/5`,
-      label: `From ${data.reviewCount.toLocaleString("en-IN")} verified ${data.reviewCount === 1 ? "review" : "reviews"}`,
-    },
-  ];
   return (
     <section className="border-y border-[#ded4c7] bg-[#f5f0e6] px-6 py-12 text-[#241c18] sm:px-12">
       <div className="mx-auto max-w-6xl">
-        <h2 className="mb-6 text-3xl font-medium text-[#781216]">Our track record</h2>
-        <dl className="flex flex-wrap gap-x-12 gap-y-5">
-          {statistics.map((stat) => stat && (
-            <div className="flex flex-col-reverse gap-1" key={stat.label}>
-              <dt className="text-sm text-[#59433b]">{stat.label}</dt>
-              <dd className="text-3xl font-semibold text-[#781216]">{stat.value}</dd>
+        <h2 className="mb-8 text-3xl font-medium text-[#781216]">Our track record</h2>
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-3 lg:gap-x-12">
+          {statistics.map((stat) => (
+            <div className="flex min-w-0 flex-col border-t border-[#ded4c7] pt-5" key={stat.label}>
+              <dt className="order-2 mt-3 text-sm font-medium text-[#59433b]">{stat.label}</dt>
+              <dd className="order-1 text-4xl leading-none font-medium tracking-tight text-[#781216] tabular-nums sm:text-5xl">{stat.value}</dd>
+              <dd className="order-3 mt-1 max-w-56 text-xs leading-relaxed text-[#75645b]">{stat.description}</dd>
             </div>
           ))}
         </dl>

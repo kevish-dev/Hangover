@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createWebsiteHandler } from "../src/seo/handler.mjs";
 import { upcomingSlots } from "../src/seo/metadata.mjs";
+import { trackRecordStatistics } from "../src/seo/track-record.mjs";
 
 const template = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const now = () => new Date("2026-11-17T18:35:00Z");
@@ -53,7 +54,7 @@ function setup({ indexable = true, offline = false, main = festival } = {}) {
     if (path === "/crm-festivals/public") return Response.json({ data: festivals });
     if (path === "/festivals") return Response.json({ data: [legacy] });
     if (path.startsWith("/reviews/")) return Response.json([{ displayName: "Verified traveler", rating: 5, comment: "Great stay", user: { email: "must-stay-private@example.com" } }]);
-    if (path === "/landing-content/track-record") return Response.json({ departures: 3, travelerPlaces: 17, averageRating: 4.5, reviewCount: 2 });
+    if (path === "/landing-content/track-record") return Response.json({ departures: 3, travelerPlaces: 17, travelerBookings: 25, returningBookers: 2, destinations: 6, festivalPackages: 4, averageRating: 4.5, reviewCount: 2 });
     const identifier = path.split("/").at(-1);
     const records = path.startsWith("/crm-trips/public/") ? [trip, unlisted] : path.startsWith("/crm-festivals/public/") ? festivals : [legacy];
     const record = records.find((row) => [row.id, row.publicSlug, row.slug].includes(identifier));
@@ -146,6 +147,20 @@ test("support and guide pages are rendered, and home displays verified counts", 
   assert.match((await get("/custom-trips")).body, /Plan around your group/);
   assert.match((await get("/booking-help")).body, /Changes, cancellations and refunds/);
   assert.match((await get("/guides/mechuka-trip-planning")).body, /<h1>Planning a six-day Mechuka trip<\/h1>/);
-  assert.match((await get("/")).body, /17 traveler places on completed bookings/);
+  const home = (await get("/")).body;
+  assert.match(home, /17 travelers hosted · On completed bookings/);
+  assert.match(home, /25 traveler bookings · Reserved, confirmed and completed/);
+  assert.match(home, /6 destinations to explore/);
+  assert.match(home, /4 festival packages/);
+  assert.match(home, /2 returning bookers/);
   assert.deepEqual(upcomingSlots([{ startDate: "2026-11-17T00:00:00Z" }, { startDate: null }, { startDate: "2026-11-18T00:00:00Z" }], now()), [{ startDate: null }, { startDate: "2026-11-18T00:00:00Z" }]);
+});
+
+test("track record tolerates earlier API responses and suppresses empty or invalid figures", () => {
+  assert.deepEqual(trackRecordStatistics(undefined), []);
+  assert.deepEqual(trackRecordStatistics({ departures: 0, travelerPlaces: 0, averageRating: null, reviewCount: 0 }), []);
+  const legacy = trackRecordStatistics({ departures: 1, travelerPlaces: 4, averageRating: null, reviewCount: 0 });
+  assert.equal(legacy.length, 2);
+  assert.equal(legacy.find((stat) => stat.label === "Travelers hosted").value, "4");
+  assert.equal(trackRecordStatistics({ travelerBookings: -2, destinations: NaN, festivalPackages: Infinity, reviewCount: 1, averageRating: null }).length, 0);
 });

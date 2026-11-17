@@ -1,6 +1,4 @@
 import { catalogName, isListedPublicly, pathOf, upcomingSlots } from "../../seo/metadata.mjs";
-import { relatedGuide } from "../../seo/render.mjs";
-import { pages } from "../../seo/content.mjs";
 import { getReviewsForFestival, getReviewsForTrip } from "../../lib/reviewApi";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, Link, useLocation, useNavigate } from "react-router";
@@ -2088,7 +2086,6 @@ function TripDetailContent({
     staleTime: 60_000,
   });
   const publishedReviews = reviews.filter((review) => review.comment && review.displayName).slice(0, 6);
-  const guidePath = isPublic ? relatedGuide(trip) : undefined;
   const unavailableLabel = trip.slots?.length ? "Sold out" : "Ask about the next departure";
 
   const safeAllImages =
@@ -3472,24 +3469,16 @@ function TripDetailContent({
         )}
       </div>
 
-      {(guidePath || publishedReviews.length > 0 || isPublic) && (
+      {publishedReviews.length > 0 && (
         <section className="mx-auto max-w-6xl px-6 py-10 text-[#1e1a14] sm:px-12">
-          {publishedReviews.length > 0 && (
-            <div className="mb-7">
-              <h2 className="mb-4 text-2xl font-medium text-[#781216]">Reviews from completed bookings</h2>
-              <ul className="grid gap-4 sm:grid-cols-2">
-                {publishedReviews.map((review) => (
-                  <li className="rounded-lg border border-[#ded4c7] bg-white p-5" key={review.id}>
-                    <blockquote className="whitespace-pre-wrap">{review.comment}</blockquote>
-                    <p className="mt-3 text-sm font-medium text-[#781216]">{review.displayName} · {review.rating}/5</p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <ul className="space-y-2 font-medium text-[#781216]">
-            {guidePath && <li><Link className="underline underline-offset-4" to={guidePath}>{pages[guidePath].heading}</Link></li>}
-            {isPublic && <li><Link className="underline underline-offset-4" to="/booking-help">Booking, cancellation and payment help</Link></li>}
+          <h2 className="mb-4 text-2xl font-medium text-[#781216]">Reviews from completed bookings</h2>
+          <ul className="grid gap-4 sm:grid-cols-2">
+            {publishedReviews.map((review) => (
+              <li className="rounded-lg border border-[#ded4c7] bg-white p-5" key={review.id}>
+                <blockquote className="whitespace-pre-wrap">{review.comment}</blockquote>
+                <p className="mt-3 text-sm font-medium text-[#781216]">{review.displayName} · {review.rating}/5</p>
+              </li>
+            ))}
           </ul>
         </section>
       )}

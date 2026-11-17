@@ -1,5 +1,6 @@
 import { CONTACT_EMAIL, CONTACT_PHONE, guidePaths, LOGO_PATH, navigation, pages, SITE_NAME } from "./content.mjs";
 import { absoluteImage, catalogName, pathOf, summary, upcomingSlots } from "./metadata.mjs";
+import { trackRecordStatistics } from "./track-record.mjs";
 
 export const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -52,12 +53,8 @@ function pageBody(path, catalog, trackRecord) {
   if (page.external?.length) links += section("Official information", list(page.external.map(([href, label]) => link(href, label))));
   if (page.inquiry) links += section("Contact Hangover Trails", list([link(`mailto:${CONTACT_EMAIL}`, CONTACT_EMAIL), link(`tel:${CONTACT_PHONE}`, "+91 84159 29069")]));
   if (trackRecord && (path === "/" || path === "/about")) {
-    const facts = [
-      trackRecord.departures > 0 && `${trackRecord.departures.toLocaleString("en-IN")} departures with completed bookings`,
-      trackRecord.travelerPlaces > 0 && `${trackRecord.travelerPlaces.toLocaleString("en-IN")} traveler places on completed bookings`,
-      trackRecord.reviewCount > 0 && `${trackRecord.averageRating?.toFixed(1)}/5 from ${trackRecord.reviewCount} verified reviews`,
-    ].filter(Boolean);
-    links += section("Track record", textList(facts));
+    const facts = trackRecordStatistics(trackRecord).map((stat) => `${stat.value} ${stat.label.toLowerCase()} · ${stat.description}`);
+    links += section("Our track record", textList(facts));
   }
   return `<h1>${escapeHtml(page.heading)}</h1>${para(page.description)}${sections}${links}`;
 }
@@ -76,14 +73,13 @@ function itineraryBody(item) {
   }).join("");
 }
 
-function detailBody(item, kind, related, primary, origin, now, reviews) {
+function detailBody(item, kind, primary, origin, now, reviews) {
   const name = catalogName(item);
   const image = absoluteImage(item.bannerImages?.[0], origin);
   const departures = upcomingSlots(item.slots, now);
   const highlights = (Array.isArray(item.highlights) ? item.highlights : []).map((item) => typeof item === "string" ? item : item?.text);
   const faqs = (Array.isArray(item.faqs) ? item.faqs : []).filter((faq) => faq.question && faq.answer);
   const facts = [item.location, item.duration > 0 && `${item.duration} days`, packagePrice(item)].filter(Boolean);
-  const guide = related && pages[related];
   const bookingPath = `/book/${encodeURIComponent(item.id)}${kind === "festivals" ? "?type=festival" : ""}`;
   const hasSeats = departures.some((slot) => Number(slot.capacity) > Number(slot.filledSpots ?? 0));
   const actions = hasSeats ? link(bookingPath, "See booking options") : link("/booking-help", "Ask about availability");
@@ -95,24 +91,11 @@ function detailBody(item, kind, related, primary, origin, now, reviews) {
     ${section("Trip highlights", textList(highlights))}${section("Day-by-day itinerary", itineraryBody(item))}
     ${section("What’s included", textList(item.inclusions))}${section("What’s excluded", textList(item.exclusions))}
     ${section("Frequently asked questions", faqs.map((faq) => `<h3>${escapeHtml(faq.question)}</h3>${para(faq.answer)}`).join(""))}
-    ${section("Reviews from completed bookings", reviews.map((review) => `<blockquote>${para(review.comment)}${para(`${review.displayName} · ${review.rating}/5`)}</blockquote>`).join(""))}
-    ${guide ? section("Plan your trip", link(related, guide.heading)) : ""}
-    <p>${link("/booking-help", "Booking, cancellation and payment help")}</p>`;
+    ${section("Reviews from completed bookings", reviews.map((review) => `<blockquote>${para(review.comment)}${para(`${review.displayName} · ${review.rating}/5`)}</blockquote>`).join(""))}`;
 }
 
-const guideForSlug = {
-  "ziro-valley-kaziranga-tour-package": "/guides/ziro-valley-trip-planning",
-  "ziro-music-festival-package": "/guides/ziro-valley-trip-planning",
-  "tawang-group-trip": "/guides/tawang-trip-planning",
-  "tawang-college-group-trip": "/guides/tawang-trip-planning",
-  "mechuka-tour-package": "/guides/mechuka-trip-planning",
-  "hornbill-festival-package": "/guides/hornbill-festival-trip-planning",
-  "hornbill-festival-package-two-travelers": "/guides/hornbill-festival-trip-planning",
-};
-export const relatedGuide = (item) => Object.hasOwn(guideForSlug, item.publicSlug) ? guideForSlug[item.publicSlug] : undefined;
-
 export function publicBody({ path, item, kind, catalog, primary, reviews = [], trackRecord, origin, now }) {
-  const body = item ? detailBody(item, kind, relatedGuide(item), primary, origin, now, reviews) : pageBody(path, catalog, trackRecord);
+  const body = item ? detailBody(item, kind, primary, origin, now, reviews) : pageBody(path, catalog, trackRecord);
   return `<div class="seo-page"><header class="seo-nav">${link("/", SITE_NAME)}<nav aria-label="Explore">${navigation.map(([href, label]) => link(href, label)).join("")}</nav></header><main>${body}</main><footer>${link(`mailto:${CONTACT_EMAIL}`, CONTACT_EMAIL)} · ${link("/booking-help", "Booking help")}</footer></div>`;
 }
 

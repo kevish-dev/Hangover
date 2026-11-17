@@ -14,7 +14,7 @@ await mkdir(functionDir, { recursive: true });
 await cp("dist", staticDir, { recursive: true });
 await rm(resolve(staticDir, "index.html"));
 await Promise.all([
-  ...["content.mjs", "handler.mjs", "metadata.mjs", "render.mjs"].map((filename) => copyFile(`src/seo/${filename}`, resolve(functionDir, filename))),
+  ...["content.mjs", "handler.mjs", "metadata.mjs", "render.mjs", "track-record.mjs"].map((filename) => copyFile(`src/seo/${filename}`, resolve(functionDir, filename))),
   copyFile("src/seo/website.mjs", resolve(functionDir, "website.js")),
   writeFile(resolve(functionDir, "package.json"), JSON.stringify({ type: "module" })),
   writeFile(resolve(functionDir, "index.html"), template),
