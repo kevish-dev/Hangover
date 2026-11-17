@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { useNavigate } from "react-router";
+import { Link } from "react-router";
+import { catalogName, pathOf } from "../../seo/metadata.mjs";
 import { mediaImageUrl } from "../../lib/media";
 import { fetchSignatureTrips, type ApiTrip } from "../../lib/tripApi";
 import {
@@ -19,7 +20,6 @@ function formatPrice(price: string | number) {
 export function SignatureDestinations() {
   const [trips, setTrips] = useState<ApiTrip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
     let cancelled = false;
@@ -120,10 +120,9 @@ export function SignatureDestinations() {
           <div className="flex flex-col lg:flex-row items-start" style={{ gap: "0" }}>
             <div style={{ flex: 1 }} className="lg:pr-16 w-full">
               {trips.map((trip, index) => (
-                <button
+                <Link
                   key={trip.id}
-                  type="button"
-                  onClick={() => navigate(`/trips/${trip.id}`)}
+                  to={pathOf("trips", trip)}
                   style={{
                     width: "100%",
                     border: "none",
@@ -144,7 +143,7 @@ export function SignatureDestinations() {
                     </span>
                     <div style={{ minWidth: 0 }}>
                       <TextStaggerHover
-                        text={trip.title}
+                        text={catalogName(trip)}
                         index={index}
                         style={{
                           color: "rgba(30,26,20,0.85)",
@@ -167,10 +166,10 @@ export function SignatureDestinations() {
                       {formatPrice(trip.packages?.[0]?.price || 0)}
                     </span>
                     <span style={{ display: "block", color: "rgba(30,26,20,0.55)", fontSize: "0.65rem", fontWeight: 400, letterSpacing: "0.08em", marginTop: "3px" }}>
-                      {trip.duration} {trip.duration === 1 ? "night" : "nights"}
+                      {trip.duration} {trip.duration === 1 ? "day" : "days"}
                     </span>
                   </div>
-                </button>
+                </Link>
               ))}
             </div>
 

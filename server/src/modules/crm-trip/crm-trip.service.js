@@ -449,6 +449,7 @@ const toPublicTrip = (trip) => {
   return {
     id: trip.id,
     slug: trip.id,
+    publicSlug: trip.publicSlug,
     title: trip.name,
     location: trip.destination?.name || "",
     bannerImages: trip.websiteBannerImages || [],

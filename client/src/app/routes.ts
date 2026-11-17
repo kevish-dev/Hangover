@@ -1,6 +1,7 @@
-import { createBrowserRouter, matchRoutes, redirect } from "react-router";
+import { createBrowserRouter, matchRoutes } from "react-router";
 import type { ComponentType } from "react";
 import Root from "./root";
+import { editorialPaths } from "../seo/content.mjs";
 import { RouteErrorBoundary } from "./components/route-error-boundary";
 
 import { InitialPageLoading, NavigationLayout } from "./components/navigation-status";
@@ -15,6 +16,8 @@ const lazyPage = (load: () => Promise<{ default: ComponentType }>) => {
     }))).default,
   });
 };
+
+const editorialPage = lazyPage(() => import("./pages/editorial"));
 
 export const router = createBrowserRouter([
   {
@@ -37,6 +40,8 @@ export const router = createBrowserRouter([
           { path: "bookings/:bookingId/review", lazy: lazyPage(() => import("./pages/review-submit")) },
           { path: "about", lazy: lazyPage(() => import("./pages/about")) },
           { path: "profile", lazy: lazyPage(() => import("./pages/profile")) },
+          ...editorialPaths.map((path) => ({ path: path.slice(1), lazy: editorialPage })),
+          { path: "*", lazy: lazyPage(() => import("./pages/not-found")) },
         ],
       },
       {
@@ -69,10 +74,6 @@ export const router = createBrowserRouter([
           { path: "notifications", lazy: lazyPage(() => import("./pages/admin/notifications")) },
           { path: "landing", lazy: lazyPage(() => import("./pages/admin/landing-page")) },
         ],
-      },
-      {
-        path: "*",
-        loader: () => redirect("/"),
       },
     ],
   },

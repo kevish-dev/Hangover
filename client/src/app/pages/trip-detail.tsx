@@ -1,3 +1,7 @@
+import { catalogName, isListedPublicly, pathOf, upcomingSlots } from "../../seo/metadata.mjs";
+import { relatedGuide } from "../../seo/render.mjs";
+import { pages } from "../../seo/content.mjs";
+import { getReviewsForFestival, getReviewsForTrip } from "../../lib/reviewApi";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, Link, useLocation, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
@@ -198,7 +202,7 @@ function RelatedCard({ trip }: { trip: ApiTrip }) {
 
   return (
     <Link
-      to={`/trips/${trip.id}`}
+      to={pathOf("trips", trip)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -1176,7 +1180,11 @@ export default function TripDetail() {
     userId: user?.id,
     isLoading: authLoading,
   }));
-  const trip: any = detailQuery.data; // ApiTrip or ApiFestival
+  const trip: any = useMemo(() => {
+    const data = detailQuery.data;
+    if (!data || shareToken || !isListedPublicly(data) || !Array.isArray(data.slots)) return data;
+    return { ...data, slots: upcomingSlots(data.slots) };
+  }, [detailQuery.data, shareToken]);
   const { data: bookings = [] } = useQuery(checkoutBookingsQuery(user?.id));
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const belongsToCurrentItem = (booking: any) => {
@@ -1288,7 +1296,7 @@ export default function TripDetail() {
             total + Math.max(0, slot.capacity - (slot.filledSpots || 0)),
           0,
         )
-      : spotsLeft(trip.capacity, trip.filledSpots);
+      : Array.isArray(trip.slots) ? 0 : spotsLeft(trip.capacity, trip.filledSpots);
   const tags = trip.tripTags?.map((t: any) => t.tag) || [];
   const stayItems = (
     Array.isArray(trip.stayTransportImages) ? trip.stayTransportImages : []
@@ -2072,6 +2080,16 @@ function TripDetailContent({
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [interestModalOpen, setInterestModalOpen] = useState(false);
+  const isPublic = isListedPublicly(trip) && !new URLSearchParams(window.location.search).has("share");
+  const { data: reviews = [] } = useQuery({
+    queryKey: ["public", "reviews", isFestival ? "festival" : "trip", trip.id],
+    queryFn: () => isFestival ? getReviewsForFestival(trip.id) : getReviewsForTrip(trip.id),
+    enabled: isPublic,
+    staleTime: 60_000,
+  });
+  const publishedReviews = reviews.filter((review) => review.comment && review.displayName).slice(0, 6);
+  const guidePath = isPublic ? relatedGuide(trip) : undefined;
+  const unavailableLabel = trip.slots?.length ? "Sold out" : "Ask about the next departure";
 
   const safeAllImages =
     allImages.length > 0 ? allImages : [heroImage].filter(Boolean);
@@ -2617,7 +2635,7 @@ function TripDetailContent({
                 margin: "0 0 10px",
               }}
             >
-              {trip.title}
+              {isPublic ? catalogName(trip) : trip.title}
             </h1>
             <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
               <MapPin size={13} color="#C8A96E" />
@@ -2677,7 +2695,7 @@ function TripDetailContent({
                   value:
                     trip.slots && trip.slots.length > 0
                       ? trip.slots.length === 1
-                        ? `${new Date(trip.slots[0].startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                        ? (trip.slots[0].startDate ? new Date(trip.slots[0].startDate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", month: "short", day: "numeric", year: "numeric" }) : "Dates on request")
                         : `${trip.slots.length} Slots Available`
                       : null,
                 },
@@ -3055,7 +3073,7 @@ function TripDetailContent({
                       margin: "4px 0 0",
                     }}
                   >
-                    per person, all inclusive
+                    See package inclusions
                   </p>
                 </div>
 
@@ -3074,7 +3092,7 @@ function TripDetailContent({
                     { label: "Duration", val: durationStr },
                     {
                       label: "Availability",
-                      val: spots > 0 ? `${spots} spots left` : "Fully booked",
+                      val: spots > 0 ? `${spots} spots left` : unavailableLabel,
                     },
                   ].map(({ label, val }) => (
                     <div
@@ -3428,7 +3446,7 @@ function TripDetailContent({
               fontWeight: 500,
             }}
           >
-            {spots > 0 ? `${spots} spots available` : "Currently sold out"}
+            {spots > 0 ? `${spots} spots available` : unavailableLabel}
           </p>
         </div>
 
@@ -3448,11 +3466,33 @@ function TripDetailContent({
             Book Now
           </Link>
         ) : (
-          <div className="mobile-booking-action mobile-booking-action-disabled">
-            Sold Out
-          </div>
+          <a className="mobile-booking-action" href={waLink} target="_blank" rel="noopener noreferrer">
+            Ask us
+          </a>
         )}
       </div>
+
+      {(guidePath || publishedReviews.length > 0 || isPublic) && (
+        <section className="mx-auto max-w-6xl px-6 py-10 text-[#1e1a14] sm:px-12">
+          {publishedReviews.length > 0 && (
+            <div className="mb-7">
+              <h2 className="mb-4 text-2xl font-medium text-[#781216]">Reviews from completed bookings</h2>
+              <ul className="grid gap-4 sm:grid-cols-2">
+                {publishedReviews.map((review) => (
+                  <li className="rounded-lg border border-[#ded4c7] bg-white p-5" key={review.id}>
+                    <blockquote className="whitespace-pre-wrap">{review.comment}</blockquote>
+                    <p className="mt-3 text-sm font-medium text-[#781216]">{review.displayName} · {review.rating}/5</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <ul className="space-y-2 font-medium text-[#781216]">
+            {guidePath && <li><Link className="underline underline-offset-4" to={guidePath}>{pages[guidePath].heading}</Link></li>}
+            {isPublic && <li><Link className="underline underline-offset-4" to="/booking-help">Booking, cancellation and payment help</Link></li>}
+          </ul>
+        </section>
+      )}
 
       {/* ── Related Trips ── */}
       {!isFestival && (

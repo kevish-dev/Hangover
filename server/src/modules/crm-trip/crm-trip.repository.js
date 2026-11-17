@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { publicCatalogSlug } from "../../utils/public-catalog-slug.js";
 import { prisma } from "../../prisma/client.js";
 
 export const CRM_TRIP_INCLUDE = {
@@ -72,8 +74,8 @@ export const findSignatureTripOptions = () => prisma.crmTrip.findMany({
   include: PUBLIC_CRM_TRIP_INCLUDE,
 });
 
-export const findPublicById = (id) => prisma.crmTrip.findFirst({
-  where: { id, isActive: true, isPublished: true },
+export const findPublicById = (identifier) => prisma.crmTrip.findFirst({
+  where: { OR: [{ id: identifier }, { publicSlug: identifier }], isActive: true, isPublished: true },
   include: CRM_TRIP_INCLUDE,
 });
 
@@ -97,6 +99,11 @@ export const findDayById = (id, client = prisma) => client.crmTripItineraryDay.f
   include: { trip: true, stayLocation: true, property: { include: { stayLocation: true } }, dropOffLocation: true, visitingPlaces: { include: { place: true } }, activities: true, commonInclusions: true },
 });
 
-export const create = (data, client = prisma) => client.crmTrip.create({ data });
+export const create = (data, client = prisma) => {
+  const id = randomUUID();
+  return client.crmTrip.create({
+    data: { ...data, id, publicSlug: publicCatalogSlug(data.name, id, "trip") },
+  });
+};
 export const update = (id, data, client = prisma) => client.crmTrip.update({ where: { id }, data });
 export const remove = (id, client = prisma) => client.crmTrip.delete({ where: { id } });

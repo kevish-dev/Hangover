@@ -390,6 +390,7 @@ model TransferLocation {
 
 model CrmTrip {
   id                         String                   @id @default(uuid())
+  publicSlug                 String?                  @unique
   name                       String
   numberOfNights             Int
   totalAmount                Decimal?                 @db.Decimal(10, 2)
@@ -541,6 +542,7 @@ model CrmTripInclusion {
 
 model CrmFestival {
   id                         String                       @id @default(uuid())
+  publicSlug                 String?                  @unique
   name                       String
   numberOfNights             Int
   totalAmount                Decimal?                     @db.Decimal(10, 2)
@@ -1160,6 +1162,7 @@ model Review {
   festivalId  String?
   bookingId   String    @unique
   isPublished Boolean   @default(true)
+  publicConsent Boolean @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import { MapPin, Mail, Phone, Instagram, ArrowRight, Send, CheckCircle } from "lucide-react";
 import { apiClient } from "../../lib/axios";
+import { captureDiscoveryConversion } from "../../lib/telemetry";
 import { toast } from "sonner";
 import { showErrorToast } from "../../lib/errors";
 
@@ -27,19 +28,18 @@ const NAV_COLS = [
   {
     heading: "Explore",
     links: [
-      { label: "Signature Destinations", url: "#" },
-      { label: "Types of Trips", url: "#" },
-      { label: "Featured Festivals", url: "#" },
-      { label: "Hidden Gems", url: "#" }
+      { label: "Group Trips", url: "/trips" },
+      { label: "Festival Packages", url: "/festivals" },
+      { label: "Custom Trips", url: "/custom-trips" },
+      { label: "College Trips", url: "/college-trips" },
+      { label: "Travel Guides", url: "/guides" },
     ],
   },
   {
     heading: "Company",
     links: [
-      { label: "Our Story", url: "#" },
-      { label: "Our Journey", url: "#" },
-      { label: "Travel Blog", url: "#" },
-      { label: "Careers", url: "#" }
+      { label: "About Hangover Trails", url: "/about" },
+      { label: "Booking & Refund Help", url: "/booking-help" },
     ],
   },
   {
@@ -48,7 +48,6 @@ const NAV_COLS = [
       { label: "Instagram", url: "https://www.instagram.com/hangovertrails/" },
       { label: "WhatsApp Us", url: "https://wa.me/918415929069" },
       { label: "Email Us", url: "mailto:experience@hangovertrails.com" },
-      { label: "Community", url: "#" }
     ],
   },
 ];
@@ -103,6 +102,7 @@ export function SiteFooter() {
         tripType: mappedTripType,
         message: values.message,
       });
+      captureDiscoveryConversion("trip inquiry submitted");
       setSubmitted(true);
       toast.success("Inquiry sent successfully", { description: "Our team will reach out within 24 hours." });
     } catch (error: unknown) {
@@ -527,23 +527,8 @@ export function SiteFooter() {
             paddingBottom: "clamp(1.5rem,3vw,2rem)",
           }}>
             <p style={{ color: "rgba(242,237,228,0.22)", fontSize: "0.68rem", fontWeight: 300, letterSpacing: "0.06em", margin: 0 }}>
-              © 2025 Hangover Trails. All rights reserved.
+              © {new Date().getFullYear()} Hangover Trails. All rights reserved.
             </p>
-            {/* <div style={{ display: "flex", gap: "20px" }}>
-              {["Privacy Policy", "Terms of Service", "Refund Policy"].map((item) => (
-                <button key={item} style={{
-                  background: "none", border: "none", padding: 0,
-                  color: "rgba(242,237,228,0.22)", fontSize: "0.68rem",
-                  fontFamily: "'Poppins', sans-serif", letterSpacing: "0.06em",
-                  cursor: "pointer", transition: "color 0.2s ease",
-                }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(242,237,228,0.55)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(242,237,228,0.22)")}
-                >
-                  {item}
-                </button>
-              ))}
-            </div> */}
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#b8943a" }} />
               <span style={{ color: "rgba(242,237,228,0.22)", fontSize: "0.65rem", letterSpacing: "0.1em" }}>

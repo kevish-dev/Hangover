@@ -1,3 +1,4 @@
+import { catalogName, pathOf } from "../../seo/metadata.mjs";
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Link } from "react-router";
@@ -823,7 +824,7 @@ function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
         {heroImage ? (
           <img
             src={mediaImageUrl(heroImage, { width: 640, height: 400 })}
-            alt={trip.title}
+            alt={catalogName(trip)}
             loading="lazy"
             decoding="async"
             style={{
@@ -948,7 +949,7 @@ function TripCard({ trip, index }: { trip: ApiTrip; index: number }) {
             margin: "0 0 6px",
           }}
         >
-          {trip.title || <NA />}
+          {trip.title ? catalogName(trip) : <NA />}
         </h3>
         <p
           style={{
@@ -1752,10 +1753,10 @@ export default function TripsPage() {
               margin: "0 0 16px",
             }}
           >
-            Find your kind of{" "}
+            Northeast India{" "}
             <strong>
               <em style={{ color: "#C8A96E", fontStyle: "italic" }}>
-                experience.
+                group trips.
               </em>
             </strong>
           </h1>
@@ -1771,7 +1772,7 @@ export default function TripsPage() {
           >
             {loading
               ? "Loading trips…"
-              : `${trips.length} handcrafted trips across India and beyond — each one built around real experiences.`}
+              : `${trips.length} trips and festivals to explore, with itineraries, departures and package inclusions.`}
           </p>
         </div>
       </div>

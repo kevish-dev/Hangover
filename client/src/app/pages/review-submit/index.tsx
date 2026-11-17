@@ -13,12 +13,13 @@ export default function ReviewSubmitPage() {
   const [hoverRating, setHoverRating] = useState<number>(0);
   const [comment, setComment] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
+  const [publicConsent, setPublicConsent] = useState(false);
 
   const submitMutation = useMutation({
     mutationFn: async () => {
       if (!bookingId) throw new Error("Booking ID missing");
       if (rating === 0) throw new Error("Please select a rating");
-      return submitReview({ bookingId, rating, comment: comment.trim() || undefined });
+      return submitReview({ bookingId, rating, comment: comment.trim() || undefined, publicConsent });
     },
     onSuccess: () => {
       setIsSuccess(true);
@@ -95,12 +96,18 @@ export default function ReviewSubmitPage() {
               <textarea
                 id="comment"
                 rows={4}
+                maxLength={3000}
                 className="w-full rounded-xl border border-gray-200 p-4 text-gray-700 placeholder-gray-400 focus:border-[#781216] focus:ring-[#781216] transition-all resize-none"
                 placeholder="What did you love? What could we improve?"
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
               />
             </div>
+
+            <label className="flex items-start gap-3 text-sm text-gray-700">
+              <input type="checkbox" className="mt-0.5" checked={publicConsent} onChange={(event) => setPublicConsent(event.target.checked)} />
+              Allow Hangover Trails to publish my rating and comment as a verified traveler.
+            </label>
 
             {/* Submit */}
             <button

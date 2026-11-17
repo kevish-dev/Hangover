@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { publicCatalogSlug } from "../../utils/public-catalog-slug.js";
 import { prisma } from "../../prisma/client.js";
 
 export const CRM_FESTIVAL_INCLUDE = {
@@ -54,8 +56,8 @@ export const findFeaturedPublic = () => prisma.crmFestival.findMany({
   include: PUBLIC_CRM_FESTIVAL_INCLUDE,
 });
 
-export const findPublicById = (id) => prisma.crmFestival.findFirst({
-  where: { id, isActive: true, isPublished: true },
+export const findPublicById = (identifier) => prisma.crmFestival.findFirst({
+  where: { OR: [{ id: identifier }, { publicSlug: identifier }], isActive: true, isPublished: true },
   include: CRM_FESTIVAL_INCLUDE,
 });
 
@@ -65,6 +67,11 @@ export const findDayById = (id, client = prisma) => client.crmFestivalItineraryD
   include: { festival: true, stayLocation: true, property: { include: { stayLocation: true } }, dropOffLocation: true, visitingPlaces: { include: { place: true } }, activities: true, commonInclusions: true },
 });
 
-export const create = (data, client = prisma) => client.crmFestival.create({ data });
+export const create = (data, client = prisma) => {
+  const id = randomUUID();
+  return client.crmFestival.create({
+    data: { ...data, id, publicSlug: publicCatalogSlug(data.name, id, "festival") },
+  });
+};
 export const update = (id, data, client = prisma) => client.crmFestival.update({ where: { id }, data });
 export const remove = (id, client = prisma) => client.crmFestival.delete({ where: { id } });

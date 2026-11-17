@@ -1,9 +1,11 @@
 import type { PostHog } from "posthog-js";
+import { getDiscoveryChannel, saveDiscoveryChannel } from "./discovery";
 import { isConnectionConstrained } from "./connection";
 
 let analytics: PostHog | undefined;
 
 export function startTelemetry() {
+  saveDiscoveryChannel();
   const load = async () => {
     try {
       const { default: posthog } = await import("posthog-js");
@@ -42,4 +44,20 @@ export function getTelemetryIds() {
     sessionId: analytics?.get_session_id(),
     distinctId: analytics?.get_distinct_id(),
   };
+}
+
+export function captureDiscoveryConversion(event: "trip inquiry submitted" | "trip booking confirmed", bookingId?: string) {
+  if (!analytics || new URLSearchParams(window.location.search).has("share")) return;
+  const channel = getDiscoveryChannel();
+  if (!channel) return;
+  try {
+    if (bookingId) {
+      const key = `hangover_confirmation_reported:${bookingId}`;
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "true");
+    }
+    analytics.capture(event, { discovery_channel: channel });
+  } catch {
+    // A failed analytics request must never affect a booking or inquiry.
+  }
 }

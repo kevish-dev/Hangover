@@ -1,7 +1,15 @@
 import { Router } from "express";
 import { optionalAuth, requireAuth, requireAdmin } from "../../core/middlewares/auth.middleware.js";
 import { prisma } from "../../prisma/client.js";
+import { getTrackRecord } from "./track-record.js";
 const router = Router();
+router.get("/track-record", async (req, res, next) => {
+  try {
+    res.json(await getTrackRecord());
+  } catch (error) {
+    next(error);
+  }
+});
 const models = { footprints: prisma.landingFootprint, journey: prisma.landingJourneyMilestone };
 const fields = { footprints: ["value","suffix","label","sublabel","sortOrder","isActive"], journey: ["period","title","tagline","description","iconName","sortOrder","isActive"] };
 const valid = (type) => models[type];

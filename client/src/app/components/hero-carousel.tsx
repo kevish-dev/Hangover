@@ -1,9 +1,10 @@
+import { pathOf } from "../../seo/metadata.mjs";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { isConnectionConstrained } from "../../lib/connection";
 import { ArrowRight, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { mediaImageUrl } from "../../lib/media";
 import { fetchFeaturedTrips } from "../../lib/tripApi";
 
@@ -15,6 +16,7 @@ interface FeaturedTrip {
   id: string;
   title: string;
   slug: string;
+  publicSlug?: string | null;
   overview?: string;
   location: string;
   duration: number;
@@ -27,13 +29,11 @@ interface FeaturedTrip {
 const FALLBACK_TRIPS: FeaturedTrip[] = [
   {
     id: "fallback-1",
-    title: "Santorini",
-    slug: "santorini",
-    location: "Greece",
-    duration: 8,
-    price: 206000,
-    bannerImages:
-      "https://images.unsplash.com/photo-1507501336603-6e31db2be093?w=1920&h=1080&fit=crop&auto=format",
+    title: "Northeast India",
+    slug: "",
+    location: "India",
+    duration: 0,
+    bannerImages: "",
   },
 ];
 
@@ -245,7 +245,7 @@ export function HeroCarousel() {
           transition={{ duration: 1.1, ease: [0.25, 0.1, 0.25, 1] }}
           className="absolute inset-0"
         >
-          <img
+          {slide.id !== "fallback-1" && <img
             src={mediaImageUrl(slide.bannerImages, { width: 1920, fit: "fit" })}
             srcSet={slide.bannerImages?.includes("res.cloudinary.com") ? [640, 960, 1440, 1920].map(
               (width) => `${mediaImageUrl(slide.bannerImages, { width, fit: "fit" })} ${width}w`,
@@ -260,7 +260,7 @@ export function HeroCarousel() {
             fetchPriority="high"
             decoding="async"
             className="w-full h-full object-cover"
-          />
+          />}
         </motion.div>
       </AnimatePresence>
 
@@ -354,8 +354,7 @@ export function HeroCarousel() {
                       fontSize: "0.88rem",
                     }}
                   >
-                    {slide.duration}{" "}
-                    {slide.duration === 1 ? "Day" : "Days"}
+                    {slide.duration ? `${slide.duration} ${slide.duration === 1 ? "day" : "days"}` : "Flexible"}
                   </div>
                 </div>
                 <div className="w-px h-8 bg-[#f2ede4]/30" />
@@ -378,14 +377,14 @@ export function HeroCarousel() {
                       fontSize: "0.88rem",
                     }}
                   >
-                    From ₹{slide.price?.toLocaleString("en-IN") ?? "N/A"}
+                    {slide.price ? `From ₹${slide.price.toLocaleString("en-IN")}` : "Ask for a quote"}
                   </div>
                 </div>
               </div>
 
               {/* Explore CTA */}
-              <button
-                onClick={() => navigate(`/trips/${slide.id}`)}
+              <Link
+                to={slide.id === "fallback-1" ? "/trips" : pathOf("trips", slide)}
                 className="group active:scale-95 transition-all duration-300 mt-8"
                 style={{
                   background: "#C8A96E",
@@ -414,7 +413,7 @@ export function HeroCarousel() {
                   size={14}
                   className="group-hover:translate-x-1 transition-transform duration-300"
                 />
-              </button>
+              </Link>
           </motion.div>
         </div>
       </div>

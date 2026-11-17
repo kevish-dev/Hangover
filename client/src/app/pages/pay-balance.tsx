@@ -1,3 +1,4 @@
+import { captureDiscoveryConversion } from "../../lib/telemetry";
 import { SessionUnavailable } from "../components/SessionUnavailable";
 import { loadRazorpay } from "../../lib/razorpay";
 import { useEffect, useMemo, useState, useRef } from "react";
@@ -241,7 +242,8 @@ function PayBalance({ bookingId }: { bookingId?: string }) {
     apiClient
       .post("/payments/verify", pendingVerify)
       .then(async () => {
-        await refetch();
+        const refreshed = await refetch();
+        if (refreshed.data?.status === "CONFIRMED") captureDiscoveryConversion("trip booking confirmed", bookingId);
         setProcessing(false);
         setPaymentStep("success");
       })
@@ -249,6 +251,7 @@ function PayBalance({ bookingId }: { bookingId?: string }) {
         const refreshed = await refetch().catch(() => null);
         const refreshedBooking = refreshed?.data;
         if (refreshedBooking?.paymentStatus === "PAID" || refreshedBooking?.status === "CONFIRMED") {
+          if (refreshedBooking.status === "CONFIRMED") captureDiscoveryConversion("trip booking confirmed", bookingId);
           setProcessing(false);
           setPaymentStep("success");
           return;
@@ -258,7 +261,7 @@ function PayBalance({ bookingId }: { bookingId?: string }) {
         setPaymentStep("failed");
       })
       .finally(() => { verifyInFlight.current = null; });
-  }, [pendingVerify, paymentStep, refetch]);
+  }, [pendingVerify, paymentStep, refetch, bookingId]);
 
   useEffect(() => {
     if (paymentStep !== "form") {

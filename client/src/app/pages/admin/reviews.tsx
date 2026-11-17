@@ -3,7 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, MessageSquare, Star, Trash2, Eye, EyeOff, Search } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { getAllReviews, toggleReviewVisibility, deleteReview } from "../../../lib/reviewApi";
+import { getAllReviews, toggleReviewVisibility, deleteReview, type Review } from "../../../lib/reviewApi";
+
+function reviewTripName(review: Review) {
+  return review.booking?.crmTrip?.name || review.booking?.crmFestival?.name
+    || review.booking?.crmTripSlot?.crmTrip.name || review.booking?.crmFestivalSlot?.crmFestival.name
+    || review.customTrip?.title || review.trip?.title || review.festival?.title || "Unknown";
+}
 
 export default function AdminReviewsPage() {
   const queryClient = useQueryClient();
@@ -35,7 +41,7 @@ export default function AdminReviewsPage() {
   const filteredReviews = reviews.filter((r) => {
     const text = (r.comment || "").toLowerCase();
     const reviewerName = (r.user?.profile?.fullName || "").toLowerCase();
-    const tripName = (r.customTrip?.title || r.trip?.title || r.festival?.title || "").toLowerCase();
+    const tripName = reviewTripName(r).toLowerCase();
     const query = searchQuery.toLowerCase();
     
     return text.includes(query) || reviewerName.includes(query) || tripName.includes(query);
@@ -90,7 +96,7 @@ export default function AdminReviewsPage() {
                   <div className="flex items-center gap-3 flex-wrap">
                     <h3 className="text-base text-gray-950 font-semibold">{review.user?.profile?.fullName || "Anonymous"}</h3>
                     <span className="bg-gray-50 border border-gray-100 text-gray-500 text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full">
-                      {review.customTrip?.title || review.trip?.title || review.festival?.title || "Unknown"}
+                      {reviewTripName(review)}
                     </span>
                   </div>
                 </div>
@@ -102,11 +108,11 @@ export default function AdminReviewsPage() {
                     ))}
                   </div>
                   <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-                    review.isPublished ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60" : "bg-gray-50 text-gray-500 border border-gray-200/60"
+                    (review.isPublished && review.publicConsent) ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60" : "bg-gray-50 text-gray-500 border border-gray-200/60"
                   }`}>
-                    {review.isPublished && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>}
-                    {!review.isPublished && <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>}
-                    {review.isPublished ? "Published" : "Hidden"}
+                    {review.isPublished && review.publicConsent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>}
+                    {(!review.isPublished || !review.publicConsent) && <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>}
+                    {(review.isPublished && review.publicConsent) ? "Published" : review.publicConsent ? "Hidden" : "Private feedback"}
                   </span>
                 </div>
               </div>
@@ -117,11 +123,12 @@ export default function AdminReviewsPage() {
               
               <div className="flex justify-end gap-2 mt-2">
                 <button
+                  disabled={!review.publicConsent || toggleMutation.isPending}
                   onClick={() => toggleMutation.mutate(review.id)}
                   className="p-2 text-gray-400 hover:text-gray-900 transition-colors duration-200 flex items-center justify-center rounded-full hover:bg-gray-50"
-                  title={review.isPublished ? "Hide Review" : "Publish Review"}
+                  title={(review.isPublished && review.publicConsent) ? "Hide Review" : "Publish Review"}
                 >
-                  {review.isPublished ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {(review.isPublished && review.publicConsent) ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
                 <button
                   onClick={() => {

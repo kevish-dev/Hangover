@@ -1,3 +1,4 @@
+import { notifyCatalogChange, publicCatalogPath } from "../../utils/index-now.js";
 import * as service from "./crm-festival.service.js";
 
 export const listFestivals = async (req, res, next) => {
@@ -37,22 +38,29 @@ export const getFestival = async (req, res, next) => {
 };
 export const createFestival = async (req, res, next) => {
   try {
-    res.status(201).json(await service.createFestival(req.body));
+    const item = await service.createFestival(req.body);
+    res.status(201).json(item);
+    void publicCatalogPath("festivals", item.id).then((path) => notifyCatalogChange("festivals", path));
   } catch (error) {
     next(error);
   }
 };
 export const updateFestival = async (req, res, next) => {
   try {
-    res.json(await service.updateFestival(req.params.id, req.body));
+    const previousPath = await publicCatalogPath("festivals", req.params.id);
+    const item = await service.updateFestival(req.params.id, req.body);
+    res.json(item);
+    void publicCatalogPath("festivals", item.id).then((path) => notifyCatalogChange("festivals", previousPath, path));
   } catch (error) {
     next(error);
   }
 };
 export const deleteFestival = async (req, res, next) => {
   try {
+    const previousPath = await publicCatalogPath("festivals", req.params.id);
     await service.deleteFestival(req.params.id);
     res.status(204).send();
+    notifyCatalogChange("festivals", previousPath);
   } catch (error) {
     next(error);
   }

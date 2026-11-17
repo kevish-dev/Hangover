@@ -1,1 +1,11 @@
 # Hangover Trails
+
+`npm run build` builds the Vite client. `npm run build:vercel` additionally builds the Vercel deployment output for the public website, including the Node renderer and static assets. `npm run test:seo` tests crawler responses without calling production services.
+
+For production, the Vercel project uses the `client` root directory, the build command in `vercel.json`, the canonical `hangovertrails.com` domain and the standard `VERCEL_ENV` system variable. Apply the backend Prisma migrations before activating the frontend deployment. `SEO_API_BASE_URL` can override the renderer’s API base (defaults to `VITE_API_URL` or the production API).
+
+- Verify production `/`, `/trips`, `/festivals` and sample detail routes deliver their public HTML without JavaScript. Check the index tag, canonical, structured data, `robots.txt`, `sitemap.xml` and `llms.txt`. Preview versions are marked `noindex`.
+- Submit `https://hangovertrails.com/sitemap.xml` in Google Search Console and Bing Webmaster Tools. Inspect representative old and new URLs and confirm which canonicals Google selects.
+- For IndexNow, set `SEO_INDEXNOW_KEY` to the same randomly generated value in the Vercel production environment and backend environment. Verify `https://hangovertrails.com/<key>.txt` serves the key before enabling backend notifications. Successful CRM trip and festival create, edit and delete requests submit affected public URLs. The sitemap reflects the catalog independently of notifications.
+- Use PostHog’s `trip inquiry submitted` and `trip booking confirmed` events with `discovery_channel` for recognized search and AI referral traffic. The booking event requires a confirmed status returned by the API after online payment. Audit Search Console indexing, non-branded search queries and AI citation accuracy separately.
+- Travelers can opt into public reviews. An admin publishes opted-in reviews from the review dashboard. Public review responses use an anonymous display name and public review fields. The track record counts completed bookings across legacy and CRM records. Traveler places count seats across bookings, and departures count distinct recorded slots with a completed booking.

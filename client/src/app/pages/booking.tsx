@@ -1,3 +1,5 @@
+import { getDiscoveryChannel } from "../../lib/discovery";
+import { captureDiscoveryConversion } from "../../lib/telemetry";
 import { loadRazorpay } from "../../lib/razorpay";
 import { useState, useEffect, useRef } from "react";
 import { useParams, Link, useSearchParams, useNavigate } from "react-router";
@@ -1102,7 +1104,12 @@ function BookingForm({ slug }: { slug?: string }) {
         razorpayPaymentId: pendingVerify.razorpayPaymentId,
         razorpaySignature: pendingVerify.razorpaySignature,
       })
-      .then(() => {
+      .then(({ data }) => {
+        if (data?.bookingId && getDiscoveryChannel() && !new URLSearchParams(window.location.search).has("share")) {
+          void apiClient.get(`/bookings/${encodeURIComponent(data.bookingId)}`).then(({ data: booking }) => {
+            if (booking?.status === "CONFIRMED") captureDiscoveryConversion("trip booking confirmed", data.bookingId);
+          }).catch(() => undefined);
+        }
         setSuccessData({
           bookingReference: pendingVerify.bookingReference,
           amountPaid: pendingVerify.amountPaid,
@@ -3064,8 +3071,7 @@ function BookingForm({ slug }: { slug?: string }) {
                   lineHeight: 1.6,
                 }}
               >
-                By submitting, you agree to Hangover Trails' booking terms and
-                cancellation policy.
+                By submitting, you agree to Hangover Trails’ booking terms and cancellation policy. <Link className="underline underline-offset-4" to="/booking-help" target="_blank" rel="noopener noreferrer">Booking help</Link>
               </p>
             </div>
           </form>

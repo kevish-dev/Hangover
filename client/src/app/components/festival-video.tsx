@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
+import { pathOf } from "../../seo/metadata.mjs";
 import { ArrowRight, Calendar, MapPin } from "lucide-react";
 import { canAutoplayVideo } from "../../lib/connection";
 import { fetchFeaturedFestivals, type ApiFestival } from "../../lib/festivalApi";
@@ -18,7 +19,6 @@ function formatFestivalDate(festival: ApiFestival) {
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export function FestivalVideo() {
-  const navigate = useNavigate();
   const { data, isPending: isLoading } = useQuery({
     queryKey: ["public", "featured-festivals"],
     queryFn: ({ signal }) => fetchFeaturedFestivals(signal),
@@ -115,7 +115,7 @@ export function FestivalVideo() {
                       date: formatFestivalDate(festival),
                       tag: festival.bestTimeToVisit || "Featured Festival",
                     }}
-                    onClick={() => navigate(`/festivals/${festival.id}`)}
+                    to={pathOf("festivals", festival)}
                   />
                 ))}
               </div>
@@ -243,15 +243,14 @@ function FestivalMedia({ festival }: { festival: ApiFestival }) {
 
 function FestivalChip({
   festival,
-  onClick,
+  to,
 }: {
   festival: { name: string; place: string; date: string; tag: string };
-  onClick: () => void;
+  to: string;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <Link
+      to={to}
       style={{
         display: "inline-flex",
         flexDirection: "column",
@@ -368,6 +367,6 @@ function FestivalChip({
           </span>
         </span>
       </div>
-    </button>
+    </Link>
   );
 }

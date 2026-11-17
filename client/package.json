@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "dev": "vite"
+    "dev": "vite",
+    "build:vercel": "vite build && node scripts/package-vercel.mjs",
+    "test:seo": "node --test test/seo.test.mjs"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",

@@ -64,6 +64,7 @@ export interface ApiFestival {
   id: string;
   title: string;
   slug: string;
+  publicSlug?: string | null;
   location: string;
   bannerImages: string[];
   videoUrl: string | null;
@@ -79,6 +80,7 @@ export interface ApiFestival {
   packages?: any[];
   isActive: boolean;
   isPublished: boolean;
+  isListed?: boolean;
   isFeatured: boolean;
   destinationId: string | null;
   destination: ApiDestination | null;

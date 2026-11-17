@@ -57,6 +57,7 @@ export interface ApiTrip {
   id: string;
   title: string;
   slug: string;
+  publicSlug?: string | null;
   location: string;
   bannerImages: string[];
   duration: number;

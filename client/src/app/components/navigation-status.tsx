@@ -1,5 +1,6 @@
 import { Outlet, ScrollRestoration, useNavigation } from "react-router";
 import { useSyncExternalStore } from "react";
+import { RouteSeo } from "./route-seo";
 
 function subscribeToConnection(notify: () => void) {
   window.addEventListener("online", notify);
@@ -47,6 +48,7 @@ export function InitialPageLoading() {
 export function NavigationLayout() {
   return (
     <>
+      <RouteSeo />
       <NavigationStatus />
       <Outlet />
       <ScrollRestoration />

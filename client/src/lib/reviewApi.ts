@@ -1,7 +1,14 @@
 import { apiClient } from "./axios";
 
 export interface Review {
-  customTrip: any;
+  customTrip?: { title: string } | null;
+  publicConsent: boolean;
+  booking?: {
+    crmTrip?: { name: string } | null;
+    crmFestival?: { name: string } | null;
+    crmTripSlot?: { crmTrip: { name: string } } | null;
+    crmFestivalSlot?: { crmFestival: { name: string } } | null;
+  };
   id: string;
   rating: number;
   comment: string | null;
@@ -25,18 +32,26 @@ export interface Review {
   } | null;
 }
 
-export const submitReview = async (data: { bookingId: string; rating: number; comment?: string }): Promise<Review> => {
+export interface PublicReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  displayName: string;
+}
+
+export const submitReview = async (data: { bookingId: string; rating: number; comment?: string; publicConsent: boolean }): Promise<Review> => {
   const response = await apiClient.post<Review>("/reviews", data);
   return response.data;
 };
 
-export const getReviewsForTrip = async (tripId: string): Promise<Review[]> => {
-  const response = await apiClient.get<Review[]>(`/reviews/trip/${tripId}`);
+export const getReviewsForTrip = async (tripId: string): Promise<PublicReview[]> => {
+  const response = await apiClient.get<PublicReview[]>(`/reviews/trip/${tripId}`);
   return response.data;
 };
 
-export const getReviewsForFestival = async (festivalId: string): Promise<Review[]> => {
-  const response = await apiClient.get<Review[]>(`/reviews/festival/${festivalId}`);
+export const getReviewsForFestival = async (festivalId: string): Promise<PublicReview[]> => {
+  const response = await apiClient.get<PublicReview[]>(`/reviews/festival/${festivalId}`);
   return response.data;
 };
 

@@ -191,7 +191,7 @@ export function Testimonials() {
             maxWidth: "440px",
             margin: "0 auto",
           }}>
-            Every review below is from a real traveler who trusted us with their time, money, and memories.
+            Travelers share their experiences with our itineraries, stays, guides and support.
           </p>
         </motion.div>
 

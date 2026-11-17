@@ -398,6 +398,7 @@ const toPublicFestival = (festival) => {
     id: festival.id,
     title: festival.name,
     slug: festival.id,
+    publicSlug: festival.publicSlug,
     location: festival.destination?.name || "",
     duration: festival.numberOfNights + 1,
     bannerImages: festival.websiteBannerImages || [],
@@ -458,6 +459,7 @@ const toPublicFestival = (festival) => {
     isInterestFormEnabled: Boolean(festival.isInterestFormEnabled),
     isCrmTrip: true,
     isCrmFestival: true,
+    updatedAt: festival.updatedAt,
   };
 };
 

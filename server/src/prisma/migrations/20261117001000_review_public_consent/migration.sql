@@ -1,0 +1,5 @@
+BEGIN;
+
+ALTER TABLE "Review" ADD COLUMN "publicConsent" BOOLEAN NOT NULL DEFAULT false;
+
+COMMIT;

@@ -1,3 +1,4 @@
+import { TrackRecord } from "../components/track-record";
 import { motion } from "motion/react";
 import { SiteFooter } from "../components/site-footer";
 
@@ -262,9 +263,7 @@ export default function AboutPage() {
               >
                 {[
                   { num: "2023",  label: "Founded" },
-                  { num: "100+",  label: "Travelers" },
                   { num: "3",     label: "Co-Founders" },
-                  { num: "4.9★",  label: "Avg Rating" },
                 ].map(({ num, label }) => (
                   <div key={label}>
                     <p style={{ color: "#C8A96E", fontSize: "clamp(1.2rem,2vw,1.6rem)", fontWeight: 300, letterSpacing: "-0.04em", lineHeight: 1, margin: "0 0 4px" }}>{num}</p>
@@ -394,7 +393,7 @@ export default function AboutPage() {
               <em style={{ color: "#781216", fontStyle: "italic" }}>started.</em>
             </h2>
             <p style={{ color: "rgba(30,26,20,0.58)", fontSize: "clamp(0.88rem,1.3vw,1rem)", fontWeight: 300, lineHeight: 1.85, margin: "0 0 32px" }}>
-              100 travelers in, 12 trips running, 3 institute collaborations signed — and we still treat every booking like it's the first one. The Northeast is big. India is massive. The world has barely been touched. We plan to change that — one small group at a time.
+              We started in Ziro Valley and continue to lead small-group journeys across Northeast India. Explore our trip and college itineraries to see where we travel and what each departure includes.
             </p>
             <div className="about-actions" style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
               <a href="/trips" style={{ background: "#781216", color: "#fff", padding: "13px 28px", fontFamily: "'Poppins', sans-serif", fontSize: "0.78rem", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "7px", transition: "background 0.25s ease", borderRadius: "4px" }}
@@ -412,6 +411,7 @@ export default function AboutPage() {
         </div>
       </section>
 
+      <TrackRecord />
       <SiteFooter />
     </div>
   );

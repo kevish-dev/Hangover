@@ -1,3 +1,4 @@
+import { notifyCatalogChange, publicCatalogPath } from "../../utils/index-now.js";
 import * as service from "./crm-trip.service.js";
 
 export const listTrips = async (req, res, next) => {
@@ -61,22 +62,29 @@ export const getTrip = async (req, res, next) => {
 };
 export const createTrip = async (req, res, next) => {
   try {
-    res.status(201).json(await service.createTrip(req.body));
+    const item = await service.createTrip(req.body);
+    res.status(201).json(item);
+    void publicCatalogPath("trips", item.id).then((path) => notifyCatalogChange("trips", path));
   } catch (error) {
     next(error);
   }
 };
 export const updateTrip = async (req, res, next) => {
   try {
-    res.json(await service.updateTrip(req.params.id, req.body));
+    const previousPath = await publicCatalogPath("trips", req.params.id);
+    const item = await service.updateTrip(req.params.id, req.body);
+    res.json(item);
+    void publicCatalogPath("trips", item.id).then((path) => notifyCatalogChange("trips", previousPath, path));
   } catch (error) {
     next(error);
   }
 };
 export const deleteTrip = async (req, res, next) => {
   try {
+    const previousPath = await publicCatalogPath("trips", req.params.id);
     await service.deleteTrip(req.params.id);
     res.status(204).send();
+    notifyCatalogChange("trips", previousPath);
   } catch (error) {
     next(error);
   }

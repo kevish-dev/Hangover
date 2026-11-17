@@ -98,7 +98,10 @@ app.use(cookieParser());
 
 // Resolve an existing session once so maintenance mode can exempt administrators
 // before any customer-facing route handles a write request.
-app.use("/api/v1", optionalAuth, blockCustomerWritesDuringMaintenance);
+app.use("/api/v1", (req, res, next) => {
+  res.set("X-Robots-Tag", "noindex, nofollow");
+  next();
+}, optionalAuth, blockCustomerWritesDuringMaintenance);
 
 mountApiRouter("/api/v1/auth", authRoutes);
 mountApiRouter("/api/v1/site-settings", siteSettingsRoutes);

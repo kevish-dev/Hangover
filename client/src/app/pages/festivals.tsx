@@ -1,3 +1,4 @@
+import { catalogName, pathOf, upcomingSlots } from "../../seo/metadata.mjs";
 // @ts-ignore
 import logoSrc from "/images/final-logo_png_transparent.png";
 
@@ -363,7 +364,7 @@ function FestivalCard({
 }) {
   const [hovered, setHovered] = useState(false);
 
-  const name = festival.title;
+  const name = catalogName(festival);
   const location = festival.location;
   const festPrice = festival.packages?.[0]?.price || 0;
   const price = formatPrice(festPrice);
@@ -595,7 +596,7 @@ function FestivalCard({
             </p>
           </div>
           <Link
-            to={`/festivals/${festival.id}`}
+            to={pathOf("festivals", festival)}
             style={{
               background: hovered ? "#C8A96E" : "transparent",
               border: `1.5px solid ${hovered ? "#C8A96E" : "rgba(30,26,20,0.14)"}`,
@@ -711,14 +712,14 @@ export default function FestivalsPage() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   // Hero derived values
-  const heroSlot = featuredFestival?.slots?.[0];
+  const heroSlot = upcomingSlots(featuredFestival?.slots)[0];
   const spotsLeft = heroSlot
     ? Math.max(0, heroSlot.capacity - heroSlot.filledSpots)
     : 0;
 
   const featured = featuredFestival
     ? {
-        name: featuredFestival.title,
+        name: catalogName(featuredFestival),
         location: featuredFestival.location,
         tagline: featuredFestival.overview
           ? featuredFestival.overview.substring(0, 100) + "…"
@@ -735,6 +736,7 @@ export default function FestivalsPage() {
         image: featuredFestival.bannerImages?.[0] || "",
         videoUrl: featuredFestival.videoUrl || null,
         tripSlug: featuredFestival.id,
+        detailPath: pathOf("festivals", featuredFestival),
       }
     : null;
 
@@ -1154,7 +1156,7 @@ export default function FestivalsPage() {
                     Book Your Spot <ArrowRight size={14} />
                   </Link>
                   <Link
-                    to={`/festivals/${featured.tripSlug}`}
+                    to={featured.detailPath}
                     style={{
                       background: "rgba(242,237,228,0.07)",
                       color: "rgba(242,237,228,0.75)",
