@@ -28,6 +28,41 @@ export const httpRequestsTotal = new client.Counter({
   registers: [register],
 });
 
+export const httpRequestsInFlight = new client.Gauge({
+  name: "http_requests_in_flight",
+  help: "Number of requests currently being handled",
+  registers: [register],
+});
+
+export const postgresQueryDurationSeconds = new client.Histogram({
+  name: "hangover_postgres_query_duration_seconds",
+  help: "Time measured by Prisma for database queries in seconds",
+  buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+  registers: [register],
+});
+
+export function registerPostgresPoolMetrics(pool) {
+  new client.Gauge({
+    name: "hangover_postgres_pool_connections",
+    help: "Application PostgreSQL pool connections by state",
+    labelNames: ["state"],
+    registers: [register],
+    collect() {
+      this.set({ state: "idle" }, pool.idleCount);
+      this.set({ state: "in_use" }, pool.totalCount - pool.idleCount);
+      this.set({ state: "limit" }, pool.options.max);
+    },
+  });
+  new client.Gauge({
+    name: "hangover_postgres_pool_waiting_requests",
+    help: "Number of requests waiting to acquire a PostgreSQL pool connection",
+    registers: [register],
+    collect() {
+      this.set(pool.waitingCount);
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Business & Domain Metrics
 // ---------------------------------------------------------------------------

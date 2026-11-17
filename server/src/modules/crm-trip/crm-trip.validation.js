@@ -1,6 +1,13 @@
 import { z } from "zod";
 
 const nullableId = z.string().uuid().nullable();
+
+export const updateSignatureTripsSchema = z.object({
+  tripIds: z.array(z.string().uuid()).max(6).refine(
+    (ids) => new Set(ids).size === ids.length,
+    "Each trip can only be selected once",
+  ),
+});
 const tripTypeSchema = z.enum(["MOUNTAIN_TREK", "BEACH_ESCAPE", "DESERT_EXPEDITION", "JUNGLE_WILDLIFE", "HERITAGE_WALK", "ROAD_TRIP", "BACKPACKING_TOUR", "PHOTOGRAPHY_TOUR", "BONFIRE_RETREAT", "INSTITUTE_COLLEGE_TRIP", "CUSTOM_TRIP"]);
 const packageSchema = z.object({ title: z.string().trim().min(1).max(200), price: z.number().min(0), tokenAmount: z.number().min(0) }).refine((item) => item.tokenAmount <= item.price, { message: "Package token cannot exceed its price", path: ["tokenAmount"] });
 const addOnSchema = z.object({

@@ -399,6 +399,7 @@ model CrmTrip {
   bestTimeToVisit            String?
   isActive                   Boolean                  @default(true)
   isFeatured                 Boolean                  @default(false)
+  signatureOrder             Int?                     @unique
   isPublished                Boolean                  @default(false)
   isListed                   Boolean                  @default(true)
   isInterestFormEnabled      Boolean                  @default(false)

@@ -42,11 +42,39 @@ scrape_configs:
       - target_label: __address__
         replacement: "blackbox_exporter:9115"
 
-  # 4. cAdvisor Container Metrics (tracks container CPU, Memory, OOM kills)
+  # Public CRM catalog smoke checks. HEAD exercises the routes without counting as user traffic.
+  - job_name: "blackbox-catalog"
+    scrape_interval: 1m
+    metrics_path: "/probe"
+    params:
+      module: ["http_catalog"]
+    static_configs:
+      - targets: ["https://api.hangovertrails.com/api/v1/crm-trips/public"]
+        labels:
+          check: catalog
+      - targets: ["https://api.hangovertrails.com/api/v1/crm-trips/public/featured"]
+        labels:
+          check: featured
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "blackbox_exporter:9115"
+
+  # cAdvisor container metrics. Use Compose metadata when available, with the configured names as a fallback.
   - job_name: "cadvisor"
     scrape_interval: 15s
     static_configs:
       - targets: ["cadvisor:8080"]
+    metric_relabel_configs:
+      - source_labels: [name]
+        regex: '/?hangover-(backend|postgres)'
+        target_label: service
+      - source_labels: [container_label_com_docker_compose_project, container_label_com_docker_compose_service]
+        regex: 'server;(backend|postgres)'
+        target_label: service
 
   # 5. Node Exporter Host Metrics (tracks VPS CPU, RAM, Disk, Load)
   - job_name: "node-exporter"

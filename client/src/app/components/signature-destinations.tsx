@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useNavigate } from "react-router";
-import axios from "axios";
 import { mediaImageUrl } from "../../lib/media";
+import { fetchSignatureTrips, type ApiTrip } from "../../lib/tripApi";
 import {
   HoverSlider,
   HoverSliderImage,
@@ -11,39 +11,23 @@ import {
   useHoverSliderContext,
 } from "./animated-slideshow";
 
-interface SignatureTrip {
-  id: string;
-  title: string;
-  slug: string;
-  overview: string;
-  location: string;
-  duration: number;
-  bannerImages: string[];
-  packages?: any[];
-}
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
-
 function formatPrice(price: string | number) {
   const value = Number(price);
   return Number.isFinite(value) ? `From Rs. ${value.toLocaleString("en-IN")}` : "Price on request";
 }
 
 export function SignatureDestinations() {
-  const [trips, setTrips] = useState<SignatureTrip[]>([]);
+  const [trips, setTrips] = useState<ApiTrip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
     let cancelled = false;
 
-    const fetchSignatureTrips = async () => {
+    const loadSignatureTrips = async () => {
       try {
-        const response = await axios.get(`${API_URL}/trips/signature-collection`, {
-          withCredentials: true,
-        });
-        const data = response.data?.result?.data;
-        if (!cancelled && Array.isArray(data)) setTrips(data);
+        const data = await fetchSignatureTrips();
+        if (!cancelled) setTrips(data);
       } catch {
         if (!cancelled) setTrips([]);
       } finally {
@@ -51,7 +35,7 @@ export function SignatureDestinations() {
       }
     };
 
-    fetchSignatureTrips();
+    loadSignatureTrips();
     return () => {
       cancelled = true;
     };
@@ -214,7 +198,7 @@ export function SignatureDestinations() {
   );
 }
 
-function ActiveCaption({ trips }: { trips: SignatureTrip[] }) {
+function ActiveCaption({ trips }: { trips: ApiTrip[] }) {
   const { activeSlide } = useHoverSliderContext();
   const active = trips[activeSlide];
   if (!active) return null;

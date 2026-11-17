@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Check, Edit2, Eye, EyeOff, Image, Loader2, MapPin, Plus, Save, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "../../../lib/axios";
-import { formatPrice, type ApiTrip } from "../../../lib/tripApi";
+import { fetchSignatureTripOptions, formatPrice, saveSignatureTrips, type ApiTrip } from "../../../lib/tripApi";
+import { getErrorMessage } from "../../../lib/errors";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Input } from "../../components/ui/input";
@@ -11,25 +12,21 @@ import { Label } from "../../components/ui/label";
 import { Textarea } from "../../components/ui/textarea";
 
 const MAX_SIGNATURE_TRIPS = 6;
+const signatureOptionsKey = ["admin", "crm-trips", "signature-collection"];
 
 export default function AdminLandingPage() {
   const queryClient = useQueryClient();
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [draftIds, setDraftIds] = useState<string[] | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const { data, isLoading } = useQuery({
-    // Keep this key distinct from the trip-management query. That query caches
-    // the full paginated response, while this one caches only the trip array.
-    queryKey: ["admin", "trips", "signature-collection-options"],
-    queryFn: async () => {
-      const response = await apiClient.get("/trips?adminView=true&limit=200");
-      return response.data.data as ApiTrip[];
-    },
+  const { data, isError, isLoading, refetch } = useQuery({
+    queryKey: signatureOptionsKey,
+    queryFn: fetchSignatureTripOptions,
   });
 
-  // Do not let malformed or legacy cached data take down the entire route.
-  const trips = Array.isArray(data) ? data : [];
+  const trips = data?.data || [];
+  const selectedIds = draftIds ?? data?.selectedIds ?? [];
+  const canEdit = Boolean(data) && !isSaving;
   const selectedTrips = useMemo(
     () => selectedIds.map((id) => trips.find((trip) => trip.id === id)).filter(Boolean) as ApiTrip[],
     [selectedIds, trips]
@@ -39,53 +36,38 @@ export default function AdminLandingPage() {
     [trips]
   );
 
-  useEffect(() => {
-    if (!isInitialized && trips.length > 0) {
-      setSelectedIds(
-        trips
-          .filter((trip) => trip.isSignature)
-          .sort((a, b) => (a.signatureOrder ?? 0) - (b.signatureOrder ?? 0))
-          .map((trip) => trip.id)
-      );
-      setIsInitialized(true);
-    }
-  }, [isInitialized, trips]);
-
   const toggleTrip = (tripId: string) => {
-    setSelectedIds((current) => {
-      if (current.includes(tripId)) return current.filter((id) => id !== tripId);
-      if (current.length >= MAX_SIGNATURE_TRIPS) {
-        toast.error(`You can select up to ${MAX_SIGNATURE_TRIPS} trips.`);
-        return current;
-      }
-      return [...current, tripId];
-    });
+    if (selectedIds.includes(tripId)) {
+      setDraftIds(selectedIds.filter((id) => id !== tripId));
+    } else if (selectedIds.length >= MAX_SIGNATURE_TRIPS) {
+      toast.error(`You can select up to ${MAX_SIGNATURE_TRIPS} trips.`);
+    } else {
+      setDraftIds([...selectedIds, tripId]);
+    }
   };
 
   const moveTrip = (index: number, direction: -1 | 1) => {
-    setSelectedIds((current) => {
-      const nextIndex = index + direction;
-      if (nextIndex < 0 || nextIndex >= current.length) return current;
-      const next = [...current];
-      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
-      return next;
-    });
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= selectedIds.length) return;
+    const next = [...selectedIds];
+    [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+    setDraftIds(next);
   };
 
   const saveCollection = async () => {
     setIsSaving(true);
     try {
-      await apiClient.put("/trips/signature-collection", { tripIds: selectedIds });
-      await queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
+      await saveSignatureTrips(selectedIds);
+      queryClient.setQueryData(signatureOptionsKey, { data: trips, selectedIds });
+      setDraftIds(null);
+      await queryClient.invalidateQueries({ queryKey: signatureOptionsKey });
       toast.success("Signature Collection updated");
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Failed to update the Signature Collection");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to update the Signature Collection"));
     } finally {
       setIsSaving(false);
     }
   };
-
-  if (isLoading) return <div className="p-8 text-gray-500">Loading landing page settings...</div>;
 
   return (
     <div className="w-full max-w-6xl">
@@ -97,13 +79,19 @@ export default function AdminLandingPage() {
           </h1>
           <p className="text-gray-500 text-sm mt-1">Choose and arrange the trips shown in the Signature Collection below the homepage hero.</p>
         </div>
-        <Button onClick={saveCollection} disabled={isSaving} className="w-full md:w-auto bg-[#c8a96e] hover:bg-[#b8943a] text-white gap-2">
+        <Button onClick={saveCollection} disabled={!canEdit || !draftIds} className="w-full md:w-auto bg-[#c8a96e] hover:bg-[#b8943a] text-white gap-2">
           {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Save collection
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      {isLoading && <p className="text-sm text-gray-500">Loading Signature Collection…</p>}
+      {isError && !data && (
+        <p className="text-sm text-red-700">
+          The Signature Collection could not be loaded. <button type="button" className="underline" onClick={() => refetch()}>Try again</button>
+        </p>
+      )}
+      {data && <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <section className="bg-white border border-gray-200 rounded-lg overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100">
             <h2 className="font-semibold text-gray-900">Selected trips</h2>
@@ -123,9 +111,9 @@ export default function AdminLandingPage() {
                   <p className="text-xs text-gray-500 truncate">{trip.location} · {formatPrice(trip.packages?.[0]?.price || 0)}</p>
                 </div>
                 <div className="flex w-full md:w-auto items-center justify-end gap-1 shrink-0">
-                  <button type="button" onClick={() => moveTrip(index, -1)} disabled={index === 0} className="p-1.5 text-gray-500 hover:text-[#781216] disabled:opacity-30" aria-label={`Move ${trip.title} up`}><ArrowUp className="w-4 h-4" /></button>
-                  <button type="button" onClick={() => moveTrip(index, 1)} disabled={index === selectedTrips.length - 1} className="p-1.5 text-gray-500 hover:text-[#781216] disabled:opacity-30" aria-label={`Move ${trip.title} down`}><ArrowDown className="w-4 h-4" /></button>
-                  <button type="button" onClick={() => toggleTrip(trip.id)} className="p-1.5 text-gray-500 hover:text-red-600" aria-label={`Remove ${trip.title}`}><X className="w-4 h-4" /></button>
+                  <button type="button" onClick={() => moveTrip(index, -1)} disabled={!canEdit || index === 0} className="p-1.5 text-gray-500 hover:text-[#781216] disabled:opacity-30" aria-label={`Move ${trip.title} up`}><ArrowUp className="w-4 h-4" /></button>
+                  <button type="button" onClick={() => moveTrip(index, 1)} disabled={!canEdit || index === selectedTrips.length - 1} className="p-1.5 text-gray-500 hover:text-[#781216] disabled:opacity-30" aria-label={`Move ${trip.title} down`}><ArrowDown className="w-4 h-4" /></button>
+                  <button type="button" onClick={() => toggleTrip(trip.id)} disabled={!canEdit} className="p-1.5 text-gray-500 hover:text-red-600" aria-label={`Remove ${trip.title}`}><X className="w-4 h-4" /></button>
                 </div>
               </div>
             ))}
@@ -141,7 +129,7 @@ export default function AdminLandingPage() {
             {eligibleTrips.map((trip) => {
               const selected = selectedIds.includes(trip.id);
               return (
-                <button key={trip.id} type="button" onClick={() => toggleTrip(trip.id)} className="w-full p-4 flex items-center gap-3 text-left hover:bg-gray-50 transition-colors">
+                <button key={trip.id} type="button" onClick={() => toggleTrip(trip.id)} disabled={!canEdit} className="w-full p-4 flex items-center gap-3 text-left hover:bg-gray-50 transition-colors">
                   <span className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 ${selected ? "bg-[#781216] border-[#781216] text-white" : "border-gray-300"}`}>
                     {selected && <Check className="w-3.5 h-3.5" />}
                   </span>
@@ -158,7 +146,7 @@ export default function AdminLandingPage() {
             {eligibleTrips.length === 0 && <div className="p-8 text-center text-sm text-gray-500">Publish a trip and add a banner image before adding it to the Signature Collection.</div>}
           </div>
         </section>
-      </div>
+      </div>}
 
       <LandingReasonsManager />
       <LandingTripTypesManager />

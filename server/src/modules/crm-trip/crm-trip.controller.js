@@ -29,6 +29,29 @@ export const getPublicTrip = async (req, res, next) => {
     next(error);
   }
 };
+export const getPublicSignatureTrips = async (_req, res, next) => {
+  try {
+    res.json(await service.getPublicSignatureTrips());
+  } catch (error) {
+    next(error);
+  }
+};
+export const getSignatureTripOptions = async (_req, res, next) => {
+  res.set("Cache-Control", "private, no-store");
+  try {
+    res.json(await service.getSignatureTripOptions());
+  } catch (error) {
+    next(error);
+  }
+};
+export const updateSignatureTrips = async (req, res, next) => {
+  try {
+    await service.updateSignatureTrips(req.body.tripIds);
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+};
 export const getTrip = async (req, res, next) => {
   try {
     res.json(await service.getTrip(req.params.id));

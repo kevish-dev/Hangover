@@ -7,6 +7,7 @@ const router = Router();
 router.use(requireAuth);
 
 router.get("/", requireAdmin, ledgerController.getUnifiedLedger);
+router.get("/trip-options", requireAdmin, ledgerController.getTripOptions);
 router.post("/entries", requireAdmin, ledgerController.addManualEntry);
 router.patch("/entries/:entryId", requireAdmin, ledgerController.updateManualEntry);
 router.delete("/entries/:entryId", requireAdmin, ledgerController.deleteManualEntry);

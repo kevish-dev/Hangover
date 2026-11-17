@@ -17,6 +17,8 @@ import { Input } from "../../components/ui/input";
 import { getErrorMessage, showErrorToast } from "../../../lib/errors";
 import { SyncIndicator } from "../../components/ui/sync-indicator";
 
+type TripOption = { id: string; title: string };
+
 type Entry = {
   id: string;
   type: "INCOME" | "EXPENSE";
@@ -92,41 +94,15 @@ export default function AdminLedgerPage() {
   });
 
   const tripsQuery = useQuery({
-    queryKey: ["admin", "trips", "all-combined"],
-    queryFn: async () => {
-      const [crmRes, legacyRes] = await Promise.allSettled([
-        apiClient.get("/crm-trips", { params: { limit: 500 } }),
-        apiClient.get("/trips", { params: { adminView: true, limit: 500 } }),
-      ]);
-
-      const crmTrips =
-        crmRes.status === "fulfilled"
-          ? (crmRes.value.data?.data || crmRes.value.data || []).map(
-              (t: any) => ({
-                id: t.id,
-                title: t.name || t.title,
-              }),
-            )
-          : [];
-
-      const legacyTrips =
-        legacyRes.status === "fulfilled"
-          ? (legacyRes.value.data?.data || legacyRes.value.data || []).map(
-              (t: any) => ({
-                id: t.id,
-                title: t.title || t.name,
-              }),
-            )
-          : [];
-
-      const crmIds = new Set(crmTrips.map((t: any) => t.id));
-      const filteredLegacy = legacyTrips.filter((t: any) => !crmIds.has(t.id));
-
-      return [...crmTrips, ...filteredLegacy];
-    },
+    queryKey: ["admin", "ledger-trip-options"],
+    queryFn: async ({ signal }) => (
+      await apiClient.get<{ data: TripOption[] }>("/ledgers/trip-options", { signal })
+    ).data.data,
   });
 
-  const trips = tripsQuery.data || [];
+  const trips = tripsQuery.data;
+  const tripOptionsUnavailable = tripsQuery.isError && !trips;
+  const tripOptionIds = useMemo(() => new Set(trips?.map(({ id }) => id)), [trips]);
 
   const festivalsQuery = useQuery({
     queryKey: ["admin", "festivals", "all-combined"],
@@ -227,7 +203,7 @@ export default function AdminLedgerPage() {
 
   const selectedTrip = useMemo(() => {
     if (!selectedTripId) return null;
-    return trips.find((t: any) => t.id === selectedTripId) || null;
+    return trips?.find((trip) => trip.id === selectedTripId) || null;
   }, [trips, selectedTripId]);
 
   const filteredSummary = useMemo(() => {
@@ -417,18 +393,27 @@ export default function AdminLedgerPage() {
             className="pl-10"
           />
         </div>
-        <select
-          value={selectedTripId}
-          onChange={(e) => setSelectedTripId(e.target.value)}
-          className="flex h-10 rounded-md border border-input bg-background px-3 text-sm truncate font-medium"
-        >
-          <option value="">Filter by Trip (All Trips)</option>
-          {trips.map((t: any) => (
-            <option key={t.id} value={t.id}>
-              {t.title}
+        <div className="min-w-0">
+          <select
+            aria-label="Filter ledger by trip"
+            value={selectedTripId}
+            onChange={(e) => setSelectedTripId(e.target.value)}
+            disabled={!trips}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm truncate font-medium"
+          >
+            <option value="">
+              {tripOptionsUnavailable ? "Trip options unavailable" : tripsQuery.isPending ? "Loading trips…" : "Filter by Trip (All Trips)"}
             </option>
-          ))}
-        </select>
+            {trips?.map(({ id, title }) => (
+              <option key={id} value={id}>{title}</option>
+            ))}
+          </select>
+          {tripOptionsUnavailable && (
+            <button type="button" onClick={() => void tripsQuery.refetch()} disabled={tripsQuery.isFetching} className="mt-1 text-sm font-semibold underline">
+              {tripsQuery.isFetching ? "Retrying…" : "Retry trip options"}
+            </button>
+          )}
+        </div>
         <select
           value={type}
           onChange={(e) => setType(e.target.value)}
@@ -590,13 +575,14 @@ export default function AdminLedgerPage() {
                   {newRow.scope === "TRIP" ? (
                     <select
                       value={newRow.tripId}
+                      disabled={!trips}
                       onChange={(e) =>
                         setNewRow({ ...newRow, tripId: e.target.value })
                       }
                       className="w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-emerald-100 focus:ring-1 focus:ring-emerald-500 text-xs"
                     >
                       <option value="">Select trip...</option>
-                      {trips.map((t: any) => (
+                      {trips?.map((t) => (
                         <option key={t.id} value={t.id}>
                           {t.title}
                         </option>
@@ -756,13 +742,20 @@ export default function AdminLedgerPage() {
                     ) : entry.scope === "TRIP" ? (
                       <select
                         defaultValue={entry.crmTripId || entry.tripId || ""}
+                        disabled={!trips}
                         onChange={(e) =>
                           handleCellChange(entry, "tripId", e.target.value)
                         }
                         className="w-full h-full min-h-10 px-2 bg-transparent outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-500 text-xs"
                       >
                         <option value="">Select trip...</option>
-                        {trips.map((t: any) => (
+                        {entry.crmTrip && !tripOptionIds.has(entry.crmTrip.id) && (
+                          <option value={entry.crmTrip.id}>{entry.crmTrip.name}</option>
+                        )}
+                        {entry.trip && !tripOptionIds.has(entry.trip.id) && (
+                          <option value={entry.trip.id}>{entry.trip.title}</option>
+                        )}
+                        {trips?.map((t) => (
                           <option key={t.id} value={t.id}>
                             {t.title}
                           </option>

@@ -43,6 +43,9 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Verify HTTP metric route labels
+        run: node --test test/http-metrics.test.js
+
       # these when available
       # - name: Run Linter
       #   run: npm run lint

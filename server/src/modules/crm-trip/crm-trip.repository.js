@@ -54,6 +54,24 @@ export const findFeaturedPublic = () => prisma.crmTrip.findMany({
   include: PUBLIC_CRM_TRIP_INCLUDE,
 });
 
+export const signatureTripEligibility = {
+  isActive: true,
+  isPublished: true,
+  websiteBannerImages: { isEmpty: false },
+};
+
+export const findSignatureTrips = () => prisma.crmTrip.findMany({
+  where: { ...signatureTripEligibility, signatureOrder: { not: null } },
+  orderBy: { signatureOrder: "asc" },
+  include: PUBLIC_CRM_TRIP_INCLUDE,
+});
+
+export const findSignatureTripOptions = () => prisma.crmTrip.findMany({
+  where: { OR: [signatureTripEligibility, { signatureOrder: { not: null } }] },
+  orderBy: { name: "asc" },
+  include: PUBLIC_CRM_TRIP_INCLUDE,
+});
+
 export const findPublicById = (id) => prisma.crmTrip.findFirst({
   where: { id, isActive: true, isPublished: true },
   include: CRM_TRIP_INCLUDE,

@@ -6,17 +6,20 @@ import {
   createCrmTripSchema, updateCrmTripSchema, updateDaySchema, replacePlacesSchema,
   createActivitySchema, updateActivitySchema, updateMealsSchema, updateDropOffSchema, validate,
   updateCommonInclusionSchema,
-  updateDayCommonInclusionSchema,
+  updateDayCommonInclusionSchema, updateSignatureTripsSchema,
 } from "./crm-trip.validation.js";
 
 const router = Router();
 router.get("/public/featured", controller.getFeaturedPublicTrips);
+router.get("/public/signature-collection", controller.getPublicSignatureTrips);
 router.get("/public/:id", optionalAuth, controller.getPublicTrip);
 router.get("/public", controller.listPublicTrips);
 router.post("/public/:id/bookings", requireAuth, bookingController.createPublic);
 router.use(requireAuth, requireAdmin);
 
 router.get("/", controller.listTrips);
+router.get("/signature-collection", controller.getSignatureTripOptions);
+router.put("/signature-collection", validate(updateSignatureTripsSchema), controller.updateSignatureTrips);
 router.post("/upload-signature", controller.createUploadSignature);
 router.post("/", validate(createCrmTripSchema), controller.createTrip);
 router.get("/:id", controller.getTrip);

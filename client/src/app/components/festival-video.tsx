@@ -1,59 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
-import { canAutoplayVideo } from "../../lib/connection";
-
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router";
-import { MapPin, Calendar, ArrowRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router";
+import { ArrowRight, Calendar, MapPin } from "lucide-react";
+import { canAutoplayVideo } from "../../lib/connection";
 import { fetchFeaturedFestivals, type ApiFestival } from "../../lib/festivalApi";
-import { mediaImageUrl, mediaVideoUrl } from "../../lib/media";
-import {
-  ContainerStagger,
-  ContainerAnimated,
-} from "./hero-video-primitives";
-import {
-  motion,
-  useScroll,
-  useMotionTemplate,
-  useMotionValue,
-  useTransform,
-  MotionValue,
-} from "motion/react";
+import { mediaImageUrl, mediaVideoPosterUrl, mediaVideoUrl } from "../../lib/media";
+import { ContainerAnimated, ContainerStagger } from "./hero-video-primitives";
 
-// Brand crimson — client-specified
 const CRIMSON = "#781216";
-
-// ── Window-scroll-based progress hook ────────────────────────────────────────
-function useElementScrollProgress(
-  ref: React.RefObject<HTMLDivElement | null>,
-): MotionValue<number> {
-  const { scrollY } = useScroll();
-  const progress = useMotionValue(0);
-
-  useEffect(() => {
-    const update = () => {
-      const el = ref.current;
-      if (!el) return;
-      const currentScroll = scrollY.get();
-      const docTop =
-        el.getBoundingClientRect().top + currentScroll;
-      const height = el.offsetHeight;
-      const vh = window.innerHeight;
-      const raw =
-        (currentScroll - docTop) / Math.max(1, height - vh);
-      progress.set(Math.max(0, Math.min(1, raw)));
-    };
-    const unsub = scrollY.on("change", update);
-    window.addEventListener("resize", update);
-    const t = setTimeout(update, 50);
-    return () => {
-      unsub();
-      window.removeEventListener("resize", update);
-      clearTimeout(t);
-    };
-  }, [scrollY, progress, ref]);
-
-  return progress;
-}
 
 function formatFestivalDate(festival: ApiFestival) {
   const slot = festival.slots?.[0];
@@ -74,20 +28,6 @@ export function FestivalVideo() {
 
   if (!isLoading && festivals.length === 0) return null;
 
-  const videos = festivals.map((festival, index) => {
-    const step = 1 / Math.max(festivals.length, 1);
-    return {
-      id: festival.id,
-      videoUrl: festival.videoUrl,
-      imageUrl: festival.bannerImages?.[0] || "",
-      label: festival.title,
-      location: festival.location,
-      date: formatFestivalDate(festival),
-      quote: festival.overview,
-      range: [Math.max(0, index * step - 0.08), Math.min(1, (index + 1) * step + 0.08)] as [number, number],
-      zIndex: index + 1,
-    };
-  });
   return (
     <div
       style={{
@@ -163,349 +103,141 @@ export function FestivalVideo() {
             </p>
           </ContainerAnimated>
 
-          <ContainerAnimated animation="blur">
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                justifyContent: "center",
-                gap: "16px",
-                marginBottom: "44px",
-                maxWidth: "960px",
-                margin: "0 auto 44px",
-              }}
-            >
-              {festivals.map((festival) => (
-                <FestivalChip
-                  key={festival.id}
-                  festival={{
-                    name: festival.title,
-                    place: festival.location,
-                    date: formatFestivalDate(festival),
-                    tag: festival.bestTimeToVisit || "Featured Festival",
-                  }}
-                  onClick={() => navigate(`/festivals/${festival.id}`)}
-                />
-              ))}
-            </div>
-          </ContainerAnimated>
+          {festivals.length > 0 && (
+            <ContainerAnimated animation="blur">
+              <div className="mx-auto mb-8 flex max-w-[960px] flex-wrap justify-center gap-4">
+                {festivals.map((festival) => (
+                  <FestivalChip
+                    key={festival.id}
+                    festival={{
+                      name: festival.title,
+                      place: festival.location,
+                      date: formatFestivalDate(festival),
+                      tag: festival.bestTimeToVisit || "Featured Festival",
+                    }}
+                    onClick={() => navigate(`/festivals/${festival.id}`)}
+                  />
+                ))}
+              </div>
+            </ContainerAnimated>
+          )}
 
           <ContainerAnimated animation="bottom">
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                gap: "14px",
-                flexWrap: "wrap",
-              }}
+            <Link
+              to="/festivals"
+              className="inline-flex min-h-11 w-full max-w-[260px] items-center justify-center gap-2 bg-[#f2c97a] px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#781216] transition-colors hover:bg-[#f9d98a] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#f2c97a]"
             >
-              <GoldButton onClick={() => navigate("/festivals")}>
-                VIEW ALL FESTIVALS <ArrowRight size={13} />
-              </GoldButton>
-              <OutlineButton onClick={() => navigate("/festivals")}>
-                BOOK A FESTIVAL TRIP
-              </OutlineButton>
-            </div>
+              View all festivals <ArrowRight size={13} aria-hidden="true" />
+            </Link>
           </ContainerAnimated>
         </ContainerStagger>
       </section>
 
-      {/* Stacked scroll videos */}
-      {isLoading ? <div style={{ height: "min(160vh, 900px)", background: "#1a1612" }} /> : <StackedVideos videos={videos} />}
+      {festivals.length > 0 && (
+        <div className="bg-[#1a1612]">
+          {festivals.map((festival) => (
+            <FestivalMedia key={festival.id} festival={festival} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-// ── Stacked Videos ────────────────────────────────────────────────────────────
-
-function StackedVideos({ videos }: { videos: VideoMeta[] }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const scrollYProgress =
-    useElementScrollProgress(containerRef);
-
-  return (
-    <div
-      ref={containerRef}
-      style={{
-        height: "min(300vh, 2100px)",
-        background: "#1a1612",
-        position: "relative",
-      }}
-    >
-      {/* Gradient bridge: crimson fades into dark so the seam is invisible */}
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: "120px",
-          background: `linear-gradient(to bottom, ${CRIMSON}, #1a1612)`,
-          zIndex: 0,
-          pointerEvents: "none",
-        }}
-      />
-      {videos.map((v) => (
-        <VideoLayer
-          key={v.label}
-          video={v}
-          scrollYProgress={scrollYProgress}
-        />
-      ))}
-    </div>
-  );
-}
-
-interface VideoMeta {
-  id: string;
-  videoUrl: string | null;
-  imageUrl: string;
-  label: string;
-  location: string;
-  date: string;
-  quote: string;
-  range: [number, number];
-  zIndex: number;
-}
-
-function VideoLayer({
-  video,
-  scrollYProgress,
-}: {
-  video: VideoMeta;
-  scrollYProgress: MotionValue<number>;
-}) {
-  const playVideo = Boolean(video.videoUrl) && canAutoplayVideo();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [shouldLoad, setShouldLoad] = useState(false);
+function FestivalMedia({ festival }: { festival: ApiFestival }) {
+  const panel = useRef<HTMLDivElement>(null);
+  const player = useRef<HTMLVideoElement>(null);
+  const [inView, setInView] = useState(false);
+  const [loadVideo, setLoadVideo] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [failedVideo, setFailedVideo] = useState<string>();
+  const [failedPoster, setFailedPoster] = useState<string>();
+  const videoUrl = festival.videoUrl;
+  const playVideo = videoUrl && failedVideo !== videoUrl && canAutoplayVideo();
+  const banner = festival.bannerImages?.find(Boolean);
+  const poster = mediaVideoPosterUrl(videoUrl);
+  const posterSource = banner && failedPoster !== banner ? banner : poster;
+  const posterUrl = posterSource === banner
+    ? mediaImageUrl(banner, { width: 1440, fit: "fit" })
+    : posterSource;
+  const responsiveBanner = posterSource === banner && banner?.includes("res.cloudinary.com");
 
   useEffect(() => {
-    const node = videoRef.current;
-    if (!node) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => setShouldLoad(entry.isIntersecting),
-      { rootMargin: "150px 0px" },
-    );
+    const node = panel.current;
+    if (!node || !playVideo) return;
+
+    const observer = new IntersectionObserver(([entry]) => {
+      const visible = entry.isIntersecting && entry.intersectionRatio >= 0.45;
+      setInView(visible);
+      if (visible) setLoadVideo(true);
+    }, { threshold: 0.45 });
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
+  }, [playVideo]);
 
   useEffect(() => {
-    const node = videoRef.current;
-    if (!node) return;
-    if (shouldLoad) {
-      node.load();
-      node.play().catch(() => undefined);
-    }
-    else {
+    const node = player.current;
+    if (!node || !loadVideo) return;
+    if (inView) {
+      void node.play().catch(() => setPlaying(false));
+    } else {
       node.pause();
-      node.removeAttribute("src");
-      node.load();
     }
-  }, [shouldLoad]);
-  const progress = useTransform(
-    scrollYProgress,
-    video.range,
-    [0, 1],
-    { clamp: true },
-  );
-
-  const insetY = useTransform(progress, [0, 1], [34, 0]);
-  const insetX = useTransform(progress, [0, 1], [40, 0]);
-  const roundedness = useTransform(progress, [0, 1], [999, 0]);
-  const clipPath = useMotionTemplate`inset(${insetY}% ${insetX}% ${insetY}% ${insetX}% round ${roundedness}px)`;
-  const scale = useTransform(progress, [0, 1], [1.06, 1]);
-  const barWidth = useTransform(
-    progress,
-    [0, 1],
-    ["0%", "100%"],
-  );
+    return () => node.pause();
+  }, [playVideo, loadVideo, inView, videoUrl]);
 
   return (
     <div
-      className="aspect-[9/16] w-full max-h-[85vh] top-[7.5vh] md:max-h-none md:aspect-auto md:h-screen md:top-0 mx-auto"
-      style={{
-        position: "sticky",
-        zIndex: video.zIndex,
-        overflow: "hidden",
-      }}
+      ref={panel}
+      className="relative isolate aspect-[9/16] max-h-[85svh] w-full overflow-hidden bg-[#1a1612] motion-safe:sticky motion-safe:top-14 md:aspect-auto md:h-svh md:max-h-none md:motion-safe:top-0"
     >
-      <motion.div
-        style={{
-          clipPath,
-          width: "100%",
-          height: "100%",
-          overflow: "hidden",
-          position: "relative",
-        }}
-      >
-        {playVideo && <motion.video
-          ref={videoRef}
+      {posterUrl && posterSource !== failedPoster && (
+        <picture>
+          {responsiveBanner && (
+            <source
+              media="(max-width: 767px)"
+              sizes="100vw"
+              srcSet={[480, 720, 1080].map((width) =>
+                `${mediaImageUrl(banner, { width, height: Math.round(width * 16 / 9) })} ${width}w`,
+              ).join(", ")}
+            />
+          )}
+          <img
+            src={posterUrl}
+            srcSet={responsiveBanner ? [960, 1440, 1920].map((width) =>
+              `${mediaImageUrl(banner, { width, fit: "fit" })} ${width}w`,
+            ).join(", ") : undefined}
+            sizes="100vw"
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={() => setFailedPoster(posterSource)}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        </picture>
+      )}
+      {playVideo && videoUrl && (
+        <video
+          ref={player}
+          src={loadVideo ? mediaVideoUrl(videoUrl) : undefined}
+          data-playing={playing}
+          aria-hidden="true"
           muted
           loop
           playsInline
           preload="none"
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            display: "block",
-            scale,
-          }}
-        >
-          {shouldLoad && video.videoUrl && <source src={mediaVideoUrl(video.videoUrl)} type="video/mp4" />}
-        </motion.video>}
-
-        {!playVideo && video.imageUrl && (
-          <img
-            src={mediaImageUrl(video.imageUrl, { width: 1920, fit: "fit" })}
-            alt={video.label}
-            loading="lazy"
-            decoding="async"
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-        )}
-
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background:
-              "linear-gradient(to top, rgba(26,22,18,0.72) 0%, rgba(26,22,18,0.15) 55%, transparent 100%)",
-            pointerEvents: "none",
-          }}
+          onPlaying={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onWaiting={() => setPlaying(false)}
+          onError={() => setFailedVideo(videoUrl)}
+          className="absolute inset-0 h-full w-full object-cover transition-opacity data-[playing=false]:opacity-0 motion-reduce:transition-none"
         />
-
-        <div
-          style={{
-            position: "absolute",
-            bottom: "clamp(20px,4vh,48px)",
-            left: "clamp(20px,4vw,56px)",
-            right: "clamp(20px,4vw,56px)",
-            display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "flex-end",
-            pointerEvents: "none",
-          }}
-        >
-          <div
-            style={{
-              background: "rgba(242,237,228,0.08)",
-              border: "1px solid rgba(242,237,228,0.18)",
-              padding: "8px 16px",
-              backdropFilter: "blur(6px)",
-              maxWidth: "100%",
-            }}
-          >
-            <span
-              style={{
-                color: "#f2ede4",
-                fontSize: "0.72rem",
-                fontWeight: 500,
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                fontFamily: "'Poppins', sans-serif",
-                lineHeight: 1.4,
-              }}
-            >
-              {video.label}
-            </span>
-          </div>
-        </div>
-
-        <motion.div
-          style={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            height: "2.5px",
-            background: "#b8943a",
-            width: barWidth,
-          }}
-        />
-      </motion.div>
+      )}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-linear-to-t from-[#1a1612]/75 via-[#1a1612]/15 to-transparent" />
+      <p className="absolute bottom-10 left-5 right-auto max-w-[calc(100%-2.5rem)] border border-[#f2ede4]/25 bg-[#1a1612]/65 px-4 py-2 text-xs font-medium uppercase leading-relaxed tracking-widest text-[#f2ede4] md:bottom-12 md:left-auto md:right-14">
+        {festival.title}
+      </p>
     </div>
-  );
-}
-
-// ── Small presentational components ──────────────────────────────────────────
-
-function GoldButton({
-  children,
-  onClick,
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        background: "#f2c97a",
-        color: "#781216",
-        border: "none",
-        padding: "12px 28px",
-        fontSize: "0.78rem",
-        fontWeight: 700,
-        letterSpacing: "0.14em",
-        textTransform: "uppercase",
-        cursor: "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "8px",
-        width: "min(100%, 260px)",
-        fontFamily: "'Poppins', sans-serif",
-        transition: "background 0.25s ease",
-      }}
-      onMouseEnter={(e) =>
-        (e.currentTarget.style.background = "#f9d98a")
-      }
-      onMouseLeave={(e) =>
-        (e.currentTarget.style.background = "#f2c97a")
-      }
-    >
-      {children}
-    </button>
-  );
-}
-
-function OutlineButton({
-  children,
-  onClick,
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        background: "transparent",
-        color: "rgba(249,241,232,0.8)",
-        border: "1px solid rgba(249,241,232,0.3)",
-        padding: "12px 28px",
-        fontSize: "0.78rem",
-        fontWeight: 400,
-        letterSpacing: "0.1em",
-        textTransform: "uppercase",
-        cursor: "pointer",
-        width: "min(100%, 260px)",
-        fontFamily: "'Poppins', sans-serif",
-        transition: "border-color 0.25s ease, color 0.25s ease",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = "#f2c97a";
-        e.currentTarget.style.color = "#f2c97a";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor =
-          "rgba(249,241,232,0.3)";
-        e.currentTarget.style.color = "rgba(249,241,232,0.8)";
-      }}
-    >
-      {children}
-    </button>
   );
 }
 

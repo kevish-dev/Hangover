@@ -1,5 +1,14 @@
 import * as ledgerService from "./ledger.service.js";
 
+export const getTripOptions = async (_req, res, next) => {
+  res.set("Cache-Control", "private, no-store");
+  try {
+    res.json(await ledgerService.getLedgerTripOptions());
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getUnifiedLedger = async (req, res, next) => {
   try {
     res.status(200).json(await ledgerService.getUnifiedLedger(req.query));

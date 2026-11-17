@@ -530,6 +530,38 @@ export const getFeaturedPublicTrips = async () => ({
   data: (await repository.findFeaturedPublic()).map(toPublicTrip),
 });
 
+export const getPublicSignatureTrips = async () => ({
+  data: (await repository.findSignatureTrips()).map(toPublicTrip),
+});
+
+export const getSignatureTripOptions = async () => {
+  const trips = await repository.findSignatureTripOptions();
+  const selectedIds = trips
+    .filter((trip) => trip.signatureOrder !== null)
+    .sort((a, b) => a.signatureOrder - b.signatureOrder)
+    .map((trip) => trip.id);
+  return { data: trips.map(toPublicTrip), selectedIds };
+};
+
+export const updateSignatureTrips = (tripIds) => prisma.$transaction(async (tx) => {
+  // Serialize collection replacements so concurrent saves cannot mix their orders.
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"crm-trip-signature-collection"}, 0))::text`;
+  const eligibleCount = await tx.crmTrip.count({
+    where: { ...repository.signatureTripEligibility, id: { in: tripIds } },
+  });
+  if (eligibleCount !== tripIds.length) {
+    throw new ValidationError("Only active, published trips with a banner image can be in the Signature Collection.");
+  }
+
+  await tx.crmTrip.updateMany({
+    where: { signatureOrder: { not: null } },
+    data: { signatureOrder: null },
+  });
+  for (const [order, id] of tripIds.entries()) {
+    await tx.crmTrip.update({ where: { id }, data: { signatureOrder: order + 1 } });
+  }
+});
+
 const UUID_PATTERN = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
 
 const findLegacyTrip = (identifier, user, shareToken) => {

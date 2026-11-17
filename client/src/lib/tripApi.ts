@@ -74,8 +74,6 @@ export interface ApiTrip {
   isActive: boolean;
   isPublished: boolean;
   isFeatured: boolean;
-  isSignature?: boolean;
-  signatureOrder?: number;
   destinationId: string | null;
   destination: ApiDestination | null;
   tripTags: ApiTripTag[];
@@ -100,14 +98,9 @@ export interface ApiTrip {
   isCrmTrip?: boolean;
 }
 
-export interface ApiTripsResponse {
+export interface SignatureTripOptions {
   data: ApiTrip[];
-  meta: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
+  selectedIds: string[];
 }
 
 // ── Fetch functions ───────────────────────────────────────────────
@@ -120,6 +113,20 @@ export async function fetchAllTrips(signal?: AbortSignal): Promise<ApiTrip[]> {
 export async function fetchFeaturedTrips(signal?: AbortSignal): Promise<ApiTrip[]> {
   const response = await apiClient.get<{ data: ApiTrip[] }>("/crm-trips/public/featured", { signal });
   return response.data.data;
+}
+
+export async function fetchSignatureTrips(): Promise<ApiTrip[]> {
+  const response = await apiClient.get<{ data: ApiTrip[] }>("/crm-trips/public/signature-collection");
+  return response.data.data;
+}
+
+export async function fetchSignatureTripOptions(): Promise<SignatureTripOptions> {
+  const response = await apiClient.get<SignatureTripOptions>("/crm-trips/signature-collection");
+  return response.data;
+}
+
+export async function saveSignatureTrips(tripIds: string[]): Promise<void> {
+  await apiClient.put("/crm-trips/signature-collection", { tripIds });
 }
 
 export async function fetchTripBySlug(slug: string, shareToken?: string | null, signal?: AbortSignal): Promise<ApiTrip> {

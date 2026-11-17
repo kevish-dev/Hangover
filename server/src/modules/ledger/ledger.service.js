@@ -1,6 +1,18 @@
 import { prisma } from "../../prisma/client.js";
 import { NotFoundError, ValidationError } from "../../core/errors/errors.js";
 
+export const getLedgerTripOptions = async () => {
+  const [crmTrips, legacyTrips] = await Promise.all([
+    prisma.crmTrip.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.trip.findMany({ select: { id: true, title: true }, orderBy: { title: "asc" } }),
+  ]);
+  const crmIds = new Set(crmTrips.map((trip) => trip.id));
+  return { data: [
+    ...crmTrips.map(({ id, name }) => ({ id, title: name })),
+    ...legacyTrips.filter((trip) => !crmIds.has(trip.id)),
+  ] };
+};
+
 export const getUnifiedLedger = async (query = {}) => {
   const where = {};
   if (query.type) where.type = query.type;

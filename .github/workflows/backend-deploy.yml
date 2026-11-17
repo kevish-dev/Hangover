@@ -171,7 +171,15 @@ jobs:
             # Start or refresh monitoring stack
             if [ -f ~/server/monitoring/docker-compose.monitoring.yml ]; then
               echo "Starting/refreshing monitoring stack..."
-              (cd ~/server/monitoring && docker compose -f docker-compose.monitoring.yml up -d) || true
+              if ! (
+                set -o pipefail
+                cd ~/server/monitoring &&
+                MONITORING_CONFIG_REVISION=$(sha256sum prometheus/prometheus.yml prometheus/blackbox.yml grafana/provisioning/dashboards/dashboards.yml | sha256sum | cut -d ' ' -f 1) &&
+                export MONITORING_CONFIG_REVISION &&
+                docker compose -f docker-compose.monitoring.yml up -d
+              ); then
+                echo "::warning::The backend deployed, but the monitoring stack could not be refreshed."
+              fi
             fi
 
             # Prune dangling images safely

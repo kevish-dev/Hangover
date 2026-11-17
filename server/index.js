@@ -38,9 +38,10 @@ import { startOperationsWorker } from "./src/workers/operations.worker.js";
 import { optionalAuth } from "./src/core/middlewares/auth.middleware.js";
 import { blockCustomerWritesDuringMaintenance } from "./src/core/middlewares/maintenance.middleware.js";
 import { register } from "./src/core/metrics/metrics.js";
-import { metricsMiddleware } from "./src/core/middlewares/metrics.middleware.js";
+import { markMetricsRoutePrefix, metricsMiddleware } from "./src/core/middlewares/metrics.middleware.js";
 import { errorTrackerMiddleware } from "./src/core/middlewares/errorTracker.middleware.js";
 const app = express();
+const mountApiRouter = (path, router) => app.use(path, markMetricsRoutePrefix(path), router);
 
 // Unauthenticated health check endpoint
 app.get("/health", async (req, res) => {
@@ -99,33 +100,33 @@ app.use(cookieParser());
 // before any customer-facing route handles a write request.
 app.use("/api/v1", optionalAuth, blockCustomerWritesDuringMaintenance);
 
-app.use("/api/v1/auth", authRoutes);
-app.use("/api/v1/site-settings", siteSettingsRoutes);
-app.use("/api/v1/festivals", festivalRoutes);
-app.use("/api/v1/itineraries", itineraryRoutes);
-app.use("/api/v1/users", userRoutes);
-app.use("/api/v1/bookings", bookingRoutes);
-app.use("/api/v1/trip-tags", tripTagRoutes);
-app.use("/api/v1/inquiries", inquiryRoutes);
-app.use("/api/v1/payments", paymentRoutes);
-app.use("/api/v1/destinations", destinationRoutes);
-app.use("/api/v1/places", placeRoutes);
-app.use("/api/v1/stay-locations", stayLocationRoutes);
-app.use("/api/v1/properties", propertyRoutes);
-app.use("/api/v1/transfer-locations", transferLocationRoutes);
-app.use("/api/v1/crm-trips", crmTripRoutes);
-app.use("/api/v1/crm-festivals", crmFestivalRoutes);
-app.use("/api/v1/crm-destinations", crmDestinationRoutes);
-app.use("/api/v1/reviews", reviewRoutes);
-app.use("/api/v1/landing-reasons", landingReasonRoutes);
-app.use("/api/v1/landing-trip-types", landingTripTypeRoutes);
-app.use("/api/v1/landing-content", landingContentRoutes);
-app.use("/api/v1/ledgers", ledgerRoutes);
-app.use("/api/v1/operations", operationsRoutes);
-app.use("/api/v1/invoices", invoiceRoutes);
-app.use("/api/v1/analytics", analyticsRoutes);
-app.use("/api/v1/interests", interestRoutes);
-app.use("/api/v1/notifications", notificationRoutes);
+mountApiRouter("/api/v1/auth", authRoutes);
+mountApiRouter("/api/v1/site-settings", siteSettingsRoutes);
+mountApiRouter("/api/v1/festivals", festivalRoutes);
+mountApiRouter("/api/v1/itineraries", itineraryRoutes);
+mountApiRouter("/api/v1/users", userRoutes);
+mountApiRouter("/api/v1/bookings", bookingRoutes);
+mountApiRouter("/api/v1/trip-tags", tripTagRoutes);
+mountApiRouter("/api/v1/inquiries", inquiryRoutes);
+mountApiRouter("/api/v1/payments", paymentRoutes);
+mountApiRouter("/api/v1/destinations", destinationRoutes);
+mountApiRouter("/api/v1/places", placeRoutes);
+mountApiRouter("/api/v1/stay-locations", stayLocationRoutes);
+mountApiRouter("/api/v1/properties", propertyRoutes);
+mountApiRouter("/api/v1/transfer-locations", transferLocationRoutes);
+mountApiRouter("/api/v1/crm-trips", crmTripRoutes);
+mountApiRouter("/api/v1/crm-festivals", crmFestivalRoutes);
+mountApiRouter("/api/v1/crm-destinations", crmDestinationRoutes);
+mountApiRouter("/api/v1/reviews", reviewRoutes);
+mountApiRouter("/api/v1/landing-reasons", landingReasonRoutes);
+mountApiRouter("/api/v1/landing-trip-types", landingTripTypeRoutes);
+mountApiRouter("/api/v1/landing-content", landingContentRoutes);
+mountApiRouter("/api/v1/ledgers", ledgerRoutes);
+mountApiRouter("/api/v1/operations", operationsRoutes);
+mountApiRouter("/api/v1/invoices", invoiceRoutes);
+mountApiRouter("/api/v1/analytics", analyticsRoutes);
+mountApiRouter("/api/v1/interests", interestRoutes);
+mountApiRouter("/api/v1/notifications", notificationRoutes);
 
 app.get("/openapi.json", (req, res) => {
   res.json(generateOpenApiDocument());
